@@ -31,7 +31,7 @@ export const cvManifest: ModuleManifest = {
     },
   ],
 
-  routes: [{ path: "/culture", label: "Culture" }],
+  routes: [{ path: "/cv", label: "Culture" }],
   navigation: [{ group: "people", label: "Culture", order: 12 }],
 
   health: async () => okHealth("CV ready"),

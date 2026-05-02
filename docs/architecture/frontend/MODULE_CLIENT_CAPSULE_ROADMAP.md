@@ -190,8 +190,8 @@ long tail.
 7. PSM                             _(Phase 3.6, merged)_
 8. HR                              _(Phase 3.7, merged)_
 9. Organization Management         _(Phase 3.8, merged)_
-10. Culture Values                 _(Phase 3.9, next)_
-11. AI Types
+10. Culture Values                 _(Phase 3.9, merged)_
+11. AI Types                       _(Phase 3.10, next)_
 12. OpenRouter
 13. Agent Studio
 14. Sandbox WF

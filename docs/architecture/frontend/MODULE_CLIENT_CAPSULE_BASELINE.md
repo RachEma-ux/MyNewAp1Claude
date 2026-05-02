@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T18:42:54.095Z
+Generated: 2026-05-02T19:06:18.223Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **208**
+Total `<Route>` declarations in App.tsx: **206**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -23,7 +23,7 @@ Compatibility redirects in App.tsx: **25**
 | psm | 0 | 11 | 7 | 0 |
 | hr | 0 | 54 | 1 | 0 |
 | organization-management | 0 | 7 | 6 | 0 |
-| culture-values | 2 | 0 | 0 | 4 |
+| culture-values | 0 | 4 | 3 | 0 |
 | ai-types | 2 | 0 | 0 | 4 |
 | openrouter | 9 | 0 | 0 | 4 |
 | agent-studio | 7 | 0 | 0 | 4 |
@@ -65,8 +65,10 @@ Compatibility redirects in App.tsx: **25**
 | `/communication/conversations` | routeInventory:communication, routes.tsx:communication |
 | `/communication/notifications` | routeInventory:communication, routes.tsx:communication |
 | `/communication/video-meeting` | routeInventory:communication, routes.tsx:communication |
-| `/cv` | App.tsx, manifest:culture-values |
-| `/cv/:item` | App.tsx, manifest:culture-values |
+| `/cv` | routeInventory:culture-values, routes.tsx:culture-values |
+| `/cv/portfolio` | routeInventory:culture-values, routes.tsx:culture-values |
+| `/cv/settings` | routeInventory:culture-values, routes.tsx:culture-values |
+| `/cv/wizard` | routeInventory:culture-values, routes.tsx:culture-values |
 | `/data-analysis` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/data-acquisition` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/data-acquisition/canonical-records` | routeInventory:data-analysis, routes.tsx:data-analysis |
@@ -371,7 +373,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | psm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | hr | ✅ | ✅ | ✅ | ✅ | ✅ |
 | organization-management | ✅ | ✅ | ✅ | ✅ | ✅ |
-| culture-values | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| culture-values | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ai-types | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | openrouter | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | agent-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

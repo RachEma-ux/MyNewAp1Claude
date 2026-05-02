@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T18:42:54.079Z
+Generated: 2026-05-02T19:06:18.212Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,13 +9,13 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 158 |
+| ✅ canonical | 160 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
 | ❓ unknown | 148 |
-| **Total** | **342** |
+| **Total** | **344** |
 
 ## Per-RTLM
 
@@ -30,7 +30,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | psm | ✅ migrated | 18 | `/psm` |
 | hr | ✅ migrated | 55 | `/hr` |
 | organizationManagement | ✅ migrated | 13 | `/om` |
-| cultureValues | ⏳ pending | 2 | `—` |
+| cultureValues | ✅ migrated | 7 | `/cv` |
 | aiTypes | ⏳ pending | 2 | `—` |
 | openRouter | ⏳ pending | 9 | `—` |
 | agentStudio | ⏳ pending | 7 | `—` |
@@ -121,8 +121,10 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/components/opencode-home` | — | unknown | — | ❓ unknown |  |
 | `/components/simple-shell` | — | unknown | — | ❓ unknown |  |
 | `/conversations` | — | app-compatibility-redirect | `/communication/conversations` | ↪️ compatibility-redirect | redirects to /communication/conversations |
-| `/cv` | cultureValues | module-manifest | `CVTopLevelPage` | ✅ canonical |  |
-| `/cv/:item` | cultureValues | module-manifest | `CVTopLevelPage` | ✅ canonical |  |
+| `/cv` | cultureValues | module-manifest | `module:cultureValues` | ✅ canonical |  |
+| `/cv/portfolio` | cultureValues | module-manifest | `module:cultureValues` | ✅ canonical |  |
+| `/cv/settings` | cultureValues | module-manifest | `module:cultureValues` | ✅ canonical |  |
+| `/cv/wizard` | cultureValues | module-manifest | `module:cultureValues` | ✅ canonical |  |
 | `/data-analysis` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
 | `/data-analysis/data-acquisition` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
 | `/data-analysis/data-acquisition/canonical-records` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
