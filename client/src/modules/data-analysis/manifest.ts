@@ -1,91 +1,74 @@
 /**
- * Data Analysis — Frontend Module Manifest
+ * Data Analysis — Frontend Module Manifest (capsule shape).
  *
- * Wires the existing Data Analysis pages (`GraphRAGPage`, with the
- * `/data-analysis` redirect to `/data-analysis/graphrag`) into the
- * client module registry. The page implementations were already
- * present at `client/src/pages/data-analysis/*` — this manifest makes
- * Data Analysis the canonical RTLM frontend owner so the AWI/Digital
- * HQ navigation composer treats GraphRAG as a Data Analysis subdomain.
+ * Data Analysis is the second Module Client Capsule (after
+ * Communication, PR #59). The manifest:
+ *   - declares the canonical subtree (`/data-analysis`)
+ *   - points at `mod.tsx` as the capsule entrypoint
+ *   - lists every canonical path under `routeInventory` so AWI and
+ *     `check:module-route-inventory` know the full surface
  *
- * Note: routes are still mounted in `client/src/App.tsx` for
- * back-compat (existing deep links remain stable). This manifest is
- * the canonical source of truth going forward.
+ * Subdomains owned by Data Analysis:
+ *   - GraphRAG               → /data-analysis/graphrag
+ *   - Data Acquisition       → /data-analysis/data-acquisition[/...]
+ *   - Data Warehouse         → /data-analysis/data-warehouse
+ *
+ * KGRA Agent is intentionally absent. KGRA Agent is a separate
+ * RTLM with its own client manifest at
+ * `client/src/modules/kgra-agent/manifest.ts` that owns
+ * `/data-analysis/kgra-agent` directly. The route lives under the
+ * `/data-analysis/*` subtree by historical accident — it is not a
+ * Data Analysis subdomain. Migrating Data Analysis to a capsule
+ * does not absorb KGRA: App.tsx and the KGRA manifest continue to
+ * mount `/data-analysis/kgra-agent` themselves. A future PR will
+ * give KGRA its own baseRoute (or its own capsule).
+ *
+ * App.tsx no longer mounts Data Analysis pages directly. The
+ * capsule renders via `<ModuleRoutes />` once `client.ts` registers
+ * this manifest.
  */
 
 import { lazy } from "react";
+
 import type { ClientModuleManifest } from "@/platform/modules/types";
 
-const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
-const DataAcquisitionPage = lazy(
-  () => import("@/pages/data-analysis/DataAcquisitionPage"),
-);
+const DataAnalysisCapsule = lazy(() => import("./mod"));
 
 export const dataAnalysisClientManifest: ClientModuleManifest = {
   key: "dataAnalysis",
   name: "Data Analysis",
-  routes: [
-    {
-      path: "/data-analysis/graphrag",
-      label: "GraphRAG (OmniGraph)",
-      component: GraphRAGPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition",
-      label: "Data Acquisition",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/sources",
-      label: "Data Acquisition — Sources",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/runs",
-      label: "Data Acquisition — Runs",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/items",
-      label: "Data Acquisition — Items",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/classification",
-      label: "Data Acquisition — Classification",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/routing",
-      label: "Data Acquisition — Routing",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/processing",
-      label: "Data Acquisition — Processing",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/document-intelligence",
-      label: "Data Acquisition — Document Intelligence",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/canonical-records",
-      label: "Data Acquisition — Canonical Records",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/outputs",
-      label: "Data Acquisition — Outputs",
-      component: DataAcquisitionPage,
-    },
-    {
-      path: "/data-analysis/data-acquisition/settings",
-      label: "Data Acquisition — Settings",
-      component: DataAcquisitionPage,
-    },
+
+  /* ---- Capsule fields (Phase-1+) ---- */
+  baseRoute: "/data-analysis",
+  capsuleEntrypoint: DataAnalysisCapsule,
+  layoutMode: "inside-main-layout",
+  routeInventory: [
+    "/data-analysis",
+    "/data-analysis/graphrag",
+    "/data-analysis/data-acquisition",
+    "/data-analysis/data-acquisition/sources",
+    "/data-analysis/data-acquisition/runs",
+    "/data-analysis/data-acquisition/items",
+    "/data-analysis/data-acquisition/classification",
+    "/data-analysis/data-acquisition/routing",
+    "/data-analysis/data-acquisition/processing",
+    "/data-analysis/data-acquisition/document-intelligence",
+    "/data-analysis/data-acquisition/canonical-records",
+    "/data-analysis/data-acquisition/outputs",
+    "/data-analysis/data-acquisition/settings",
+    "/data-analysis/data-warehouse",
   ],
+  // No legacy paths to redirect — Data Analysis was already
+  // canonically rooted at `/data-analysis/*` before the capsule
+  // migration.
+  compatibilityRoutes: [],
+  deprecatedRoutes: [],
+
+  /* ---- Legacy field — empty for capsule modules ---- */
+  // The composer ignores `routes[]` when `baseRoute + capsuleEntrypoint`
+  // are present; we leave it empty to match the capsule shape.
+  routes: [],
+
   navigation: [
     { group: "dataAnalysis", label: "Data Analysis", order: 5 },
   ],

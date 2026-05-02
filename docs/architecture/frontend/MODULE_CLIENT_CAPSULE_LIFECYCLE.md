@@ -3,11 +3,27 @@
 What every file inside `client/src/modules/<folder>/` does, when
 it is loaded, and what it is allowed to import.
 
-**Pilot module: `communication`.** Communication is the first RTLM
-to fully implement the capsule pattern (`MIGRATED_MODULES = ["communication"]`).
-Use `client/src/modules/communication/` as the reference shape when
-migrating subsequent modules. The next module to migrate is
-**Data Analysis** (PR 3 / Phase 3.1).
+**Migrated modules:** `communication` (pilot, PR #59) and
+`dataAnalysis` (PR 3, Phase 3.1).
+`MIGRATED_MODULES = ["communication", "dataAnalysis"]`.
+
+Use `client/src/modules/communication/` for a single-subdomain
+example and `client/src/modules/data-analysis/` for a
+multi-subdomain example (3 subdomains: GraphRAG, Data Acquisition
+with 10 sub-tabs, Data Warehouse). The next module to migrate is
+**PM Central** (PR 4 / Phase 3.2).
+
+**KGRA Agent note.** KGRA Agent's canonical route
+`/data-analysis/kgra-agent` lives under the `/data-analysis/*` URL
+prefix but is **not** a Data Analysis subdomain. KGRA is a separate
+RTLM with its own client manifest (`client/src/modules/kgra-agent/`).
+The Data Analysis capsule's `routeInventory` deliberately excludes
+that path, and `App.tsx` continues to mount it directly so it is
+matched before the Data Analysis capsule's `/data-analysis/:rest*`
+splat. KGRA will get its own capsule (or its own baseRoute) in a
+later PR. `check:app-route-ownership` understands cross-manifest
+ownership and does not flag App.tsx's KGRA mount as a Data Analysis
+violation.
 
 ## Files at a glance
 

@@ -79,12 +79,21 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * IMPORTANT: only edit this list as part of the migration PR for the
  * specific module being added. Do not add modules speculatively.
  *
- * Phase 2 (this PR): Communication is the pilot capsule. Every
- * frontend modularity check runs strict for `communication`; the
- * remaining 14 RTLMs continue in report-only mode until their own
- * migration PRs land.
+ * Phase 2 (Communication pilot, merged in PR #59): the first
+ * capsule migration. Every frontend modularity check runs strict
+ * for `communication`.
+ *
+ * Phase 3.1 (this PR): Data Analysis migrates to the capsule shape,
+ * adding `dataAnalysis` as the second migrated module. Frontend
+ * modularity checks now run strict for both `communication` and
+ * `dataAnalysis`. The remaining 13 RTLMs continue in report-only
+ * mode until their own migration PRs land.
+ *
+ * Data Analysis owns the GraphRAG, Data Acquisition, and Data
+ * Warehouse subdomains. KGRA Agent is a separate RTLM and does
+ * NOT enter strict mode in this PR.
  */
-export const MIGRATED_MODULES: RtlmKey[] = ["communication"];
+export const MIGRATED_MODULES: RtlmKey[] = ["communication", "dataAnalysis"];
 
 /**
  * Platform Core route prefixes that are mounted directly in App.tsx.

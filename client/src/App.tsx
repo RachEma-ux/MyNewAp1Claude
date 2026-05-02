@@ -234,12 +234,15 @@ const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudio
 const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
 // OpenRouter — Unified model gateway
 const OpenRouterShellPage = lazy(() => import("@/pages/openrouter/OpenRouterShellPage"));
-// Data Analysis — GraphRAG
-const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
-// Data Analysis — KGRA Agent
+// Data Analysis — GraphRAG, Data Acquisition, and Data Warehouse pages
+// are now mounted by the Data Analysis capsule via <ModuleRoutes />.
+// See `client/src/modules/data-analysis/`.
+//
+// KGRA Agent is a separate RTLM and continues to be mounted directly
+// here — its UI lives at `/data-analysis/kgra-agent` because that's
+// the historical canonical path; KGRA does not own a Data Analysis
+// subdomain.
 const KGRAAgentPage = lazy(() => import("@/pages/data-analysis/KGRAAgentPage"));
-// Data Analysis — Data Warehouse
-const DataWarehousePage = lazy(() => import("@/pages/data-analysis/DataWarehousePage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -728,11 +731,17 @@ function Router() {
       <Route path="/pm-central/shell" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
-      {/* Data Analysis — GraphRAG */}
-      <Route path="/data-analysis/graphrag" component={() => <ProtectedRoute component={GraphRAGPage} />} />
-      {/* Data Analysis — Data Warehouse */}
-      <Route path="/data-analysis/data-warehouse" component={() => <ProtectedRoute component={DataWarehousePage} />} />
-      <Route path="/data-analysis" component={() => <Redirect to="/data-analysis/graphrag" />} />
+      {/* Data Analysis — capsule mode.
+          /data-analysis, /data-analysis/graphrag,
+          /data-analysis/data-acquisition[/...] and
+          /data-analysis/data-warehouse are mounted by
+          <ModuleRoutes /> below via the Data Analysis capsule's
+          manifest (`client/src/modules/data-analysis/manifest.ts`).
+          The bare /data-analysis path redirects to
+          /data-analysis/graphrag inside the capsule itself.
+
+          The /data-analysis/kgra-agent route above is owned by the
+          KGRA Agent RTLM (a separate module), not by Data Analysis. */}
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />

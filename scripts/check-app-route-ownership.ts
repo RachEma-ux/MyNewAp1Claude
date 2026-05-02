@@ -25,6 +25,7 @@ import {
   RTLM_LIST,
   type RtlmKey,
 } from "./module-tools/migration-state";
+import { readAllManifests } from "./module-tools/manifest-reader";
 import { extractAppRoutes } from "./module-tools/route-inventory";
 import { isBaseRouteMatch, normalizePath } from "./module-tools/route-parser";
 import { walkSourceFiles } from "./module-tools/walk";
@@ -45,6 +46,28 @@ function main() {
   const appSrc = readFileSync(appPath, "utf8");
   const appRoutes = extractAppRoutes(appSrc);
 
+  // Build a path → owners map from every module's manifest. Used
+  // below to disambiguate App.tsx mounts that fall under a migrated
+  // module's baseRoute by URL prefix but are actually claimed by
+  // another module's manifest (e.g. KGRA Agent's
+  // `/data-analysis/kgra-agent` lives under Data Analysis's
+  // `/data-analysis` baseRoute by historical accident, but KGRA
+  // Agent owns the route via its own client manifest — Data
+  // Analysis is not responsible for it).
+  const manifests = readAllManifests(repoRoot);
+  const claimedBy = new Map<string, Set<string>>();
+  for (const m of manifests) {
+    if (!m.key) continue;
+    const claimed = new Set<string>();
+    for (const r of m.routes) claimed.add(normalizePath(r.path));
+    for (const p of m.routeInventory) claimed.add(normalizePath(p));
+    for (const p of claimed) {
+      let s = claimedBy.get(p);
+      if (!s) claimedBy.set(p, (s = new Set()));
+      s.add(m.key);
+    }
+  }
+
   const findings: Finding[] = [];
 
   // For each migrated module: hardcoded canonical routes are FAIL.
@@ -58,12 +81,18 @@ function main() {
       // Skip pure redirects
       if (r.redirectTo) continue;
       const baseRoute = `/${folder}`;
-      if (isBaseRouteMatch(baseRoute, p)) {
-        findings.push({
-          severity: "fail",
-          msg: `App.tsx hardcodes canonical route ${p} for migrated module ${key}`,
-        });
-      }
+      if (!isBaseRouteMatch(baseRoute, p)) continue;
+      // The path falls under the migrated module's URL subtree by
+      // prefix — but if a different module's manifest explicitly
+      // claims this exact path, it is not this migrated module's
+      // responsibility. (`check:module-routes-conflict` separately
+      // enforces that two modules don't both claim the same path.)
+      const owners = claimedBy.get(p);
+      if (owners && [...owners].some((o) => o !== key)) continue;
+      findings.push({
+        severity: "fail",
+        msg: `App.tsx hardcodes canonical route ${p} for migrated module ${key}`,
+      });
     }
     // Private page imports for migrated modules.
     const privateImportRe = new RegExp(

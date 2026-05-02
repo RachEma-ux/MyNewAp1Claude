@@ -23,6 +23,7 @@ import { registerClientModule } from "@/platform/modules/registry";
 // `./<folder>/manifest.ts`; we keep that path alive during the
 // migration window so existing modules don't need to change.
 import { registerCommunicationClientModule } from "./communication/client";
+import { registerDataAnalysisClientModule } from "./data-analysis/client";
 
 import { prmClientManifest } from "./prm/manifest";
 import { psmClientManifest } from "./psm/manifest";
@@ -38,7 +39,6 @@ import { cultureValuesClientManifest } from "./culture-values/manifest";
 import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
 import { pmCentralClientManifest } from "./pm-central/manifest";
-import { dataAnalysisClientManifest } from "./data-analysis/manifest";
 
 const LEGACY_CLIENT_MANIFESTS = [
   prmClientManifest,
@@ -55,7 +55,6 @@ const LEGACY_CLIENT_MANIFESTS = [
   aiTypesClientManifest,
   kgraAgentClientManifest,
   pmCentralClientManifest,
-  dataAnalysisClientManifest,
 ];
 
 let registered = false;
@@ -73,6 +72,7 @@ export function registerAllClientModules(): void {
 
   // Migrated capsules.
   registerCommunicationClientModule();
+  registerDataAnalysisClientModule();
 
   // Legacy manifests.
   for (const manifest of LEGACY_CLIENT_MANIFESTS) {

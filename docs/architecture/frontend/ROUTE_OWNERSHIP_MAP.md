@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T11:33:23.654Z
+Generated: 2026-05-02T13:34:30.839Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,8 +9,8 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 94 |
-| ↪️ compatibility-redirect | 14 |
+| ✅ canonical | 96 |
+| ↪️ compatibility-redirect | 12 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
@@ -21,7 +21,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | RTLM | Migration | Declared paths | Manifest baseRoute |
 |---|---|---|---|
-| dataAnalysis | ⏳ pending | 12 | `—` |
+| dataAnalysis | ✅ migrated | 28 | `/data-analysis` |
 | communication | ✅ migrated | 10 | `/communication` |
 | pmCentral | ⏳ pending | 10 | `—` |
 | codeStudio | ⏳ pending | 11 | `—` |
@@ -123,20 +123,20 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/conversations` | — | app-compatibility-redirect | `/communication/conversations` | ↪️ compatibility-redirect | redirects to /communication/conversations |
 | `/cv` | cultureValues | module-manifest | `CVTopLevelPage` | ✅ canonical |  |
 | `/cv/:item` | cultureValues | module-manifest | `CVTopLevelPage` | ✅ canonical |  |
-| `/data-analysis` | — | app-compatibility-redirect | `/data-analysis/graphrag` | ↪️ compatibility-redirect | redirects to /data-analysis/graphrag |
-| `/data-analysis/data-acquisition` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/canonical-records` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/classification` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/document-intelligence` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/items` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/outputs` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/processing` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/routing` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/runs` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/settings` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-acquisition/sources` | — | module-manifest | `module:?` | ✅ canonical |  |
-| `/data-analysis/data-warehouse` | — | app-compatibility-redirect | `/data-analysis/graphrag` | ↪️ compatibility-redirect | redirects to /data-analysis/graphrag |
-| `/data-analysis/graphrag` | dataAnalysis | module-manifest | `GraphRAGPage` | ✅ canonical |  |
+| `/data-analysis` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/canonical-records` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/classification` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/document-intelligence` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/items` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/outputs` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/processing` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/routing` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/runs` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/settings` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-acquisition/sources` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/data-warehouse` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
+| `/data-analysis/graphrag` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
 | `/data-analysis/kgra-agent` | kgraAgent | module-manifest | `KGRAAgentPage` | ✅ canonical |  |
 | `/deploy` | — | unknown | — | ❓ unknown |  |
 | `/deployment-status` | — | unknown | — | ❓ unknown |  |
