@@ -1,6 +1,6 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T13:34:30.845Z
+Generated: 2026-05-02T13:58:39.237Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
@@ -8,7 +8,7 @@ Snapshot of the frontend modularity surface at the start of the migration. Each 
 
 Total `<Route>` declarations in App.tsx: **308**
 
-Compatibility redirects in App.tsx: **15**
+Compatibility redirects in App.tsx: **25**
 
 ## Module manifest routes
 
@@ -16,7 +16,7 @@ Compatibility redirects in App.tsx: **15**
 |---|---|---|---|---|
 | data-analysis | 0 | 14 | 14 | 0 |
 | communication | 0 | 5 | 5 | 0 |
-| pm-central | 10 | 0 | 0 | 4 |
+| pm-central | 0 | 10 | 9 | 0 |
 | code-studio | 11 | 0 | 0 | 4 |
 | ps | 8 | 0 | 0 | 4 |
 | prm | 8 | 0 | 0 | 4 |
@@ -94,16 +94,16 @@ Compatibility redirects in App.tsx: **15**
 | `/openrouter/playground` | App.tsx, manifest:openrouter |
 | `/openrouter/routing` | App.tsx, manifest:openrouter |
 | `/openrouter/usage` | App.tsx, manifest:openrouter |
-| `/pm-central/rtlm` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/decisions` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/handoffs` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/issues` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/milestones` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/projects` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/projects/:id` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/risks` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/settings` | App.tsx, manifest:pm-central |
-| `/pm-central/rtlm/tasks` | App.tsx, manifest:pm-central |
+| `/pm` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/decisions` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/handoffs` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/issues` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/milestones` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/projects` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/projects/:id` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/risks` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/settings` | routeInventory:pm-central, routes.tsx:pm-central |
+| `/pm/tasks` | routeInventory:pm-central, routes.tsx:pm-central |
 | `/prm` | App.tsx, manifest:prm |
 | `/prm/cases` | App.tsx, manifest:prm |
 | `/prm/cases/:id` | App.tsx, manifest:prm |
@@ -359,7 +359,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 |---|---|---|---|---|---|
 | data-analysis | ✅ | ✅ | ✅ | ✅ | ✅ |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ |
-| pm-central | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| pm-central | ✅ | ✅ | ✅ | ✅ | ✅ |
 | code-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | ps | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | prm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

@@ -71,16 +71,29 @@ function main() {
   const findings: Finding[] = [];
 
   // For each migrated module: hardcoded canonical routes are FAIL.
+  // The baseRoute test uses the manifest's declared `baseRoute` when
+  // present, falling back to `/<folder>` otherwise. This matters when
+  // a module's storage folder differs from its URL subtree — e.g.
+  // PM Central lives at `client/src/modules/pm-central/` (folder
+  // `pm-central`) but its manifest declares `baseRoute: "/pm"`. In
+  // that case the legacy `/pm-central/*` paths are not the migrated
+  // module's canonical surface — they are a separate non-RTLM legacy
+  // shell — and should not be flagged as canonical for `pmCentral`.
+  const baseRouteByKey = new Map<string, string>();
+  for (const m of manifests) {
+    if (!m.key) continue;
+    if (m.baseRoute) baseRouteByKey.set(m.key, normalizePath(m.baseRoute));
+  }
   for (const key of RTLM_LIST) {
     const folder = RTLM_FOLDER_MAP[key as RtlmKey];
     if (!isMigrated(key)) continue;
+    const baseRoute = baseRouteByKey.get(key) ?? `/${folder}`;
     for (const r of appRoutes) {
       const p = normalizePath(r.path);
       // Skip platform-core
       if (PLATFORM_CORE_PREFIXES.some((pc) => isBaseRouteMatch(pc, p))) continue;
       // Skip pure redirects
       if (r.redirectTo) continue;
-      const baseRoute = `/${folder}`;
       if (!isBaseRouteMatch(baseRoute, p)) continue;
       // The path falls under the migrated module's URL subtree by
       // prefix — but if a different module's manifest explicitly
@@ -91,7 +104,7 @@ function main() {
       if (owners && [...owners].some((o) => o !== key)) continue;
       findings.push({
         severity: "fail",
-        msg: `App.tsx hardcodes canonical route ${p} for migrated module ${key}`,
+        msg: `App.tsx hardcodes canonical route ${p} for migrated module ${key} (baseRoute ${baseRoute})`,
       });
     }
     // Private page imports for migrated modules.

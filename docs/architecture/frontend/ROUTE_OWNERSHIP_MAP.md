@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T13:34:30.839Z
+Generated: 2026-05-02T13:58:39.230Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -10,12 +10,12 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | Status | Count |
 |---|---|
 | ✅ canonical | 96 |
-| ↪️ compatibility-redirect | 12 |
+| ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
 | ❓ unknown | 205 |
-| **Total** | **327** |
+| **Total** | **337** |
 
 ## Per-RTLM
 
@@ -23,7 +23,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 |---|---|---|---|
 | dataAnalysis | ✅ migrated | 28 | `/data-analysis` |
 | communication | ✅ migrated | 10 | `/communication` |
-| pmCentral | ⏳ pending | 10 | `—` |
+| pmCentral | ✅ migrated | 19 | `/pm` |
 | codeStudio | ⏳ pending | 11 | `—` |
 | ps | ⏳ pending | 8 | `—` |
 | prm | ⏳ pending | 8 | `—` |
@@ -259,6 +259,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/openrouter/usage` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
 | `/personal/:workspaceId` | — | unknown | — | ❓ unknown |  |
 | `/personal/:workspaceId/*` | — | unknown | — | ❓ unknown |  |
+| `/pm` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
 | `/pm-central` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/:item` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/agent-engine` | — | unknown | — | ❓ unknown |  |
@@ -282,20 +283,29 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/pm-central/projects` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/reports` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/risks` | — | unknown | — | ❓ unknown |  |
-| `/pm-central/rtlm` | pmCentral | module-manifest | `PMCentralRtlmDashboardPage` | ✅ canonical |  |
-| `/pm-central/rtlm/decisions` | pmCentral | module-manifest | `PMCentralRtlmDecisionsPage` | ✅ canonical |  |
-| `/pm-central/rtlm/handoffs` | pmCentral | module-manifest | `PMCentralRtlmHandoffsPage` | ✅ canonical |  |
-| `/pm-central/rtlm/issues` | pmCentral | module-manifest | `PMCentralRtlmIssuesPage` | ✅ canonical |  |
-| `/pm-central/rtlm/milestones` | pmCentral | module-manifest | `PMCentralRtlmMilestonesPage` | ✅ canonical |  |
-| `/pm-central/rtlm/projects` | pmCentral | module-manifest | `PMCentralRtlmProjectsPage` | ✅ canonical |  |
-| `/pm-central/rtlm/projects/:id` | pmCentral | module-manifest | `PMCentralRtlmProjectDetailPage` | ✅ canonical |  |
-| `/pm-central/rtlm/risks` | pmCentral | module-manifest | `PMCentralRtlmRisksPage` | ✅ canonical |  |
-| `/pm-central/rtlm/settings` | pmCentral | module-manifest | `PMCentralRtlmSettingsPage` | ✅ canonical |  |
-| `/pm-central/rtlm/tasks` | pmCentral | module-manifest | `PMCentralRtlmTasksPage` | ✅ canonical |  |
+| `/pm-central/rtlm` | — | app-compatibility-redirect | `/pm` | ↪️ compatibility-redirect | redirects to /pm |
+| `/pm-central/rtlm/decisions` | — | app-compatibility-redirect | `/pm/decisions` | ↪️ compatibility-redirect | redirects to /pm/decisions |
+| `/pm-central/rtlm/handoffs` | — | app-compatibility-redirect | `/pm/handoffs` | ↪️ compatibility-redirect | redirects to /pm/handoffs |
+| `/pm-central/rtlm/issues` | — | app-compatibility-redirect | `/pm/issues` | ↪️ compatibility-redirect | redirects to /pm/issues |
+| `/pm-central/rtlm/milestones` | — | app-compatibility-redirect | `/pm/milestones` | ↪️ compatibility-redirect | redirects to /pm/milestones |
+| `/pm-central/rtlm/projects` | — | app-compatibility-redirect | `/pm/projects` | ↪️ compatibility-redirect | redirects to /pm/projects |
+| `/pm-central/rtlm/projects/:id` | — | app-compatibility-redirect | `/pm/projects` | ↪️ compatibility-redirect | redirects to /pm/projects |
+| `/pm-central/rtlm/risks` | — | app-compatibility-redirect | `/pm/risks` | ↪️ compatibility-redirect | redirects to /pm/risks |
+| `/pm-central/rtlm/settings` | — | app-compatibility-redirect | `/pm/settings` | ↪️ compatibility-redirect | redirects to /pm/settings |
+| `/pm-central/rtlm/tasks` | — | app-compatibility-redirect | `/pm/tasks` | ↪️ compatibility-redirect | redirects to /pm/tasks |
 | `/pm-central/shell` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/shell/clone/:sourceId` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/shell/new` | — | unknown | — | ❓ unknown |  |
 | `/pm-central/templates` | — | unknown | — | ❓ unknown |  |
+| `/pm/decisions` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/handoffs` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/issues` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/milestones` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/projects` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/projects/:id` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/risks` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/settings` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
+| `/pm/tasks` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
 | `/policies` | platform-core | app-platform-core | `PolicyManagement` | 🏛 platform-core |  |
 | `/prm` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
 | `/prm/ai-catalog` | prm | unknown | — | ❓ unknown |  |

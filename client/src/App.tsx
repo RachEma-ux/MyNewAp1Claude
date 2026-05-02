@@ -217,17 +217,16 @@ const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetailPanel"));
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
-// PM Central RTLM — canonical registered module frontend (lives under /pm-central/rtlm/*)
-const PMCentralRtlmDashboardPage = lazy(() => import("@/modules/pm-central/pages/PMCentralDashboardPage"));
-const PMCentralRtlmProjectsPage = lazy(() => import("@/modules/pm-central/pages/PMProjectsPage"));
-const PMCentralRtlmProjectDetailPage = lazy(() => import("@/modules/pm-central/pages/PMProjectDetailPage"));
-const PMCentralRtlmTasksPage = lazy(() => import("@/modules/pm-central/pages/PMTasksPage"));
-const PMCentralRtlmMilestonesPage = lazy(() => import("@/modules/pm-central/pages/PMMilestonesPage"));
-const PMCentralRtlmRisksPage = lazy(() => import("@/modules/pm-central/pages/PMRisksPage"));
-const PMCentralRtlmIssuesPage = lazy(() => import("@/modules/pm-central/pages/PMIssuesPage"));
-const PMCentralRtlmDecisionsPage = lazy(() => import("@/modules/pm-central/pages/PMDecisionsPage"));
-const PMCentralRtlmHandoffsPage = lazy(() => import("@/modules/pm-central/pages/PMHandoffsPage"));
-const PMCentralRtlmSettingsPage = lazy(() => import("@/modules/pm-central/pages/PMSettingsPage"));
+// PM Central RTLM — canonical at /pm/* via the Module Client Capsule
+// (see client/src/modules/pm-central/). The capsule is mounted by
+// <ModuleRoutes /> below; App.tsx no longer imports PM Central RTLM
+// pages directly. The legacy /pm-central/rtlm/* paths are served
+// as compatibility redirects to /pm/* (rendered just before the
+// /pm-central/:item catch-all so they're matched first).
+//
+// The legacy /pm-central/* shell (PMCentralShellPage and friends
+// imported above) is NOT a PM Central RTLM canonical surface and
+// continues to be mounted directly here.
 // AI Agent Studio — Standalone agent lifecycle module
 const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
 // KGIA — Knowledge Graph Interpretation Agent
@@ -243,6 +242,25 @@ const OpenRouterShellPage = lazy(() => import("@/pages/openrouter/OpenRouterShel
 // the historical canonical path; KGRA does not own a Data Analysis
 // subdomain.
 const KGRAAgentPage = lazy(() => import("@/pages/data-analysis/KGRAAgentPage"));
+
+/**
+ * Compatibility redirect for the legacy PM Central RTLM project
+ * detail path `/pm-central/rtlm/projects/:id` → `/pm/projects/:id`.
+ * Preserves the dynamic id segment. Defined as a named component so
+ * the route ownership extractor can recognize the redirect target
+ * (the extractor's regex does not understand JSX template-literal
+ * `to={...}` expressions).
+ */
+function RtlmProjectRedirect() {
+  const [pathname] = useLocation();
+  const id = pathname.split("/").pop() ?? "";
+  // Keep this string literal — the route ownership map regex looks
+  // for `<Redirect to="/static/path">`. Encoding the id in the URL
+  // happens via the dynamic concatenation below, but the redirectTo
+  // metadata is recognized from the literal `<Redirect to="/pm/projects">`.
+  if (!id) return <Redirect to="/pm/projects" />;
+  return <Redirect to={"/pm/projects/" + id} />;
+}
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -703,17 +721,21 @@ function Router() {
       <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
       {/* PM Central — Agent Engine run detail (must be before shell catch-all) */}
       <Route path="/pm-central/agent-engine/run/:id" component={() => <ProtectedRoute component={AgentRunDetailPanel} />} />
-      {/* PM Central RTLM — canonical module frontend (must be before /pm-central/:item catch-all) */}
-      <Route path="/pm-central/rtlm/projects/:id" component={() => <ProtectedRoute component={PMCentralRtlmProjectDetailPage} />} />
-      <Route path="/pm-central/rtlm/projects" component={() => <ProtectedRoute component={PMCentralRtlmProjectsPage} />} />
-      <Route path="/pm-central/rtlm/tasks" component={() => <ProtectedRoute component={PMCentralRtlmTasksPage} />} />
-      <Route path="/pm-central/rtlm/milestones" component={() => <ProtectedRoute component={PMCentralRtlmMilestonesPage} />} />
-      <Route path="/pm-central/rtlm/risks" component={() => <ProtectedRoute component={PMCentralRtlmRisksPage} />} />
-      <Route path="/pm-central/rtlm/issues" component={() => <ProtectedRoute component={PMCentralRtlmIssuesPage} />} />
-      <Route path="/pm-central/rtlm/decisions" component={() => <ProtectedRoute component={PMCentralRtlmDecisionsPage} />} />
-      <Route path="/pm-central/rtlm/handoffs" component={() => <ProtectedRoute component={PMCentralRtlmHandoffsPage} />} />
-      <Route path="/pm-central/rtlm/settings" component={() => <ProtectedRoute component={PMCentralRtlmSettingsPage} />} />
-      <Route path="/pm-central/rtlm" component={() => <ProtectedRoute component={PMCentralRtlmDashboardPage} />} />
+      {/* PM Central RTLM — capsule mode at /pm/*. The legacy
+          /pm-central/rtlm/* canonical paths used before this PR are
+          preserved here as compatibility redirects so deep links
+          keep working. The redirect routes must be matched before
+          the /pm-central/:item catch-all below. */}
+      <Route path="/pm-central/rtlm/projects/:id" component={RtlmProjectRedirect} />
+      <Route path="/pm-central/rtlm/projects" component={() => <Redirect to="/pm/projects" />} />
+      <Route path="/pm-central/rtlm/tasks" component={() => <Redirect to="/pm/tasks" />} />
+      <Route path="/pm-central/rtlm/milestones" component={() => <Redirect to="/pm/milestones" />} />
+      <Route path="/pm-central/rtlm/risks" component={() => <Redirect to="/pm/risks" />} />
+      <Route path="/pm-central/rtlm/issues" component={() => <Redirect to="/pm/issues" />} />
+      <Route path="/pm-central/rtlm/decisions" component={() => <Redirect to="/pm/decisions" />} />
+      <Route path="/pm-central/rtlm/handoffs" component={() => <Redirect to="/pm/handoffs" />} />
+      <Route path="/pm-central/rtlm/settings" component={() => <Redirect to="/pm/settings" />} />
+      <Route path="/pm-central/rtlm" component={() => <Redirect to="/pm" />} />
       {/* PM Central — Simple IBM Shell (sidebar + content) */}
       <Route path="/pm-central/dashboard" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       <Route path="/pm-central/projects" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
