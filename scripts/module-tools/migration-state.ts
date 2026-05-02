@@ -195,7 +195,7 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * boundary rule. Server `agent-studio/manifest.ts` already
  * declared `routes:` consistent with the capsule baseRoute.
  *
- * Phase 3.13 (this PR): Sandbox WF migrates to the capsule shape,
+ * Phase 3.13 (PR #74): Sandbox WF migrated to the capsule shape,
  * adding `sandboxWf` as the fourteenth migrated module. Sandbox WF
  * owns 3 canonical paths (`/automation/sandbox-wf`,
  * `/automation/sandbox-wf/new`, `/automation/sandbox-wf/:id`).
@@ -215,9 +215,29 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `/workflows`; fixed to `/automation/sandbox-wf` to match the
  * capsule baseRoute (PR #61/#63/#69/#70 pattern).
  *
- * Frontend modularity checks now run strict for the fourteen
- * migrated modules; the remaining 1 RTLM (kgraAgent) continues in
- * report-only mode until its own migration PR lands.
+ *
+ * Phase 3.14 (this PR): KGRA Agent migrates to the capsule shape,
+ * adding `kgraAgent` as the FIFTEENTH and FINAL migrated module.
+ * KGRA Agent owns 1 canonical path (`/data-analysis/kgra-agent`) —
+ * the path lives under Data Analysis's `/data-analysis` URL prefix
+ * for historical reasons but KGRA is its own RTLM (Data Analysis
+ * PR #60 explicitly left this route alone for KGRA's own
+ * migration). Same sub-prefix-inside-shared-parent pattern as
+ * Sandbox WF (`/automation/sandbox-wf`). 2 pages relocated
+ * (KGRAAgentPage, KGRAQueryLab) from
+ * `client/src/pages/data-analysis/` (the directory is removed
+ * since both files lived there). `mod.tsx` renders KGRAAgentPage
+ * directly — that page hosts the OmniRAG-cloned UI by injecting
+ * HTML+CSS+JS from `/kgra-ui` into a container ref, no further
+ * internal routing needed. Server `kgra-agent/manifest.ts` had a
+ * stale `routes:` declaration of `/kgra`; fixed to
+ * `/data-analysis/kgra-agent` (PR #61/#63/#69/#70/#74 pattern).
+ *
+ * **Migration sequence COMPLETE.** Every Real-Time Lifecycle
+ * Module is now a Module Client Capsule. Frontend modularity
+ * checks run strict for all 15 RTLMs; the readiness phase gate
+ * (`audit:production-readiness`) now unblocks per the user's
+ * standing rules.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -234,6 +254,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "openRouter",
   "agentStudio",
   "sandboxWf",
+  "kgraAgent",
 ];
 
 /**

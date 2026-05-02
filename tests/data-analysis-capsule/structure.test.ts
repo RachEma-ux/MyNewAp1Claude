@@ -66,8 +66,8 @@ describe("Data Analysis migration state", () => {
     expect(isMigrated("communication")).toBe(true);
   });
 
-  it("kgraAgent is NOT migrated (separate RTLM, future PR)", () => {
-    expect(isMigrated("kgraAgent")).toBe(false);
+  it("kgraAgent is migrated (PR #75 / Phase 3.14, the final RTLM)", () => {
+    expect(isMigrated("kgraAgent")).toBe(true);
   });
 });
 
@@ -166,11 +166,11 @@ describe("App.tsx ownership", () => {
     expect(offending.map((r) => r.path)).toEqual([]);
   });
 
-  it("preserves the KGRA Agent route (separate RTLM)", () => {
+  it("does NOT mount the KGRA Agent route (now owned by KGRA capsule, PR #75)", () => {
     const has = appRoutes.some(
       (r) => normalizePath(r.path) === "/data-analysis/kgra-agent",
     );
-    expect(has).toBe(true);
+    expect(has).toBe(false);
   });
 });
 

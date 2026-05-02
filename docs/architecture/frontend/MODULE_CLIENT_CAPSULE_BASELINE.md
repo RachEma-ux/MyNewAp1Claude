@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T21:21:35.538Z
+Generated: 2026-05-02T21:36:50.157Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **181**
+Total `<Route>` declarations in App.tsx: **180**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -28,7 +28,7 @@ Compatibility redirects in App.tsx: **25**
 | openrouter | 0 | 9 | 9 | 0 |
 | agent-studio | 0 | 11 | 6 | 0 |
 | sandbox-wf | 0 | 3 | 2 | 0 |
-| kgra-agent | 1 | 0 | 0 | 4 |
+| kgra-agent | 0 | 1 | 1 | 0 |
 
 ## Duplicate paths
 
@@ -98,7 +98,7 @@ Compatibility redirects in App.tsx: **25**
 | `/data-analysis/data-acquisition/sources` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/data-warehouse` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/graphrag` | routeInventory:data-analysis, routes.tsx:data-analysis |
-| `/data-analysis/kgra-agent` | App.tsx, manifest:kgra-agent |
+| `/data-analysis/kgra-agent` | routeInventory:kgra-agent, routes.tsx:kgra-agent |
 | `/hr` | routeInventory:hr, routes.tsx:hr |
 | `/hr/analytics` | routeInventory:hr, routes.tsx:hr |
 | `/hr/analytics-reporting` | routeInventory:hr, routes.tsx:hr |
@@ -391,7 +391,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | openrouter | ✅ | ✅ | ✅ | ✅ | ✅ |
 | agent-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
 | sandbox-wf | ✅ | ✅ | ✅ | ✅ | ✅ |
-| kgra-agent | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| kgra-agent | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
 

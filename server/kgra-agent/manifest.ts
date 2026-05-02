@@ -33,7 +33,7 @@ export const kgraAgentManifest: ModuleManifest = {
     },
   ],
 
-  routes: [{ path: "/kgra", label: "KGRA" }],
+  routes: [{ path: "/data-analysis/kgra-agent", label: "KGRA Agent" }],
   navigation: [{ group: "knowledge", label: "KGRA", order: 32 }],
 
   health: async () => okHealth("KGRA ready"),

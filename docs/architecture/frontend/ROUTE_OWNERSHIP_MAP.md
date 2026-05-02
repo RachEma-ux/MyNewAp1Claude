@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T21:21:35.531Z
+Generated: 2026-05-02T21:36:50.151Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -35,7 +35,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | openRouter | ✅ migrated | 18 | `—` |
 | agentStudio | ✅ migrated | 17 | `/agent-studio` |
 | sandboxWf | ✅ migrated | 5 | `/automation/sandbox-wf` |
-| kgraAgent | ⏳ pending | 1 | `—` |
+| kgraAgent | ✅ migrated | 2 | `/data-analysis/kgra-agent` |
 
 ## Routes
 
@@ -152,7 +152,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/data-analysis/data-acquisition/sources` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
 | `/data-analysis/data-warehouse` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
 | `/data-analysis/graphrag` | dataAnalysis | module-manifest | `module:dataAnalysis` | ✅ canonical |  |
-| `/data-analysis/kgra-agent` | kgraAgent | module-manifest | `KGRAAgentPage` | ✅ canonical |  |
+| `/data-analysis/kgra-agent` | kgraAgent | module-manifest | `module:kgraAgent` | ✅ canonical |  |
 | `/deploy` | — | unknown | — | ❓ unknown |  |
 | `/deployment-status` | — | unknown | — | ❓ unknown |  |
 | `/digital-hq/:item` | platform-core | app-platform-core | — | 🏛 platform-core |  |
