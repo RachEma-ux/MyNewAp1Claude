@@ -111,6 +111,7 @@ temp/
 # Claude Code local workflow files
 .claude/settings.local.json
 .claude/tmp/
+.claude/bin/
 
 # Runtime governance artifacts
 artifacts/

@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T18:16:37.837Z
+Generated: 2026-05-02T18:42:54.079Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,13 +9,13 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 153 |
+| ✅ canonical | 158 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
 | ❓ unknown | 148 |
-| **Total** | **337** |
+| **Total** | **342** |
 
 ## Per-RTLM
 
@@ -29,7 +29,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | prm | ✅ migrated | 18 | `/prm` |
 | psm | ✅ migrated | 18 | `/psm` |
 | hr | ✅ migrated | 55 | `/hr` |
-| organizationManagement | ⏳ pending | 2 | `—` |
+| organizationManagement | ✅ migrated | 13 | `/om` |
 | cultureValues | ⏳ pending | 2 | `—` |
 | aiTypes | ⏳ pending | 2 | `—` |
 | openRouter | ⏳ pending | 9 | `—` |
@@ -246,8 +246,13 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/models/dashboard` | — | unknown | — | ❓ unknown |  |
 | `/models/list` | — | unknown | — | ❓ unknown |  |
 | `/models/wizard` | — | unknown | — | ❓ unknown |  |
-| `/om` | organizationManagement | module-manifest | `OMTopLevelPage` | ✅ canonical |  |
-| `/om/:item` | organizationManagement | module-manifest | `OMTopLevelPage` | ✅ canonical |  |
+| `/om` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/control-panel` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/list` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/portfolio` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/settings` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/templates` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
+| `/om/wizard` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
 | `/openrouter` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
 | `/openrouter/activity` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
 | `/openrouter/connect` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
