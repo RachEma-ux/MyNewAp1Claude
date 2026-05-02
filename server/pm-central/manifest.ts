@@ -141,17 +141,23 @@ export const pmCentralManifest: ModuleManifest = {
     },
   ],
 
+  // Canonical PM Central RTLM frontend routes. Migrated from
+  // /pm-central/rtlm/* to /pm/* in the Module Client Capsule
+  // refactor (see client/src/modules/pm-central/manifest.ts).
+  // The legacy /pm-central/rtlm/* paths remain reachable as
+  // compatibility redirects rendered by App.tsx; they are not
+  // canonical and are not declared here.
   routes: [
-    { path: "/pm-central/rtlm", label: "PM Central — Module Dashboard" },
-    { path: "/pm-central/rtlm/projects", label: "Projects" },
-    { path: "/pm-central/rtlm/projects/:id", label: "Project" },
-    { path: "/pm-central/rtlm/tasks", label: "Tasks" },
-    { path: "/pm-central/rtlm/milestones", label: "Milestones" },
-    { path: "/pm-central/rtlm/risks", label: "Risks" },
-    { path: "/pm-central/rtlm/issues", label: "Issues" },
-    { path: "/pm-central/rtlm/decisions", label: "Decisions" },
-    { path: "/pm-central/rtlm/handoffs", label: "Handoffs" },
-    { path: "/pm-central/rtlm/settings", label: "Settings" },
+    { path: "/pm", label: "PM Central — Module Dashboard" },
+    { path: "/pm/projects", label: "Projects" },
+    { path: "/pm/projects/:id", label: "Project" },
+    { path: "/pm/tasks", label: "Tasks" },
+    { path: "/pm/milestones", label: "Milestones" },
+    { path: "/pm/risks", label: "Risks" },
+    { path: "/pm/issues", label: "Issues" },
+    { path: "/pm/decisions", label: "Decisions" },
+    { path: "/pm/handoffs", label: "Handoffs" },
+    { path: "/pm/settings", label: "Settings" },
   ],
   navigation: [{ group: "pmCentral", label: "PM Central", order: 4 }],
 

@@ -4,12 +4,12 @@ One module's UI may not reach into another module's internals.
 This is the operational contract; the rules are enforced by the
 `check:frontend-modularity` suite.
 
-**Status:** Strict mode is currently active for **`communication`** and
-**`dataAnalysis`**
-(`MIGRATED_MODULES = ["communication", "dataAnalysis"]`). Every rule
-below fails the build for any Communication-side or Data
-Analysis-side violation. Other RTLMs continue in report-only mode
-until their own migration PR flips them to strict.
+**Status:** Strict mode is currently active for **`communication`**,
+**`dataAnalysis`**, and **`pmCentral`**
+(`MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral"]`).
+Every rule below fails the build for any violation in those three
+capsules. Other RTLMs continue in report-only mode until their own
+migration PR flips them to strict.
 
 Data Analysis owns three frontend subdomains — GraphRAG, Data
 Acquisition, and Data Warehouse — all served by the single
@@ -17,6 +17,25 @@ Acquisition, and Data Warehouse — all served by the single
 separate RTLM and is **not** a Data Analysis subdomain even though
 its canonical route `/data-analysis/kgra-agent` lives under the
 `/data-analysis/*` URL prefix.
+
+PM Central owns the canonical `/pm/*` surface (Dashboard, Projects,
+Tasks, Milestones, Risks, Issues, Decisions, Handoffs, Settings).
+Two ownership notes specific to PM Central:
+
+1. **Folder/baseRoute mismatch.** PM Central's storage folder is
+   `client/src/modules/pm-central/` but its canonical URL subtree
+   is `/pm`. The `check:app-route-ownership` script consults the
+   manifest's declared `baseRoute` (rather than the folder name)
+   when testing whether App.tsx mounts a canonical route for a
+   migrated module. The legacy `/pm-central/*` shell mounts
+   (PMCentralShellPage and its 16 sibling panels) are **not** PM
+   Central RTLM canonical routes and continue to be mounted
+   directly in App.tsx.
+2. **PS → PM Central handoff.** Projects System (`ps`) is a
+   separate RTLM. PS does not write PM Central data and PM Central
+   does not call `trpc.ps.*`. PS → PM Central is a backend handoff
+   via `pmCentral.project.receiveFromPS`; no frontend
+   reach-around.
 
 ## Allowed
 
@@ -92,11 +111,15 @@ The checks are *phase-aware* (`scripts/module-tools/migration-state.ts`):
   Phase-0 PRs.
 
 The Communication pilot PR (#59) flipped the rules to strict for
-Communication. The Data Analysis migration PR set
-`MIGRATED_MODULES = ["communication", "dataAnalysis"]`, extending
+Communication. The Data Analysis migration PR (#60) extended
 strict-mode coverage to GraphRAG, Data Acquisition, and Data
-Warehouse. KGRA Agent continues in report-only mode pending its
-own migration PR.
+Warehouse. The PM Central migration PR set
+`MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral"]`,
+extending strict-mode coverage to PM Central's planning/delivery
+surface. KGRA Agent and the remaining 12 RTLMs (Code Studio, PS,
+PRM, PSM, HR, OM, Culture Values, AI Types, OpenRouter, Agent
+Studio, Sandbox WF, RAG) continue in report-only mode pending
+their own migration PRs.
 
 ## Backend cross-module communication
 

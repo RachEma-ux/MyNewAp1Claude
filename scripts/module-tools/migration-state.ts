@@ -83,17 +83,36 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * capsule migration. Every frontend modularity check runs strict
  * for `communication`.
  *
- * Phase 3.1 (this PR): Data Analysis migrates to the capsule shape,
- * adding `dataAnalysis` as the second migrated module. Frontend
- * modularity checks now run strict for both `communication` and
- * `dataAnalysis`. The remaining 13 RTLMs continue in report-only
- * mode until their own migration PRs land.
+ * Phase 3.1 (Data Analysis, merged in PR #60): added `dataAnalysis`
+ * as the second migrated module. Data Analysis owns the GraphRAG,
+ * Data Acquisition, and Data Warehouse subdomains. KGRA Agent is a
+ * separate RTLM and remains outside strict mode.
  *
- * Data Analysis owns the GraphRAG, Data Acquisition, and Data
- * Warehouse subdomains. KGRA Agent is a separate RTLM and does
- * NOT enter strict mode in this PR.
+ * Phase 3.2 (this PR): PM Central migrates to the capsule shape,
+ * adding `pmCentral` as the third migrated module. Frontend
+ * modularity checks now run strict for `communication`,
+ * `dataAnalysis`, and `pmCentral`. The remaining 12 RTLMs continue
+ * in report-only mode until their own migration PRs land.
+ *
+ * PM Central owns project management planning and delivery
+ * execution (projects, tasks, milestones, risks, issues, decisions,
+ * handoffs, settings). Projects System (`ps`) remains separate —
+ * PS → PM Central is a backend handoff, not a frontend reach-around.
+ * Workforce Assignment, HR, and Organization Management remain
+ * separate RTLMs.
+ *
+ * PM Central's canonical baseRoute moved from `/pm-central/rtlm/*`
+ * (the previous "RTLM-namespaced" canonical) to `/pm/*` in this
+ * PR. The legacy `/pm-central/*` shell routes (PMCentralShellPage
+ * and related non-RTLM legacy pages) are NOT migrated and are NOT
+ * canonical RTLM routes — they continue to be mounted directly in
+ * App.tsx.
  */
-export const MIGRATED_MODULES: RtlmKey[] = ["communication", "dataAnalysis"];
+export const MIGRATED_MODULES: RtlmKey[] = [
+  "communication",
+  "dataAnalysis",
+  "pmCentral",
+];
 
 /**
  * Platform Core route prefixes that are mounted directly in App.tsx.

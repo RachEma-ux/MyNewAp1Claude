@@ -3,15 +3,21 @@
 What every file inside `client/src/modules/<folder>/` does, when
 it is loaded, and what it is allowed to import.
 
-**Migrated modules:** `communication` (pilot, PR #59) and
-`dataAnalysis` (PR 3, Phase 3.1).
-`MIGRATED_MODULES = ["communication", "dataAnalysis"]`.
+**Migrated modules:** `communication` (pilot, PR #59),
+`dataAnalysis` (PR 3, Phase 3.1), and `pmCentral` (PR 4, Phase 3.2).
+`MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral"]`.
 
-Use `client/src/modules/communication/` for a single-subdomain
-example and `client/src/modules/data-analysis/` for a
-multi-subdomain example (3 subdomains: GraphRAG, Data Acquisition
-with 10 sub-tabs, Data Warehouse). The next module to migrate is
-**PM Central** (PR 4 / Phase 3.2).
+Reference shapes:
+- Single-subdomain capsule: `client/src/modules/communication/`
+- Multi-subdomain capsule: `client/src/modules/data-analysis/` (3
+  subdomains; GraphRAG, Data Acquisition with 10 sub-tabs, Data
+  Warehouse)
+- Capsule with folder/baseRoute mismatch and compatibility
+  redirects: `client/src/modules/pm-central/` (folder `pm-central`,
+  baseRoute `/pm`, 9 `/pm-central/rtlm/*` compatibility redirects
+  rendered from App.tsx)
+
+The next module to migrate is **Code Studio** (PR 5 / Phase 3.3).
 
 **KGRA Agent note.** KGRA Agent's canonical route
 `/data-analysis/kgra-agent` lives under the `/data-analysis/*` URL
@@ -24,6 +30,19 @@ splat. KGRA will get its own capsule (or its own baseRoute) in a
 later PR. `check:app-route-ownership` understands cross-manifest
 ownership and does not flag App.tsx's KGRA mount as a Data Analysis
 violation.
+
+**PM Central legacy shell note.** The 22-route legacy
+`/pm-central/*` shell (PMCentralShellPage, ProjectPage, panels,
+wizards, methodes, idea-builder, etc.) is **not** the PM Central
+RTLM canonical surface. Those routes continue to be mounted
+directly in App.tsx and serve a different shell experience. The
+PM Central RTLM canonical surface lives at `/pm/*`.
+`check:app-route-ownership` uses the manifest's declared
+`baseRoute` (`/pm`) — not the folder name (`pm-central`) — for its
+canonical-prefix test, so the legacy `/pm-central/*` mounts are
+not flagged as `pmCentral` canonical violations. A future PR may
+choose to migrate the legacy shell into a separate capsule (or
+sunset it).
 
 ## Files at a glance
 

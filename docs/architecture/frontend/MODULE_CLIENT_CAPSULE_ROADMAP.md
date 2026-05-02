@@ -34,6 +34,42 @@ its own internal routing, layout, and nav.
   `/conversations`, `/video-meeting`) remain in App.tsx as
   `<Redirect>` shims only.
 
+### Phase 3.2 — PM Central ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose
+  storage folder name (`pm-central`) differs from its canonical URL
+  subtree (`/pm`). Migrated `client/src/modules/pm-central/` to the
+  capsule layout.
+- The 10 RTLM pages were already inside the module folder
+  (PMCentralDashboardPage, PMProjectsPage, PMProjectDetailPage,
+  PMTasksPage, PMMilestonesPage, PMRisksPage, PMIssuesPage,
+  PMDecisionsPage, PMHandoffsPage, PMSettingsPage). No file moves
+  were needed.
+- Canonical baseRoute moved from `/pm-central/rtlm/*` (the
+  RTLM-namespaced canonical used before the capsule migration) to
+  `/pm/*`. The 10 server-manifest routes were updated to match;
+  the 9 distinct `/pm-central/rtlm/*` paths remain reachable as
+  compatibility redirects rendered from App.tsx.
+- The legacy `/pm-central/*` shell (PMCentralShellPage and the
+  associated 16 panel routes) is **not** a PM Central RTLM
+  canonical surface and was **not** migrated. Those routes
+  continue to be mounted directly in App.tsx and serve a different
+  shell experience.
+- Updated `check:app-route-ownership` to use the manifest's
+  declared `baseRoute` (when present) instead of the storage
+  folder name when testing whether App.tsx mounts a canonical
+  route for a migrated module. Without this fix, the legacy
+  `/pm-central/*` shell mounts would have falsely failed as
+  pmCentral canonical violations once `pmCentral` flipped to
+  strict.
+- PS → PM Central boundary preserved: PM Central UI calls only
+  `trpc.pmCentral.*` (and platform-shared `trpc.hq.*`). PS hands
+  off via `pmCentral.project.receiveFromPS` on the backend; no
+  frontend reach-around.
+- `MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral"]`.
+  AWI: `pmCentral` 96 fully-wired, warnings=0 (preserved from
+  pre-capsule baseline). The next module to migrate is **Code
+  Studio** (PR 5 / Phase 3.3).
+
 ### Phase 3.1 — Data Analysis ✅ MERGED
 - **Goal:** prove the capsule shape scales to a multi-subdomain
   RTLM. Data Analysis owns three subdomains (GraphRAG, Data
@@ -75,8 +111,8 @@ long tail.
 
 1. Communication                   _(Phase 2 pilot, merged)_
 2. Data Analysis                   _(Phase 3.1, merged)_
-3. PM Central                      _(Phase 3.2, next)_
-4. Code Studio
+3. PM Central                      _(Phase 3.2, merged)_
+4. Code Studio                     _(Phase 3.3, next)_
 5. Projects System (`ps`)
 6. PRM
 7. PSM
