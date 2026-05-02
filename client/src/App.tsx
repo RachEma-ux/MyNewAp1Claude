@@ -166,10 +166,8 @@ const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopL
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
 // PRM — migrated to capsule (PR #65). Mounted by <ModuleRoutes />
 // from `client/src/modules/prm/`.
-const PSMShellPage = lazy(() => import("@/pages/psm/PSMShellPage"));
-const PSMCaseDetailPage = lazy(() => import("@/pages/psm/PSMCaseDetailPage"));
-const PSMRunPage = lazy(() => import("@/pages/psm/PSMRunPage"));
-const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage"));
+// PSM — migrated to capsule (PR #67). Mounted by <ModuleRoutes />
+// from `client/src/modules/psm/`.
 // Code Studio — migrated to capsule (PR #62). Mounted by <ModuleRoutes />
 // from `client/src/modules/code-studio/`.
 // Projects System — migrated to capsule (PR #63). Mounted by <ModuleRoutes />
@@ -466,18 +464,8 @@ function Router() {
       <Route path="/components/ai-catalog" component={() => <ProtectedRoute component={AICatalogPage} />} />
       <Route path="/components/opencode-chat" component={() => <ProtectedRoute component={OpenCodeChatPage} />} />
       <Route path="/components/opencode-home" component={() => <ProtectedRoute component={OpenCodeHomePage} />} />
-      {/* PSM — Problem Solving Methods (detail routes must precede shell catch-all) */}
-      <Route path="/psm/methods/:id" component={() => <ProtectedRoute component={PSMMethodDetailPage} />} />
-      <Route path="/psm/cases/:id" component={() => <ProtectedRoute component={PSMCaseDetailPage} />} />
-      <Route path="/psm/runs/:id" component={() => <ProtectedRoute component={PSMRunPage} />} />
-      <Route path="/psm/dashboard" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/library" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/selector" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/cases" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/ai-catalog" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/admin" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm/analytics" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      <Route path="/psm" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      {/* PSM — migrated to capsule (PR #67). Routes /psm/* now rendered
+          by <ModuleRoutes /> via the capsule manifest. */}
       {/* PRM — migrated to capsule (PR #65). Routes /prm/* now rendered
           by <ModuleRoutes /> via the capsule manifest. */}
       {/* Code Studio — migrated to capsule (PR #62). Routes /code-studio/*

@@ -28,8 +28,8 @@ import { registerPMCentralClientModule } from "./pm-central/client";
 import { registerCodeStudioClientModule } from "./code-studio/client";
 import { registerProjectsSystemClientModule } from "./ps/client";
 import { registerPRMClientModule } from "./prm/client";
+import { registerPSMClientModule } from "./psm/client";
 
-import { psmClientManifest } from "./psm/manifest";
 import { agentStudioClientManifest } from "./agent-studio/manifest";
 import { sandboxWfClientManifest } from "./sandbox-wf/manifest";
 import { ragClientManifest } from "./rag/manifest";
@@ -41,7 +41,6 @@ import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
 
 const LEGACY_CLIENT_MANIFESTS = [
-  psmClientManifest,
   agentStudioClientManifest,
   sandboxWfClientManifest,
   ragClientManifest,
@@ -73,6 +72,7 @@ export function registerAllClientModules(): void {
   registerCodeStudioClientModule();
   registerProjectsSystemClientModule();
   registerPRMClientModule();
+  registerPSMClientModule();
 
   // Legacy manifests.
   for (const manifest of LEGACY_CLIENT_MANIFESTS) {

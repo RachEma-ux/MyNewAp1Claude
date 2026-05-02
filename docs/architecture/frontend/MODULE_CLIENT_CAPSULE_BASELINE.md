@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T17:03:55.863Z
+Generated: 2026-05-02T17:58:33.199Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **275**
+Total `<Route>` declarations in App.tsx: **264**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -20,7 +20,7 @@ Compatibility redirects in App.tsx: **25**
 | code-studio | 0 | 14 | 12 | 0 |
 | ps | 0 | 9 | 6 | 0 |
 | prm | 0 | 10 | 8 | 0 |
-| psm | 10 | 0 | 0 | 4 |
+| psm | 0 | 11 | 7 | 0 |
 | hr | 4 | 0 | 0 | 4 |
 | organization-management | 2 | 0 | 0 | 4 |
 | culture-values | 2 | 0 | 0 | 4 |
@@ -126,16 +126,17 @@ Compatibility redirects in App.tsx: **25**
 | `/ps/ideation/:id/convert` | routeInventory:ps, routes.tsx:ps |
 | `/ps/list` | routeInventory:ps, routes.tsx:ps |
 | `/ps/wizard` | routeInventory:ps, routes.tsx:ps |
-| `/psm` | App.tsx, manifest:psm |
-| `/psm/admin` | App.tsx, manifest:psm |
-| `/psm/analytics` | App.tsx, manifest:psm |
-| `/psm/cases` | App.tsx, manifest:psm |
-| `/psm/cases/:id` | App.tsx, manifest:psm |
-| `/psm/dashboard` | App.tsx, manifest:psm |
-| `/psm/library` | App.tsx, manifest:psm |
-| `/psm/methods/:id` | App.tsx, manifest:psm |
-| `/psm/runs/:id` | App.tsx, manifest:psm |
-| `/psm/selector` | App.tsx, manifest:psm |
+| `/psm` | routeInventory:psm, routes.tsx:psm |
+| `/psm/admin` | routeInventory:psm, routes.tsx:psm |
+| `/psm/ai-catalog` | routeInventory:psm, routes.tsx:psm |
+| `/psm/analytics` | routeInventory:psm, routes.tsx:psm |
+| `/psm/cases` | routeInventory:psm, routes.tsx:psm |
+| `/psm/cases/:id` | routeInventory:psm, routes.tsx:psm |
+| `/psm/dashboard` | routeInventory:psm, routes.tsx:psm |
+| `/psm/library` | routeInventory:psm, routes.tsx:psm |
+| `/psm/methods/:id` | routeInventory:psm, routes.tsx:psm |
+| `/psm/runs/:id` | routeInventory:psm, routes.tsx:psm |
+| `/psm/selector` | routeInventory:psm, routes.tsx:psm |
 
 ## Orphan / unknown routes
 
@@ -316,7 +317,6 @@ Compatibility redirects in App.tsx: **25**
 | `/providers/dashboard` | unknown | — |  |
 | `/providers/list` | unknown | — |  |
 | `/providers/wizard` | unknown | — |  |
-| `/psm/ai-catalog` | unknown | psm |  |
 | `/research/:workspaceId` | unknown | — |  |
 | `/research/:workspaceId/*` | unknown | — |  |
 | `/resources` | unknown | — |  |
@@ -363,7 +363,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | code-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ps | ✅ | ✅ | ✅ | ✅ | ✅ |
 | prm | ✅ | ✅ | ✅ | ✅ | ✅ |
-| psm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| psm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | hr | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | organization-management | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | culture-values | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

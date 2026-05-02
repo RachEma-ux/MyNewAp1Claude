@@ -187,9 +187,8 @@ long tail.
 4. Code Studio                     _(Phase 3.3, merged)_
 5. Projects System (`ps`)          _(Phase 3.4, merged)_
 6. PRM                             _(Phase 3.5, merged)_
-7. PSM                             _(Phase 3.6, next)_
-7. PSM
-8. HR
+7. PSM                             _(Phase 3.6, merged)_
+8. HR                              _(Phase 3.7, next)_
 9. Organization Management
 10. Culture Values
 11. AI Types
