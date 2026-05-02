@@ -141,3 +141,13 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+
+/**
+ * Convenience helper for tests and integration callers that want to
+ * invoke the root router without having to spell out
+ * `appRouter.createCaller(ctx)`. Accepts a partial context — callers
+ * are expected to supply the fields each procedure actually reads.
+ */
+export function createCaller(ctx: Partial<import("./_core/context").TrpcContext> = {}) {
+  return appRouter.createCaller(ctx as import("./_core/context").TrpcContext);
+}

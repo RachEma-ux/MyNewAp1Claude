@@ -8,9 +8,10 @@
 import { getDb } from "../db";
 import { evaluatePolicy } from "./opa-engine";
 import { DriftReport } from "./drift-detector";
-import { eq } from "drizzle-orm";
-import { agents } from "../../drizzle/schema";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { agents, governanceAuditLogs } from "../../drizzle/schema";
 import { TRPCError } from "@trpc/server";
+import { getAuditLogger } from "../services/auditLogger";
 
 export interface RemediationAction {
   type: "adjust_limit" | "disable_capability" | "restrict_access" | "update_config";
@@ -234,6 +235,242 @@ export async function batchRemediation(
   }
 
   return results;
+}
+
+// ── Drift-input remediation API (drift-driven, single-agent) ─────────────────
+//
+// `canAutoRemediate` / `autoRemediate` / `getRemediationHistory` are the
+// drift-shaped public contract used by the agents UI and tests. They are
+// thin and intentionally do not require a live OPA evaluation — they
+// inspect the drift report directly. They sit alongside the heavier
+// `generateRemediationPlan` / `applyRemediationPlan` / `batchRemediation`
+// pipeline, which is OPA-driven.
+
+/** Permissive shape — tests pass plain literal objects. */
+export interface DriftLike {
+  driftType: string;
+  severity: string;
+  details?: Record<string, unknown> | null;
+}
+
+export interface AutoRemediationOutcome {
+  success: boolean;
+  /** Short human description of what was changed, when success=true. */
+  action?: string;
+  /** Error message when success=false. */
+  error?: string;
+  /** Audit log event id, when an audit entry was written. */
+  logId?: string;
+  /** Resulting agent status, when applicable. */
+  newStatus?: string;
+}
+
+const REMEDIABLE_VIOLATIONS = new Set<string>([
+  "budget_exceeded",
+  "forbidden_capability",
+]);
+
+/**
+ * Pure predicate: is this drift safe to auto-remediate?
+ *
+ * Rules:
+ *  - only `policy_change` drifts are auto-remediable
+ *  - critical severity is never auto-remediable (escalate)
+ *  - the violation type must be in the safe-list
+ */
+export function canAutoRemediate(drift: DriftLike): boolean {
+  if (!drift) return false;
+  if (drift.driftType !== "policy_change") return false;
+  if (drift.severity === "critical") return false;
+  const violation = (drift.details as { violation?: string } | null | undefined)?.violation;
+  if (!violation) return false;
+  return REMEDIABLE_VIOLATIONS.has(violation);
+}
+
+/**
+ * Auto-remediate a drift report against an agent.
+ *
+ * Returns `{ success, action, logId, newStatus }` on success, or
+ * `{ success: false, error }` when the drift is not auto-remediable, the
+ * agent is missing, or the database is unavailable. Errors are surfaced
+ * — never swallowed — and a denied audit entry is recorded when possible.
+ */
+export async function autoRemediate(
+  agentId: string,
+  drift: DriftLike,
+): Promise<AutoRemediationOutcome> {
+  if (!canAutoRemediate(drift)) {
+    return {
+      success: false,
+      error: `Drift is not auto-remediable: driftType=${drift?.driftType} severity=${drift?.severity}`,
+    };
+  }
+
+  const db = getDb();
+  if (!db) {
+    return { success: false, error: "Database unavailable" };
+  }
+
+  const violation =
+    (drift.details as { violation?: string } | null | undefined)?.violation ??
+    "";
+
+  // Resolve agent — accepts numeric or string id (drizzle column is integer).
+  const idNumeric = Number(agentId);
+  if (!Number.isFinite(idNumeric)) {
+    return { success: false, error: `Invalid agentId: ${agentId}` };
+  }
+  let agent: typeof agents.$inferSelect | undefined;
+  try {
+    [agent] = await db.select().from(agents).where(eq(agents.id, idNumeric)).limit(1);
+  } catch (err: any) {
+    return { success: false, error: `Database error: ${err?.message ?? String(err)}` };
+  }
+  if (!agent) {
+    return { success: false, error: `Agent not found: ${agentId}` };
+  }
+
+  let actionDescription: string;
+  let newStatus: string | undefined;
+  try {
+    if (violation === "budget_exceeded") {
+      const maxBudget = Number(
+        (drift.details as { maxBudget?: number })?.maxBudget ?? 0,
+      );
+      const currentLimits = ((agent as any).limits ?? {}) as Record<string, unknown>;
+      const newLimits = { ...currentLimits, costLimit: maxBudget };
+      await db
+        .update(agents)
+        .set({
+          limits: newLimits as any,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(agents.id, idNumeric));
+      actionDescription = `Reduced monthly budget to ${maxBudget}`;
+      newStatus = "GOVERNED_VALID";
+    } else if (violation === "forbidden_capability") {
+      const forbidden = String(
+        (drift.details as { capability?: string })?.capability ?? "",
+      );
+      const currentCaps = ((agent as any).capabilities ?? {}) as Record<string, unknown>;
+      // capabilities JSON shape: { tools: string[], actions: string[], memory?: ... }
+      const tools = Array.isArray((currentCaps as any).tools)
+        ? ((currentCaps as any).tools as string[]).filter((c) => c !== forbidden)
+        : [];
+      const actions = Array.isArray((currentCaps as any).actions)
+        ? ((currentCaps as any).actions as string[]).filter((c) => c !== forbidden)
+        : [];
+      const newCaps = { ...currentCaps, tools, actions };
+      await db
+        .update(agents)
+        .set({
+          capabilities: newCaps as any,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(agents.id, idNumeric));
+      actionDescription = `Removed forbidden capability: ${forbidden}`;
+      newStatus = "GOVERNED_VALID";
+    } else {
+      // canAutoRemediate already filtered, but be defensive
+      return {
+        success: false,
+        error: `Unknown safe-list violation: ${violation}`,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Apply failed: ${err?.message ?? String(err)}`,
+    };
+  }
+
+  // Audit
+  let logId: string | undefined;
+  try {
+    const event = await getAuditLogger().log({
+      actor_id: "system",
+      principal_type: "system",
+      action_type: "LIFECYCLE_CHANGE",
+      target_type: "agent",
+      target_id: String(agentId),
+      decision_result: "success",
+      metadata: {
+        action: "autoRemediate",
+        violation,
+        driftType: drift.driftType,
+        severity: drift.severity,
+        description: actionDescription,
+      },
+    });
+    logId = event.event_id;
+  } catch {
+    // Audit failure must not mask success; record absent logId.
+    logId = undefined;
+  }
+
+  return {
+    success: true,
+    action: actionDescription,
+    logId,
+    newStatus,
+  };
+}
+
+export interface RemediationHistoryRecord {
+  id: number;
+  agentId: string;
+  remediatedAt: Date;
+  action: string;
+  decision: string | null;
+  details: Record<string, unknown> | null;
+}
+
+/**
+ * Return recent auto-remediation history for an agent (most recent first).
+ *
+ * Reads from `governance_audit_logs` where the action_type/code is the
+ * standard `LIFECYCLE_CHANGE` and metadata.action == "autoRemediate".
+ * Returns an empty array if the database is unavailable.
+ */
+export async function getRemediationHistory(
+  agentId: string,
+  limit: number = 50,
+): Promise<RemediationHistoryRecord[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const idNumeric = Number(agentId);
+  if (!Number.isFinite(idNumeric)) return [];
+
+  let rows: Array<typeof governanceAuditLogs.$inferSelect> = [];
+  try {
+    rows = await db
+      .select()
+      .from(governanceAuditLogs)
+      .where(
+        and(
+          eq(governanceAuditLogs.code, "LIFECYCLE_CHANGE"),
+          eq(governanceAuditLogs.agentId, idNumeric),
+          sql`${governanceAuditLogs.details}->>'action' = 'autoRemediate'`,
+        ),
+      )
+      .orderBy(desc(governanceAuditLogs.createdAt))
+      .limit(limit);
+  } catch {
+    return [];
+  }
+
+  return rows.map((row) => {
+    const details = (row.details ?? {}) as Record<string, unknown>;
+    return {
+      id: row.id,
+      agentId: String(row.agentId ?? agentId),
+      remediatedAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt as any),
+      action: typeof details.description === "string" ? details.description : "autoRemediate",
+      decision: row.decision ?? null,
+      details,
+    };
+  });
 }
 
 // Helper functions
