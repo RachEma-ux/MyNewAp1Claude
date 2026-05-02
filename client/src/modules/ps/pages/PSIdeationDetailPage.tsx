@@ -5,7 +5,7 @@
  * Pattern: "flex -mx-6 -mt-6 overflow-hidden" with calc(100vh - 4rem).
  */
 import { useParams } from "wouter";
-import { PSIdeationShell } from "@/components/projects-system/ideation/PSIdeationShell";
+import { PSIdeationShell } from "../components/ideation/PSIdeationShell";
 
 export function PSIdeationDetailPage() {
   const { id } = useParams<{ id: string }>();

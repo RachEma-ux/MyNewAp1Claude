@@ -6,7 +6,7 @@
  *
  * All wizard state + step content is in PSWizardShell (Fragment pattern).
  */
-import { PSWizardShell } from "@/components/projects-system/wizard/PSWizardShell";
+import { PSWizardShell } from "../components/wizard/PSWizardShell";
 
 export default function PSWizardPage() {
   return (

@@ -172,9 +172,8 @@ const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage")
 const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
 // Code Studio — migrated to capsule (PR #62). Mounted by <ModuleRoutes />
 // from `client/src/modules/code-studio/`.
-const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
-const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
-const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
+// Projects System — migrated to capsule (PR #63). Mounted by <ModuleRoutes />
+// from `client/src/modules/ps/`.
 const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"));
 const DoubleShellPage = lazy(() => import("@/pages/components/DoubleShellPage"));
 const HomeTemplatePage = lazy(() => import("@/pages/components/HomeTemplatePage"));
@@ -506,17 +505,8 @@ function Router() {
       <Route path="/agent-studio/:agentId/:section" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       <Route path="/agent-studio/:agentId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       <Route path="/agent-studio" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      {/* Projects System — Ideation detail routes (must precede shell catch-all) */}
-      <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
-      <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />
-      {/* Projects System — Simple Shell */}
-      <Route path="/ps/catalog" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps/ideation" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps/control-panel" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps/wizard" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps/list" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps/ai-catalog" component={() => <ProtectedRoute component={PSShellPage} />} />
-      <Route path="/ps" component={() => <ProtectedRoute component={PSShellPage} />} />
+      {/* Projects System — migrated to capsule (PR #63). Routes /ps/*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* KGIA — Knowledge Graph Interpretation Agent (shell handles internal routing) */}
       <Route path="/kgia/sources" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia/benchmarks" component={() => <ProtectedRoute component={KGIAShellPage} />} />

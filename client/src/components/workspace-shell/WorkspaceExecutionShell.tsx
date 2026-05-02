@@ -90,10 +90,10 @@ import { CVWizardPage } from "@/pages/culture-values/CVWizardPage";
 import { CVSettingsPage } from "@/pages/culture-values/CVSettingsPage";
 
 // PS — Projects System
-import { PSCatalogPage } from "@/pages/projects-system/PSCatalogPage";
-import { PSControlPanelPage } from "@/pages/projects-system/PSControlPanelPage";
-import PSWizardPage from "@/pages/projects-system/PSWizardPage";
-import { PSListPage } from "@/pages/projects-system/PSListPage";
+import { PSCatalogPage } from "@/modules/ps/pages/PSCatalogPage";
+import { PSControlPanelPage } from "@/modules/ps/pages/PSControlPanelPage";
+import PSWizardPage from "@/modules/ps/pages/PSWizardPage";
+import { PSListPage } from "@/modules/ps/pages/PSListPage";
 
 /** Fallback shell data while loading — renders skeleton context immediately */
 function makeLoadingShell(workspaceId: number): ShellViewData {

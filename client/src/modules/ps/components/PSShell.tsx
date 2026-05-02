@@ -8,16 +8,16 @@ import { trpc } from "@/lib/trpc";
 import PSSidebar, { type PSView } from "./PSSidebar";
 import { PSIdeationChatWindow } from "./ideation/PSIdeationChatWindow";
 
-const PSCatalogPage = lazy(() => import("@/pages/projects-system/PSCatalogPage"));
-const PSIdeationPage = lazy(() => import("@/pages/projects-system/PSIdeationPage"));
+const PSCatalogPage = lazy(() => import("../pages/PSCatalogPage"));
+const PSIdeationPage = lazy(() => import("../pages/PSIdeationPage"));
 const PSControlPanelShell = lazy(() =>
-  import("@/components/projects-system/control-panel/PSControlPanelShell").then(m => ({ default: m.PSControlPanelShell }))
+  import("./control-panel/PSControlPanelShell").then(m => ({ default: m.PSControlPanelShell }))
 );
 const PSWizardShell = lazy(() =>
-  import("@/components/projects-system/wizard/PSWizardShell").then(m => ({ default: m.PSWizardShell }))
+  import("./wizard/PSWizardShell").then(m => ({ default: m.PSWizardShell }))
 );
-const PSListPage = lazy(() => import("@/pages/projects-system/PSListPage"));
-const PSAICatalogPage = lazy(() => import("@/pages/projects-system/PSAICatalogPage"));
+const PSListPage = lazy(() => import("../pages/PSListPage"));
+const PSAICatalogPage = lazy(() => import("../pages/PSAICatalogPage"));
 
 const routeMap: Record<PSView, string> = {
   catalog: "/ps/catalog",
