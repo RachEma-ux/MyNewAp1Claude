@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T19:06:18.212Z
+Generated: 2026-05-02T19:59:58.129Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,13 +9,13 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 160 |
+| ✅ canonical | 171 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
 | ❓ unknown | 148 |
-| **Total** | **344** |
+| **Total** | **355** |
 
 ## Per-RTLM
 
@@ -31,7 +31,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | hr | ✅ migrated | 55 | `/hr` |
 | organizationManagement | ✅ migrated | 13 | `/om` |
 | cultureValues | ✅ migrated | 7 | `/cv` |
-| aiTypes | ⏳ pending | 2 | `—` |
+| aiTypes | ✅ migrated | 20 | `/ai-types` |
 | openRouter | ⏳ pending | 9 | `—` |
 | agentStudio | ⏳ pending | 7 | `—` |
 | sandboxWf | ⏳ pending | 3 | `—` |
@@ -65,8 +65,19 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/agents/list` | — | unknown | — | ❓ unknown |  |
 | `/agents/templates` | — | unknown | — | ❓ unknown |  |
 | `/agents/wizard` | — | unknown | — | ❓ unknown |  |
-| `/ai-types` | aiTypes | module-manifest | `AITypesShell` | ✅ canonical |  |
-| `/ai-types/:rest*` | aiTypes | module-manifest | `AITypesShell` | ✅ canonical |  |
+| `/ai-types` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/agents` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/bots` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/catalog` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/control-panel` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/governance` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/llms` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/models` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/overview` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/providers` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/relationships` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/taxonomy` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
+| `/ai-types/validation` | aiTypes | module-manifest | `module:aiTypes` | ✅ canonical |  |
 | `/analytics` | — | unknown | — | ❓ unknown |  |
 | `/analytics/downloads` | — | unknown | — | ❓ unknown |  |
 | `/auto-remediation` | — | unknown | — | ❓ unknown |  |

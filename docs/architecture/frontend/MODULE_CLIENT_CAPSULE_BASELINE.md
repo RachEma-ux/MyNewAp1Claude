@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T19:06:18.223Z
+Generated: 2026-05-02T19:59:58.134Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **206**
+Total `<Route>` declarations in App.tsx: **204**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -24,7 +24,7 @@ Compatibility redirects in App.tsx: **25**
 | hr | 0 | 54 | 1 | 0 |
 | organization-management | 0 | 7 | 6 | 0 |
 | culture-values | 0 | 4 | 3 | 0 |
-| ai-types | 2 | 0 | 0 | 4 |
+| ai-types | 0 | 13 | 7 | 0 |
 | openrouter | 9 | 0 | 0 | 4 |
 | agent-studio | 7 | 0 | 0 | 4 |
 | sandbox-wf | 3 | 0 | 0 | 4 |
@@ -41,8 +41,19 @@ Compatibility redirects in App.tsx: **25**
 | `/agent-studio/marketplace` | App.tsx, manifest:agent-studio |
 | `/agent-studio/new` | App.tsx, manifest:agent-studio |
 | `/agent-studio/templates` | App.tsx, manifest:agent-studio |
-| `/ai-types` | App.tsx, manifest:ai-types |
-| `/ai-types/:rest*` | App.tsx, manifest:ai-types |
+| `/ai-types` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/agents` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/bots` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/catalog` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/control-panel` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/governance` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/llms` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/models` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/overview` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/providers` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/relationships` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/taxonomy` | routeInventory:ai-types, routes.tsx:ai-types |
+| `/ai-types/validation` | routeInventory:ai-types, routes.tsx:ai-types |
 | `/automation/sandbox-wf` | App.tsx, manifest:sandbox-wf |
 | `/automation/sandbox-wf/:id` | App.tsx, manifest:sandbox-wf |
 | `/automation/sandbox-wf/new` | App.tsx, manifest:sandbox-wf |
@@ -374,7 +385,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | hr | ✅ | ✅ | ✅ | ✅ | ✅ |
 | organization-management | ✅ | ✅ | ✅ | ✅ | ✅ |
 | culture-values | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ai-types | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| ai-types | ✅ | ✅ | ✅ | ✅ | ✅ |
 | openrouter | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | agent-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | sandbox-wf | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

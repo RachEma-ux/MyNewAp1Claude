@@ -8,10 +8,10 @@
 import { useState, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
-import AITypesSidebar from "@/components/ai-types/AITypesSidebar";
+import AITypesSidebar from "../components/AITypesSidebar";
 
 const AITypesOverviewPage = lazy(() => import("./AITypesOverviewPage"));
-const AITypesCatalogPage = lazy(() => import("../AITypesPage"));
+const AITypesCatalogPage = lazy(() => import("./AITypesPage"));
 const AITypesTaxonomyPage = lazy(() => import("./AITypesTaxonomyPage"));
 const AITypesRelationshipsPage = lazy(() => import("./AITypesRelationshipsPage"));
 const AITypesValidationPage = lazy(() => import("./AITypesValidationPage"));

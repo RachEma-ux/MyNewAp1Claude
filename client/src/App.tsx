@@ -150,8 +150,8 @@ const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
-const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
-const AITypesShell = lazy(() => import("@/pages/ai-types/AITypesShell"));
+// AI Types — migrated to capsule (PR #71). Mounted by <ModuleRoutes />
+// from `client/src/modules/ai-types/`.
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
 const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
@@ -471,8 +471,8 @@ function Router() {
       {/* Governance Scorecard — CGT v2 automated compliance engine */}
       <Route path="/governance/scorecard" component={() => <ProtectedRoute component={GovernanceScorecard} />} />
       {/* AI Types Module — Shell handles internal routing */}
-      <Route path="/ai-types/:rest*" component={() => <ProtectedRoute component={AITypesShell} />} />
-      <Route path="/ai-types" component={() => <ProtectedRoute component={AITypesShell} />} />
+      {/* AI Types — migrated to capsule (PR #71). Routes /ai-types/*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* Backward-compatibility redirects for old namespaces */}
       <Route path="/digital-hq/:item">{(params) => <Redirect to={`/hq/${params.item}`} />}</Route>
       <Route path="/governance-center/:item">{(params) => <Redirect to={`/governance/${params.item}`} />}</Route>
