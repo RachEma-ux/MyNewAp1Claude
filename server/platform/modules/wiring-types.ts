@@ -87,6 +87,20 @@ export interface HandoffInventory {
   status: WiringStatus;
 }
 
+/**
+ * Where a route is mounted. Mirrors `RouteSource` in
+ * `scripts/module-tools/route-source.ts` so the static checks and
+ * AWI agree on the same vocabulary.
+ */
+export type RouteSourceTag =
+  | "app-platform-core"
+  | "app-compatibility-redirect"
+  | "module-manifest"
+  | "module-mod-route"
+  | "module-nav"
+  | "deprecated"
+  | "unknown";
+
 export interface RouteInventory {
   /** Server-declared SPA paths from manifest.routes. */
   serverDeclared: string[];
@@ -94,6 +108,13 @@ export interface RouteInventory {
   clientRegistered: string[];
   /** Navigation entries from manifest.navigation. */
   nav: string[];
+  /**
+   * Per-path source tag — populated by the wiring builder when the
+   * AWI integration knows where a route comes from. Empty during
+   * Phase-0 for legacy manifests; populated for capsule-mounted
+   * modules so AWI does not flag them as "missing".
+   */
+  routeSource?: Record<string, RouteSourceTag>;
   status: WiringStatus;
 }
 

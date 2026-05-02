@@ -416,12 +416,73 @@ function parseRoutes(
     ...clientManifest.matchAll(/path\s*:\s*["'`]([^"'`]+)["'`]/g),
   ].map((m) => m[1]);
 
+  /* Per-path source classification. The AWI uses this to count
+     capsule-mounted routes as wired even when the client manifest
+     does not list every path — a `baseRoute` + `capsuleEntrypoint`
+     means the capsule handles every server-declared path under the
+     subtree. */
+  const routeSource: Record<
+    string,
+    | "module-manifest"
+    | "module-mod-route"
+    | "module-nav"
+    | "deprecated"
+    | "unknown"
+  > = {};
+  const baseRouteMatch =
+    /baseRoute\s*:\s*["'`]([^"'`]+)["'`]/.exec(clientManifest);
+  const hasCapsule =
+    baseRouteMatch !== null &&
+    /capsuleEntrypoint\s*:/.test(clientManifest);
+  const baseRoute = baseRouteMatch?.[1] ?? null;
+  const clientSet = new Set(clientRegistered);
+
+  for (const p of serverDeclared) {
+    if (clientSet.has(p)) {
+      routeSource[p] = "module-manifest";
+      continue;
+    }
+    if (
+      hasCapsule &&
+      baseRoute &&
+      (p === baseRoute || p.startsWith(baseRoute + "/"))
+    ) {
+      routeSource[p] = "module-mod-route";
+      continue;
+    }
+    routeSource[p] = "unknown";
+  }
+
+  // For AWI status purposes, capsule-covered server routes are
+  // effectively wired — extend `clientRegistered` with the implicit
+  // capsule-covered set. This avoids the false-negative where a
+  // module declares 12 server routes but its client manifest only
+  // lists 1 explicit `routes[]` entry while a `capsuleEntrypoint`
+  // covers the rest.
+  const effectiveClientRegistered = clientRegistered.slice();
+  if (hasCapsule && baseRoute) {
+    for (const p of serverDeclared) {
+      if (
+        (p === baseRoute || p.startsWith(baseRoute + "/")) &&
+        !clientSet.has(p)
+      ) {
+        effectiveClientRegistered.push(p);
+      }
+    }
+  }
+
   let status: RouteInventory["status"];
   if (serverDeclared.length === 0) status = "not-applicable";
-  else if (clientRegistered.length === 0) status = "declared-only";
+  else if (effectiveClientRegistered.length === 0) status = "declared-only";
   else status = "wired";
 
-  return { serverDeclared, clientRegistered, nav, status };
+  return {
+    serverDeclared,
+    clientRegistered: effectiveClientRegistered,
+    nav,
+    routeSource,
+    status,
+  };
 }
 
 /* ------------------------------------------------------------------ */

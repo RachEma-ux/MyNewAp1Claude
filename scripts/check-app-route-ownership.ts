@@ -1,0 +1,122 @@
+#!/usr/bin/env tsx
+/**
+ * check:app-route-ownership
+ *
+ * Enforces App.tsx scope:
+ *   - For migrated RTLMs, App.tsx must NOT import private pages of
+ *     the module and must NOT mount canonical module routes.
+ *   - App.tsx may keep platform-core routes.
+ *   - App.tsx may keep compatibility redirects (Route → Redirect).
+ *   - No `mod.tsx` or page under client/src/modules/<migrated>/
+ *     may import MainLayout.
+ *
+ * Phase-0 behavior: with no migrated modules, this script reports
+ * the current ownership state and only fails on outright structural
+ * issues (missing App.tsx).
+ */
+
+import { existsSync, readFileSync } from "fs";
+import { join, relative } from "path";
+
+import {
+  isMigrated,
+  PLATFORM_CORE_PREFIXES,
+  RTLM_FOLDER_MAP,
+  RTLM_LIST,
+  type RtlmKey,
+} from "./module-tools/migration-state";
+import { extractAppRoutes } from "./module-tools/route-inventory";
+import { isBaseRouteMatch, normalizePath } from "./module-tools/route-parser";
+import { walkSourceFiles } from "./module-tools/walk";
+import { scanFileForBoundaries } from "./module-tools/boundary-rules";
+
+interface Finding {
+  severity: "fail" | "warn";
+  msg: string;
+}
+
+function main() {
+  const repoRoot = process.cwd();
+  const appPath = join(repoRoot, "client", "src", "App.tsx");
+  if (!existsSync(appPath)) {
+    console.error("[FAIL] client/src/App.tsx not found");
+    process.exit(1);
+  }
+  const appSrc = readFileSync(appPath, "utf8");
+  const appRoutes = extractAppRoutes(appSrc);
+
+  const findings: Finding[] = [];
+
+  // For each migrated module: hardcoded canonical routes are FAIL.
+  for (const key of RTLM_LIST) {
+    const folder = RTLM_FOLDER_MAP[key as RtlmKey];
+    if (!isMigrated(key)) continue;
+    for (const r of appRoutes) {
+      const p = normalizePath(r.path);
+      // Skip platform-core
+      if (PLATFORM_CORE_PREFIXES.some((pc) => isBaseRouteMatch(pc, p))) continue;
+      // Skip pure redirects
+      if (r.redirectTo) continue;
+      const baseRoute = `/${folder}`;
+      if (isBaseRouteMatch(baseRoute, p)) {
+        findings.push({
+          severity: "fail",
+          msg: `App.tsx hardcodes canonical route ${p} for migrated module ${key}`,
+        });
+      }
+    }
+    // Private page imports for migrated modules.
+    const privateImportRe = new RegExp(
+      `import[^"'\`]*?from\\s+["'\`]@/(?:pages/${folder}|modules/${folder}/(?:pages|components|hooks|api))[^"'\`]*?["'\`]`,
+      "g",
+    );
+    for (const m of appSrc.matchAll(privateImportRe)) {
+      findings.push({
+        severity: "fail",
+        msg: `App.tsx privately imports ${m[0]} from migrated module ${key}`,
+      });
+    }
+  }
+
+  // MainLayout imports under any module folder are always FAIL — the
+  // platform owns layout, modules don't. (Reported as baseline for
+  // unmigrated modules so we can see drift.)
+  for (const file of walkSourceFiles(
+    join(repoRoot, "client", "src", "modules"),
+  )) {
+    const src = readFileSync(file, "utf8");
+    const findings2 = scanFileForBoundaries(relative(repoRoot, file), src);
+    for (const f of findings2) {
+      if (f.kind === "main-layout-import") {
+        const sev: Finding["severity"] =
+          f.selfModule && isMigrated(f.selfModule) ? "fail" : "warn";
+        findings.push({
+          severity: sev,
+          msg: `${f.file}: imports MainLayout (modules cannot own layout)`,
+        });
+      }
+    }
+  }
+
+  /* ----- summary ----- */
+  console.log("App Route Ownership");
+  console.log("===================");
+  console.log(`App.tsx routes:        ${appRoutes.length}`);
+  console.log(
+    `App.tsx redirects:     ${appRoutes.filter((r) => r.redirectTo).length}`,
+  );
+  console.log("");
+
+  const fails = findings.filter((f) => f.severity === "fail");
+  const warns = findings.filter((f) => f.severity === "warn");
+  for (const f of fails) console.log(`  [FAIL] ${f.msg}`);
+  for (const w of warns) console.log(`  [warn] ${w.msg}`);
+  console.log("");
+  console.log(`Failures: ${fails.length}`);
+  console.log(`Baseline warnings: ${warns.length}`);
+  if (fails.length > 0) process.exit(1);
+  console.log("OK — App.tsx ownership within tolerance.");
+  process.exit(0);
+}
+
+main();
