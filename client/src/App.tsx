@@ -54,8 +54,8 @@ const AutomationSettings = lazy(() => import("./pages/AutomationSettings"));
 const FlowChartPage = lazy(() => import("./pages/FlowChartPage"));
 const AirflowPage = lazy(() => import("./pages/AirflowPage"));
 const AirbytePage = lazy(() => import("./pages/AirbytePage"));
-const SandboxWFPage = lazy(() => import("./pages/automation/SandboxWFPage"));
-const WFCreationShell = lazy(() => import("./pages/automation/WFCreationShell"));
+// Sandbox WF — migrated to capsule (PR #74). Mounted by <ModuleRoutes />
+// from `client/src/modules/sandbox-wf/`.
 const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const CodeEditor = lazy(() => import("./pages/CodeEditor"));
 const EmbeddingsManagement = lazy(() => import("./pages/EmbeddingsManagement"));
@@ -353,9 +353,8 @@ function Router() {
       <Route path="/automation/flowchart" component={() => <ProtectedRoute component={FlowChartPage} />} />
       <Route path="/automation/airflow" component={() => <ProtectedRoute component={AirflowPage} />} />
       <Route path="/automation/airbyte" component={() => <ProtectedRoute component={AirbytePage} />} />
-      <Route path="/automation/sandbox-wf/new" component={() => <ProtectedRoute component={WFCreationShell} />} />
-      <Route path="/automation/sandbox-wf/:id" component={() => <ProtectedRoute component={WFCreationShell} />} />
-      <Route path="/automation/sandbox-wf" component={() => <ProtectedRoute component={SandboxWFPage} />} />
+      {/* Sandbox WF — migrated to capsule (PR #74). Routes /automation/sandbox-wf*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
       <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
       <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />

@@ -17,7 +17,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 import { useLocation } from "wouter";
-import { MaestroChatWindow } from "@/components/automation/MaestroChatWindow";
+import { MaestroChatWindow } from "../components/MaestroChatWindow";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";

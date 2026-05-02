@@ -94,9 +94,9 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { NodePropertiesPanel } from "@/components/automation/NodePropertiesPanel";
-import { ExecutionMonitor } from "@/components/automation/ExecutionMonitor";
-import { MaestroChatWindow } from "@/components/automation/MaestroChatWindow";
+import { NodePropertiesPanel } from "../components/NodePropertiesPanel";
+import { ExecutionMonitor } from "../components/ExecutionMonitor";
+import { MaestroChatWindow } from "../components/MaestroChatWindow";
 
 // ── Constants ────────────────────────────────────────────
 

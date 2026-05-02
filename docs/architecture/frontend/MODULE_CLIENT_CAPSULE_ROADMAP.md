@@ -291,6 +291,45 @@ its own internal routing, layout, and nav.
   wired (mostly-wired or fully-wired), blockers=[]. The next module
   to migrate is **Sandbox WF** at Phase 3.13.
 
+### Phase 3.13 — Sandbox WF ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose
+  canonical baseRoute is a sub-prefix (`/automation/sandbox-wf`)
+  inside a shared parent subtree (`/automation`) used by other
+  non-capsule pages (the legacy AutomationBuilder at `/automation`
+  itself, plus `/automation/secrets`, `/automation/flowchart`,
+  `/automation/airflow`, `/automation/airbyte`). Migrated
+  `client/src/modules/sandbox-wf/` to the capsule layout.
+- 2 pages relocated from `client/src/pages/automation/`
+  (`SandboxWFPage`, `WFCreationShell`) to
+  `client/src/modules/sandbox-wf/pages/`. `client/src/pages/automation/`
+  removed since it now has no remaining files. 3 SWF-only
+  components (`MaestroChatWindow`, `ExecutionMonitor`,
+  `NodePropertiesPanel`) relocated from
+  `client/src/components/automation/` to
+  `client/src/modules/sandbox-wf/components/`. The shared
+  automation primitives `BlockConfigModal` and `WorkflowNode` stay
+  in `client/src/components/automation/` because the legacy
+  AutomationBuilder page (`client/src/pages/AutomationBuilder.tsx`,
+  not part of this capsule) still imports them.
+- 3 canonical paths covered: `/automation/sandbox-wf` (workflow
+  list, renders `SandboxWFPage`), `/automation/sandbox-wf/new`
+  (new workflow creator, renders `WFCreationShell`), and
+  `/automation/sandbox-wf/:id` (workflow editor, renders
+  `WFCreationShell`).
+- `mod.tsx` is a Wouter `<Switch>`: deep-link routes (`/new` and
+  `/:id`) dispatch to `WFCreationShell`, bare
+  `/automation/sandbox-wf` falls through to `SandboxWFPage`. Same
+  pattern as PS PR #63 (deep links dispatch to dedicated pages).
+- **Server stale-route fix:** `server/sandbox-wf/manifest.ts`
+  declared `routes: [{ path: "/workflows" }]` — this never matched
+  the capsule baseRoute. Fixed to `[{ path: "/automation/sandbox-wf" }]`
+  to align with the capsule (PR #61/#63/#69/#70 pattern continues).
+- `MIGRATED_MODULES = [..., "sandboxWf"]`. AWI: `sandboxWf` wired
+  (mostly-wired or fully-wired), blockers=[]. The next module to
+  migrate is **KGRA Agent** at Phase 3.14 — the FIFTEENTH and
+  FINAL RTLM. After that PR merges, the full Production Readiness
+  Verification Protocol unlocks per the user's standing rules.
+
 ### Subsequent migrations (one PR each)
 
 The order is intentional — modules with the largest blast radius
@@ -310,8 +349,8 @@ long tail.
 11. AI Types                       _(Phase 3.10, merged)_
 12. OpenRouter                     _(Phase 3.11, merged)_
 13. Agent Studio                   _(Phase 3.12, merged)_
-14. Sandbox WF                     _(Phase 3.13, next)_
-15. KGRA Agent
+14. Sandbox WF                     _(Phase 3.13, merged)_
+15. KGRA Agent                     _(Phase 3.14, next — final RTLM)_
 
 ## Definition of Done per migration
 

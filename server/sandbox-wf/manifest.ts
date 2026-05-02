@@ -48,7 +48,7 @@ export const sandboxWfManifest: ModuleManifest = {
     },
   ],
 
-  routes: [{ path: "/workflows", label: "Workflows" }],
+  routes: [{ path: "/automation/sandbox-wf", label: "Sandbox WF" }],
   navigation: [{ group: "build", label: "Workflows", order: 12 }],
 
   boot: async (ctx) => {

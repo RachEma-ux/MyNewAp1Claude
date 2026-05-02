@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { AITypesRoutes } from "@/modules/ai-types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -293,7 +294,7 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
       />
       {config.catalogEntryId && (
         <a
-          href="/ai-types"
+          href={AITypesRoutes.root()}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[10px] text-cyan-500 hover:underline"

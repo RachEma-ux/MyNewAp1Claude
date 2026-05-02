@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T20:53:31.662Z
+Generated: 2026-05-02T21:21:35.531Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -34,7 +34,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | aiTypes | ✅ migrated | 20 | `/ai-types` |
 | openRouter | ✅ migrated | 18 | `—` |
 | agentStudio | ✅ migrated | 17 | `/agent-studio` |
-| sandboxWf | ⏳ pending | 3 | `—` |
+| sandboxWf | ✅ migrated | 5 | `/automation/sandbox-wf` |
 | kgraAgent | ⏳ pending | 1 | `—` |
 
 ## Routes
@@ -91,9 +91,9 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/automation/executions` | — | unknown | — | ❓ unknown |  |
 | `/automation/executions/:id` | — | unknown | — | ❓ unknown |  |
 | `/automation/flowchart` | — | unknown | — | ❓ unknown |  |
-| `/automation/sandbox-wf` | sandboxWf | module-manifest | `SandboxWFPage` | ✅ canonical |  |
-| `/automation/sandbox-wf/:id` | sandboxWf | module-manifest | `WFCreationShell` | ✅ canonical |  |
-| `/automation/sandbox-wf/new` | sandboxWf | module-manifest | `WFCreationShell` | ✅ canonical |  |
+| `/automation/sandbox-wf` | sandboxWf | module-manifest | `module:sandboxWf` | ✅ canonical |  |
+| `/automation/sandbox-wf/:id` | sandboxWf | module-manifest | `module:sandboxWf` | ✅ canonical |  |
+| `/automation/sandbox-wf/new` | sandboxWf | module-manifest | `module:sandboxWf` | ✅ canonical |  |
 | `/automation/secrets` | — | unknown | — | ❓ unknown |  |
 | `/automation/settings` | — | unknown | — | ❓ unknown |  |
 | `/automation/triggers` | — | unknown | — | ❓ unknown |  |
