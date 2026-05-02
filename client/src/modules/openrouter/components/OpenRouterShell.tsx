@@ -5,15 +5,15 @@ import OpenRouterSidebar, { type OpenRouterView } from "./OpenRouterSidebar";
 import OpenRouterStatusBar from "./OpenRouterStatusBar";
 import { trpc } from "@/lib/trpc";
 
-const OpenRouterHomePage = lazy(() => import("@/pages/openrouter/OpenRouterHomePage"));
-const OpenRouterConnectPage = lazy(() => import("@/pages/openrouter/OpenRouterConnectPage"));
-const OpenRouterModelsPage = lazy(() => import("@/pages/openrouter/OpenRouterModelsPage"));
-const OpenRouterRoutingPage = lazy(() => import("@/pages/openrouter/OpenRouterRoutingPage"));
-const OpenRouterGuardrailsPage = lazy(() => import("@/pages/openrouter/OpenRouterGuardrailsPage"));
-const OpenRouterPlaygroundPage = lazy(() => import("@/pages/openrouter/OpenRouterPlaygroundPage"));
-const OpenRouterUsagePage = lazy(() => import("@/pages/openrouter/OpenRouterUsagePage"));
-const OpenRouterHealthPage = lazy(() => import("@/pages/openrouter/OpenRouterHealthPage"));
-const OpenRouterActivityPage = lazy(() => import("@/pages/openrouter/OpenRouterActivityPage"));
+const OpenRouterHomePage = lazy(() => import("../pages/OpenRouterHomePage"));
+const OpenRouterConnectPage = lazy(() => import("../pages/OpenRouterConnectPage"));
+const OpenRouterModelsPage = lazy(() => import("../pages/OpenRouterModelsPage"));
+const OpenRouterRoutingPage = lazy(() => import("../pages/OpenRouterRoutingPage"));
+const OpenRouterGuardrailsPage = lazy(() => import("../pages/OpenRouterGuardrailsPage"));
+const OpenRouterPlaygroundPage = lazy(() => import("../pages/OpenRouterPlaygroundPage"));
+const OpenRouterUsagePage = lazy(() => import("../pages/OpenRouterUsagePage"));
+const OpenRouterHealthPage = lazy(() => import("../pages/OpenRouterHealthPage"));
+const OpenRouterActivityPage = lazy(() => import("../pages/OpenRouterActivityPage"));
 
 function parseRoute(location: string): OpenRouterView {
   if (location.startsWith("/openrouter/connect")) return "connect";

@@ -33,18 +33,17 @@ import { registerHRClientModule } from "./hr/client";
 import { registerOrganizationManagementClientModule } from "./organization-management/client";
 import { registerCultureValuesClientModule } from "./culture-values/client";
 import { registerAITypesClientModule } from "./ai-types/client";
+import { registerOpenRouterClientModule } from "./openrouter/client";
 
 import { agentStudioClientManifest } from "./agent-studio/manifest";
 import { sandboxWfClientManifest } from "./sandbox-wf/manifest";
 import { ragClientManifest } from "./rag/manifest";
-import { openRouterClientManifest } from "./openrouter/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
 
 const LEGACY_CLIENT_MANIFESTS = [
   agentStudioClientManifest,
   sandboxWfClientManifest,
   ragClientManifest,
-  openRouterClientManifest,
   kgraAgentClientManifest,
 ];
 
@@ -73,6 +72,7 @@ export function registerAllClientModules(): void {
   registerOrganizationManagementClientModule();
   registerCultureValuesClientModule();
   registerAITypesClientModule();
+  registerOpenRouterClientModule();
 
   // Legacy manifests.
   for (const manifest of LEGACY_CLIENT_MANIFESTS) {

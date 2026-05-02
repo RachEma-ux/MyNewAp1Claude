@@ -152,7 +152,7 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * PR #61/#63 pattern). `WorkspaceExecutionShell.tsx` CV imports
  * (Portfolio / Wizard / Settings) tracked the move.
  *
- * Phase 3.10 (this PR): AI Types migrates to the capsule shape,
+ * Phase 3.10 (PR #71): AI Types migrated to the capsule shape,
  * adding `aiTypes` as the eleventh migrated module. AI Types owns
  * 13 canonical paths (`/ai-types` plus 12 item slugs: overview,
  * catalog, providers, llms, models, agents, bots, taxonomy,
@@ -162,10 +162,23 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `useLocation()`; the catalog view (`AITypesPage.tsx`, formerly
  * at `client/src/pages/AITypesPage.tsx`) covers six legacy slugs
  * (`catalog`, `providers`, `llms`, `models`, `agents`, `bots`).
- * Frontend modularity checks now run strict for the eleven
- * migrated modules; the remaining 4 RTLMs (openRouter,
- * agentStudio, sandboxWf, kgraAgent) continue in report-only mode
- * until their own migration PRs land.
+ *
+ * Phase 3.11 (this PR): OpenRouter migrates to the capsule shape,
+ * adding `openRouter` as the twelfth migrated module. OpenRouter
+ * owns 9 canonical paths (`/openrouter` plus 8 view slugs: connect,
+ * models, routing, guardrails, playground, usage, health,
+ * activity). Same in-capsule shell pattern as AI Types and Code
+ * Studio: `OpenRouterShell` already drove the S1 sidebar + view
+ * dispatch off `useLocation()`. The legacy 9-line
+ * `OpenRouterShellPage.tsx` wrapper is dropped — `mod.tsx` carries
+ * the `flex/calc(100vh - 4rem)` chrome directly. Server
+ * `openrouter/manifest.ts` already declared
+ * `routes: [{ path: "/openrouter" }]` consistent with the capsule
+ * baseRoute, so no server-manifest stale-route fix was needed.
+ * Frontend modularity checks now run strict for the twelve
+ * migrated modules; the remaining 3 RTLMs (agentStudio, sandboxWf,
+ * kgraAgent) continue in report-only mode until their own
+ * migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -179,6 +192,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "organizationManagement",
   "cultureValues",
   "aiTypes",
+  "openRouter",
 ];
 
 /**
