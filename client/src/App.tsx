@@ -164,12 +164,12 @@ const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefiniti
 // OM / CV / PS Modules — top-level pages (auto-select default workspace)
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
-const PRMShellPage = lazy(() => import("@/pages/prm/PRMShellPage"));
+// PRM — migrated to capsule (PR #65). Mounted by <ModuleRoutes />
+// from `client/src/modules/prm/`.
 const PSMShellPage = lazy(() => import("@/pages/psm/PSMShellPage"));
 const PSMCaseDetailPage = lazy(() => import("@/pages/psm/PSMCaseDetailPage"));
 const PSMRunPage = lazy(() => import("@/pages/psm/PSMRunPage"));
 const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage"));
-const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
 // Code Studio — migrated to capsule (PR #62). Mounted by <ModuleRoutes />
 // from `client/src/modules/code-studio/`.
 // Projects System — migrated to capsule (PR #63). Mounted by <ModuleRoutes />
@@ -478,17 +478,8 @@ function Router() {
       <Route path="/psm/admin" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm/analytics" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm" component={() => <ProtectedRoute component={PSMShellPage} />} />
-      {/* PRM — Problem Resolution Methods (case detail must precede shell catch-all) */}
-      <Route path="/prm/cases/:id" component={() => <ProtectedRoute component={PRMCaseWorkspacePage} />} />
-      <Route path="/prm/dashboard" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/new" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/cases" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/methods" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/playbooks" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/ai-catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm/control-panel" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      <Route path="/prm" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      {/* PRM — migrated to capsule (PR #65). Routes /prm/* now rendered
+          by <ModuleRoutes /> via the capsule manifest. */}
       {/* Code Studio — migrated to capsule (PR #62). Routes /code-studio/*
           now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* AI Agent Studio — Standalone agent lifecycle module (shell handles internal routing) */}

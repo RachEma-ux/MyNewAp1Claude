@@ -106,20 +106,18 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * the backend. Code Studio does not own the legacy `/code` Monaco
  * editor — that route serves a separate non-RTLM page.
  *
- * Phase 3.4 (this PR): Projects System migrates to the capsule
- * shape, adding `ps` as the fifth migrated module. Frontend
- * modularity checks now run strict for `communication`,
- * `dataAnalysis`, `pmCentral`, `codeStudio`, and `ps`. The remaining
- * 10 RTLMs continue in report-only mode until their own migration
- * PRs land.
+ * Phase 3.4 (Projects System, merged in PR #63): added `ps` as the
+ * fifth migrated module. PS owns intake, ideation (incl. detail and
+ * convert deep links), classification, wizard execution, PS project
+ * records, catalog/reference views, and the PS control panel. PS →
+ * PM Central is a backend handoff.
  *
- * PS owns intake, ideation (incl. detail and convert deep links),
- * classification, wizard execution, PS project/system records,
- * catalog/reference views, and the PS control panel. PS → PM
- * Central is a backend handoff: PS UI calls only `trpc.ps.*`; the
- * PS backend hops to PM Central via Handoff Manager / public API.
- * The frontend never reaches across `trpc.pmCentral.*` from inside
- * the PS capsule.
+ * Phase 3.5 (this PR): PRM migrates to the capsule shape, adding
+ * `prm` as the sixth migrated module. PRM owns problem-resolution
+ * cases (incl. case workspace deep link), method library, playbooks,
+ * catalog, AI catalog, and control panel. Frontend modularity checks
+ * now run strict for the six migrated modules; the remaining 9 RTLMs
+ * continue in report-only mode until their own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -127,6 +125,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "pmCentral",
   "codeStudio",
   "ps",
+  "prm",
 ];
 
 /**

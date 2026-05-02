@@ -5,7 +5,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { PRMCaseCard } from "@/components/prm/PRMCaseCard";
+import { PRMCaseCard } from "../components/PRMCaseCard";
 
 const STATUSES = [
   "", "draft", "intake", "triage", "analysis", "decision_pending",
