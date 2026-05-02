@@ -6,11 +6,26 @@
  */
 
 import { describe, it, expect } from "vitest";
+import path from "path";
 
 /**
  * These tests validate the resolver's contract and type shapes.
  * DB-dependent integration tests would require test fixtures.
  */
+
+const REPO_ROOT = process.cwd();
+const WORKSPACE_ROUTER_PATH = path.resolve(
+  REPO_ROOT,
+  "server/workspace/workspace-router.ts",
+);
+const SHELL_VIEW_RESOLVER_PATH = path.resolve(
+  REPO_ROOT,
+  "server/workspace/shell-view-resolver.ts",
+);
+const ASSIGNMENT_RESOLVER_PATH = path.resolve(
+  REPO_ROOT,
+  "server/workspace/assignment-resolver.ts",
+);
 
 describe("Workspace Assignment Resolver — Contract", () => {
   it("exports resolveWorkspaceAssignments function", async () => {
@@ -52,18 +67,23 @@ describe("Workspace Staffing — Governance Enforcement", () => {
     const mod = await import("../assignment-resolver");
     const exportNames = Object.keys(mod);
 
-    // Resolver must be read-only — no mutation functions
-    const writePatterns = [
+    // Resolver must be read-only — no mutation functions. We check verb
+    // PREFIXES (camelCase) so noun-bearing names like
+    // `resolveWorkspaceAssignments` (read-only) don't trip the
+    // `assign` / `assignment` / `release` substrings.
+    const writeVerbPrefixes = [
       "create", "insert", "update", "delete", "remove",
       "assign", "release", "approve", "reject", "cancel",
       "mutate", "write", "set", "modify",
     ];
 
     for (const name of exportNames) {
-      const lower = name.toLowerCase();
-      for (const pattern of writePatterns) {
-        expect(lower.includes(pattern)).toBe(false);
-      }
+      // Only function-style camelCase names start with a lowercase verb.
+      const firstWord = name.match(/^[a-z]+/)?.[0] ?? "";
+      expect(
+        writeVerbPrefixes.includes(firstWord),
+        `Export ${name} starts with write-verb ${firstWord}`,
+      ).toBe(false);
     }
   });
 
@@ -71,10 +91,7 @@ describe("Workspace Staffing — Governance Enforcement", () => {
     // Verify the staffing sub-router only has query (read) endpoints
     // This is a structural test — the router definition should only use .query(), not .mutation()
     const routerSource = await import("fs/promises").then((fs) =>
-      fs.readFile(
-        "/data/data/com.termux/files/home/MyNewAp1Claude/server/workspace/workspace-router.ts",
-        "utf-8",
-      ),
+      fs.readFile(WORKSPACE_ROUTER_PATH, "utf-8"),
     );
 
     // Find the staffing section
@@ -92,10 +109,7 @@ describe("Workspace Shell View — Staffing Integration", () => {
   it("ShellView type includes staffing field", async () => {
     // Verify the shell view resolver exports a type with staffing
     const shellSource = await import("fs/promises").then((fs) =>
-      fs.readFile(
-        "/data/data/com.termux/files/home/MyNewAp1Claude/server/workspace/shell-view-resolver.ts",
-        "utf-8",
-      ),
+      fs.readFile(SHELL_VIEW_RESOLVER_PATH, "utf-8"),
     );
     expect(shellSource).toContain("staffing:");
     expect(shellSource).toContain("bridgeConnected:");
@@ -108,20 +122,14 @@ describe("Assignment Lifecycle in Workspace", () => {
   it("only pending and active statuses are shown by default (not released/completed)", async () => {
     // Verify the resolver filters to active statuses
     const resolverSource = await import("fs/promises").then((fs) =>
-      fs.readFile(
-        "/data/data/com.termux/files/home/MyNewAp1Claude/server/workspace/assignment-resolver.ts",
-        "utf-8",
-      ),
+      fs.readFile(ASSIGNMENT_RESOLVER_PATH, "utf-8"),
     );
     expect(resolverSource).toContain('"pending", "active"');
   });
 
   it("released/completed assignments can be included with flag", async () => {
     const resolverSource = await import("fs/promises").then((fs) =>
-      fs.readFile(
-        "/data/data/com.termux/files/home/MyNewAp1Claude/server/workspace/assignment-resolver.ts",
-        "utf-8",
-      ),
+      fs.readFile(ASSIGNMENT_RESOLVER_PATH, "utf-8"),
     );
     expect(resolverSource).toContain("includeReleased");
     expect(resolverSource).toContain('"released", "completed"');
@@ -129,10 +137,7 @@ describe("Assignment Lifecycle in Workspace", () => {
 
   it("conflict detection checks for over_allocated employees", async () => {
     const resolverSource = await import("fs/promises").then((fs) =>
-      fs.readFile(
-        "/data/data/com.termux/files/home/MyNewAp1Claude/server/workspace/assignment-resolver.ts",
-        "utf-8",
-      ),
+      fs.readFile(ASSIGNMENT_RESOLVER_PATH, "utf-8"),
     );
     expect(resolverSource).toContain("over_allocated");
     expect(resolverSource).toContain("totalAlloc > 100");

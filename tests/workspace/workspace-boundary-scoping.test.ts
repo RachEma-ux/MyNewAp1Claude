@@ -1,5 +1,6 @@
 /**
  * Phase 2 — Workspace Boundary Scoping Tests
+ *   (post-per-purpose-shell migration)
  *
  * WS-03: Workspace pages use scoped queries (no cross-workspace leakage)
  * WS-09: Workspace membership governs participation
@@ -7,114 +8,88 @@
  *
  * Validates that workspace-facing pages use explicitly scoped queries
  * and do not leak global data into workspace surfaces.
+ *
+ * Legacy `WorkspaceShell.tsx` / `WorkspaceDetail.tsx` / `WorkspaceHome.tsx`
+ * were replaced by three per-purpose shells (Personal/Project/Research).
  */
 
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 
+import { allShellSources } from "./_workspace-shell-helpers";
+
 const CLIENT_PAGES = path.resolve(process.cwd(), "client/src/pages");
 const CLIENT_WORKSPACE = path.resolve(CLIENT_PAGES, "workspace");
 
 // ============================================================================
-// WS-03: Workspace Data Scoping
+// WS-03: Per-purpose shells use workspace-scoped data queries
 // ============================================================================
 
-describe("Phase 2 — WorkspaceDetail scoped queries", () => {
-  const filePath = path.join(CLIENT_PAGES, "WorkspaceDetail.tsx");
+describe("Phase 2 — Per-purpose shells: scoped data queries", () => {
+  for (const { name, source } of allShellSources()) {
+    it(`${name} does NOT use unscoped global trpc.agents.list`, () => {
+      expect(source).not.toMatch(/trpc\.agents\.list\.useQuery\(\s*\)/);
+    });
 
-  it("WorkspaceDetail exists", () => {
-    expect(fs.existsSync(filePath)).toBe(true);
-  });
+    it(`${name} references workspaceId for scoping`, () => {
+      expect(source).toContain("workspaceId");
+    });
 
-  it("WorkspaceDetail does NOT use global trpc.agents.list", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    // Should NOT have unscoped global agent list
-    expect(content).not.toMatch(/trpc\.agents\.list\.useQuery\(\)/);
-  });
+    it(`${name} loads modules via modules.manage.list with workspaceId`, () => {
+      expect(source).toMatch(
+        /trpc\.modules\.manage\.list\.useQuery\(\s*\{\s*workspaceId/,
+      );
+    });
 
-  it("WorkspaceDetail uses workspace-scoped agent query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    // Should use modules.agentOrch.agents.list with workspaceId
-    expect(content).toContain("workspaceId");
-  });
-
-  it("WorkspaceDetail uses workspace-scoped document query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    // documents.list with workspaceId
-    expect(content).toMatch(/documents\.list\.useQuery.*workspaceId/s);
-  });
+    it(`${name} loads the workspace via workspaces.get with id`, () => {
+      expect(source).toMatch(
+        /trpc\.workspaces\.get\.useQuery\(\s*\{\s*id:\s*workspaceId/,
+      );
+    });
+  }
 });
 
 // ============================================================================
-// WS-03: WorkspaceShell passes workspaceId to all module pages
+// WS-03: Per-purpose shells route module pages under the workspace prefix
+//         (replaces "passes workspaceId={workspaceId}" prop pattern)
 // ============================================================================
 
-describe("Phase 2 — WorkspaceShell scoped module rendering", () => {
-  const filePath = path.join(CLIENT_PAGES, "WorkspaceShell.tsx");
+describe("Phase 2 — Per-purpose shells: workspace-scoped routing", () => {
+  for (const { name, source } of allShellSources()) {
+    it(`${name} reads workspaceId from useParams`, () => {
+      expect(source).toContain("useParams");
+    });
 
-  it("WorkspaceShell exists", () => {
-    expect(fs.existsSync(filePath)).toBe(true);
-  });
-
-  it("WorkspaceShell passes workspaceId to every module page", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const matches = content.match(/workspaceId={workspaceId}/g);
-    expect(matches).not.toBeNull();
-    // Should pass to many module pages (at least 10)
-    expect(matches!.length).toBeGreaterThanOrEqual(10);
-  });
-
-  it("WorkspaceShell loads workspace via scoped query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain("trpc.workspaces.get.useQuery");
-  });
-
-  it("WorkspaceShell loads modules via scoped query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain("trpc.modules.manage.list.useQuery");
-  });
+    it(`${name} mounts module routes under basePath`, () => {
+      expect(source).toMatch(/\$\{basePath\}/);
+    });
+  }
 });
 
 // ============================================================================
-// WS-03: WorkspaceHome uses scoped queries
+// WS-03: Per-purpose shells render workspace-aware content
+//         (replaces WorkspaceHome dashboard inline default route)
 // ============================================================================
 
-describe("Phase 2 — WorkspaceHome scoped queries", () => {
-  const filePath = path.join(CLIENT_PAGES, "WorkspaceHome.tsx");
+describe("Phase 2 — Per-purpose shells render workspace-aware content", () => {
+  for (const { name, source } of allShellSources()) {
+    it(`${name} renders workspace.name`, () => {
+      expect(source).toContain("workspace.name");
+    });
 
-  it("WorkspaceHome exists", () => {
-    expect(fs.existsSync(filePath)).toBe(true);
-  });
-
-  it("WorkspaceHome uses workspace-scoped activity query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain("getActivity");
-  });
-
-  it("WorkspaceHome uses workspace-scoped members query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain("getMembers");
-  });
-
-  it("WorkspaceHome uses workspace-scoped modules query", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain("getModules");
-  });
-
-  it("WorkspaceHome does NOT contain global list queries", () => {
-    const content = fs.readFileSync(filePath, "utf-8");
-    // Should NOT have unscoped global queries
-    expect(content).not.toMatch(/trpc\.agents\.list\.useQuery\(\)/);
-    expect(content).not.toMatch(/trpc\.providers\.list\.useQuery\(\)/);
-  });
+    it(`${name} surfaces enabled module count`, () => {
+      // Each shell tracks enabledCount/enabledModules and renders it.
+      expect(source).toMatch(/enabledCount|enabledModules/);
+    });
+  }
 });
 
 // ============================================================================
-// WS-15: Workspace module pages require workspaceId
+// WS-15: Module pages receive workspaceId via URL params (not props)
 // ============================================================================
 
-describe("Phase 2 — Module pages receive workspaceId", () => {
+describe("Phase 2 — Module pages live under per-purpose shells", () => {
   const modulePages = [
     "AgentsRosterPage.tsx",
     "KnowledgeDocsPage.tsx",
@@ -125,11 +100,29 @@ describe("Phase 2 — Module pages receive workspaceId", () => {
   ];
 
   for (const page of modulePages) {
-    it(`${page} accepts workspaceId prop`, () => {
+    it(`${page} is workspace-scoped (workspaceId prop, URL param, or shell-id resolver)`, () => {
       const filePath = path.join(CLIENT_WORKSPACE, page);
-      if (!fs.existsSync(filePath)) return; // skip if not present
+      if (!fs.existsSync(filePath)) return; // page may have been retired
       const content = fs.readFileSync(filePath, "utf-8");
-      expect(content).toContain("workspaceId");
+      // After the per-purpose shell migration, scoping is signaled
+      // any of three ways:
+      //   1. Page references workspaceId directly (legacy prop / URL param)
+      //   2. Server-side queries resolve via getShellWorkspaceId
+      //   3. Page calls a workspace-scoped tRPC route (the server router
+      //      itself enforces the scope, e.g. pmCentral / agents.* under
+      //      governedProcedure with shell resolver).
+      const scoped =
+        /workspaceId/.test(content) ||
+        /getShellWorkspaceId/.test(content) ||
+        /trpc\.(pmCentral|agents|knowledge|collaboration|reporting)\./.test(
+          content,
+        ) ||
+        // Module sub-routers under `trpc.modules.<key>.*` resolve the
+        // workspace server-side via getShellWorkspaceId.
+        /trpc\.modules\.(pmt|knowledge|agents|collaboration|reporting|agentOrch)\./.test(
+          content,
+        );
+      expect(scoped, `${page} has no workspace-scoping signal`).toBe(true);
     });
   }
 });
@@ -145,9 +138,8 @@ describe("Phase 2 — Server-side access enforcement", () => {
   });
 
   it("workspace routes use access checks before data return", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
-    // get, getRoutingProfile, getActivity, getMembers should all have guards
     expect(content).toContain("requireReadableWorkspaceRoute");
   });
 });

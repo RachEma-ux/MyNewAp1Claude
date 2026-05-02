@@ -136,27 +136,43 @@ describe("WS-02: Access resolves through capability model", () => {
 });
 
 // ============================================================================
-// WS-03: Workspace Boundary Scoping
+// WS-03: Workspace Boundary Scoping (per-purpose shells)
 // ============================================================================
 
 describe("WS-03: Workspace pages use scoped queries", () => {
-  const CLIENT_PAGES = path.resolve(process.cwd(), "client/src/pages");
+  const SHELLS = [
+    "PersonalWorkspaceShell",
+    "ProjectWorkspaceShell",
+    "ResearchWorkspaceShell",
+  ] as const;
 
-  it("WorkspaceDetail does not use global agents.list", () => {
-    const filePath = path.join(CLIENT_PAGES, "WorkspaceDetail.tsx");
-    if (!fs.existsSync(filePath)) return; // skip if file doesn't exist
-    const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).not.toMatch(/trpc\.agents\.list\.useQuery\(\)/);
-  });
+  for (const name of SHELLS) {
+    it(`${name} does not use unscoped global agents.list`, () => {
+      const filePath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      if (!fs.existsSync(filePath)) return; // shell may have moved
+      const content = fs.readFileSync(filePath, "utf-8");
+      expect(content).not.toMatch(/trpc\.agents\.list\.useQuery\(\s*\)/);
+    });
 
-  it("WorkspaceShell passes workspaceId to module pages", () => {
-    const filePath = path.join(CLIENT_PAGES, "WorkspaceShell.tsx");
-    if (!fs.existsSync(filePath)) return;
-    const content = fs.readFileSync(filePath, "utf-8");
-    const matches = content.match(/workspaceId={workspaceId}/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(10);
-  });
+    it(`${name} threads workspaceId via URL params and basePath`, () => {
+      const filePath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      if (!fs.existsSync(filePath)) return;
+      const content = fs.readFileSync(filePath, "utf-8");
+      // URL-scoped: shells read workspaceId from useParams and mount
+      // module routes under basePath (replaces prop-passing).
+      expect(content).toContain("useParams");
+      expect(content).toContain("workspaceId");
+      expect(content).toMatch(/\$\{basePath\}/);
+    });
+  }
 });
 
 // ============================================================================
@@ -164,47 +180,57 @@ describe("WS-03: Workspace pages use scoped queries", () => {
 // ============================================================================
 
 describe("WS-04: Workspace lifecycle status enforcement", () => {
-  it("WORKSPACE_STATUSES includes all required statuses", () => {
-    expect(WORKSPACE_STATUSES).toContain("created");
-    expect(WORKSPACE_STATUSES).toContain("configured");
-    expect(WORKSPACE_STATUSES).toContain("active");
-    expect(WORKSPACE_STATUSES).toContain("paused");
-    expect(WORKSPACE_STATUSES).toContain("archived");
-    expect(WORKSPACE_STATUSES).toContain("deleted");
-    expect(WORKSPACE_STATUSES.length).toBe(6);
+  // Lifecycle was extended from 6 statuses to a 9-status canonical
+  // model: draft, ready_for_review, under_review, approved, published,
+  // active, rejected, archived, deleted. The legacy "created" /
+  // "configured" / "paused" names are mapped via LEGACY_STATUS_MAP.
+  it("WORKSPACE_STATUSES is the canonical 9-status set", () => {
+    const required = [
+      "draft",
+      "ready_for_review",
+      "under_review",
+      "approved",
+      "published",
+      "active",
+      "rejected",
+      "archived",
+      "deleted",
+    ];
+    for (const s of required) {
+      expect(WORKSPACE_STATUSES, `missing status ${s}`).toContain(s);
+    }
+    expect(WORKSPACE_STATUSES.length).toBe(9);
   });
 
-  it("isWorkspaceExecutable allows active, created, configured", async () => {
+  it("isWorkspaceExecutable is true only for `active`", async () => {
     const { isWorkspaceExecutable } = await import(
       "../../server/workspace/workspace-lifecycle"
     );
 
     expect(isWorkspaceExecutable("active")).toBe(true);
-    expect(isWorkspaceExecutable("created")).toBe(true);
-    expect(isWorkspaceExecutable("configured")).toBe(true);
-    expect(isWorkspaceExecutable("paused")).toBe(false);
+    expect(isWorkspaceExecutable("draft")).toBe(false);
+    expect(isWorkspaceExecutable("ready_for_review")).toBe(false);
     expect(isWorkspaceExecutable("archived")).toBe(false);
     expect(isWorkspaceExecutable("deleted")).toBe(false);
   });
 
-  it("isWorkspaceReadable allows paused and archived", async () => {
+  it("isWorkspaceReadable allows active and archived; deleted is blocked", async () => {
     const { isWorkspaceReadable } = await import(
       "../../server/workspace/workspace-lifecycle"
     );
 
     expect(isWorkspaceReadable("active")).toBe(true);
-    expect(isWorkspaceReadable("paused")).toBe(true);
     expect(isWorkspaceReadable("archived")).toBe(true);
     expect(isWorkspaceReadable("deleted")).toBe(false);
   });
 
-  it("requireExecutableWorkspace throws for paused workspace", async () => {
+  it("requireExecutableWorkspace throws for archived workspace (without escape action)", async () => {
     const { requireExecutableWorkspace } = await import(
       "../../server/workspace/workspace-lifecycle"
     );
 
-    const ctx = mockContext({ status: "paused" });
-    expect(() => requireExecutableWorkspace(ctx)).toThrow(/paused/);
+    const ctx = mockContext({ status: "archived" });
+    expect(() => requireExecutableWorkspace(ctx)).toThrow(/archived/);
   });
 
   it("requireExecutableWorkspace throws for deleted workspace", async () => {
@@ -252,13 +278,22 @@ describe("WS-04: Workspace lifecycle status enforcement", () => {
 
 describe("WS-05: Workspace purpose type", () => {
   it("WORKSPACE_PURPOSE_TYPES includes all required types", () => {
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("goal");
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("mission");
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("project");
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("team");
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("strategy");
-    expect(WORKSPACE_PURPOSE_TYPES).toContain("other");
-    expect(WORKSPACE_PURPOSE_TYPES.length).toBe(6);
+    // Canonical purpose set was expanded from 6 to 8 (added
+    // `research`, `operational`).
+    const required = [
+      "goal",
+      "mission",
+      "project",
+      "team",
+      "research",
+      "operational",
+      "strategy",
+      "other",
+    ];
+    for (const t of required) {
+      expect(WORKSPACE_PURPOSE_TYPES, `missing purpose ${t}`).toContain(t);
+    }
+    expect(WORKSPACE_PURPOSE_TYPES.length).toBe(8);
   });
 
   it("WorkspaceContext includes purposeType field", () => {
@@ -277,13 +312,15 @@ describe("WS-05: Workspace purpose type", () => {
 // ============================================================================
 
 describe("WS-06: Non-executable workspaces block writes", () => {
-  it("isActionAllowed blocks writes on paused workspace", async () => {
+  it("isActionAllowed blocks writes on archived workspace (writes denied)", async () => {
     const { isActionAllowed } = await import(
       "../../server/workspace/workspace-lifecycle"
     );
 
-    expect(isActionAllowed("paused", "documents.upload", false)).toBe(false);
-    expect(isActionAllowed("paused", "workspace.get", true)).toBe(true);
+    // Archived is the canonical "non-executable readable" status
+    // (legacy "paused" was folded into archived).
+    expect(isActionAllowed("archived", "documents.upload", false)).toBe(false);
+    expect(isActionAllowed("archived", "workspace.get", true)).toBe(true);
   });
 
   it("isActionAllowed blocks all on deleted workspace", async () => {
@@ -476,7 +513,9 @@ describe("WS-14: Workspace has required configuration", () => {
   it("workspace schema has status with default", () => {
     const schemaPath = path.resolve(process.cwd(), "drizzle/tables/users.ts");
     const content = fs.readFileSync(schemaPath, "utf-8");
-    expect(content).toMatch(/status.*default.*active/);
+    // Default flipped from "active" to "draft" with the 9-status
+    // canonical lifecycle (workspaces enter the world unsubmitted).
+    expect(content).toMatch(/status.*default\("draft"\)/);
   });
 });
 
@@ -509,7 +548,7 @@ describe("WS-15: Module presets are consistent with workspace types", () => {
 
 describe("Anti-patterns: No execution without workspaceId", () => {
   it("workspace router procedures require workspace ID in input", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
 
     // The workspace get/update/delete endpoints all require id input
