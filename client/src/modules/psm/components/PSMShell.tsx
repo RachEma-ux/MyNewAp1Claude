@@ -6,13 +6,13 @@ import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import PSMSidebar, { type PSMView } from "./PSMSidebar";
 
-const PSMDashboardPage = lazy(() => import("@/pages/psm/PSMDashboardPage"));
-const PSMLibraryPage = lazy(() => import("@/pages/psm/PSMLibraryPage"));
-const PSMSelectorPage = lazy(() => import("@/pages/psm/PSMSelectorPage"));
-const PSMCasesPage = lazy(() => import("@/pages/psm/PSMCasesPage"));
-const PSMAdminPage = lazy(() => import("@/pages/psm/PSMAdminPage"));
-const PSMAnalyticsPage = lazy(() => import("@/pages/psm/PSMAnalyticsPage"));
-const PSMAICatalogPage = lazy(() => import("@/pages/psm/PSMAICatalogPage"));
+const PSMDashboardPage = lazy(() => import("../pages/PSMDashboardPage"));
+const PSMLibraryPage = lazy(() => import("../pages/PSMLibraryPage"));
+const PSMSelectorPage = lazy(() => import("../pages/PSMSelectorPage"));
+const PSMCasesPage = lazy(() => import("../pages/PSMCasesPage"));
+const PSMAdminPage = lazy(() => import("../pages/PSMAdminPage"));
+const PSMAnalyticsPage = lazy(() => import("../pages/PSMAnalyticsPage"));
+const PSMAICatalogPage = lazy(() => import("../pages/PSMAICatalogPage"));
 
 const routeMap: Record<PSMView, string> = {
   dashboard: "/psm/dashboard",

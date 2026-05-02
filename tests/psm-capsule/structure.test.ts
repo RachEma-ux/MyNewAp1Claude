@@ -1,5 +1,5 @@
 /**
- * PRM Capsule — Structural invariants.
+ * PSM Capsule — Structural invariants.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,10 +19,10 @@ import { extractAppRoutes } from "../../scripts/module-tools/route-inventory";
 import { scanFileForBoundaries } from "../../scripts/module-tools/boundary-rules";
 
 const REPO_ROOT = process.cwd();
-const PRM_DIR = join(REPO_ROOT, "client", "src", "modules", "prm");
+const PSM_DIR = join(REPO_ROOT, "client", "src", "modules", "psm");
 const APP_PATH = join(REPO_ROOT, "client", "src", "App.tsx");
 
-describe("PRM capsule files exist", () => {
+describe("PSM capsule files exist", () => {
   it.each([
     "client.ts",
     "manifest.ts",
@@ -31,29 +31,31 @@ describe("PRM capsule files exist", () => {
     "nav.ts",
     "index.ts",
     "types.ts",
-    "components/PRMShell.tsx",
-    "components/PRMSidebar.tsx",
+    "components/PSMShell.tsx",
+    "components/PSMSidebar.tsx",
   ])("has %s", (rel) => {
-    expect(existsSync(join(PRM_DIR, rel))).toBe(true);
+    expect(existsSync(join(PSM_DIR, rel))).toBe(true);
   });
 
   it.each([
-    "PRMDashboardPage.tsx",
-    "PRMNewCasePage.tsx",
-    "PRMCaseListPage.tsx",
-    "PRMCaseWorkspacePage.tsx",
-    "PRMMethodsLibraryPage.tsx",
-    "PRMPlaybooksPage.tsx",
-    "PRMCatalogPage.tsx",
-    "PRMAICatalogPage.tsx",
-    "PRMControlPanelPage.tsx",
+    "PSMDashboardPage.tsx",
+    "PSMLibraryPage.tsx",
+    "PSMSelectorPage.tsx",
+    "PSMCasesPage.tsx",
+    "PSMCaseDetailPage.tsx",
+    "PSMMethodDetailPage.tsx",
+    "PSMRunPage.tsx",
+    "PSMAdminPage.tsx",
+    "PSMAnalyticsPage.tsx",
+    "PSMAICatalogPage.tsx",
   ])("has page %s", (rel) => {
-    expect(existsSync(join(PRM_DIR, "pages", rel))).toBe(true);
+    expect(existsSync(join(PSM_DIR, "pages", rel))).toBe(true);
   });
 });
 
-describe("PRM migration state", () => {
+describe("PSM migration state", () => {
   it.each([
+    "psm",
     "prm",
     "communication",
     "dataAnalysis",
@@ -65,11 +67,11 @@ describe("PRM migration state", () => {
   });
 });
 
-describe("PRM manifest", () => {
-  const snap = readManifestFor(REPO_ROOT, "prm", "prm");
+describe("PSM manifest", () => {
+  const snap = readManifestFor(REPO_ROOT, "psm", "psm");
 
-  it("declares baseRoute /prm", () => {
-    expect(snap.baseRoute).toBe("/prm");
+  it("declares baseRoute /psm", () => {
+    expect(snap.baseRoute).toBe("/psm");
   });
   it("declares a capsuleEntrypoint", () => {
     expect(snap.capsuleEntrypoint).toBeTruthy();
@@ -77,20 +79,21 @@ describe("PRM manifest", () => {
   it("layoutMode is inside-main-layout", () => {
     expect(snap.layoutMode).toBe("inside-main-layout");
   });
-  it("routeInventory contains the 10 canonical routes", () => {
+  it("routeInventory contains the 11 canonical routes", () => {
     const set = new Set(snap.routeInventory.map(normalizePath));
     expect(set).toEqual(
       new Set([
-        "/prm",
-        "/prm/dashboard",
-        "/prm/new",
-        "/prm/cases",
-        "/prm/cases/:id",
-        "/prm/methods",
-        "/prm/playbooks",
-        "/prm/catalog",
-        "/prm/ai-catalog",
-        "/prm/control-panel",
+        "/psm",
+        "/psm/dashboard",
+        "/psm/library",
+        "/psm/selector",
+        "/psm/cases",
+        "/psm/cases/:id",
+        "/psm/methods/:id",
+        "/psm/runs/:id",
+        "/psm/admin",
+        "/psm/analytics",
+        "/psm/ai-catalog",
       ]),
     );
   });
@@ -103,7 +106,7 @@ describe("PRM manifest", () => {
 });
 
 describe("routeInventory ⊆ routes.tsx", () => {
-  const snap = readManifestFor(REPO_ROOT, "prm", "prm");
+  const snap = readManifestFor(REPO_ROOT, "psm", "psm");
   it("every routeInventory path matches a routes.tsx pattern", () => {
     for (const inv of snap.routeInventory) {
       const matched = snap.routesFileEntries.some((p) =>
@@ -119,20 +122,20 @@ describe("routeInventory ⊆ routes.tsx", () => {
 describe("App.tsx ownership", () => {
   const appSrc = readFileSync(APP_PATH, "utf8");
   const appRoutes = extractAppRoutes(appSrc);
-  const folder = RTLM_FOLDER_MAP.prm;
+  const folder = RTLM_FOLDER_MAP.psm;
 
-  it("does not lazy-import any private PRM capsule page", () => {
+  it("does not lazy-import any private PSM capsule page", () => {
     expect(appSrc).not.toMatch(
       new RegExp(`import\\([^)]*?modules/${folder}/pages/`),
     );
   });
 
-  it("does not lazy-import legacy @/pages/prm/ pages", () => {
-    expect(appSrc).not.toMatch(/import\([^)]*?@\/pages\/prm\//);
+  it("does not lazy-import legacy @/pages/psm/ pages", () => {
+    expect(appSrc).not.toMatch(/import\([^)]*?@\/pages\/psm\//);
   });
 
-  it("does not mount any canonical /prm/* route owned by PRM", () => {
-    const snap = readManifestFor(REPO_ROOT, "prm", "prm");
+  it("does not mount any canonical /psm/* route owned by PSM", () => {
+    const snap = readManifestFor(REPO_ROOT, "psm", "psm");
     const owned = new Set(snap.routeInventory.map(normalizePath));
     const offending = appRoutes.filter((r) => {
       const p = normalizePath(r.path);
@@ -143,7 +146,7 @@ describe("App.tsx ownership", () => {
 });
 
 describe("Boundary discipline", () => {
-  const findings = collectAllBoundaryFindings(PRM_DIR);
+  const findings = collectAllBoundaryFindings(PSM_DIR);
 
   it("no MainLayout import inside the capsule", () => {
     const main = findings.filter((f) => f.kind === "main-layout-import");

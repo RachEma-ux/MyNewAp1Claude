@@ -112,11 +112,17 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * records, catalog/reference views, and the PS control panel. PS →
  * PM Central is a backend handoff.
  *
- * Phase 3.5 (this PR): PRM migrates to the capsule shape, adding
+ * Phase 3.5 (PR #65): PRM migrated to the capsule shape, adding
  * `prm` as the sixth migrated module. PRM owns problem-resolution
  * cases (incl. case workspace deep link), method library, playbooks,
- * catalog, AI catalog, and control panel. Frontend modularity checks
- * now run strict for the six migrated modules; the remaining 9 RTLMs
+ * catalog, AI catalog, and control panel.
+ *
+ * Phase 3.6 (this PR): PSM migrates to the capsule shape, adding
+ * `psm` as the seventh migrated module. PSM owns problem-solving
+ * methods: dashboard, method library, selector, cases (incl. case
+ * detail deep link), method detail and run detail deep links, AI
+ * catalog, admin, and analytics. Frontend modularity checks now run
+ * strict for the seven migrated modules; the remaining 8 RTLMs
  * continue in report-only mode until their own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
@@ -126,6 +132,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "codeStudio",
   "ps",
   "prm",
+  "psm",
 ];
 
 /**
