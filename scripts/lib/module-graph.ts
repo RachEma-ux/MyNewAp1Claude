@@ -64,7 +64,7 @@ export const MODULE_MAP: ModuleDescriptor[] = [
   {
     key: "rag",
     folder: "rag",
-    privateSchemas: ["ragdb", "graphrag"],
+    privateSchemas: ["ragdb"],
     connectionAccessors: ["getRagDb"],
   },
   {
@@ -130,6 +130,16 @@ export const MODULE_MAP: ModuleDescriptor[] = [
     folder: "pm-central",
     privateSchemas: ["pmdb"],
     connectionAccessors: ["getPmDb"],
+  },
+  {
+    key: "dataAnalysis",
+    folder: "data-analysis",
+    // Phase-1 staged ownership: graphrag tables physically live in the
+    // shared platform DB but are declared Data Analysis-owned via the
+    // manifest. The dedicated `dataanalysisdb` connector is in
+    // server/data-analysis/connection.ts (`getDataAnalysisDb`).
+    privateSchemas: ["graphrag"],
+    connectionAccessors: ["getDataAnalysisDb"],
   },
 ];
 

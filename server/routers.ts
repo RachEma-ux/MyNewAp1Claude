@@ -62,7 +62,7 @@ import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
 import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
 import { workforceAssignmentRouter } from "./workforce-assignment/router";
-import { dataAnalysisRouter } from "./data-analysis/router";
+// Data Analysis is now sourced from MODULE_ROUTERS (manifest-driven).
 
 // ---------------------------------------------------------------------------
 // Module routers — manifest-driven
@@ -120,7 +120,7 @@ export const appRouter = router({
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
-  dataAnalysis: dataAnalysisRouter, // GraphRAG + analytical tools
+  // dataAnalysis is mounted via MODULE_ROUTERS (manifest-driven).
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),

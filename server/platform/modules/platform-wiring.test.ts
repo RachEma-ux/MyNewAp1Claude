@@ -19,8 +19,8 @@ import { renderReportMarkdown, rollUp } from "./wiring-report";
 import { emptyInventory } from "./wiring-types";
 
 describe("wiring inventory", () => {
-  it("discovers all 15 known modules", () => {
-    expect(KNOWN_MODULES.length).toBe(15);
+  it("discovers all 16 known modules", () => {
+    expect(KNOWN_MODULES.length).toBe(16);
     const keys = new Set(KNOWN_MODULES.map((m) => m.key));
     for (const k of [
       "prm",
@@ -38,6 +38,7 @@ describe("wiring inventory", () => {
       "kgraAgent",
       "communication",
       "pmCentral",
+      "dataAnalysis",
     ]) {
       expect(keys.has(k)).toBe(true);
     }

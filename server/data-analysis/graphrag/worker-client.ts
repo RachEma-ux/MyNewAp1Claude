@@ -26,7 +26,41 @@ const WORKER_BASE_URL =
 
 let workerHealthy = false;
 let lastHealthCheck = 0;
+let lastEmittedHealthy: boolean | null = null;
 const HEALTH_CHECK_INTERVAL = 30000; // 30s
+
+/**
+ * Best-effort emission of worker availability transitions. We import
+ * lazily to avoid a hard dep cycle (events.ts → manifest.ts → worker).
+ * Failure to emit must never alter the returned health value.
+ */
+async function emitWorkerTransition(currentHealthy: boolean): Promise<void> {
+  if (lastEmittedHealthy === currentHealthy) return;
+  lastEmittedHealthy = currentHealthy;
+  try {
+    const [{ publishEvent, makeEnvelope }, { DATA_ANALYSIS_EVENTS }] =
+      await Promise.all([
+        import("../../platform/events"),
+        import("../events"),
+      ]);
+    await publishEvent(
+      makeEnvelope({
+        eventType: currentHealthy
+          ? DATA_ANALYSIS_EVENTS.graphRagWorkerRecovered
+          : DATA_ANALYSIS_EVENTS.graphRagWorkerUnavailable,
+        sourceModule: "dataAnalysis",
+        payload: {
+          url: WORKER_BASE_URL,
+          message: currentHealthy
+            ? "GraphRAG worker is reachable."
+            : "GraphRAG worker is not available.",
+        },
+      }),
+    );
+  } catch {
+    /* event-bus failure must not affect health probe */
+  }
+}
 
 /**
  * Check if the Python worker is reachable.
@@ -50,6 +84,7 @@ export async function checkWorkerHealth(): Promise<boolean> {
   }
 
   lastHealthCheck = now;
+  void emitWorkerTransition(workerHealthy);
   return workerHealthy;
 }
 

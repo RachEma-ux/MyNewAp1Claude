@@ -23,6 +23,7 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | OpenRouter         | `appdb`               | shares `getDb`                              | Schema today      |
 | Communication      | `communicationdb`     | `server/communication/connection.ts` (`getCommunicationDb`) | Owned |
 | PM Central         | `pmdb`                | `server/pm-central/connection.ts` (`getPmDb`) | Owned |
+| Data Analysis (GraphRAG subdomain) | `appdb` → `dataanalysisdb` (Phase 2) | `server/data-analysis/connection.ts` (`getDataAnalysisDb`) | Phase-1 staged: `kind: "shared"`. Owns `graphrag_sources / sync_runs / index_runs / query_runs / artifact_registry`. Physical move tracked under "Data Analysis RTLM hardening". |
 
 ## Rules
 
@@ -50,3 +51,4 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | RAG         | `DATABASE_URL_RAGDB`       | `${DATABASE_URL → /ragdb}`                                  |
 | Communication | `DATABASE_URL_COMMUNICATIONDB` | `${DATABASE_URL → /communicationdb}`                  |
 | PM Central  | `DATABASE_URL_PMDB`        | `${DATABASE_URL → /pmdb}`                                   |
+| Data Analysis | `DATABASE_URL_DATA_ANALYSISDB` | (Phase 1: delegates to `getDb()`; Phase 2: `${DATABASE_URL → /dataanalysisdb}`) |

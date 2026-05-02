@@ -2735,3 +2735,38 @@ actions:
     stage: mutate
     approval: none
     evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DATA ANALYSIS — GraphRAG (OmniGraph)
+  # ═══════════════════════════════════════════════════════════════════════════
+  dataAnalysis.graphRag.registerSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.graphRag.syncSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.graphRag.buildIndex:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.graphRag.query:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }

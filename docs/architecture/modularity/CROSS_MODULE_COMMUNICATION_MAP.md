@@ -50,6 +50,9 @@ Use the coordinator only when the flow becomes a real multi-module workflow:
 | Communication   | All modules     | event        | none                 | `communication.message.sent`, `communication.notification.created`, `communication.conversation.*`, `communication.meeting.*` — fan-out to subscribers (HQ, agents, audit). |
 | Any module      | PM Central      | gateway      | receipt for `pm.handoff.convert`, `pm.project.archive`, `pm.project.status.update`, `pm.plan.approve` | Create/update PM records exclusively through `pmCentral.*` gateway actions. Direct PMDB writes from non-PM modules are forbidden. |
 | PM Central      | All modules     | event        | none                 | `pm.project.*`, `pm.task.*`, `pm.milestone.*`, `pm.handoff.*` etc. — fan-out to subscribers (HQ, governance, audit). |
+| Any module      | Data Analysis   | gateway      | receipt for `dataAnalysis.graphRag.buildIndex` | Read GraphRAG state and submit sync/index/query through `dataAnalysis.graphRag.*` gateway actions. KGRA Agent consumes this surface; KGRA must NOT touch `graphrag_*` tables directly. |
+| Data Analysis   | All modules     | event        | none                 | `dataAnalysis.graphRag.sourceRegistered`, `*.sync*/.index*/.query*`, `*.workerUnavailable/Recovered` — fan-out to subscribers (HQ, KGRA, audit). |
+| Data Analysis   | GraphRAG worker (`:8484`) | port (external) | none           | Python `graphrag` worker is a Data Analysis runtime endpoint, not its own module. Missing worker → Data Analysis health = `degraded`. |
 
 ## Forbidden flows
 

@@ -102,6 +102,7 @@ async function main() {
       "kgraAgent",
       "communication",
       "pmCentral",
+      "dataAnalysis",
     ];
     for (const k of expected) {
       if (!literalKeys.includes(k)) {

@@ -480,6 +480,10 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "pmCentral.handoff.accept": "pmCentral.handoff.accept",
   "pmCentral.handoff.reject": "pmCentral.handoff.reject",
   "pmCentral.handoff.convert": "pmCentral.handoff.convert",
+  "dataAnalysis.graphRag.registerSource": "dataAnalysis.graphRag.registerSource",
+  "dataAnalysis.graphRag.syncSource": "dataAnalysis.graphRag.syncSource",
+  "dataAnalysis.graphRag.buildIndex": "dataAnalysis.graphRag.buildIndex",
+  "dataAnalysis.graphRag.query": "dataAnalysis.graphRag.query",
 };
 
 /**

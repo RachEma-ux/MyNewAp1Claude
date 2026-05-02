@@ -5,7 +5,7 @@
  * Enforces concurrency limits, timeouts, and module isolation.
  */
 
-import { getDb } from "../../db/connection";
+import { getDataAnalysisDb as getDb } from "../connection";
 import { eq, and, desc } from "drizzle-orm";
 import {
   graphragSources,
@@ -21,6 +21,29 @@ import {
   type GraphRagQueryMethod,
   type RunStatus,
 } from "./types";
+import { publishEvent, makeEnvelope } from "../../platform/events";
+import { DATA_ANALYSIS_EVENTS } from "../events";
+
+const SOURCE_MODULE = "dataAnalysis" as const;
+
+/**
+ * Best-effort event emission. Never let an event-bus failure mask
+ * the underlying job result — the UI relies on the run row, not the
+ * event, for failure visibility.
+ */
+async function emit(eventType: string, payload: Record<string, unknown>) {
+  try {
+    await publishEvent(
+      makeEnvelope({
+        eventType,
+        sourceModule: SOURCE_MODULE,
+        payload,
+      }),
+    );
+  } catch {
+    // swallow — caller is responsible for primary state via DB row
+  }
+}
 
 // Active job tracking for concurrency control
 const activeJobs = new Map<string, number>(); // moduleSlug → count
@@ -88,6 +111,10 @@ export async function runSyncJob(sourceId: number): Promise<{
     .returning();
 
   incrementActive(source.moduleSlug);
+  await emit(DATA_ANALYSIS_EVENTS.graphRagSyncStarted, {
+    sourceId: source.id,
+    syncRunId: syncRun.id,
+  });
 
   try {
     // Export documents from adapter
@@ -126,6 +153,11 @@ export async function runSyncJob(sourceId: number): Promise<{
     }
 
     decrementActive(source.moduleSlug);
+    await emit(DATA_ANALYSIS_EVENTS.graphRagSyncCompleted, {
+      sourceId: source.id,
+      syncRunId: syncRun.id,
+      documentCount: docs.length,
+    });
 
     return {
       syncRunId: syncRun.id,
@@ -143,6 +175,11 @@ export async function runSyncJob(sourceId: number): Promise<{
         completedAt: new Date(),
       })
       .where(eq(graphragSyncRuns.id, syncRun.id));
+    await emit(DATA_ANALYSIS_EVENTS.graphRagSyncFailed, {
+      sourceId: source.id,
+      syncRunId: syncRun.id,
+      errorMessage: err.message,
+    });
 
     return {
       syncRunId: syncRun.id,
@@ -216,6 +253,11 @@ export async function runIndexJob(
     .returning();
 
   incrementActive(source.moduleSlug);
+  await emit(DATA_ANALYSIS_EVENTS.graphRagIndexStarted, {
+    sourceId: source.id,
+    indexRunId: indexRun.id,
+    syncRunId: syncRunId ?? null,
+  });
 
   try {
     const result = await submitIndexJob({
@@ -245,6 +287,20 @@ export async function runIndexJob(
       .where(eq(graphragIndexRuns.id, indexRun.id));
 
     decrementActive(source.moduleSlug);
+    if (finalStatus === "completed") {
+      await emit(DATA_ANALYSIS_EVENTS.graphRagIndexCompleted, {
+        sourceId: source.id,
+        indexRunId: indexRun.id,
+        entityCount: result.entityCount,
+        relationshipCount: result.relationshipCount,
+      });
+    } else {
+      await emit(DATA_ANALYSIS_EVENTS.graphRagIndexFailed, {
+        sourceId: source.id,
+        indexRunId: indexRun.id,
+        errorMessage: result.error,
+      });
+    }
 
     return {
       indexRunId: indexRun.id,
@@ -262,6 +318,11 @@ export async function runIndexJob(
         completedAt: new Date(),
       })
       .where(eq(graphragIndexRuns.id, indexRun.id));
+    await emit(DATA_ANALYSIS_EVENTS.graphRagIndexFailed, {
+      sourceId: source.id,
+      indexRunId: indexRun.id,
+      errorMessage: err.message,
+    });
 
     return {
       indexRunId: indexRun.id,
@@ -312,6 +373,12 @@ export async function runQueryJob(args: {
     .returning();
 
   const startTime = Date.now();
+  await emit(DATA_ANALYSIS_EVENTS.graphRagQueryStarted, {
+    sourceId: source.id,
+    queryRunId: queryRun.id,
+    method: args.method,
+    question: args.question,
+  });
 
   try {
     const result = await submitQueryJob({
@@ -338,6 +405,23 @@ export async function runQueryJob(args: {
       })
       .where(eq(graphragQueryRuns.id, queryRun.id));
 
+    if (finalStatus === "completed") {
+      await emit(DATA_ANALYSIS_EVENTS.graphRagQueryCompleted, {
+        sourceId: source.id,
+        queryRunId: queryRun.id,
+        method: args.method,
+        question: args.question,
+      });
+    } else {
+      await emit(DATA_ANALYSIS_EVENTS.graphRagQueryFailed, {
+        sourceId: source.id,
+        queryRunId: queryRun.id,
+        method: args.method,
+        question: args.question,
+        errorMessage: result.error,
+      });
+    }
+
     return {
       queryRunId: queryRun.id,
       answer: result.answer || "",
@@ -355,6 +439,13 @@ export async function runQueryJob(args: {
         errorMessage: err.message,
       })
       .where(eq(graphragQueryRuns.id, queryRun.id));
+    await emit(DATA_ANALYSIS_EVENTS.graphRagQueryFailed, {
+      sourceId: source.id,
+      queryRunId: queryRun.id,
+      method: args.method,
+      question: args.question,
+      errorMessage: err.message,
+    });
 
     return {
       queryRunId: queryRun.id,
