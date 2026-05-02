@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T13:58:39.237Z
+Generated: 2026-05-02T14:36:50.719Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **308**
+Total `<Route>` declarations in App.tsx: **294**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -17,7 +17,7 @@ Compatibility redirects in App.tsx: **25**
 | data-analysis | 0 | 14 | 14 | 0 |
 | communication | 0 | 5 | 5 | 0 |
 | pm-central | 0 | 10 | 9 | 0 |
-| code-studio | 11 | 0 | 0 | 4 |
+| code-studio | 0 | 14 | 12 | 0 |
 | ps | 8 | 0 | 0 | 4 |
 | prm | 8 | 0 | 0 | 4 |
 | psm | 10 | 0 | 0 | 4 |
@@ -46,17 +46,20 @@ Compatibility redirects in App.tsx: **25**
 | `/automation/sandbox-wf` | App.tsx, manifest:sandbox-wf |
 | `/automation/sandbox-wf/:id` | App.tsx, manifest:sandbox-wf |
 | `/automation/sandbox-wf/new` | App.tsx, manifest:sandbox-wf |
-| `/code-studio` | App.tsx, manifest:code-studio |
-| `/code-studio/agents` | App.tsx, manifest:code-studio |
-| `/code-studio/approvals` | App.tsx, manifest:code-studio |
-| `/code-studio/control-panel` | App.tsx, manifest:code-studio |
-| `/code-studio/dashboard` | App.tsx, manifest:code-studio |
-| `/code-studio/jobs` | App.tsx, manifest:code-studio |
-| `/code-studio/jobs/:id` | App.tsx, manifest:code-studio |
-| `/code-studio/policies` | App.tsx, manifest:code-studio |
-| `/code-studio/repos` | App.tsx, manifest:code-studio |
-| `/code-studio/sessions` | App.tsx, manifest:code-studio |
-| `/code-studio/templates` | App.tsx, manifest:code-studio |
+| `/code-studio` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/agents` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/ai-catalog` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/approvals` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/control-panel` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/dashboard` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/how-to` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/jobs` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/jobs/:id` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/opencode-settings` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/policies` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/repos` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/sessions` | routeInventory:code-studio, routes.tsx:code-studio |
+| `/code-studio/templates` | routeInventory:code-studio, routes.tsx:code-studio |
 | `/communication` | routeInventory:communication, routes.tsx:communication |
 | `/communication/chat` | routeInventory:communication, routes.tsx:communication |
 | `/communication/conversations` | routeInventory:communication, routes.tsx:communication |
@@ -174,9 +177,6 @@ Compatibility redirects in App.tsx: **25**
 | `/bots/wizard` | unknown | — |  |
 | `/catalog/agents/:catalogEntryId/chat` | unknown | — |  |
 | `/code` | unknown | — |  |
-| `/code-studio/ai-catalog` | unknown | codeStudio |  |
-| `/code-studio/how-to` | unknown | codeStudio |  |
-| `/code-studio/opencode-settings` | unknown | codeStudio |  |
 | `/collaboration` | unknown | — |  |
 | `/compliance-export` | unknown | — |  |
 | `/components/ai-catalog` | unknown | — |  |
@@ -360,7 +360,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | data-analysis | ✅ | ✅ | ✅ | ✅ | ✅ |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ |
 | pm-central | ✅ | ✅ | ✅ | ✅ | ✅ |
-| code-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| code-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ps | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | prm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | psm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

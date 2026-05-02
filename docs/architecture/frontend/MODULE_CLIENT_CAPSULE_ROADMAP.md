@@ -70,6 +70,42 @@ its own internal routing, layout, and nav.
   pre-capsule baseline). The next module to migrate is **Code
   Studio** (PR 5 / Phase 3.3).
 
+### Phase 3.3 — Code Studio ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose existing
+  shell already does view-based internal routing (the Double IBM
+  Shell pattern: S1 module sidebar + optional S2 OpenCode settings
+  rail). Migrated `client/src/modules/code-studio/` to the capsule
+  layout.
+- Pages relocated from `client/src/pages/code-studio/` to
+  `client/src/modules/code-studio/pages/` (13 pages: Dashboard,
+  Jobs incl. detail, Templates, Sessions, Approvals, Repositories,
+  Agents, AI Catalog, Policies, Control Panel, OpenCode Settings,
+  How To). Shell components relocated from
+  `client/src/components/code-studio/` to
+  `client/src/modules/code-studio/components/`
+  (`CodeStudioShell`, `CodeStudioSidebar`, `OpenCodeSettingsRail`).
+- `mod.tsx` renders `<CodeStudioShell />` directly: the existing
+  shell already drives internal routing off `useLocation()` and
+  preserves the special S2 rail propagation for the OpenCode
+  Settings page (activeSection / activeTab / dirty). `routes.tsx`
+  exists alongside as the canonical path list for
+  `check:module-route-inventory`.
+- 14 canonical routes covered: 11 spec paths plus 3 long-standing
+  extras (`/code-studio/templates`, `/code-studio/ai-catalog`,
+  `/code-studio/opencode-settings`) that pre-date the capsule
+  roadmap list. Including them in `routeInventory` preserves the
+  existing UX without expanding scope.
+- The legacy `/code` Monaco editor route is **not** part of the
+  Code Studio RTLM canonical surface. It remains mounted directly
+  in App.tsx as a separate non-RTLM page.
+- Port reservations remain backend-mediated through the Port
+  Registry lane. Governance enforcement remains owned by the
+  backend Governance module. The capsule renders only its own UI;
+  no `trpc.<otherRtlm>.*` calls.
+- `MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral",
+  "codeStudio"]`. AWI: `codeStudio` fully-wired, blockers=[]. The
+  next module to migrate is **Projects System** (`ps`) at Phase 3.4.
+
 ### Phase 3.1 — Data Analysis ✅ MERGED
 - **Goal:** prove the capsule shape scales to a multi-subdomain
   RTLM. Data Analysis owns three subdomains (GraphRAG, Data
@@ -112,8 +148,8 @@ long tail.
 1. Communication                   _(Phase 2 pilot, merged)_
 2. Data Analysis                   _(Phase 3.1, merged)_
 3. PM Central                      _(Phase 3.2, merged)_
-4. Code Studio                     _(Phase 3.3, next)_
-5. Projects System (`ps`)
+4. Code Studio                     _(Phase 3.3, merged)_
+5. Projects System (`ps`)          _(Phase 3.4, next)_
 6. PRM
 7. PSM
 8. HR

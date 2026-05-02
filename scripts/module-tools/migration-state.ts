@@ -88,30 +88,35 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * Data Acquisition, and Data Warehouse subdomains. KGRA Agent is a
  * separate RTLM and remains outside strict mode.
  *
- * Phase 3.2 (this PR): PM Central migrates to the capsule shape,
- * adding `pmCentral` as the third migrated module. Frontend
+ * Phase 3.2 (PM Central, merged in PR #61): added `pmCentral` as
+ * the third migrated module. PM Central owns project management
+ * planning and delivery execution. Projects System (`ps`) remains
+ * separate — PS → PM Central is a backend handoff. PM Central's
+ * canonical baseRoute moved from `/pm-central/rtlm/*` to `/pm/*`;
+ * the legacy `/pm-central/*` shell routes are not RTLM canonical
+ * and continue to be mounted directly in App.tsx.
+ *
+ * Phase 3.3 (this PR): Code Studio migrates to the capsule shape,
+ * adding `codeStudio` as the fourth migrated module. Frontend
  * modularity checks now run strict for `communication`,
- * `dataAnalysis`, and `pmCentral`. The remaining 12 RTLMs continue
- * in report-only mode until their own migration PRs land.
+ * `dataAnalysis`, `pmCentral`, and `codeStudio`. The remaining 11
+ * RTLMs continue in report-only mode until their own migration
+ * PRs land.
  *
- * PM Central owns project management planning and delivery
- * execution (projects, tasks, milestones, risks, issues, decisions,
- * handoffs, settings). Projects System (`ps`) remains separate —
- * PS → PM Central is a backend handoff, not a frontend reach-around.
- * Workforce Assignment, HR, and Organization Management remain
- * separate RTLMs.
- *
- * PM Central's canonical baseRoute moved from `/pm-central/rtlm/*`
- * (the previous "RTLM-namespaced" canonical) to `/pm/*` in this
- * PR. The legacy `/pm-central/*` shell routes (PMCentralShellPage
- * and related non-RTLM legacy pages) are NOT migrated and are NOT
- * canonical RTLM routes — they continue to be mounted directly in
- * App.tsx.
+ * Code Studio owns the code execution / build / development
+ * workbench UI (jobs, sessions, approvals, repos, agents,
+ * policies, control panel, how-to, and the AI catalog / OpenCode
+ * settings / templates sub-surfaces that pre-date the canonical
+ * roadmap list). Port reservations remain backend-mediated through
+ * the Port Registry lane; Governance enforcement remains on the
+ * backend. Code Studio does not own the legacy `/code` Monaco
+ * editor — that route serves a separate non-RTLM page.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
   "dataAnalysis",
   "pmCentral",
+  "codeStudio",
 ];
 
 /**
