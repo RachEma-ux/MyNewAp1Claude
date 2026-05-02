@@ -387,23 +387,41 @@ export function renderTemplate(template: string, values: Record<string, string>)
 }
 
 /**
- * Seed built-in templates if they don't already exist.
+ * Built-in template definition shape — `Audit Job` is the canonical
+ * built-in. This is exposed so tests and seed scripts can both reach it.
  */
-export async function ensureBuiltInTemplates(): Promise<void> {
-  const db = getCodeDb();
-  if (!db) return;
-  const existing = await db.select().from(schema.codeJobTemplates)
-    .where(eq(schema.codeJobTemplates.isBuiltIn, true));
-  const hasAudit = existing.some((t: any) => t.slug === "audit-job");
-  if (!hasAudit) {
-    await createTemplate({
-      name: "Audit Job",
-      description: "Audit an implementation prompt against actual repository code. Produces a strict evidence-based verdict.",
-      category: "audit",
-      templateType: "audit",
-      isBuiltIn: true,
-      titleTemplate: "Audit: {{targetPrompt}}",
-      objectiveTemplate: `Read and follow AGENTS.md first as the mandatory repository operating policy.
+export interface BuiltInTemplateDefinition {
+  name: string;
+  description: string;
+  category: string;
+  templateType: string;
+  isBuiltIn: true;
+  titleTemplate: string;
+  objectiveTemplate: string;
+  defaultPriority: string;
+  variableSchema: Array<{
+    key: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string;
+  }>;
+}
+
+/**
+ * Definition of the built-in `Audit Job` template. Single source of
+ * truth shared by `ensureBuiltInTemplates` and the template-import test.
+ */
+export function getAuditJobTemplateDefinition(): BuiltInTemplateDefinition {
+  return {
+    name: "Audit Job",
+    description:
+      "Audit an implementation prompt against actual repository code. Produces a strict evidence-based verdict.",
+    category: "audit",
+    templateType: "audit",
+    isBuiltIn: true,
+    titleTemplate: "Audit Job",
+    objectiveTemplate: `Read and follow AGENTS.md first as the mandatory repository operating policy.
 
 Mandatory execution order:
 Planner -> Builder -> Reviewer -> Tester -> Governance
@@ -433,24 +451,37 @@ Output format:
 - Specific issues found (with file:line references)
 - Missing implementations
 - Unexpected changes (scope drift)`,
-      defaultPriority: "normal",
-      variableSchema: [
-        {
-          key: "targetPrompt",
-          label: "Target prompt to audit",
-          type: "long_text",
-          required: true,
-          placeholder: "Paste the exact original implementation prompt here",
-        },
-        {
-          key: "scopeNotes",
-          label: "Extra audit notes",
-          type: "long_text",
-          required: false,
-          placeholder: "Optional: any additional context or focus areas for the audit",
-        },
-      ],
-    });
+    defaultPriority: "normal",
+    variableSchema: [
+      {
+        key: "targetPrompt",
+        label: "Target prompt to audit",
+        type: "long_text",
+        required: true,
+        placeholder: "Paste the exact original implementation prompt here",
+      },
+      {
+        key: "scopeNotes",
+        label: "Extra audit notes",
+        type: "long_text",
+        required: false,
+        placeholder: "Optional: any additional context or focus areas for the audit",
+      },
+    ],
+  };
+}
+
+/**
+ * Seed built-in templates if they don't already exist.
+ */
+export async function ensureBuiltInTemplates(): Promise<void> {
+  const db = getCodeDb();
+  if (!db) return;
+  const existing = await db.select().from(schema.codeJobTemplates)
+    .where(eq(schema.codeJobTemplates.isBuiltIn, true));
+  const hasAudit = existing.some((t: any) => t.slug === "audit-job");
+  if (!hasAudit) {
+    await createTemplate(getAuditJobTemplateDefinition());
   }
 }
 
