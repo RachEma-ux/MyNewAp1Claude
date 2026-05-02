@@ -33,8 +33,39 @@ its own internal routing, layout, and nav.
   removed. The three compatibility redirects (`/chat`,
   `/conversations`, `/video-meeting`) remain in App.tsx as
   `<Redirect>` shims only.
-- `MIGRATED_MODULES = ["communication"]`. Every frontend modularity
-  check is strict for Communication.
+
+### Phase 3.1 — Data Analysis ✅ MERGED
+- **Goal:** prove the capsule shape scales to a multi-subdomain
+  RTLM. Data Analysis owns three subdomains (GraphRAG, Data
+  Acquisition with 10 sub-tabs, Data Warehouse).
+- Migrated `client/src/modules/data-analysis/` to the capsule
+  layout. Pages relocated from `client/src/pages/data-analysis/` to
+  `client/src/modules/data-analysis/pages/` (GraphRAG family +
+  Data Acquisition family + Data Warehouse).
+- Moved `/data-analysis`, `/data-analysis/graphrag`,
+  `/data-analysis/data-acquisition[/...]` (10 paths), and
+  `/data-analysis/data-warehouse` off App.tsx. The bare
+  `/data-analysis` redirects to `/data-analysis/graphrag` inside
+  the capsule (preserves the prior `<Redirect>` UX).
+- KGRA Agent was **not** migrated. KGRA's `/data-analysis/kgra-agent`
+  route stays on App.tsx (mounted by KGRA's own manifest), since
+  KGRA Agent is a separate RTLM. The path lives under Data
+  Analysis's `/data-analysis` URL prefix by historical accident
+  only.
+- Removed RAG manifest's stale `/data-analysis/graphrag` claim
+  (GraphRAG is a Data Analysis subdomain, not a RAG subdomain).
+  This eliminated a pre-existing duplicate-canonical-ownership
+  warning that would otherwise have failed
+  `check:module-routes-conflict` once Data Analysis flipped to
+  strict mode.
+- Dropped a single tab inside `GraphRAGPage` ("KGRA Agent" tab)
+  that previously made `trpc.kgraAgent.*` calls from inside Data
+  Analysis territory. KGRA remains accessible at its own
+  `/data-analysis/kgra-agent` route.
+- `MIGRATED_MODULES = ["communication", "dataAnalysis"]`. Every
+  frontend modularity check is strict for Communication and Data
+  Analysis. AWI: `dataAnalysis` 95 fully-wired (improved from
+  warnings=1 → warnings=0).
 
 ### Subsequent migrations (one PR each)
 
@@ -42,9 +73,9 @@ The order is intentional — modules with the largest blast radius
 go first so we shake out platform-side issues before touching the
 long tail.
 
-1. Communication                   _(Phase 1 pilot, above)_
-2. Data Analysis
-3. PM Central
+1. Communication                   _(Phase 2 pilot, merged)_
+2. Data Analysis                   _(Phase 3.1, merged)_
+3. PM Central                      _(Phase 3.2, next)_
 4. Code Studio
 5. Projects System (`ps`)
 6. PRM

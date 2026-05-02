@@ -1,20 +1,20 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T11:33:23.661Z
+Generated: 2026-05-02T13:34:30.845Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **311**
+Total `<Route>` declarations in App.tsx: **308**
 
-Compatibility redirects in App.tsx: **17**
+Compatibility redirects in App.tsx: **15**
 
 ## Module manifest routes
 
 | Module | manifest.routes | routeInventory | nav.ts hrefs | warnings |
 |---|---|---|---|---|
-| data-analysis | 12 | 0 | 0 | 4 |
+| data-analysis | 0 | 14 | 14 | 0 |
 | communication | 0 | 5 | 5 | 0 |
 | pm-central | 10 | 0 | 0 | 4 |
 | code-studio | 11 | 0 | 0 | 4 |
@@ -64,7 +64,20 @@ Compatibility redirects in App.tsx: **17**
 | `/communication/video-meeting` | routeInventory:communication, routes.tsx:communication |
 | `/cv` | App.tsx, manifest:culture-values |
 | `/cv/:item` | App.tsx, manifest:culture-values |
-| `/data-analysis/graphrag` | App.tsx, manifest:data-analysis |
+| `/data-analysis` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/canonical-records` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/classification` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/document-intelligence` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/items` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/outputs` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/processing` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/routing` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/runs` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/settings` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-acquisition/sources` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/data-warehouse` | routeInventory:data-analysis, routes.tsx:data-analysis |
+| `/data-analysis/graphrag` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/kgra-agent` | App.tsx, manifest:kgra-agent |
 | `/hr` | App.tsx, manifest:hr |
 | `/hr/directory` | App.tsx, manifest:hr |
@@ -344,7 +357,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 
 | Module | manifest | baseRoute | capsuleEntrypoint | layoutMode | routeInventory |
 |---|---|---|---|---|---|
-| data-analysis | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| data-analysis | ✅ | ✅ | ✅ | ✅ | ✅ |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ |
 | pm-central | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | code-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
