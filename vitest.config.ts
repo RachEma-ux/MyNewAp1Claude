@@ -1,10 +1,16 @@
 import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 import path from "path";
 
 const templateRoot = path.resolve(import.meta.dirname);
 
 export default defineConfig({
   root: templateRoot,
+  // The React plugin enables the automatic JSX runtime for *.tsx
+  // files (no explicit `import React` needed) and matches the
+  // production vite.config.ts build pipeline. Server *.ts tests
+  // are not affected — the plugin only transforms JSX/TSX.
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(templateRoot, "client", "src"),
@@ -14,6 +20,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["./vitest.setup.ts"],
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "tests/**/*.test.ts", "client/**/*.test.tsx"],
     coverage: {
       provider: "v8",
