@@ -130,3 +130,207 @@ export function _resetWorkerStateForTests(): void {
   lastEmittedHealthy = null;
   lastCheckedAt = 0;
 }
+
+/* ── Per-capability RPC clients ─────────────────────────────────────
+ *
+ * Each capability is one HTTP POST to the worker. Behavior:
+ *   reachable, 2xx     → returns parsed JSON body
+ *   reachable, non-2xx → throws WorkerRpcError with status + body
+ *   unreachable        → throws WorkerRpcError("unreachable")
+ *   timeout            → throws WorkerRpcError("timeout")
+ *
+ * Service callers wrap these in try/catch and record `failed`/`degraded`
+ * processing runs. They never silently swallow failures or fake success.
+ */
+
+export class WorkerRpcError extends Error {
+  readonly kind: "unreachable" | "timeout" | "http_error" | "bad_response";
+  readonly statusCode?: number;
+  readonly body?: string;
+  constructor(
+    kind: "unreachable" | "timeout" | "http_error" | "bad_response",
+    message: string,
+    extra: { statusCode?: number; body?: string } = {},
+  ) {
+    super(message);
+    this.kind = kind;
+    this.statusCode = extra.statusCode;
+    this.body = extra.body;
+    this.name = "WorkerRpcError";
+  }
+}
+
+async function callWorker<T>(
+  capabilityPath: string,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  const url = getDataAcquisitionWorkerUrl();
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    DATA_ACQUISITION_WORKER_TIMEOUT_MS,
+  );
+  try {
+    const res = await fetch(`${url}${capabilityPath}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new WorkerRpcError(
+        "http_error",
+        `Worker ${capabilityPath} responded ${res.status} ${res.statusText}`,
+        { statusCode: res.status, body },
+      );
+    }
+    try {
+      return (await res.json()) as T;
+    } catch (err) {
+      throw new WorkerRpcError(
+        "bad_response",
+        `Worker ${capabilityPath} returned non-JSON body: ${(err as Error).message}`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof WorkerRpcError) throw err;
+    if ((err as { name?: string })?.name === "AbortError") {
+      throw new WorkerRpcError(
+        "timeout",
+        `Worker ${capabilityPath} timed out after ${DATA_ACQUISITION_WORKER_TIMEOUT_MS} ms`,
+      );
+    }
+    throw new WorkerRpcError(
+      "unreachable",
+      `Worker ${capabilityPath} unreachable: ${(err as Error).message}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface WorkerClassifyInput {
+  itemId: number;
+  itemType: string;
+  metadata?: Record<string, unknown>;
+}
+export interface WorkerClassifyResult {
+  dataType: string;
+  mode: string;
+  complexity?: string;
+  language?: string;
+  requiresOcr?: boolean;
+  hasTables?: boolean;
+  recommendedProcessor?: string;
+  confidence: number;
+  result?: Record<string, unknown>;
+}
+export const callWorkerClassify = (input: WorkerClassifyInput) =>
+  callWorker<WorkerClassifyResult>(
+    dataAcquisitionWorkerContract.classifyPath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerRouteInput {
+  itemId: number;
+  classification: WorkerClassifyResult;
+}
+export interface WorkerRouteResult {
+  selectedPipeline: string;
+  selectedProcessor: string;
+  fallbackChain: string[];
+  strategy: string;
+  costEstimate?: string;
+  slaClass?: string;
+  decision?: Record<string, unknown>;
+}
+export const callWorkerRoute = (input: WorkerRouteInput) =>
+  callWorker<WorkerRouteResult>(
+    dataAcquisitionWorkerContract.routePath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerParseInput {
+  itemId: number;
+  pipeline: string;
+  processorName: string;
+  rawLocation?: string;
+  fallbackChain?: string[];
+}
+export interface WorkerParseResult {
+  parserUsed: string;
+  fallbackUsed: boolean;
+  sections?: Array<{ title?: string; content: unknown[]; tables: unknown[]; figures: unknown[] }>;
+  ocrConfidence?: number;
+  outputLocation?: string;
+  errors?: string[];
+}
+export const callWorkerParse = (input: WorkerParseInput) =>
+  callWorker<WorkerParseResult>(
+    dataAcquisitionWorkerContract.parsePath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerOcrInput {
+  itemId: number;
+  rawLocation?: string;
+  language?: string;
+}
+export interface WorkerOcrResult {
+  text: string;
+  confidence: number;
+  processor: string;
+}
+export const callWorkerOcr = (input: WorkerOcrInput) =>
+  callWorker<WorkerOcrResult>(
+    dataAcquisitionWorkerContract.ocrPath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerReconstructInput {
+  itemId: number;
+  parserOutput: WorkerParseResult;
+}
+export interface WorkerReconstructResult {
+  sections: Array<{ title?: string; content: unknown[]; tables: unknown[]; figures: unknown[] }>;
+  graph?: { nodes: unknown[]; edges: unknown[] };
+}
+export const callWorkerReconstruct = (input: WorkerReconstructInput) =>
+  callWorker<WorkerReconstructResult>(
+    dataAcquisitionWorkerContract.reconstructPath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerValidateInput {
+  itemId: number;
+  output: WorkerParseResult | WorkerReconstructResult | Record<string, unknown>;
+}
+export interface WorkerValidateResult {
+  confidenceScore: number;
+  requiresReview: boolean;
+  issues: Array<{ code: string; severity: "low" | "medium" | "high"; message: string }>;
+}
+export const callWorkerValidate = (input: WorkerValidateInput) =>
+  callWorker<WorkerValidateResult>(
+    dataAcquisitionWorkerContract.validatePath,
+    input as unknown as Record<string, unknown>,
+  );
+
+export interface WorkerOutputInput {
+  outputType: string;
+  canonicalRecordId?: number;
+  itemId?: number;
+  targetRef?: string;
+  payload?: Record<string, unknown>;
+}
+export interface WorkerOutputResult {
+  status: "completed" | "degraded" | "failed";
+  targetRef?: string;
+  message?: string;
+}
+export const callWorkerOutput = (input: WorkerOutputInput) =>
+  callWorker<WorkerOutputResult>(
+    dataAcquisitionWorkerContract.outputPath,
+    input as unknown as Record<string, unknown>,
+  );

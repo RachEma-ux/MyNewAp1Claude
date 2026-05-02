@@ -239,6 +239,13 @@
       "when": 1778976000000,
       "tag": "0034_data_acquisition",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1778994000000,
+      "tag": "0035_data_acquisition_phase2",
+      "breakpoints": true
     }
   ]
 }

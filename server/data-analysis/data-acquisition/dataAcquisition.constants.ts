@@ -133,6 +133,7 @@ export type DocumentParser = (typeof KNOWN_DOCUMENT_PARSERS)[number];
 
 /** Owned table list — used by manifest + boundary tests. */
 export const DATA_ACQUISITION_OWNED_TABLES = [
+  // Universal core (Phase-1)
   "data_acquisition_sources",
   "data_acquisition_runs",
   "data_acquisition_items",
@@ -143,5 +144,16 @@ export const DATA_ACQUISITION_OWNED_TABLES = [
   "data_acquisition_canonical_records",
   "data_acquisition_output_runs",
   "data_acquisition_audit_events",
+  // Specializations (Phase-2)
+  "data_acquisition_batches",
   "data_acquisition_documents",
+  "data_acquisition_sensor_readings",
+  "data_acquisition_stream_events",
+  "data_acquisition_api_records",
+  "data_acquisition_db_records",
+  "data_acquisition_media_assets",
+  "data_acquisition_web_pages",
+  "data_acquisition_git_objects",
+  "data_acquisition_form_submissions",
+  "data_acquisition_webhook_events",
 ] as const;

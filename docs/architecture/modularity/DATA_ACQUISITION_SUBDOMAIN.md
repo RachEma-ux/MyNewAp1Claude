@@ -1,7 +1,12 @@
 # Data Acquisition Subdomain
 
 > **Ownership:** `dataAnalysis` RTLM → `dataAcquisition` subdomain.
-> **Status:** Phase 1 wired (PR `feat/data-analysis-data-acquisition`).
+> **Status:** Phase 2 wired (branch
+> `feat/data-acquisition-full-implementation`).
+> Phase 1 = universal core + Document Intelligence + worker contract.
+> Phase 2 = 9 specialization tables, 11 per-mode pipelines, per-pipeline
+> worker RPCs, 6 output modules, 10 split external-connector files,
+> 11 per-page client surface + 12 components.
 > **Worker:** external Python service at `http://localhost:8485`
 > (`DATA_ACQUISITION_WORKER_URL`).
 
@@ -114,37 +119,97 @@ server/data-analysis/
     ├── dataAcquisition.constants.ts  (source/item/pipeline/output enums)
     ├── connectors/
     │   ├── connector.types.ts
-    │   ├── connector.registry.ts
-    │   ├── local.connector.ts        (real)
-    │   ├── manual.connector.ts       (real)
-    │   ├── webhook.connector.ts      (real)
-    │   └── externalConnector.factory.ts
-    │       └── creates: s3, gdrive, github, api, database, sensor,
-    │           stream, saas, web, objectStorage
-    │           (each reports `unconfigured` until env vars/source-row
-    │           config arrive — never fakes success)
+    │   ├── connector.registry.ts        (explicit imports — no factory)
+    │   ├── local.connector.ts           (real)
+    │   ├── manual.connector.ts          (real)
+    │   ├── webhook.connector.ts         (real)
+    │   ├── s3.connector.ts              (Phase 2)
+    │   ├── gdrive.connector.ts          (Phase 2)
+    │   ├── github.connector.ts          (Phase 2)
+    │   ├── api.connector.ts             (Phase 2)
+    │   ├── database.connector.ts        (Phase 2)
+    │   ├── sensor.connector.ts          (Phase 2)
+    │   ├── stream.connector.ts          (Phase 2)
+    │   ├── saas.connector.ts            (Phase 2)
+    │   ├── web.connector.ts             (Phase 2)
+    │   ├── objectStorage.connector.ts   (Phase 2)
+    │   └── externalConnector.factory.ts (legacy thin shim)
+    │       (each external connector declares its env vars + config
+    │        schema; reports `unconfigured` until env/source-row config
+    │        arrives — never fakes success)
     ├── pipelines/
     │   ├── document/
     │   │   ├── documentClassifier.ts
     │   │   ├── parserRouter.ts
+    │   │   ├── parserExecution.ts       (Phase 2 — calls /parse with
+    │   │   │                              timeout + fallback chain)
+    │   │   ├── reconstruction.ts        (Phase 2 — assembles parser
+    │   │   │                              output into ordered sections)
     │   │   ├── canonicalDocumentModel.ts
     │   │   └── documentValidation.ts
+    │   ├── sensor/                      (Phase 2)
+    │   │   ├── sensorNormalizer.ts
+    │   │   └── timeSeriesValidator.ts
+    │   ├── stream/                      (Phase 2)
+    │   │   ├── streamDecoder.ts
+    │   │   └── eventNormalizer.ts
+    │   ├── api/                         (Phase 2)
+    │   │   ├── apiSync.ts
+    │   │   └── responseNormalizer.ts
+    │   ├── database/                    (Phase 2)
+    │   │   ├── schemaIntrospection.ts
+    │   │   └── cdcSync.ts
+    │   ├── object-storage/              (Phase 2)
+    │   │   ├── objectDiscovery.ts
+    │   │   └── objectClassifier.ts
+    │   ├── saas/                        (Phase 2)
+    │   │   ├── saasNormalizer.ts
+    │   │   └── collaborationExtractor.ts
+    │   ├── web/                         (Phase 2)
+    │   │   ├── crawler.ts
+    │   │   └── htmlExtractor.ts
+    │   ├── git/                         (Phase 2)
+    │   │   ├── repoExtractor.ts
+    │   │   └── codeClassifier.ts
+    │   ├── manual/                      (Phase 2)
+    │   │   └── formNormalizer.ts
+    │   ├── webhook/                     (Phase 2)
+    │   │   ├── webhookNormalizer.ts
+    │   │   └── signatureVerifier.ts
+    │   ├── media/                       (Phase 2)
+    │   │   ├── mediaClassifier.ts
+    │   │   └── mediaMetadataExtractor.ts
     │   └── output/
-    │       └── outputRunner.ts
+    │       ├── outputRunner.ts
+    │       ├── ragOutput.ts             (Phase 2)
+    │       ├── graphRagOutput.ts        (Phase 2)
+    │       ├── analyticsOutput.ts       (Phase 2)
+    │       ├── warehouseOutput.ts       (Phase 2)
+    │       ├── alertOutput.ts           (Phase 2)
+    │       └── reportOutput.ts          (Phase 2)
     └── __tests__/
         ├── dataAcquisition.service.test.ts
         ├── dataAcquisition.router.test.ts
         ├── dataAcquisition.public-api.test.ts
         ├── dataAcquisition.worker.test.ts
-        └── dataAcquisition.events.test.ts
+        ├── dataAcquisition.events.test.ts
+        └── dataAcquisition.phase2.test.ts  (Phase 2 — connector
+                                              registry, per-mode
+                                              pipelines, output
+                                              modules, specialization
+                                              tables)
 ```
 
-Non-document pipelines (sensor, stream, api, database, web, git, etc.)
-share the same intake/classification/routing/processing/canonical/output
-flow — the per-mode worker capability does the heavy lifting; the
-service layer records every state transition. Per-mode pipeline
-specialization files are added as they require their own classifier or
-normalizer; today only `document/` and `output/` need their own modules.
+Non-document pipelines (sensor, stream, api, database, web, git, saas,
+object-storage, manual, webhook, media) share the same intake/
+classification/routing/processing/canonical/output flow. As of Phase 2
+each mode has its own classifier/normalizer module under
+`pipelines/<mode>/` producing canonical record shapes; the worker
+capability still does the heavy lifting (`/classify`, `/route`,
+`/parse`, `/ocr`, `/reconstruct`, `/validate`, `/output`), and the
+service layer dispatches per-pipeline RPCs and records every state
+transition. Worker unreachable / timeout / non-2xx still produces a
+clean `failed`/`degraded` run row — never fake success.
 
 ## Database
 
@@ -154,6 +219,7 @@ future physical move to `dataanalysisdb` is `getDataAnalysisDb()` in
 `server/data-analysis/connection.ts`).
 
 Tables (`drizzle/0034_data_acquisition.sql`,
+`drizzle/0035_data_acquisition_phase2.sql`,
 `drizzle/tables/data-acquisition.ts`):
 
 Core (universal — every source type writes here):
@@ -169,17 +235,38 @@ Core (universal — every source type writes here):
 - `data_acquisition_canonical_records` — normalized canonical records
 - `data_acquisition_output_runs` — output pipeline emissions
 - `data_acquisition_audit_events` — narrow audit trail
+- `data_acquisition_batches` — Phase 2: groups items inside a run for
+  batched per-mode pipelines (sensor windows, stream micro-batches,
+  api page-cursors, etc.)
 
 Specialization:
 
 - `data_acquisition_documents` — Document Intelligence specialization
   (parser used, fallback used, page count, canonical document JSON)
+- `data_acquisition_sensor_readings` — Phase 2 — IoT/time-series
+  readings (deviceId, metricKey, value, unit, ts)
+- `data_acquisition_stream_events` — Phase 2 — decoded stream events
+  (topic, partition, offset, payload, eventTime)
+- `data_acquisition_api_records` — Phase 2 — normalized API responses
+  (endpoint, method, requestKey, payload, fetchedAt)
+- `data_acquisition_db_records` — Phase 2 — DB sync / CDC rows
+  (schemaName, tableName, primaryKey, op, rowSnapshot)
+- `data_acquisition_media_assets` — Phase 2 — media metadata
+  (mediaType, mimeType, durationMs, dimensions, exif)
+- `data_acquisition_web_pages` — Phase 2 — extracted web pages
+  (url, title, html, text, links, fetchedAt)
+- `data_acquisition_git_objects` — Phase 2 — Git extraction
+  (repo, ref, path, kind, sha, language, summary)
+- `data_acquisition_form_submissions` — Phase 2 — manual/form intake
+  (formId, fields, attachments, submittedBy, submittedAt)
+- `data_acquisition_webhook_events` — Phase 2 — webhook envelopes
+  (provider, eventName, signatureValid, deliveryId, payload)
 
-Future specialization tables (`*_sensor_readings`, `*_stream_events`,
-`*_api_records`, `*_db_records`, `*_media_assets`, `*_web_pages`,
-`*_git_objects`, `*_form_submissions`, `*_webhook_events`) land
-incrementally; the canonical record table absorbs them via
-`recordType` until then.
+Phase-2 tables ship as physical tables in the platform DB under the
+`dataAnalysis` logical owner (same Phase-1 staging seam — one-line
+flip in `getDataAnalysisDb()` when the dedicated DB is provisioned).
+The canonical record table still absorbs records that do not match a
+specialization shape via `recordType`.
 
 ## Worker contract
 
@@ -202,10 +289,18 @@ Behavior:
 | unreachable        | `degraded`    | `failed` with error text   |
 | timeout            | `degraded`    | `failed` with timeout text |
 
+Phase 2 wires real per-pipeline HTTP POST callers in
+`dataAcquisition.worker.ts` for each capability above, with timeout +
+JSON parse + structured error handling. `service.runProcessing`
+dispatches by pipeline mode and calls the matching worker capability
+— recording a `failed`/`degraded` run on unreachable/timeout/bad
+response. **Never fakes success.**
+
 The worker is **not** installed as part of this PR. It is an external
 runtime dependency and missing it produces clean degraded state, never
-a crash. UI banner (`DataAcquisitionWorkerBanner`) renders when the
-worker is unhealthy.
+a crash. UI banner (`WorkerStatusBanner` —
+`client/src/modules/data-analysis/data-acquisition/components/`)
+renders when the worker is unhealthy.
 
 `workerUnavailable` / `workerRecovered` events emit on transition only,
 not on every probe.
@@ -304,19 +399,65 @@ Data Acquisition records the output run, marks it completed once the
 intent is recorded, and emits `outputPipelineCompleted`. Subscribing
 modules (e.g. GraphRAG) ingest the canonical record on receipt.
 
+Phase 2 splits each output type into its own module under
+`pipelines/output/`:
+
+| Module               | Behavior                                                                 |
+| -------------------- | ------------------------------------------------------------------------ |
+| `ragOutput.ts`       | record output run; attempt internal RAG service if available; degraded otherwise |
+| `graphRagOutput.ts`  | record output run; attempt GraphRAG service if available; degraded otherwise |
+| `analyticsOutput.ts` | record output run; attempt analytics service if available; degraded otherwise |
+| `warehouseOutput.ts` | record output run; attempt warehouse service if available; degraded otherwise |
+| `alertOutput.ts`     | record output run; attempt alert service if available; degraded otherwise |
+| `reportOutput.ts`    | record output run; attempt report service if available; degraded otherwise |
+
+Each module emits `outputPipelineCompleted` or `outputPipelineFailed`
+through the event bus. None fakes success when the downstream service
+is unavailable — the run row is marked `failed` or `degraded` with a
+readable error.
+
 ## Frontend
 
-`client/src/pages/data-analysis/DataAcquisitionPage.tsx` is the
-top-level shell at `/data-analysis/data-acquisition`. Tabs cover the
-universal lifecycle: Dashboard → Sources → Runs → Items →
-Classification → Routing → Processing → Document Intelligence →
-Canonical Records → Outputs → Settings.
+Phase 2 splits the single-page shell into a per-route module surface
+under `client/src/modules/data-analysis/data-acquisition/`:
 
-`DataAcquisitionWorkerBanner` and `DataAcquisitionSummaryCards`
-support degraded-state UX and dashboard metrics. The route is
-registered through `client/src/modules/data-analysis/manifest.ts` →
-`@/platform/modules/route-composer.tsx` (`<ModuleRoutes />`).
-Navigation appears under the "Data Analysis" group.
+```
+data-acquisition/
+├── routes.tsx                          # 11 module routes
+├── nav.ts                              # nav-group entries
+├── pages/
+│   ├── DataAcquisitionDashboardPage.tsx
+│   ├── DataAcquisitionSourcesPage.tsx
+│   ├── DataAcquisitionRunsPage.tsx
+│   ├── DataAcquisitionItemsPage.tsx
+│   ├── DataAcquisitionClassificationPage.tsx
+│   ├── DataAcquisitionRoutingPage.tsx
+│   ├── DataAcquisitionProcessingPage.tsx
+│   ├── DocumentIntelligencePage.tsx
+│   ├── DataAcquisitionCanonicalRecordsPage.tsx
+│   ├── DataAcquisitionOutputsPage.tsx
+│   └── DataAcquisitionSettingsPage.tsx
+└── components/
+    ├── DataAcquisitionSummaryCards.tsx
+    ├── SourceList.tsx
+    ├── DocumentList.tsx
+    ├── IngestionRunTimeline.tsx
+    ├── ClassificationPanel.tsx
+    ├── ParserRoutePanel.tsx
+    ├── ParserRunList.tsx
+    ├── CanonicalRecordViewer.tsx
+    ├── CanonicalDocumentViewer.tsx
+    ├── ValidationResultPanel.tsx
+    ├── OutputPipelinePanel.tsx
+    └── WorkerStatusBanner.tsx
+```
+
+The 11 routes are registered through
+`client/src/modules/data-analysis/manifest.ts` →
+`@/platform/modules/route-composer.tsx` (`<ModuleRoutes />`) under the
+"Data Analysis" navigation group. The legacy single-page
+`DataAcquisitionPage.tsx` shell is retained as a redirect to the new
+Dashboard route.
 
 ## AWI / Digital HQ visibility
 
@@ -339,6 +480,7 @@ shows the `dataAcquisitionWorker` health alongside `graphRagWorker`.
 | `__tests__/dataAcquisition.public-api.test.ts`                 | every required public-API action is registered; receipts present      |
 | `__tests__/dataAcquisition.worker.test.ts`                     | worker contract (URL, env, capabilities, paths); degraded-not-crash   |
 | `__tests__/dataAcquisition.events.test.ts`                     | 21 events; namespace; manifest-emits superset                         |
+| `__tests__/dataAcquisition.phase2.test.ts`                     | Phase-2 — connector registry registers all 13 modes; per-mode pipeline pure-function shapes; output module degraded paths; specialization-table ownership |
 | `server/platform/modules/data-analysis-data-acquisition.test.ts` | not-an-RTLM; Data Analysis owns ownedTables / actions / events / routes; KGRA Agent does not import DA tables |
 
 ## Ownership map
@@ -383,12 +525,14 @@ KGRA Agent does not import any `dataAcquisition*` table directly.
 
 ## Follow-ups
 
-- Phase-2 physical DB move: flip `getDataAnalysisDb()` to read
+- Phase-3 physical DB move: flip `getDataAnalysisDb()` to read
   `DATABASE_URL_DATA_ANALYSISDB` (one-line change once the dedicated
   DB is provisioned).
-- Per-mode specialization tables and pipeline modules (sensor, stream,
-  api, database, etc.) — added as each mode's worker capability
-  matures.
-- Worker per-pipeline RPCs (currently the worker reachability is
-  probed; per-capability RPC contracts are stubbed to record
-  `degraded` runs until the Python service implements them).
+- External worker implementation: the per-pipeline HTTP RPCs are now
+  wired (Phase 2). The Python worker at `:8485` still needs to
+  implement `/classify`, `/route`, `/parse`, `/ocr`, `/reconstruct`,
+  `/validate`, `/output` for each pipeline mode. Until then
+  pipelines record `degraded` runs cleanly — no fake success.
+- Connector credentials: per-source credential storage + rotation
+  for the 10 split external connectors (each declares its env var +
+  config schema today; long-term goes through `server/secrets/`).

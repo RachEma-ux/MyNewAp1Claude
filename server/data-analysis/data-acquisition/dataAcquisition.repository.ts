@@ -10,28 +10,48 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getDataAnalysisDb as getDb } from "../connection";
 import {
+  dataAcquisitionApiRecords,
   dataAcquisitionAuditEvents,
+  dataAcquisitionBatches,
   dataAcquisitionCanonicalRecords,
   dataAcquisitionClassifications,
+  dataAcquisitionDbRecords,
   dataAcquisitionDocuments,
+  dataAcquisitionFormSubmissions,
+  dataAcquisitionGitObjects,
   dataAcquisitionItems,
+  dataAcquisitionMediaAssets,
   dataAcquisitionOutputRuns,
   dataAcquisitionProcessingRuns,
   dataAcquisitionQualityResults,
   dataAcquisitionRoutes,
   dataAcquisitionRuns,
+  dataAcquisitionSensorReadings,
   dataAcquisitionSources,
+  dataAcquisitionStreamEvents,
+  dataAcquisitionWebPages,
+  dataAcquisitionWebhookEvents,
+  type InsertDataAcquisitionApiRecord,
   type InsertDataAcquisitionAuditEvent,
+  type InsertDataAcquisitionBatch,
   type InsertDataAcquisitionCanonicalRecord,
   type InsertDataAcquisitionClassification,
+  type InsertDataAcquisitionDbRecord,
   type InsertDataAcquisitionDocument,
+  type InsertDataAcquisitionFormSubmission,
+  type InsertDataAcquisitionGitObject,
   type InsertDataAcquisitionItem,
+  type InsertDataAcquisitionMediaAsset,
   type InsertDataAcquisitionOutputRun,
   type InsertDataAcquisitionProcessingRun,
   type InsertDataAcquisitionQualityResult,
   type InsertDataAcquisitionRoute,
   type InsertDataAcquisitionRun,
+  type InsertDataAcquisitionSensorReading,
   type InsertDataAcquisitionSource,
+  type InsertDataAcquisitionStreamEvent,
+  type InsertDataAcquisitionWebPage,
+  type InsertDataAcquisitionWebhookEvent,
 } from "../../../drizzle/schema";
 
 function db() {
@@ -323,6 +343,165 @@ export async function getDocumentSpec(itemId: number) {
     .where(eq(dataAcquisitionDocuments.itemId, itemId))
     .limit(1);
   return rows[0];
+}
+
+/* ── Batches ─────────────────────────────────────────────────────── */
+
+export async function insertBatch(values: InsertDataAcquisitionBatch) {
+  const [row] = await db().insert(dataAcquisitionBatches).values(values).returning();
+  return row;
+}
+
+export async function listBatches(workspaceId?: number) {
+  const q = db().select().from(dataAcquisitionBatches);
+  return workspaceId === undefined
+    ? q.orderBy(desc(dataAcquisitionBatches.id))
+    : q
+        .where(eq(dataAcquisitionBatches.workspaceId, workspaceId))
+        .orderBy(desc(dataAcquisitionBatches.id));
+}
+
+/* ── Specialization tables ───────────────────────────────────────── */
+
+export async function insertSensorReading(values: InsertDataAcquisitionSensorReading) {
+  const [row] = await db()
+    .insert(dataAcquisitionSensorReadings)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listSensorReadings(itemId?: number) {
+  const q = db().select().from(dataAcquisitionSensorReadings);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionSensorReadings.id))
+    : q
+        .where(eq(dataAcquisitionSensorReadings.itemId, itemId))
+        .orderBy(desc(dataAcquisitionSensorReadings.id));
+}
+
+export async function insertStreamEvent(values: InsertDataAcquisitionStreamEvent) {
+  const [row] = await db()
+    .insert(dataAcquisitionStreamEvents)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listStreamEvents(itemId?: number) {
+  const q = db().select().from(dataAcquisitionStreamEvents);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionStreamEvents.id))
+    : q
+        .where(eq(dataAcquisitionStreamEvents.itemId, itemId))
+        .orderBy(desc(dataAcquisitionStreamEvents.id));
+}
+
+export async function insertApiRecord(values: InsertDataAcquisitionApiRecord) {
+  const [row] = await db()
+    .insert(dataAcquisitionApiRecords)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listApiRecords(itemId?: number) {
+  const q = db().select().from(dataAcquisitionApiRecords);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionApiRecords.id))
+    : q
+        .where(eq(dataAcquisitionApiRecords.itemId, itemId))
+        .orderBy(desc(dataAcquisitionApiRecords.id));
+}
+
+export async function insertDbRecord(values: InsertDataAcquisitionDbRecord) {
+  const [row] = await db()
+    .insert(dataAcquisitionDbRecords)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listDbRecords(itemId?: number) {
+  const q = db().select().from(dataAcquisitionDbRecords);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionDbRecords.id))
+    : q
+        .where(eq(dataAcquisitionDbRecords.itemId, itemId))
+        .orderBy(desc(dataAcquisitionDbRecords.id));
+}
+
+export async function insertMediaAsset(values: InsertDataAcquisitionMediaAsset) {
+  const [row] = await db()
+    .insert(dataAcquisitionMediaAssets)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listMediaAssets(itemId?: number) {
+  const q = db().select().from(dataAcquisitionMediaAssets);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionMediaAssets.id))
+    : q
+        .where(eq(dataAcquisitionMediaAssets.itemId, itemId))
+        .orderBy(desc(dataAcquisitionMediaAssets.id));
+}
+
+export async function insertWebPage(values: InsertDataAcquisitionWebPage) {
+  const [row] = await db().insert(dataAcquisitionWebPages).values(values).returning();
+  return row;
+}
+export async function listWebPages(itemId?: number) {
+  const q = db().select().from(dataAcquisitionWebPages);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionWebPages.id))
+    : q
+        .where(eq(dataAcquisitionWebPages.itemId, itemId))
+        .orderBy(desc(dataAcquisitionWebPages.id));
+}
+
+export async function insertGitObject(values: InsertDataAcquisitionGitObject) {
+  const [row] = await db()
+    .insert(dataAcquisitionGitObjects)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listGitObjects(itemId?: number) {
+  const q = db().select().from(dataAcquisitionGitObjects);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionGitObjects.id))
+    : q
+        .where(eq(dataAcquisitionGitObjects.itemId, itemId))
+        .orderBy(desc(dataAcquisitionGitObjects.id));
+}
+
+export async function insertFormSubmission(values: InsertDataAcquisitionFormSubmission) {
+  const [row] = await db()
+    .insert(dataAcquisitionFormSubmissions)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listFormSubmissions(itemId?: number) {
+  const q = db().select().from(dataAcquisitionFormSubmissions);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionFormSubmissions.id))
+    : q
+        .where(eq(dataAcquisitionFormSubmissions.itemId, itemId))
+        .orderBy(desc(dataAcquisitionFormSubmissions.id));
+}
+
+export async function insertWebhookEvent(values: InsertDataAcquisitionWebhookEvent) {
+  const [row] = await db()
+    .insert(dataAcquisitionWebhookEvents)
+    .values(values)
+    .returning();
+  return row;
+}
+export async function listWebhookEvents(itemId?: number) {
+  const q = db().select().from(dataAcquisitionWebhookEvents);
+  return itemId === undefined
+    ? q.orderBy(desc(dataAcquisitionWebhookEvents.id))
+    : q
+        .where(eq(dataAcquisitionWebhookEvents.itemId, itemId))
+        .orderBy(desc(dataAcquisitionWebhookEvents.id));
 }
 
 /* ── Audit ───────────────────────────────────────────────────────── */

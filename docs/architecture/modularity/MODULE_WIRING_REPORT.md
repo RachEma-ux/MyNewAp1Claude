@@ -1,16 +1,16 @@
 # Application Wiring Inventory
 
-Generated: 2026-05-02T05:57:40.155Z
+Generated: 2026-05-02T07:41:21.505Z
 
 ## Summary
 
 - Modules: **16**
-- Fully wired: **10**
-- Mostly wired: **6**
+- Fully wired: **9**
+- Mostly wired: **7**
 - Partially wired: **0**
 - Declared only: **0**
 - Blocked: **0**
-- Average readiness score: **92**
+- Average readiness score: **91**
 - Blockers: **0**
 - Warnings: **6**
 - Missing required wires: **1**
@@ -34,7 +34,7 @@ Generated: 2026-05-02T05:57:40.155Z
 | KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
 | Communication (communication) | 94 | fully-wired | 0 | 1 |
 | PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
-| Data Analysis (dataAnalysis) | 95 | fully-wired | 0 | 1 |
+| Data Analysis (dataAnalysis) | 89 | mostly-wired | 0 | 1 |
 
 ## Wiring matrix
 
@@ -66,5 +66,5 @@ Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/br
 - `aiTypes` — agent-provider: declared-only (aiTypes.catalog port consumption)
 - `kgraAgent` — agent-provider: declared-only (aiTypes.catalog port consumption)
 - `communication` — agent-provider: declared-only (aiTypes.catalog port consumption)
-- `dataAnalysis` — client-route: partial (/data-analysis)
+- `dataAnalysis` — client-route: partial (/data-analysis, /data-analysis/data-acquisition, /data-analysis/data-acquisition/sources, /data-analysis/data-acquisition/runs, /data-analysis/data-acquisition/items, /data-analysis/data-acquisition/classification, /data-analysis/data-acquisition/routing, /data-analysis/data-acquisition/processing, /data-analysis/data-acquisition/document-intelligence, /data-analysis/data-acquisition/canonical-records, /data-analysis/data-acquisition/outputs, /data-analysis/data-acquisition/settings)
 

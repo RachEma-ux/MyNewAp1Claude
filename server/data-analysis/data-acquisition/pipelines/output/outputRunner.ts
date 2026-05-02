@@ -91,3 +91,19 @@ export async function markOutputRunFailed(
     })
     .where(eq(dataAcquisitionOutputRuns.id, id));
 }
+
+export async function markOutputRunDegraded(
+  id: number,
+  errorMessage: string,
+): Promise<void> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(dataAcquisitionOutputRuns)
+    .set({
+      status: "degraded",
+      completedAt: new Date(),
+      errorMessage,
+    })
+    .where(eq(dataAcquisitionOutputRuns.id, id));
+}

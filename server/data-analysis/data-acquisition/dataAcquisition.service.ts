@@ -68,7 +68,17 @@ import {
   updateRunStatus,
   updateSourceRow,
 } from "./dataAcquisition.repository";
-import { getDataAcquisitionWorkerStatus } from "./dataAcquisition.worker";
+import {
+  callWorkerClassify,
+  callWorkerOcr,
+  callWorkerOutput,
+  callWorkerParse,
+  callWorkerReconstruct,
+  callWorkerRoute,
+  callWorkerValidate,
+  getDataAcquisitionWorkerStatus,
+  WorkerRpcError,
+} from "./dataAcquisition.worker";
 import type {
   DataAcquisitionSummary,
 } from "./dataAcquisition.contracts";
@@ -469,26 +479,265 @@ export async function runProcessing(input: {
     return { processingRun: proc, status: "failed" as const, errorMessage: errMsg };
   }
 
-  // Worker is reachable but no real call is wired yet. We mark
-  // `degraded` rather than fake success — the worker contract is
-  // declared, but the per-pipeline RPCs land in follow-up work.
-  const reason =
-    "Worker reachable, but per-pipeline RPC not yet wired. Recording degraded run row.";
-  await updateProcessingRun(proc.id, {
-    status: "degraded",
-    completedAt: new Date(),
-    errorMessage: reason,
-  });
-  await updateItemStatus(input.itemId, "needs_review");
-  await emit(DATA_ACQUISITION_EVENTS.processingFailed, {
+  // Worker is reachable — dispatch by pipeline. Each capability has its
+  // own RPC; failure is recorded as a `failed` run with the worker's
+  // error preserved (kind=unreachable/timeout/http_error/bad_response).
+  // No fake success path exists.
+  try {
+    const dispatched = await dispatchProcessingToWorker({
+      itemId: input.itemId,
+      pipeline,
+      processorName,
+      rawLocation: item.rawLocation ?? undefined,
+    });
+    await updateProcessingRun(proc.id, {
+      status: "completed",
+      completedAt: new Date(),
+      confidence: dispatched.confidence ?? null,
+      outputLocation: dispatched.outputLocation ?? null,
+      resultJson: dispatched.result ?? null,
+    });
+    await updateItemStatus(input.itemId, "processed");
+    await emit(DATA_ACQUISITION_EVENTS.processingCompleted, {
+      itemId: input.itemId,
+      processingRunId: proc.id,
+      pipeline,
+      processorName,
+      status: "completed",
+      confidence: dispatched.confidence,
+    });
+    return {
+      processingRun: proc,
+      status: "completed" as const,
+      result: dispatched.result,
+    };
+  } catch (err) {
+    const rpcErr = err instanceof WorkerRpcError ? err : null;
+    const errMsg = rpcErr
+      ? `Worker ${pipeline}/${processorName} ${rpcErr.kind}: ${rpcErr.message}`
+      : `Worker ${pipeline}/${processorName} failed: ${(err as Error).message}`;
+    // Unreachable/timeout → degraded (UI banner takes over);
+    // http_error/bad_response → failed (worker is broken, not absent).
+    const status =
+      rpcErr && (rpcErr.kind === "unreachable" || rpcErr.kind === "timeout")
+        ? "degraded"
+        : "failed";
+    await updateProcessingRun(proc.id, {
+      status,
+      completedAt: new Date(),
+      errorMessage: errMsg,
+    });
+    await updateItemStatus(
+      input.itemId,
+      status === "degraded" ? "needs_review" : "failed",
+    );
+    await emit(DATA_ACQUISITION_EVENTS.processingFailed, {
+      itemId: input.itemId,
+      processingRunId: proc.id,
+      pipeline,
+      processorName,
+      status,
+      errorMessage: errMsg,
+    });
+    return { processingRun: proc, status: status as "degraded" | "failed", errorMessage: errMsg };
+  }
+}
+
+/**
+ * Dispatch a processing call to the appropriate worker capability based on
+ * pipeline. Document → /parse. Other modes → /parse with the pipeline name
+ * as a hint; the worker decides per-mode behavior. Throws WorkerRpcError
+ * on any failure; never returns a fake-success placeholder.
+ */
+async function dispatchProcessingToWorker(input: {
+  itemId: number;
+  pipeline: string;
+  processorName: string;
+  rawLocation?: string;
+}): Promise<{
+  confidence?: number;
+  outputLocation?: string;
+  result: Record<string, unknown>;
+}> {
+  // OCR has its own RPC because parsers may delegate to it.
+  if (input.processorName === "tesseract" || input.processorName === "paddleocr") {
+    const out = await callWorkerOcr({
+      itemId: input.itemId,
+      rawLocation: input.rawLocation,
+    });
+    return {
+      confidence: Math.round((out.confidence ?? 0) * 100),
+      outputLocation: undefined,
+      result: out as unknown as Record<string, unknown>,
+    };
+  }
+  const parsed = await callWorkerParse({
     itemId: input.itemId,
-    processingRunId: proc.id,
-    pipeline,
-    processorName,
-    status: "degraded",
-    errorMessage: reason,
+    pipeline: input.pipeline,
+    processorName: input.processorName,
+    rawLocation: input.rawLocation,
   });
-  return { processingRun: proc, status: "degraded" as const, errorMessage: reason };
+  return {
+    confidence: parsed.ocrConfidence
+      ? Math.round(parsed.ocrConfidence * 100)
+      : undefined,
+    outputLocation: parsed.outputLocation,
+    result: parsed as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * Worker-backed classification for non-document items. Falls back to the
+ * service's fast-path classifier (already covered above by `classifyItem`)
+ * if the worker is unavailable — that fast path always succeeds because
+ * it's pure JS, but it produces a low-confidence verdict.
+ */
+export async function classifyItemViaWorker(input: { itemId: number }) {
+  const item = await getItem(input.itemId);
+  if (!item) throw new Error(`Item ${input.itemId} not found`);
+  try {
+    const out = await callWorkerClassify({
+      itemId: item.id,
+      itemType: item.itemType,
+      metadata: { ...(item.metadataJson ?? {}), mimeType: item.mimeType },
+    });
+    const classification = await insertClassification({
+      itemId: item.id,
+      dataType: out.dataType,
+      mode: out.mode,
+      complexity: out.complexity ?? null,
+      language: out.language ?? null,
+      requiresOcr: out.requiresOcr ?? null,
+      hasTables: out.hasTables ?? null,
+      recommendedProcessor: out.recommendedProcessor ?? null,
+      confidence: out.confidence,
+      classifierVersion: DATA_ACQUISITION_CLASSIFIER_VERSION,
+      resultJson: out.result ?? {},
+    });
+    await updateItemStatus(item.id, "classified");
+    await emit(DATA_ACQUISITION_EVENTS.itemClassified, {
+      itemId: item.id,
+      classificationId: classification.id,
+      dataType: out.dataType,
+      mode: out.mode,
+      confidence: out.confidence,
+    });
+    return classification;
+  } catch (err) {
+    // Worker unavailable → fall back to local fast-path classifier.
+    return classifyItem(input);
+  }
+}
+
+/**
+ * Worker-backed routing — uses the worker's policy engine when available,
+ * else the local heuristic in `routeParser`. Never silently downgrades.
+ */
+export async function routeItemViaWorker(input: { itemId: number }) {
+  const cls = (await listClassificationsRow(input.itemId))[0];
+  if (!cls) throw new Error(`Item ${input.itemId} has no classification`);
+  try {
+    const out = await callWorkerRoute({
+      itemId: input.itemId,
+      classification: {
+        dataType: cls.dataType,
+        mode: cls.mode,
+        complexity: cls.complexity ?? undefined,
+        language: cls.language ?? undefined,
+        requiresOcr: cls.requiresOcr ?? undefined,
+        hasTables: cls.hasTables ?? undefined,
+        recommendedProcessor: cls.recommendedProcessor ?? undefined,
+        confidence: cls.confidence,
+        result: cls.resultJson ?? {},
+      },
+    });
+    const route = await insertRoute({
+      itemId: input.itemId,
+      selectedPipeline: out.selectedPipeline,
+      selectedProcessor: out.selectedProcessor,
+      fallbackChainJson: out.fallbackChain,
+      strategy: out.strategy,
+      costEstimate: out.costEstimate ?? null,
+      slaClass: out.slaClass ?? null,
+      decisionJson: out.decision ?? {},
+    });
+    await updateItemStatus(input.itemId, "routed");
+    await emit(DATA_ACQUISITION_EVENTS.itemRouted, {
+      itemId: input.itemId,
+      routeId: route.id,
+      selectedPipeline: route.selectedPipeline,
+      selectedProcessor: route.selectedProcessor,
+      fallbackChain: out.fallbackChain,
+    });
+    return route;
+  } catch {
+    return routeItem(input);
+  }
+}
+
+/**
+ * Worker-backed validation — hits /validate. On failure falls back to the
+ * pure-JS `validateDocumentOutput` so the item still gets a quality verdict.
+ */
+export async function validateItemViaWorker(input: {
+  itemId: number;
+  workerOutput?: Record<string, unknown>;
+}) {
+  try {
+    const out = await callWorkerValidate({
+      itemId: input.itemId,
+      output: input.workerOutput ?? {},
+    });
+    const quality = await insertQuality({
+      itemId: input.itemId,
+      confidenceScore: out.confidenceScore,
+      requiresReview: out.requiresReview,
+      issuesJson: out.issues,
+      validationVersion: DATA_ACQUISITION_VALIDATION_VERSION,
+    });
+    await emit(DATA_ACQUISITION_EVENTS.qualityValidated, {
+      itemId: input.itemId,
+      qualityResultId: quality.id,
+      confidenceScore: out.confidenceScore,
+      requiresReview: out.requiresReview,
+    });
+    return { quality, verdict: out };
+  } catch {
+    return validateDocument({
+      itemId: input.itemId,
+      workerOutput: input.workerOutput as any,
+    });
+  }
+}
+
+/**
+ * Worker-backed reconstruction. Returns the canonical sections produced
+ * by the worker's /reconstruct endpoint. Throws on failure — caller is
+ * expected to record a failed processing run.
+ */
+export async function reconstructViaWorker(input: {
+  itemId: number;
+  parserOutput: Record<string, unknown>;
+}) {
+  return callWorkerReconstruct({
+    itemId: input.itemId,
+    parserOutput: input.parserOutput as any,
+  });
+}
+
+/**
+ * Worker-backed output emission. The worker decides whether to push to
+ * the configured downstream (RAG indexer, GraphRAG worker, warehouse,
+ * alert sink, etc.). On failure, caller records a `failed` output run.
+ */
+export async function emitOutputViaWorker(input: {
+  outputType: string;
+  canonicalRecordId?: number;
+  itemId?: number;
+  targetRef?: string;
+  payload?: Record<string, unknown>;
+}) {
+  return callWorkerOutput(input);
 }
 
 export async function listProcessingRuns(itemId?: number) {

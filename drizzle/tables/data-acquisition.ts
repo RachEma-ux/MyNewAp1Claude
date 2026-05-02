@@ -391,3 +391,310 @@ export type DataAcquisitionDocument =
   typeof dataAcquisitionDocuments.$inferSelect;
 export type InsertDataAcquisitionDocument =
   typeof dataAcquisitionDocuments.$inferInsert;
+
+/**
+ * data_acquisition_batches — groups multiple acquisition runs that
+ * belong to the same logical campaign (e.g. "ingest the 2026-Q1 contract
+ * archive" might span many runs against many sources).
+ */
+export const dataAcquisitionBatches = pgTable(
+  "data_acquisition_batches",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    status: varchar("status", { length: 32 }).default("active").notNull(),
+    runCount: integer("run_count").default(0).notNull(),
+    itemCount: integer("item_count").default(0).notNull(),
+    createdBy: integer("created_by"),
+    metadataJson: json("metadata_json").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    wsIdx: index("idx_da_batches_ws").on(table.workspaceId),
+    statusIdx: index("idx_da_batches_status").on(table.status),
+  }),
+);
+
+export type DataAcquisitionBatch = typeof dataAcquisitionBatches.$inferSelect;
+export type InsertDataAcquisitionBatch =
+  typeof dataAcquisitionBatches.$inferInsert;
+
+/**
+ * data_acquisition_sensor_readings — Sensor / IoT specialization.
+ * One row per normalized reading. `metricKey` is the sensor channel
+ * (e.g. `temperature`, `pressure`); `value` is numeric; `unit` is the
+ * unit-of-measure; `recordedAt` is the sensor-side timestamp.
+ */
+export const dataAcquisitionSensorReadings = pgTable(
+  "data_acquisition_sensor_readings",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    deviceId: varchar("device_id", { length: 128 }),
+    metricKey: varchar("metric_key", { length: 64 }).notNull(),
+    value: text("value").notNull(),
+    unit: varchar("unit", { length: 32 }),
+    qualityFlag: varchar("quality_flag", { length: 32 }),
+    recordedAt: timestamp("recorded_at"),
+    metadataJson: json("metadata_json").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_sensor_item").on(table.itemId),
+    deviceIdx: index("idx_da_sensor_device").on(table.deviceId),
+    metricIdx: index("idx_da_sensor_metric").on(table.metricKey),
+    recordedIdx: index("idx_da_sensor_recorded").on(table.recordedAt),
+  }),
+);
+
+export type DataAcquisitionSensorReading =
+  typeof dataAcquisitionSensorReadings.$inferSelect;
+export type InsertDataAcquisitionSensorReading =
+  typeof dataAcquisitionSensorReadings.$inferInsert;
+
+/**
+ * data_acquisition_stream_events — Stream / Kafka / Pulsar / Redis Streams
+ * specialization. One row per decoded event.
+ */
+export const dataAcquisitionStreamEvents = pgTable(
+  "data_acquisition_stream_events",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    streamKey: varchar("stream_key", { length: 128 }).notNull(),
+    partition: integer("partition"),
+    offset: text("offset_key"),
+    eventType: varchar("event_type", { length: 64 }),
+    eventTime: timestamp("event_time"),
+    payloadJson: json("payload_json").$type<Record<string, unknown>>(),
+    headersJson: json("headers_json").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_stream_item").on(table.itemId),
+    streamIdx: index("idx_da_stream_stream").on(table.streamKey),
+    eventTypeIdx: index("idx_da_stream_event_type").on(table.eventType),
+  }),
+);
+
+export type DataAcquisitionStreamEvent =
+  typeof dataAcquisitionStreamEvents.$inferSelect;
+export type InsertDataAcquisitionStreamEvent =
+  typeof dataAcquisitionStreamEvents.$inferInsert;
+
+/**
+ * data_acquisition_api_records — API Sync specialization.
+ */
+export const dataAcquisitionApiRecords = pgTable(
+  "data_acquisition_api_records",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    endpoint: text("endpoint").notNull(),
+    method: varchar("method", { length: 10 }).default("GET").notNull(),
+    statusCode: integer("status_code"),
+    requestJson: json("request_json").$type<Record<string, unknown>>(),
+    responseJson: json("response_json").$type<Record<string, unknown>>(),
+    durationMs: integer("duration_ms"),
+    fetchedAt: timestamp("fetched_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_api_item").on(table.itemId),
+    endpointIdx: index("idx_da_api_endpoint").on(table.endpoint),
+    statusIdx: index("idx_da_api_status").on(table.statusCode),
+  }),
+);
+
+export type DataAcquisitionApiRecord =
+  typeof dataAcquisitionApiRecords.$inferSelect;
+export type InsertDataAcquisitionApiRecord =
+  typeof dataAcquisitionApiRecords.$inferInsert;
+
+/**
+ * data_acquisition_db_records — External database / CDC specialization.
+ */
+export const dataAcquisitionDbRecords = pgTable(
+  "data_acquisition_db_records",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    schemaName: varchar("schema_name", { length: 128 }),
+    tableName: varchar("table_name", { length: 128 }).notNull(),
+    primaryKey: text("primary_key"),
+    operation: varchar("operation", { length: 16 }),
+    rowJson: json("row_json").$type<Record<string, unknown>>(),
+    cdcLsn: text("cdc_lsn"),
+    capturedAt: timestamp("captured_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_db_item").on(table.itemId),
+    tableIdx: index("idx_da_db_table").on(table.tableName),
+    operationIdx: index("idx_da_db_operation").on(table.operation),
+  }),
+);
+
+export type DataAcquisitionDbRecord =
+  typeof dataAcquisitionDbRecords.$inferSelect;
+export type InsertDataAcquisitionDbRecord =
+  typeof dataAcquisitionDbRecords.$inferInsert;
+
+/**
+ * data_acquisition_media_assets — Media (image / audio / video) specialization.
+ */
+export const dataAcquisitionMediaAssets = pgTable(
+  "data_acquisition_media_assets",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    mediaType: varchar("media_type", { length: 32 }).notNull(),
+    durationSec: integer("duration_sec"),
+    width: integer("width"),
+    height: integer("height"),
+    codec: varchar("codec", { length: 64 }),
+    rawLocation: text("raw_location"),
+    metadataJson: json("metadata_json").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_media_item").on(table.itemId),
+    typeIdx: index("idx_da_media_type").on(table.mediaType),
+  }),
+);
+
+export type DataAcquisitionMediaAsset =
+  typeof dataAcquisitionMediaAssets.$inferSelect;
+export type InsertDataAcquisitionMediaAsset =
+  typeof dataAcquisitionMediaAssets.$inferInsert;
+
+/**
+ * data_acquisition_web_pages — Web crawl specialization.
+ */
+export const dataAcquisitionWebPages = pgTable(
+  "data_acquisition_web_pages",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    url: text("url").notNull(),
+    httpStatus: integer("http_status"),
+    titleText: text("title_text"),
+    bodyText: text("body_text"),
+    headersJson: json("headers_json").$type<Record<string, unknown>>(),
+    fetchedAt: timestamp("fetched_at"),
+    contentLength: integer("content_length"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_web_item").on(table.itemId),
+    statusIdx: index("idx_da_web_status").on(table.httpStatus),
+  }),
+);
+
+export type DataAcquisitionWebPage =
+  typeof dataAcquisitionWebPages.$inferSelect;
+export type InsertDataAcquisitionWebPage =
+  typeof dataAcquisitionWebPages.$inferInsert;
+
+/**
+ * data_acquisition_git_objects — Git / repository specialization.
+ */
+export const dataAcquisitionGitObjects = pgTable(
+  "data_acquisition_git_objects",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    repo: text("repo").notNull(),
+    objectType: varchar("object_type", { length: 32 }).notNull(),
+    objectSha: varchar("object_sha", { length: 64 }),
+    pathText: text("path_text"),
+    refName: varchar("ref_name", { length: 128 }),
+    language: varchar("language", { length: 64 }),
+    contentText: text("content_text"),
+    metadataJson: json("metadata_json").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_git_item").on(table.itemId),
+    typeIdx: index("idx_da_git_type").on(table.objectType),
+    repoIdx: index("idx_da_git_repo").on(table.repo),
+  }),
+);
+
+export type DataAcquisitionGitObject =
+  typeof dataAcquisitionGitObjects.$inferSelect;
+export type InsertDataAcquisitionGitObject =
+  typeof dataAcquisitionGitObjects.$inferInsert;
+
+/**
+ * data_acquisition_form_submissions — Manual form / capture specialization.
+ */
+export const dataAcquisitionFormSubmissions = pgTable(
+  "data_acquisition_form_submissions",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    formKey: varchar("form_key", { length: 128 }),
+    submittedBy: integer("submitted_by"),
+    fieldsJson: json("fields_json").$type<Record<string, unknown>>(),
+    submittedAt: timestamp("submitted_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_form_item").on(table.itemId),
+    formIdx: index("idx_da_form_key").on(table.formKey),
+  }),
+);
+
+export type DataAcquisitionFormSubmission =
+  typeof dataAcquisitionFormSubmissions.$inferSelect;
+export type InsertDataAcquisitionFormSubmission =
+  typeof dataAcquisitionFormSubmissions.$inferInsert;
+
+/**
+ * data_acquisition_webhook_events — Webhook / event specialization.
+ */
+export const dataAcquisitionWebhookEvents = pgTable(
+  "data_acquisition_webhook_events",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => dataAcquisitionItems.id),
+    provider: varchar("provider", { length: 64 }),
+    eventType: varchar("event_type", { length: 64 }),
+    deliveryId: varchar("delivery_id", { length: 128 }),
+    signatureValid: boolean("signature_valid"),
+    payloadJson: json("payload_json").$type<Record<string, unknown>>(),
+    receivedAt: timestamp("received_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index("idx_da_webhook_item").on(table.itemId),
+    providerIdx: index("idx_da_webhook_provider").on(table.provider),
+    eventTypeIdx: index("idx_da_webhook_event_type").on(table.eventType),
+  }),
+);
+
+export type DataAcquisitionWebhookEvent =
+  typeof dataAcquisitionWebhookEvents.$inferSelect;
+export type InsertDataAcquisitionWebhookEvent =
+  typeof dataAcquisitionWebhookEvents.$inferInsert;
