@@ -78,8 +78,13 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  *
  * IMPORTANT: only edit this list as part of the migration PR for the
  * specific module being added. Do not add modules speculatively.
+ *
+ * Phase 2 (this PR): Communication is the pilot capsule. Every
+ * frontend modularity check runs strict for `communication`; the
+ * remaining 14 RTLMs continue in report-only mode until their own
+ * migration PRs land.
  */
-export const MIGRATED_MODULES: RtlmKey[] = [];
+export const MIGRATED_MODULES: RtlmKey[] = ["communication"];
 
 /**
  * Platform Core route prefixes that are mounted directly in App.tsx.

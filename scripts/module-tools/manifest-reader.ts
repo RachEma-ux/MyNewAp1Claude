@@ -146,7 +146,7 @@ export function readManifestFor(
   snap.key = extractStringField(src, "key");
   snap.name = extractStringField(src, "name");
   snap.baseRoute = extractStringField(src, "baseRoute");
-  snap.capsuleEntrypoint = extractStringField(src, "capsuleEntrypoint");
+  snap.capsuleEntrypoint = extractCapsuleEntrypoint(src);
   const layoutModeRaw = extractStringField(src, "layoutMode");
   snap.layoutMode = isLayoutMode(layoutModeRaw) ? layoutModeRaw : null;
   snap.layoutReason = extractStringField(src, "layoutReason");
@@ -208,6 +208,30 @@ function extractStringField(src: string, field: string): string | null {
   return re.exec(src)?.[1] ?? null;
 }
 
+/**
+ * `capsuleEntrypoint` may be set as:
+ *   - a string path (legacy / docs example): `capsuleEntrypoint: "..."`
+ *   - an identifier referring to a lazy component:
+ *       `capsuleEntrypoint: SomeCapsule`
+ *   - a call expression (e.g. `lazy(() => import("./mod"))`)
+ *
+ * The reader's job is presence / shape — not loading the component —
+ * so we accept any non-empty RHS expression and return its source
+ * text as the "value" so reports stay readable.
+ */
+function extractCapsuleEntrypoint(src: string): string | null {
+  // Match `capsuleEntrypoint: <RHS>` up to a comma or end-of-line at
+  // brace depth 0. Tolerant to multi-line values.
+  const re = /(?:^|[\s,{])capsuleEntrypoint\s*:\s*([\s\S]+?)(,\s*$|,\s*\n|\n\s*[a-zA-Z_]+\s*:|\n\s*\})/m;
+  const m = re.exec(src);
+  if (!m) return null;
+  const rhs = m[1].trim();
+  if (!rhs) return null;
+  // Strip surrounding quotes if it's a literal string.
+  const quoted = /^["'`]([^"'`]+)["'`]$/.exec(rhs);
+  return quoted ? quoted[1] : rhs;
+}
+
 function extractStringArray(src: string, field: string): string[] {
   const re = new RegExp(`${field}\\s*:\\s*\\[([\\s\\S]*?)\\]`, "m");
   const m = re.exec(src);
@@ -253,16 +277,35 @@ function extractCompatibilityRoutes(src: string): CompatibilityRouteDecl[] {
  * Pull every quoted path-shaped string from a source file. Used to
  * scan `nav.ts` / `routes.tsx` for declared paths without building
  * a full TS AST.
+ *
+ * Strips comments first so prose mentions of legacy paths inside
+ * JSDoc / `//` comments don't pollute the result. (E.g. a nav.ts
+ * docstring documenting which paths are NOT allowed is not a path
+ * declaration.)
  */
 function extractStringLikePaths(src: string): string[] {
   const out = new Set<string>();
-  for (const m of src.matchAll(/["'`](\/[A-Za-z0-9/_:?\-*.]+)["'`]/g)) {
+  const stripped = stripComments(src);
+  for (const m of stripped.matchAll(/["'`](\/[A-Za-z0-9/_:?\-*.]+)["'`]/g)) {
     const p = m[1];
     // Skip `/foo.png` style assets and obvious non-routes.
     if (/\.[a-z0-9]{2,5}$/i.test(p)) continue;
     out.add(p);
   }
   return Array.from(out);
+}
+
+/**
+ * Strip TS/JS line and block comments. Crude — does not parse JSX,
+ * does not respect strings inside comments — but enough for the
+ * declarative manifest / nav / routes files this module reads.
+ */
+function stripComments(src: string): string {
+  // Block comments first (greedy across newlines).
+  let out = src.replace(/\/\*[\s\S]*?\*\//g, " ");
+  // Then line comments.
+  out = out.replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return out;
 }
 
 /**

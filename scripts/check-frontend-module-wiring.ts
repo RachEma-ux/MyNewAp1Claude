@@ -127,10 +127,20 @@ async function main() {
       }
     }
 
-    // Cross-check nav items reference declared routes.
-    const declaredPaths = new Set(
-      [...src.matchAll(/path\s*:\s*["'`]([^"'`]+)["'`]/g)].map((m) => m[1]),
-    );
+    // Cross-check nav items reference declared routes. A path is
+    // "declared" if it appears in the manifest's `routes: [{ path }]`
+    // entries (legacy shape) or in `routeInventory: [...]` (capsule
+    // shape). Without the routeInventory branch, capsule modules
+    // generate false-positive medium findings on the same paths
+    // their compatibility-redirect entries point at.
+    const declaredPaths = new Set<string>();
+    for (const m of src.matchAll(/path\s*:\s*["'`]([^"'`]+)["'`]/g)) {
+      declaredPaths.add(m[1]);
+    }
+    const inventoryBlock = /routeInventory\s*:\s*\[([\s\S]*?)\]/m.exec(src)?.[1] ?? "";
+    for (const m of inventoryBlock.matchAll(/["'`](\/[^"'`]+)["'`]/g)) {
+      declaredPaths.add(m[1]);
+    }
     const navTargets = [...src.matchAll(/(href|to|target|route)\s*:\s*["'`](\/[^"'`]+)["'`]/g)].map(
       (m) => m[2],
     );

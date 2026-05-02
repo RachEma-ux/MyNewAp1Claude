@@ -24,16 +24,17 @@ its own internal routing, layout, and nav.
   counts every server-declared subtree path as wired through the
   capsule.
 
-### Phase 1 — Pilot: Communication
+### Phase 2 — Pilot: Communication ✅ MERGED
 - **Goal:** prove a real RTLM works end-to-end in the capsule shape.
-- Migrate `client/src/modules/communication/` to the capsule layout
+- Migrated `client/src/modules/communication/` to the capsule layout
   (`client.ts`, `manifest.ts`, `mod.tsx`, `routes.tsx`, `nav.ts`,
-  `index.ts`).
-- Move `/communication/*` routes off App.tsx (private imports
-  removed; only the three compatibility redirects `/chat`,
-  `/conversations`, `/video-meeting` remain in App.tsx).
-- Set `MIGRATED_MODULES = ["communication"]`. Frontend modularity
-  checks become strict for Communication.
+  `index.ts`, `components/CommunicationShell.tsx`, `types.ts`).
+- Moved `/communication/*` routes off App.tsx; private page imports
+  removed. The three compatibility redirects (`/chat`,
+  `/conversations`, `/video-meeting`) remain in App.tsx as
+  `<Redirect>` shims only.
+- `MIGRATED_MODULES = ["communication"]`. Every frontend modularity
+  check is strict for Communication.
 
 ### Subsequent migrations (one PR each)
 

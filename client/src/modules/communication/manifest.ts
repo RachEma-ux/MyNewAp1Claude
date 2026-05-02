@@ -1,62 +1,64 @@
 /**
- * Communication — Frontend Module Manifest
+ * Communication — Frontend Module Manifest (capsule shape).
  *
- * Wires the canonical Communication routes (`/communication/*`).
- * App.tsx still owns the top-level Switch but registers ModuleRoutes
- * after its own routes; the routes here also appear directly in
- * App.tsx so wouter can resolve them. Keeping both in sync is the
- * convention used by every other client module.
+ * Communication is the pilot Module Client Capsule. The manifest:
+ *   - declares the canonical subtree (`/communication`)
+ *   - points at `mod.tsx` as the capsule entrypoint
+ *   - lists every canonical path under `routeInventory` so AWI and
+ *     `check:module-route-inventory` know the full surface
+ *   - lists legacy redirects under `compatibilityRoutes` so the
+ *     baseline / ownership-map generators can mark them as
+ *     compatibility-redirect rather than duplicate canonical
+ *
+ * App.tsx no longer mounts Communication pages. The capsule renders
+ * via `<ModuleRoutes />` once `client.ts` registers this manifest.
  */
 
 import { lazy } from "react";
+
 import type { ClientModuleManifest } from "@/platform/modules/types";
 
-const CommunicationDashboardPage = lazy(
-  () => import("./pages/CommunicationDashboardPage"),
-);
-const CommunicationChatPage = lazy(
-  () => import("./pages/CommunicationChatPage"),
-);
-const CommunicationConversationsPage = lazy(
-  () => import("./pages/CommunicationConversationsPage"),
-);
-const CommunicationVideoMeetingPage = lazy(
-  () => import("./pages/CommunicationVideoMeetingPage"),
-);
-const CommunicationNotificationsPage = lazy(
-  () => import("./pages/CommunicationNotificationsPage"),
-);
+const CommunicationCapsule = lazy(() => import("./mod"));
 
 export const communicationClientManifest: ClientModuleManifest = {
   key: "communication",
   name: "Communication",
-  routes: [
+
+  /* ---- Capsule fields (Phase-1+) ---- */
+  baseRoute: "/communication",
+  capsuleEntrypoint: CommunicationCapsule,
+  layoutMode: "inside-main-layout",
+  routeInventory: [
+    "/communication",
+    "/communication/chat",
+    "/communication/conversations",
+    "/communication/video-meeting",
+    "/communication/notifications",
+  ],
+  compatibilityRoutes: [
     {
-      path: "/communication",
-      label: "Communication",
-      component: CommunicationDashboardPage,
+      from: "/chat",
+      to: "/communication/chat",
+      reason: "legacy deep link",
     },
     {
-      path: "/communication/chat",
-      label: "Chat",
-      component: CommunicationChatPage,
+      from: "/conversations",
+      to: "/communication/conversations",
+      reason: "legacy deep link",
     },
     {
-      path: "/communication/conversations",
-      label: "Conversations",
-      component: CommunicationConversationsPage,
-    },
-    {
-      path: "/communication/video-meeting",
-      label: "Video Meeting",
-      component: CommunicationVideoMeetingPage,
-    },
-    {
-      path: "/communication/notifications",
-      label: "Notifications",
-      component: CommunicationNotificationsPage,
+      from: "/video-meeting",
+      to: "/communication/video-meeting",
+      reason: "legacy deep link",
     },
   ],
+  deprecatedRoutes: [],
+
+  /* ---- Legacy field — empty for capsule modules ---- */
+  // The composer ignores `routes[]` when `baseRoute + capsuleEntrypoint`
+  // are present; we leave it empty to match the capsule shape.
+  routes: [],
+
   navigation: [
     { group: "communication", label: "Communication", order: 5 },
   ],
