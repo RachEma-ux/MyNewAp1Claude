@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T20:53:31.669Z
+Generated: 2026-05-02T21:21:35.538Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **184**
+Total `<Route>` declarations in App.tsx: **181**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -27,7 +27,7 @@ Compatibility redirects in App.tsx: **25**
 | ai-types | 0 | 13 | 7 | 0 |
 | openrouter | 0 | 9 | 9 | 0 |
 | agent-studio | 0 | 11 | 6 | 0 |
-| sandbox-wf | 3 | 0 | 0 | 4 |
+| sandbox-wf | 0 | 3 | 2 | 0 |
 | kgra-agent | 1 | 0 | 0 | 4 |
 
 ## Duplicate paths
@@ -58,9 +58,9 @@ Compatibility redirects in App.tsx: **25**
 | `/ai-types/relationships` | routeInventory:ai-types, routes.tsx:ai-types |
 | `/ai-types/taxonomy` | routeInventory:ai-types, routes.tsx:ai-types |
 | `/ai-types/validation` | routeInventory:ai-types, routes.tsx:ai-types |
-| `/automation/sandbox-wf` | App.tsx, manifest:sandbox-wf |
-| `/automation/sandbox-wf/:id` | App.tsx, manifest:sandbox-wf |
-| `/automation/sandbox-wf/new` | App.tsx, manifest:sandbox-wf |
+| `/automation/sandbox-wf` | routeInventory:sandbox-wf, routes.tsx:sandbox-wf |
+| `/automation/sandbox-wf/:id` | routeInventory:sandbox-wf, routes.tsx:sandbox-wf |
+| `/automation/sandbox-wf/new` | routeInventory:sandbox-wf, routes.tsx:sandbox-wf |
 | `/code-studio` | routeInventory:code-studio, routes.tsx:code-studio |
 | `/code-studio/agents` | routeInventory:code-studio, routes.tsx:code-studio |
 | `/code-studio/ai-catalog` | routeInventory:code-studio, routes.tsx:code-studio |
@@ -390,7 +390,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | ai-types | ✅ | ✅ | ✅ | ✅ | ✅ |
 | openrouter | ✅ | ✅ | ✅ | ✅ | ✅ |
 | agent-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
-| sandbox-wf | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| sandbox-wf | ✅ | ✅ | ✅ | ✅ | ✅ |
 | kgra-agent | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 
 ---

@@ -176,7 +176,7 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `routes: [{ path: "/openrouter" }]` consistent with the capsule
  * baseRoute, so no server-manifest stale-route fix was needed.
  *
- * Phase 3.12 (this PR): Agent Studio migrates to the capsule shape,
+ * Phase 3.12 (PR #73): Agent Studio migrated to the capsule shape,
  * adding `agentStudio` as the thirteenth migrated module. Agent
  * Studio owns 11 canonical path patterns (`/agent-studio` plus
  * literal sub-routes new/templates/import/catalog/marketplace,
@@ -194,10 +194,30 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `/agent-studio/*` routes without breaking the no-private-import
  * boundary rule. Server `agent-studio/manifest.ts` already
  * declared `routes:` consistent with the capsule baseRoute.
- * Frontend modularity checks now run strict for the thirteen
- * migrated modules; the remaining 2 RTLMs (sandboxWf, kgraAgent)
- * continue in report-only mode until their own migration PRs
- * land.
+ *
+ * Phase 3.13 (this PR): Sandbox WF migrates to the capsule shape,
+ * adding `sandboxWf` as the fourteenth migrated module. Sandbox WF
+ * owns 3 canonical paths (`/automation/sandbox-wf`,
+ * `/automation/sandbox-wf/new`, `/automation/sandbox-wf/:id`).
+ * Note that the capsule's baseRoute is `/automation/sandbox-wf`,
+ * NOT `/automation` — the `/automation` subtree is shared with the
+ * legacy AutomationBuilder page and other automation-namespaced
+ * routes. The capsule scopes itself to the `/automation/sandbox-wf`
+ * prefix so AutomationBuilder stays unaffected. `mod.tsx` is a
+ * Wouter `<Switch>`: deep-link routes (`/new`, `/:id`) dispatch to
+ * `WFCreationShell`, bare `/automation/sandbox-wf` falls through
+ * to `SandboxWFPage`. 2 pages and 3 SWF-only components
+ * (MaestroChatWindow, ExecutionMonitor, NodePropertiesPanel)
+ * relocated; the shared automation primitives BlockConfigModal and
+ * WorkflowNode stay in `client/src/components/automation/` because
+ * the legacy AutomationBuilder page still imports them. Server
+ * `sandbox-wf/manifest.ts` had a stale `routes:` declaration of
+ * `/workflows`; fixed to `/automation/sandbox-wf` to match the
+ * capsule baseRoute (PR #61/#63/#69/#70 pattern).
+ *
+ * Frontend modularity checks now run strict for the fourteen
+ * migrated modules; the remaining 1 RTLM (kgraAgent) continues in
+ * report-only mode until its own migration PR lands.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -213,6 +233,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "aiTypes",
   "openRouter",
   "agentStudio",
+  "sandboxWf",
 ];
 
 /**
