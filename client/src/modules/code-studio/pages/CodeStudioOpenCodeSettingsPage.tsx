@@ -57,7 +57,7 @@ import {
   Code2,
   Braces,
 } from "lucide-react";
-import type { SettingsSection } from "@/components/code-studio/OpenCodeSettingsRail";
+import type { SettingsSection } from "../components/OpenCodeSettingsRail";
 
 // ── Default configs ──────────────────────────────────────────────────────────
 

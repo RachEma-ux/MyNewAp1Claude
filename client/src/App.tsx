@@ -170,8 +170,8 @@ const PSMCaseDetailPage = lazy(() => import("@/pages/psm/PSMCaseDetailPage"));
 const PSMRunPage = lazy(() => import("@/pages/psm/PSMRunPage"));
 const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage"));
 const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
-const CodeStudioShellPage = lazy(() => import("@/pages/code-studio/CodeStudioShellPage"));
-// CodeStudioJobDetailPage now rendered inside CodeStudioShell (not standalone)
+// Code Studio — migrated to capsule (PR #62). Mounted by <ModuleRoutes />
+// from `client/src/modules/code-studio/`.
 const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
@@ -490,21 +490,8 @@ function Router() {
       <Route path="/prm/ai-catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm/control-panel" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      {/* Code Studio — job detail inside shell */}
-      <Route path="/code-studio/jobs/:id" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/dashboard" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/jobs" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/templates" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/sessions" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/approvals" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/repos" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/agents" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/ai-catalog" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/policies" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/control-panel" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/opencode-settings" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio/how-to" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
-      <Route path="/code-studio" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
+      {/* Code Studio — migrated to capsule (PR #62). Routes /code-studio/*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* AI Agent Studio — Standalone agent lifecycle module (shell handles internal routing) */}
       {/* Order matters in wouter — literal sub-routes must precede :agentId patterns */}
       <Route path="/agent-studio/new" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />

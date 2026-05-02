@@ -15,19 +15,19 @@ import { Loader2 } from "lucide-react";
 import CodeStudioSidebar, { type CodeStudioView } from "./CodeStudioSidebar";
 import OpenCodeSettingsRail, { type SettingsSection } from "./OpenCodeSettingsRail";
 
-const CodeStudioDashboardPage = lazy(() => import("@/pages/code-studio/CodeStudioDashboardPage"));
-const CodeStudioJobsPage = lazy(() => import("@/pages/code-studio/CodeStudioJobsPage"));
-const CodeStudioJobDetailPage = lazy(() => import("@/pages/code-studio/CodeStudioJobDetailPage"));
-const CodeStudioSessionsPage = lazy(() => import("@/pages/code-studio/CodeStudioSessionsPage"));
-const CodeStudioApprovalsPage = lazy(() => import("@/pages/code-studio/CodeStudioApprovalsPage"));
-const CodeStudioReposPage = lazy(() => import("@/pages/code-studio/CodeStudioReposPage"));
-const CodeStudioAgentsPage = lazy(() => import("@/pages/code-studio/CodeStudioAgentsPage"));
-const CodeStudioPoliciesPage = lazy(() => import("@/pages/code-studio/CodeStudioPoliciesPage"));
-const CodeStudioAICatalogPage = lazy(() => import("@/pages/code-studio/CodeStudioAICatalogPage"));
-const CodeStudioControlPanelPage = lazy(() => import("@/pages/code-studio/CodeStudioControlPanelPage"));
-const CodeStudioOpenCodeSettingsPage = lazy(() => import("@/pages/code-studio/CodeStudioOpenCodeSettingsPage"));
-const CodeStudioHowToPage = lazy(() => import("@/pages/code-studio/CodeStudioHowToPage"));
-const CodeStudioTemplatesPage = lazy(() => import("@/pages/code-studio/CodeStudioTemplatesPage"));
+const CodeStudioDashboardPage = lazy(() => import("../pages/CodeStudioDashboardPage"));
+const CodeStudioJobsPage = lazy(() => import("../pages/CodeStudioJobsPage"));
+const CodeStudioJobDetailPage = lazy(() => import("../pages/CodeStudioJobDetailPage"));
+const CodeStudioSessionsPage = lazy(() => import("../pages/CodeStudioSessionsPage"));
+const CodeStudioApprovalsPage = lazy(() => import("../pages/CodeStudioApprovalsPage"));
+const CodeStudioReposPage = lazy(() => import("../pages/CodeStudioReposPage"));
+const CodeStudioAgentsPage = lazy(() => import("../pages/CodeStudioAgentsPage"));
+const CodeStudioPoliciesPage = lazy(() => import("../pages/CodeStudioPoliciesPage"));
+const CodeStudioAICatalogPage = lazy(() => import("../pages/CodeStudioAICatalogPage"));
+const CodeStudioControlPanelPage = lazy(() => import("../pages/CodeStudioControlPanelPage"));
+const CodeStudioOpenCodeSettingsPage = lazy(() => import("../pages/CodeStudioOpenCodeSettingsPage"));
+const CodeStudioHowToPage = lazy(() => import("../pages/CodeStudioHowToPage"));
+const CodeStudioTemplatesPage = lazy(() => import("../pages/CodeStudioTemplatesPage"));
 
 const routeMap: Record<CodeStudioView, string> = {
   dashboard: "/code-studio/dashboard",

@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T13:58:39.230Z
+Generated: 2026-05-02T14:36:50.705Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,12 +9,12 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 96 |
+| ✅ canonical | 99 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
-| ❓ unknown | 205 |
+| ❓ unknown | 202 |
 | **Total** | **337** |
 
 ## Per-RTLM
@@ -24,7 +24,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | dataAnalysis | ✅ migrated | 28 | `/data-analysis` |
 | communication | ✅ migrated | 10 | `/communication` |
 | pmCentral | ✅ migrated | 19 | `/pm` |
-| codeStudio | ⏳ pending | 11 | `—` |
+| codeStudio | ✅ migrated | 26 | `/code-studio` |
 | ps | ⏳ pending | 8 | `—` |
 | prm | ⏳ pending | 8 | `—` |
 | psm | ⏳ pending | 10 | `—` |
@@ -93,20 +93,20 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/catalog/agents/:catalogEntryId/chat` | — | unknown | — | ❓ unknown |  |
 | `/chat` | — | app-compatibility-redirect | `/communication/chat` | ↪️ compatibility-redirect | redirects to /communication/chat |
 | `/code` | — | unknown | — | ❓ unknown |  |
-| `/code-studio` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/agents` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/ai-catalog` | codeStudio | unknown | — | ❓ unknown |  |
-| `/code-studio/approvals` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/control-panel` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/dashboard` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/how-to` | codeStudio | unknown | — | ❓ unknown |  |
-| `/code-studio/jobs` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/jobs/:id` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/opencode-settings` | codeStudio | unknown | — | ❓ unknown |  |
-| `/code-studio/policies` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/repos` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/sessions` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
-| `/code-studio/templates` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
+| `/code-studio` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/agents` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/ai-catalog` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/approvals` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/control-panel` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/dashboard` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/how-to` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/jobs` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/jobs/:id` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/opencode-settings` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/policies` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/repos` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/sessions` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
+| `/code-studio/templates` | codeStudio | module-manifest | `module:codeStudio` | ✅ canonical |  |
 | `/collaboration` | — | unknown | — | ❓ unknown |  |
 | `/communication` | communication | module-manifest | `module:communication` | ✅ canonical |  |
 | `/communication/chat` | communication | module-manifest | `module:communication` | ✅ canonical |  |
@@ -422,9 +422,6 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/bots/wizard` | unknown | — |  |
 | `/catalog/agents/:catalogEntryId/chat` | unknown | — |  |
 | `/code` | unknown | — |  |
-| `/code-studio/ai-catalog` | unknown | codeStudio |  |
-| `/code-studio/how-to` | unknown | codeStudio |  |
-| `/code-studio/opencode-settings` | unknown | codeStudio |  |
 | `/collaboration` | unknown | — |  |
 | `/compliance-export` | unknown | — |  |
 | `/components/ai-catalog` | unknown | — |  |
