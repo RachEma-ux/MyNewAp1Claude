@@ -23,11 +23,19 @@ mockIo.to = vi.fn(() => ({
   emit: vi.fn(),
 }));
 
-// Mock HTTP Server
-const mockHttpServer = {
-  listen: vi.fn(),
-  close: vi.fn(),
-} as any;
+// Mock HTTP Server.
+//
+// Socket.IO 4 wraps the underlying http.Server and inspects it during
+// engine initialization (calls `.listeners(eventName)` to detect
+// existing listener stacks, plus standard EventEmitter methods).
+// A bare `{listen, close}` literal is missing those, causing a
+// `TypeError: server.listeners is not a function` at construction.
+// An `EventEmitter` instance with a `listen`/`close` shim has the
+// full surface Socket.IO needs.
+const mockHttpServer: any = new EventEmitter();
+mockHttpServer.listen = vi.fn();
+mockHttpServer.close = vi.fn();
+mockHttpServer.address = vi.fn(() => ({ port: 0 }));
 
 describe("WebSocket Service", () => {
   beforeEach(() => {

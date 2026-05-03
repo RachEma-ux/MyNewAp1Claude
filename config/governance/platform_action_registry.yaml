@@ -462,6 +462,18 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # Provider connectivity probe used by ProviderDetail.tsx to verify a
+  # configured LLM provider can be reached. Read-shaped (no state
+  # change to the platform) but routed through governedProcedure so
+  # it must be registered. Maps to chatRouter.testProvider.
+  chat.testProvider:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # CONVERSATIONS
   # ═══════════════════════════════════════════════════════════════════════════

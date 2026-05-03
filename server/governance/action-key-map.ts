@@ -77,6 +77,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "chat.deleteConversation": "chat.deleteConversation",
   "chat.updateSettings": "chat.updateSettings",
   "chat.generateTitle": "chat.generateTitle",
+  "chat.testProvider": "chat.testProvider",
 
   // ── Conversations ────────────────────────────────────────────────────────
   "conversations.create": "conversation.create",
