@@ -1,0 +1,216 @@
+# MyNewAp1Claude — Staging Runtime
+#
+# Brings up the full staging dependency surface so that production
+# readiness PRs 3–10 can produce executable evidence:
+#
+#   * 4 Postgres instances (mynewap1claude / asdb / ragdb / wfdb)
+#   * Redis (worker queue)
+#   * OPA (real openpolicyagent/opa image, mounted with the staging bundle)
+#   * Mock workers — graphrag / data-acquisition / external-orchestrator /
+#     sandbox-wf / kgra — each exposes /health and a minimal /run.
+#     Mocks are clearly labeled "mode: staging-mock" so reviewers can
+#     tell mock evidence apart from real-worker evidence.
+#
+# The app itself is not containerised here — start it separately with
+#   pnpm run dev   # or pnpm build && pnpm start
+# pointing STAGING_APP_URL=http://localhost:3000.
+#
+# Reproduction:
+#   cp .env.staging.example .env.staging
+#   # fill in real ENCRYPTION_KEY / SECRETS_ENCRYPTION_KEY / COOKIE_SECRET / JWT_SECRET
+#   set -a; source .env.staging; set +a
+#   pnpm run staging:up
+#   pnpm run staging:preflight:gate
+#
+# Tear down:
+#   pnpm run staging:down
+
+services:
+  postgres-mynewap1claude:
+    image: postgres:16-alpine
+    container_name: staging-postgres-mynewap1claude
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: mynewap1claude
+      POSTGRES_USER: ${POSTGRES_MYNEWAP1CLAUDE_USER:-mynewap1claude}
+      POSTGRES_PASSWORD: ${POSTGRES_MYNEWAP1CLAUDE_PASSWORD:-mynewap1claude_staging}
+    volumes:
+      - mynewap1claude-data:/var/lib/postgresql/data
+      - ./infra/staging/postgres-init/mynewap1claude:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_MYNEWAP1CLAUDE_USER:-mynewap1claude} -d mynewap1claude"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres-asdb:
+    image: postgres:16-alpine
+    container_name: staging-postgres-asdb
+    restart: unless-stopped
+    ports: ["5433:5432"]
+    environment:
+      POSTGRES_DB: asdb
+      POSTGRES_USER: ${POSTGRES_ASDB_USER:-asdb}
+      POSTGRES_PASSWORD: ${POSTGRES_ASDB_PASSWORD:-asdb_staging}
+    volumes:
+      - asdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ASDB_USER:-asdb} -d asdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres-ragdb:
+    image: postgres:16-alpine
+    container_name: staging-postgres-ragdb
+    restart: unless-stopped
+    ports: ["5434:5432"]
+    environment:
+      POSTGRES_DB: ragdb
+      POSTGRES_USER: ${POSTGRES_RAGDB_USER:-ragdb}
+      POSTGRES_PASSWORD: ${POSTGRES_RAGDB_PASSWORD:-ragdb_staging}
+    volumes:
+      - ragdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_RAGDB_USER:-ragdb} -d ragdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres-wfdb:
+    image: postgres:16-alpine
+    container_name: staging-postgres-wfdb
+    restart: unless-stopped
+    ports: ["5435:5432"]
+    environment:
+      POSTGRES_DB: wfdb
+      POSTGRES_USER: ${POSTGRES_WFDB_USER:-wfdb}
+      POSTGRES_PASSWORD: ${POSTGRES_WFDB_PASSWORD:-wfdb_staging}
+    volumes:
+      - wfdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_WFDB_USER:-wfdb} -d wfdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: staging-redis
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  opa:
+    image: openpolicyagent/opa:1.4.0
+    container_name: staging-opa
+    restart: unless-stopped
+    ports: ["8181:8181"]
+    command:
+      - "run"
+      - "--server"
+      - "--log-level=info"
+      - "--addr=0.0.0.0:8181"
+      - "/policies"
+    volumes:
+      - ./infra/staging/opa:/policies:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-graphrag-worker:
+    build:
+      context: ./infra/staging/mock-workers
+      dockerfile: Dockerfile
+    container_name: staging-mock-graphrag-worker
+    restart: unless-stopped
+    ports: ["4101:4000"]
+    environment:
+      WORKER_NAME: graphrag-worker
+      WORKER_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-data-acquisition-worker:
+    build:
+      context: ./infra/staging/mock-workers
+      dockerfile: Dockerfile
+    container_name: staging-mock-data-acquisition-worker
+    restart: unless-stopped
+    ports: ["4102:4000"]
+    environment:
+      WORKER_NAME: data-acquisition-worker
+      WORKER_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-external-orchestrator:
+    build:
+      context: ./infra/staging/mock-workers
+      dockerfile: Dockerfile
+    container_name: staging-mock-external-orchestrator
+    restart: unless-stopped
+    ports: ["4103:4000"]
+    environment:
+      WORKER_NAME: external-orchestrator
+      WORKER_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-sandbox-wf-worker:
+    build:
+      context: ./infra/staging/mock-workers
+      dockerfile: Dockerfile
+    container_name: staging-mock-sandbox-wf-worker
+    restart: unless-stopped
+    ports: ["4104:4000"]
+    environment:
+      WORKER_NAME: sandbox-wf-worker
+      WORKER_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-kgra-service:
+    build:
+      context: ./infra/staging/mock-workers
+      dockerfile: Dockerfile
+    container_name: staging-mock-kgra-service
+    restart: unless-stopped
+    ports: ["4105:4000"]
+    environment:
+      WORKER_NAME: kgra-service
+      WORKER_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mynewap1claude-data:
+  asdb-data:
+  ragdb-data:
+  wfdb-data:
+  redis-data:

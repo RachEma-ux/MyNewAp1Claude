@@ -13,7 +13,11 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.staging
 .env.staging.local
+# Keep example templates tracked
+!.env.example
+!.env.staging.example
 
 # IDE and editor files
 .vscode/
