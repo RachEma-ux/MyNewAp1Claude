@@ -129,7 +129,7 @@ console.log("Seeding workflow templates...");
 
 for (const template of templates) {
   await client.query(
-    `INSERT INTO workflow_templates (name, description, category, icon, tags, workflow_definition, is_public, created_by)
+    `INSERT INTO workflow_templates (name, description, category, icon, tags, "workflowDefinition", "isPublic", "createdBy")
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       template.name,
