@@ -66,12 +66,13 @@ export function ModuleRoutes() {
       {capsules.flatMap((c) => {
         const Capsule = c.manifest.capsuleEntrypoint as any;
         // Mount both the bare baseRoute (`/foo`) and a splat
-        // (`/foo/:rest*`) so the capsule renders for the root and any
-        // descendant. Wouter's <Switch> picks the first match; the
-        // bare entry is emitted first so `useLocation()` inside the
-        // capsule sees the exact URL.
+        // (`/foo/*`) so the capsule renders for the root and any
+        // descendant. The wildcard `*` matches multi-segment tails
+        // (e.g. `/agent-studio/catalog/skills`); using a named param
+        // like `:rest*` would only match single-segment tails because
+        // regexparam treats the `*` as part of the key name.
         const splatPath =
-          c.baseRoute === "/" ? "/:rest*" : `${c.baseRoute}/:rest*`;
+          c.baseRoute === "/" ? "/*" : `${c.baseRoute}/*`;
         return [
           <Route key={`capsule:${c.manifest.key}:base`} path={c.baseRoute}>
             <Suspense fallback={null}>
