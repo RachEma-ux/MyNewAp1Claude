@@ -74,6 +74,24 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ASDB] Agent Studio Expert seed failed: ${message}`);
   }
 
+  // Step 2b: Boot-time seed for the 5 fixture agents (legacy parity).
+  try {
+    const { seedLegacyFixtures } = await import("./db/seed-legacy-fixtures");
+    const result = await seedLegacyFixtures();
+    if (result.created > 0) {
+      console.log(
+        `[ASDB] Legacy fixtures seeded — ${result.created} created, ${result.skipped} already present (of ${result.total})`
+      );
+    } else if (result.total > 0) {
+      console.log(
+        `[ASDB] Legacy fixtures present — ${result.skipped}/${result.total} already seeded`
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ASDB] Legacy fixtures seed failed: ${message}`);
+  }
+
   // Step 3: Phase 10 scheduler — formalized boot path
   try {
     const { ensureSchedulerStarted } = await import("./services/scheduler");
