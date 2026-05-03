@@ -194,7 +194,34 @@ modes (see PR #81) is that real failures surface as failures.
 
 ---
 
-## 4. Outstanding gaps (tracked elsewhere)
+## 4. Worker runtime verification
+
+Phase 4 of the readiness report flagged worker verification as
+PARTIAL because static manifests pass but no test exercises a
+live worker. The fix lives at
+`tests/integration/workers/worker-runtime.test.ts`:
+
+* Probes `/health` on each declared worker (GraphRAG,
+  Data Acquisition, External Orchestrator) when its env var is
+  set.
+* Excluded from local-unit mode by the `tests/integration/**`
+  exclude rule.
+* Each worker block uses a plain `skipIf(!hasWorker)` predicate,
+  not `skipUnlessInfra` — workers are component-scoped optional
+  infra. A staging environment without GraphRAG simply runs in
+  degraded mode for that subdomain; we want the test to skip
+  cleanly there, not BLOCK the whole suite.
+
+To run the live worker probes against staging:
+
+```bash
+GRAPHRAG_WORKER_URL=https://graphrag.staging.internal \
+DATA_ACQUISITION_WORKER_URL=https://data-acquisition.staging.internal \
+EXTERNAL_ORCHESTRATOR_URL=https://orchestrator.staging.internal \
+pnpm run test:integration:staging
+```
+
+## 5. Outstanding gaps (tracked elsewhere)
 
 | Item | Status | Owner |
 |---|---|---|
