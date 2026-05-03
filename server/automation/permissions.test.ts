@@ -10,8 +10,12 @@ import {
   getWorkflowPermissions,
 } from "./permissions";
 import * as db from "../db";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
-describe("Permissions System", () => {
+// Real-DB integration: every test creates a workflow row in
+// Postgres in beforeEach. Skipped in local-unit mode; runs
+// against staging in staging-integration mode.
+describe.skipIf(skipUnlessInfra(hasDb))("Permissions System", () => {
   const ownerId = 1;
   const otherUserId = 2;
   let testWorkflowId: number;

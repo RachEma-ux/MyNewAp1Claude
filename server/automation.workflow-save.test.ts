@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createWorkflow, getUserWorkflows, deleteWorkflow } from "./db";
+import { hasDb, skipUnlessInfra } from "../tests/_helpers/test-modes";
 
-describe("Workflow Save Functionality", () => {
+// Real-DB integration: createWorkflow / deleteWorkflow hit
+// Postgres directly. Skipped in local-unit mode; runs against
+// the staging DB in staging-integration mode.
+describe.skipIf(skipUnlessInfra(hasDb))("Workflow Save Functionality", () => {
   let testWorkflowId: number;
 
   it("should create a workflow with nodes and edges", async () => {

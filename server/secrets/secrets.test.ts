@@ -10,6 +10,7 @@ import {
   resolveSecrets,
   redactSecretsInConfig,
 } from "./secrets-service";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
 describe("Secrets Encryption", () => {
   it("should encrypt and decrypt correctly", () => {
@@ -40,7 +41,12 @@ describe("Secrets Encryption", () => {
   });
 });
 
-describe("Secrets Service", () => {
+// The Secrets Service tests below hit the real Postgres
+// `secrets` table via createSecret / listSecrets / deleteSecret.
+// They are skipped in local-unit mode and run against the
+// staging DB in staging-integration mode. The encryption tests
+// above are pure unit tests and continue to run unconditionally.
+describe.skipIf(skipUnlessInfra(hasDb))("Secrets Service", () => {
   const mockUserId = 1;
 
   beforeEach(async () => {

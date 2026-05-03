@@ -6,8 +6,14 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExternalOrchestratorClient } from './externalOrchestrator';
+import { hasOrchestrator, skipUnlessInfra } from '../../tests/_helpers/test-modes';
 
-describe('ExternalOrchestratorClient', () => {
+// This suite issues real fetch() calls against the configured
+// orchestrator URL. Without a live or mocked orchestrator the tests
+// hang the network stack until the per-test timeout. In local-unit
+// mode we skip; in staging-integration mode we run and surface the
+// real result.
+describe.skipIf(skipUnlessInfra(hasOrchestrator))('ExternalOrchestratorClient', () => {
   let client: ExternalOrchestratorClient;
 
   beforeEach(() => {

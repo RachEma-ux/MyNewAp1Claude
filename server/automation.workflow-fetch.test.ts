@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import * as db from "./db";
+import { hasDb, skipUnlessInfra } from "../tests/_helpers/test-modes";
 
-describe("Workflow Fetching - Database Integration", () => {
+// Real-DB integration test. Without DATABASE_URL the
+// getUserWorkflows() call returns nothing or throws on the
+// uninitialized client. Skipped in local-unit mode; runs against
+// the staging DB in staging-integration mode.
+describe.skipIf(skipUnlessInfra(hasDb))("Workflow Fetching - Database Integration", () => {
   const testUserId = 1;
 
   it("should fetch workflows from database for userId 1", async () => {
