@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T21:36:50.151Z
+Generated: 2026-05-03T01:29:17.636Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,11 +9,11 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 175 |
+| ✅ canonical | 177 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
-| ⚠️ orphan | 2 |
+| ⚠️ orphan | 0 |
 | ❓ unknown | 144 |
 | **Total** | **357** |
 
@@ -33,7 +33,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | cultureValues | ✅ migrated | 7 | `/cv` |
 | aiTypes | ✅ migrated | 20 | `/ai-types` |
 | openRouter | ✅ migrated | 18 | `—` |
-| agentStudio | ✅ migrated | 17 | `/agent-studio` |
+| agentStudio | ✅ migrated | 19 | `/agent-studio` |
 | sandboxWf | ✅ migrated | 5 | `/automation/sandbox-wf` |
 | kgraAgent | ✅ migrated | 2 | `/data-analysis/kgra-agent` |
 
@@ -52,8 +52,8 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/agent-studio/:agentId/versions/compare` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
 | `/agent-studio/catalog` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
 | `/agent-studio/catalog/:section` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
-| `/agent-studio/catalog/skills` | agentStudio | module-nav | — | ⚠️ orphan | nav points to a path no manifest declares |
-| `/agent-studio/catalog/tools` | agentStudio | module-nav | — | ⚠️ orphan | nav points to a path no manifest declares |
+| `/agent-studio/catalog/skills` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
+| `/agent-studio/catalog/tools` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
 | `/agent-studio/import` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
 | `/agent-studio/marketplace` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
 | `/agent-studio/new` | agentStudio | module-manifest | `module:agentStudio` | ✅ canonical |  |
@@ -398,13 +398,6 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/ws/dashboard` | platform-core | app-platform-core | `WSDashboardPage` | 🏛 platform-core |  |
 | `/ws/list` | platform-core | app-platform-core | `WSListPage` | 🏛 platform-core |  |
 | `/ws/wizard/:id?` | platform-core | app-platform-core | `WSWizardPage` | 🏛 platform-core |  |
-
-## Orphan routes (nav-only)
-
-| Path | Source | Owner | Notes |
-|---|---|---|---|
-| `/agent-studio/catalog/skills` | module-nav | agentStudio | nav points to a path no manifest declares |
-| `/agent-studio/catalog/tools` | module-nav | agentStudio | nav points to a path no manifest declares |
 
 ## Unknown routes
 

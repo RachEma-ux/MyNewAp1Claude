@@ -39,12 +39,20 @@ export const agentStudioClientManifest: ClientModuleManifest = {
   baseRoute: "/agent-studio",
   capsuleEntrypoint: AgentStudioCapsule,
   layoutMode: "inside-main-layout",
+  // The two literal `/catalog/skills` and `/catalog/tools` paths
+  // are also advertised in `nav.ts`. Listing them explicitly here
+  // alongside the parametrized `/catalog/:section` form pins what
+  // the nav promises at the manifest level so route-ownership
+  // tooling can verify nav→inventory coverage without inferring
+  // the `:section` match.
   routeInventory: [
     "/agent-studio",
     "/agent-studio/new",
     "/agent-studio/templates",
     "/agent-studio/import",
     "/agent-studio/catalog",
+    "/agent-studio/catalog/skills",
+    "/agent-studio/catalog/tools",
     "/agent-studio/catalog/:section",
     "/agent-studio/marketplace",
     "/agent-studio/:agentId",

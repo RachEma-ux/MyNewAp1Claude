@@ -1,6 +1,6 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T21:36:50.157Z
+Generated: 2026-05-03T01:29:17.642Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
@@ -26,7 +26,7 @@ Compatibility redirects in App.tsx: **25**
 | culture-values | 0 | 4 | 3 | 0 |
 | ai-types | 0 | 13 | 7 | 0 |
 | openrouter | 0 | 9 | 9 | 0 |
-| agent-studio | 0 | 11 | 6 | 0 |
+| agent-studio | 0 | 13 | 6 | 0 |
 | sandbox-wf | 0 | 3 | 2 | 0 |
 | kgra-agent | 0 | 1 | 1 | 0 |
 
@@ -218,8 +218,6 @@ Compatibility redirects in App.tsx: **25**
 | `/404` | unknown | — |  |
 | `/agent-dashboard` | unknown | — |  |
 | `/agent-detail/:id` | unknown | — |  |
-| `/agent-studio/catalog/skills` | module-nav | agentStudio | nav points to a path no manifest declares |
-| `/agent-studio/catalog/tools` | module-nav | agentStudio | nav points to a path no manifest declares |
 | `/agents` | unknown | — |  |
 | `/agents/:agentId/chat` | unknown | — |  |
 | `/agents/:id` | unknown | — |  |
