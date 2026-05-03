@@ -279,13 +279,22 @@ have a deliverable in this repo:
   console errors, no 5xx, hardening dashboard green). Phase 8
   remains BLOCKED until a human walks the matrix against
   staging.
-* **Phase 9 (Real user workflow)** — the existing
+* **Phase 9 (Real user workflow)** — the evidence deliverable
+  is `docs/evidence/workflows/REAL_USER_WORKFLOW_REPORT.md`. It
+  classifies every cross-module workflow named in the readiness
+  remediation plan as EXECUTABLE_NOW / PARTIAL / BLOCKED and
+  cites the **actual discovered API/router/handoff/gateway-action
+  paths** for each — no guessed names. The companion test
+  `tests/integration/workflows/workflow-readiness.test.ts`
+  asserts every cited symbol still exists, so the report cannot
+  silently rot. The existing
   `tests/integration/ai-types/scenario*.test.ts` files exercise
-  the AI Types cross-module path. The full 7-step replay (PM →
-  PS → PSM → HR → Agent Studio → Sandbox WF → KGRA) requires
-  seed users + per-module data and is owned by SRE/QA against
-  staging; this PR does not invent a synthetic-user replay
-  without seed data.
+  the AI Types subset of cross-module flows. The full
+  synthetic-user replay (PS → PM → Code Studio → KGRA, with
+  metric comparisons) is owned by SRE/QA against staging and is
+  not faked here. Phase 9 is **not** claimed as PASS — it is
+  lifted from "BLOCKED, no artifact" to "PARTIAL, with
+  discovered-API evidence".
 * **Phase 10 (E2E synchronization)** —
   `tests/integration/sync/event-handoff-sync.test.ts` asserts
   the deterministic floor: cross-module event bus emit/consume,
