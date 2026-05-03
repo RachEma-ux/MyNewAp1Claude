@@ -1,16 +1,16 @@
 # Application Wiring Inventory
 
-Generated: 2026-05-02T14:01:58.687Z
+Generated: 2026-05-03T12:58:20.932Z
 
 ## Summary
 
 - Modules: **16**
-- Fully wired: **10**
-- Mostly wired: **6**
+- Fully wired: **9**
+- Mostly wired: **7**
 - Partially wired: **0**
 - Declared only: **0**
 - Blocked: **0**
-- Average readiness score: **92**
+- Average readiness score: **91**
 - Blockers: **0**
 - Warnings: **5**
 - Missing required wires: **0**
@@ -30,7 +30,7 @@ Generated: 2026-05-02T14:01:58.687Z
 | HR (hr) | 100 | fully-wired | 0 | 0 |
 | Organization Management (organizationManagement) | 93 | fully-wired | 0 | 0 |
 | Culture Values (cultureValues) | 93 | fully-wired | 0 | 0 |
-| AI Types (aiTypes) | 94 | fully-wired | 0 | 1 |
+| AI Types (aiTypes) | 85 | mostly-wired | 0 | 1 |
 | KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
 | Communication (communication) | 94 | fully-wired | 0 | 1 |
 | PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
@@ -53,7 +53,7 @@ Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/br
 | hr | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ |
 | organizationManagement | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
 | cultureValues | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
-| aiTypes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
+| aiTypes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
 | kgraAgent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
 | pmCentral | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | 🚫 |

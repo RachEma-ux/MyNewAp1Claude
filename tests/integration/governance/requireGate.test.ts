@@ -35,8 +35,8 @@ vi.mock("./scorecard", () => ({
   getFreezeDetails: (...args: any[]) => mockGetFreezeDetails(...args),
 }));
 
-import { requireGate } from "./requireGate";
-import { persistEvidenceBundle } from "./scorecard/evidence";
+import { requireGate } from "../../../server/governance/requireGate";
+import { persistEvidenceBundle } from "../../../server/governance/scorecard/evidence";
 
 // ============================================================================
 // Fixtures

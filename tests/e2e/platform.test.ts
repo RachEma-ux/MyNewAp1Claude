@@ -3,7 +3,7 @@
  * Comprehensive platform testing
  */
 
-import { test, expect } from "vitest";
+import { describe, test, expect } from "vitest";
 
 describe("Platform E2E Tests", () => {
   describe("Authentication", () => {

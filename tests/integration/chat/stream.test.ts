@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Request, Response } from 'express';
-import { handleChatStream } from './stream';
-import { getProviderRegistry } from '../providers/registry';
-import { OpenAIProvider } from '../providers/openai';
-import type { ProviderConfig } from '../providers/types';
+import { handleChatStream } from '../../../server/chat/stream';
+import { getProviderRegistry } from '../../../server/providers/registry';
+import { OpenAIProvider } from '../../../server/providers/openai';
+import type { ProviderConfig } from '../../../server/providers/types';
 
 // Mock dependencies
 vi.mock('../_core/sdk', () => ({

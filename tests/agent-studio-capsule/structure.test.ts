@@ -115,7 +115,12 @@ describe("Agent Studio manifest", () => {
   it("layoutMode is inside-main-layout", () => {
     expect(snap.layoutMode).toBe("inside-main-layout");
   });
-  it("routeInventory contains the 11 canonical patterns", () => {
+  it("routeInventory contains the 13 canonical patterns", () => {
+    // Two literal entries (`/agent-studio/catalog/skills` and
+    // `/agent-studio/catalog/tools`) were pinned alongside the
+    // parameterized `/catalog/:section` by readiness PR 6 (orphan
+    // route fix) — see docs/evidence/production-readiness/
+    // PRODUCTION_READINESS_REMEDIATION_PLAN.md PR 6.
     const set = new Set(snap.routeInventory.map(normalizePath));
     expect(set).toEqual(
       new Set([
@@ -124,6 +129,8 @@ describe("Agent Studio manifest", () => {
         "/agent-studio/templates",
         "/agent-studio/import",
         "/agent-studio/catalog",
+        "/agent-studio/catalog/skills",
+        "/agent-studio/catalog/tools",
         "/agent-studio/catalog/:section",
         "/agent-studio/marketplace",
         "/agent-studio/:agentId",

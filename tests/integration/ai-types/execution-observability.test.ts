@@ -29,10 +29,10 @@ import {
   getConversationById,
   getUserWorkspaces,
   updateExecutionRun,
-} from "../db";
-import { getProviderRegistry } from "../providers/registry";
-import { getAgent } from "../agents/db";
-import { executeCatalogChatStream } from "./execution";
+} from "../../../server/db";
+import { getProviderRegistry } from "../../../server/providers/registry";
+import { getAgent } from "../../../server/agents/db";
+import { executeCatalogChatStream } from "../../../server/ai-types/execution";
 
 function buildEntry(overrides: Record<string, unknown> = {}) {
   return {

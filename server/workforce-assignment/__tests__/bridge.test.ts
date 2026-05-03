@@ -18,7 +18,7 @@
  * 11. Key events emit audit behavior (audit structure)
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   validateRequestTransition,
   validateAssignmentTransition,
@@ -544,8 +544,8 @@ describe("Audit — Bridge Event Types", () => {
 // ============================================================================
 
 describe("Temporary Authority Resolution", () => {
-  it("resolves authority for admin role", () => {
-    const result = resolveAssignmentAuthority({
+  it("resolves authority for admin role", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 1,
       actorRole: "admin",
       employeeId: 10,
@@ -558,8 +558,8 @@ describe("Temporary Authority Resolution", () => {
     expect(result.chain._transitional).toBe(true);
   });
 
-  it("resolves authority for hrbp role", () => {
-    const result = resolveAssignmentAuthority({
+  it("resolves authority for hrbp role", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 2,
       actorRole: "hrbp",
       employeeId: 10,
@@ -569,8 +569,8 @@ describe("Temporary Authority Resolution", () => {
     expect(result.source).toBe("transitional");
   });
 
-  it("resolves authority for workspace_admin role", () => {
-    const result = resolveAssignmentAuthority({
+  it("resolves authority for workspace_admin role", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 5,
       actorRole: "workspace_admin",
       employeeId: 10,
@@ -579,8 +579,8 @@ describe("Temporary Authority Resolution", () => {
     expect(result.resolved).toBe(true);
   });
 
-  it("does NOT resolve authority for regular user (PM role)", () => {
-    const result = resolveAssignmentAuthority({
+  it("does NOT resolve authority for regular user (PM role)", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 3,
       actorRole: "user",
       employeeId: 10,
@@ -590,8 +590,8 @@ describe("Temporary Authority Resolution", () => {
     expect(result.warning).toContain("does not have authority");
   });
 
-  it("does NOT resolve authority for employee role", () => {
-    const result = resolveAssignmentAuthority({
+  it("does NOT resolve authority for employee role", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 4,
       actorRole: "employee",
       employeeId: 10,
@@ -600,8 +600,8 @@ describe("Temporary Authority Resolution", () => {
     expect(result.resolved).toBe(false);
   });
 
-  it("does NOT resolve authority for manager role (OM-dependent)", () => {
-    const result = resolveAssignmentAuthority({
+  it("does NOT resolve authority for manager role (OM-dependent)", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 6,
       actorRole: "manager",
       employeeId: 10,
@@ -611,20 +611,25 @@ describe("Temporary Authority Resolution", () => {
     expect(result.warning).toContain("does not have authority");
   });
 
-  it("all authority records are marked transitional with OM dependency note", () => {
-    const result = resolveAssignmentAuthority({
+  it("all authority records are marked transitional with OM dependency note", async () => {
+    const result = await resolveAssignmentAuthority({
       actorId: 1,
       actorRole: "admin",
       employeeId: 10,
       projectId: 100,
     });
     expect(result.chain._transitional).toBe(true);
-    expect(result.chain._omDependency).toContain("Organization Management module not yet implemented");
+    // Source moved from `_omDependency` to `_omIntegration` and message
+    // text was rephrased — assertion updated to match current contract
+    // in server/workforce-assignment/authority.ts.
+    expect(result.chain._omIntegration).toContain(
+      "OM module available but workspaceId not provided",
+    );
   });
 
-  it("authority source is always 'transitional' (not 'om_hierarchy')", () => {
+  it("authority source is always 'transitional' (not 'om_hierarchy')", async () => {
     for (const role of ["admin", "hrbp", "user", "employee"]) {
-      const result = resolveAssignmentAuthority({
+      const result = await resolveAssignmentAuthority({
         actorId: 1,
         actorRole: role,
         employeeId: 10,

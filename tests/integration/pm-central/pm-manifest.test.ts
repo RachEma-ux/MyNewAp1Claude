@@ -2,8 +2,8 @@
  * PM Central — manifest shape tests.
  */
 import { describe, it, expect } from "vitest";
-import { pmCentralManifest } from "../manifest";
-import { PM_CENTRAL_HANDOFFS } from "../handoffs";
+import { pmCentralManifest } from "../../../server/pm-central/manifest";
+import { PM_CENTRAL_HANDOFFS } from "../../../server/pm-central/handoffs";
 
 describe("pmCentralManifest", () => {
   it("declares the expected identity", () => {

@@ -10,8 +10,19 @@
  * files, so DOM mutations don't leak across test cases. The
  * cleanup is loaded lazily and silently skipped for tests that
  * never used `render` (e.g. server-only suites).
+ *
+ * Loads `@testing-library/jest-dom/vitest` so jsdom-mode tests can
+ * use `toBeInTheDocument()` etc. without each test file importing
+ * `@testing-library/jest-dom` directly — the bare import path runs
+ * `expect.extend(...)` against the global `expect` symbol that does
+ * not exist when `globals: false` (the default), which surfaces as
+ * `ReferenceError: expect is not defined` at module-load time. The
+ * `/vitest` subpath uses vitest's module-scoped `expect`.
  */
-import { afterEach } from "vitest";
+import { afterEach, expect } from "vitest";
+import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
+
+expect.extend(jestDomMatchers);
 
 afterEach(async () => {
   if (typeof document === "undefined") return;
