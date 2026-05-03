@@ -37,10 +37,9 @@ interface Rule {
   allowedFiles: Set<string>;
 }
 
-// Patterns are constructed via RegExp() rather than regex literals so that
-// the source code of this script does NOT itself contain the literal
-// `from "streamdown"` / `from "shiki"` byte sequence — otherwise this
-// script would flag itself when scanned.
+// Patterns are constructed via RegExp() with concatenated fragments so the
+// matchable byte sequence is not literally present in this file — otherwise
+// the script would flag its own source when scanned.
 const STREAMDOWN_RULE: Rule = {
   description: "direct import of streamdown (route through AppStreamdown instead)",
   pattern: new RegExp("from\\s+[\"']" + "streamdown" + "(\\/[^\"']*)?[\"']"),
