@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(*)",
+      "Read(/root/MyNewAp1Claude/**)",
+      "Edit(/root/MyNewAp1Claude/**)",
+      "Read(./**)",
+      "Edit(./**)"
+    ],
+    "ask": [],
+    "deny": [
+      "Read(/root/MyNewAp1Claude/.env)",
+      "Read(/root/MyNewAp1Claude/.env.*)",
+      "Read(/root/MyNewAp1Claude/secrets/**)",
+      "Read(/root/MyNewAp1Claude/**/secrets/**)",
+      "Edit(/root/MyNewAp1Claude/.env)",
+      "Edit(/root/MyNewAp1Claude/.env.*)",
+      "Edit(/root/MyNewAp1Claude/secrets/**)",
+      "Edit(/root/MyNewAp1Claude/**/secrets/**)",
+      "Bash(printenv)",
+      "Bash(env)",
+      "Bash(sudo *)",
+      "Bash(chown / *)",
+      "Bash(chmod 777 *)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf /root)"
+    ]
+  }
+}
