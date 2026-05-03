@@ -487,12 +487,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <HeaderActionsContext.Provider value={{ actions: headerActions, setActions: setHeaderActions }}>
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh w-full max-w-full bg-background">
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen transition-transform ${
+        className={`fixed left-0 top-0 z-40 h-dvh transition-transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } w-64 border-r border-border bg-card`}
+        } w-64 max-w-[85vw] border-r border-border bg-card`}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
@@ -755,9 +755,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <div className={`transition-all ${sidebarOpen ? "lg:pl-64" : ""}`}>
+      <div className={`min-w-0 max-w-full transition-all ${sidebarOpen ? "lg:pl-64" : ""}`}>
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border bg-card px-4 sm:gap-4 sm:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -765,16 +765,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0" />
           {headerActions && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {headerActions}
             </div>
           )}
         </header>
 
         {/* Page Content */}
-        <main className="p-6">{children}</main>
+        <main className="min-w-0 max-w-full p-4 sm:p-6">{children}</main>
       </div>
 
       {/* Mobile Overlay */}
