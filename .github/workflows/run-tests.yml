@@ -65,10 +65,13 @@ jobs:
 
       # ── Layer 3: Integration Tests — Scenarios ─────────────────────
       # 7 real-world scenarios with step-by-step invariant checks.
+      # TEST_MODE=staging-integration lifts the vitest config exclude
+      # for tests/integration/** added in the test-mode separation PR.
       - name: Scenario tests (Layer 3a)
         run: npx vitest run tests/integration/ai-types/ --reporter=verbose
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+          TEST_MODE: staging-integration
 
       # ── Layer 3: Integration Tests — DB Integrity ──────────────────
       # FK integrity, fallback, dedup, state constraints, availability.
@@ -76,6 +79,7 @@ jobs:
         run: npx vitest run tests/integration/runtime-db/ --reporter=verbose
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+          TEST_MODE: staging-integration
 
       # ── Layer 4: UI Selector Tests ─────────────────────────────────
       # Intake selectors, app selectors, chat selectors, bot wizard.
