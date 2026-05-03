@@ -267,7 +267,42 @@ AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… S3_BUCKET=… \
 pnpm exec vitest run tests/integration/connectors/
 ```
 
-## 6. Outstanding gaps (tracked elsewhere)
+## 6. UI smoke matrix and E2E sync
+
+The Phase 8 / 9 / 10 BLOCKED rows in the readiness report each
+have a deliverable in this repo:
+
+* **Phase 8 (Full UI behaviour)** —
+  `docs/deployment/ui-smoke-matrix.md` is the codified manual
+  smoke checklist: 15 capsules × golden path × edge cases plus
+  cross-cutting checks (auth bypass off in production, no
+  console errors, no 5xx, hardening dashboard green). Phase 8
+  remains BLOCKED until a human walks the matrix against
+  staging.
+* **Phase 9 (Real user workflow)** — the evidence deliverable
+  is `docs/evidence/workflows/REAL_USER_WORKFLOW_REPORT.md`. It
+  classifies every cross-module workflow named in the readiness
+  remediation plan as EXECUTABLE_NOW / PARTIAL / BLOCKED and
+  cites the **actual discovered API/router/handoff/gateway-action
+  paths** for each — no guessed names. The companion test
+  `tests/integration/workflows/workflow-readiness.test.ts`
+  asserts every cited symbol still exists, so the report cannot
+  silently rot. The existing
+  `tests/integration/ai-types/scenario*.test.ts` files exercise
+  the AI Types subset of cross-module flows. The full
+  synthetic-user replay (PS → PM → Code Studio → KGRA, with
+  metric comparisons) is owned by SRE/QA against staging and is
+  not faked here. Phase 9 is **not** claimed as PASS — it is
+  lifted from "BLOCKED, no artifact" to "PARTIAL, with
+  discovered-API evidence".
+* **Phase 10 (E2E synchronization)** —
+  `tests/integration/sync/event-handoff-sync.test.ts` asserts
+  the deterministic floor: cross-module event bus emit/consume,
+  fanout, unsubscribe, wildcard pattern matching, idempotency
+  dedup. Load behaviour and Postgres-outbox durability remain a
+  staging concern.
+
+## 7. Outstanding gaps (tracked elsewhere)
 
 | Item | Status | Owner |
 |---|---|---|
