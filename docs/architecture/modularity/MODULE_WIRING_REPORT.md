@@ -1,69 +1,36 @@
-# Application Wiring Inventory
+# Module Wiring Report
 
-Generated: 2026-05-03T12:58:20.932Z
+Generated: 2026-05-03T13:44:06.057Z
 
-## Summary
+## Totals
 
-- Modules: **16**
-- Fully wired: **9**
-- Mostly wired: **7**
-- Partially wired: **0**
-- Declared only: **0**
-- Blocked: **0**
-- Average readiness score: **91**
+- Modules tracked: **16**
+- Fully wired: **16**
+- Declared-only: **0**
 - Blockers: **0**
-- Warnings: **5**
-- Missing required wires: **0**
+- Follow-ups: **0**
 
-## Module readiness
+## Per-module status
 
-| Module | Readiness | Status | Blockers | Warnings |
-|---|---:|---|---:|---:|
-| PRM (prm) | 86 | mostly-wired | 0 | 0 |
-| PSM (psm) | 86 | mostly-wired | 0 | 0 |
-| Code Studio (codeStudio) | 98 | fully-wired | 0 | 0 |
-| Agent Studio (agentStudio) | 98 | fully-wired | 0 | 1 |
-| Sandbox WF (sandboxWf) | 87 | mostly-wired | 0 | 0 |
-| RAG (rag) | 83 | mostly-wired | 0 | 0 |
-| OpenRouter (openRouter) | 85 | mostly-wired | 0 | 1 |
-| PS (ps) | 96 | fully-wired | 0 | 0 |
-| HR (hr) | 100 | fully-wired | 0 | 0 |
-| Organization Management (organizationManagement) | 93 | fully-wired | 0 | 0 |
-| Culture Values (cultureValues) | 93 | fully-wired | 0 | 0 |
-| AI Types (aiTypes) | 85 | mostly-wired | 0 | 1 |
-| KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
-| Communication (communication) | 94 | fully-wired | 0 | 1 |
-| PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
-| Data Analysis (dataAnalysis) | 95 | fully-wired | 0 | 0 |
+| Module | Manifest | Router | Runtime | DB | PublicAPI | Events | Handoffs | Routes | Gov | HQ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| prm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| psm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| codeStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| agentStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| sandboxWf | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| rag | ✓ | ✗ | WIRED | WIRED | WIRED | WIRED | n/a | n/a | WIRED | WIRED |
+| openRouter | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| ps | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| hr | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| organizationManagement | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| cultureValues | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| aiTypes | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| kgraAgent | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| communication | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| pmCentral | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| dataAnalysis | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
 
-## Wiring matrix
+## Findings
 
-Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/broken/blocked · — not-applicable
-
-| Module | manifest | server-router | client-route | navigation | public-api | gateway | database | permission | governance | event | handoff | runtime | port-endpoint | agent-provider | observability | test | documentation |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| prm | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | 🚫 | 🚫 |
-| psm | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | 🚫 | 🚫 |
-| codeStudio | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
-| agentStudio | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚪ | ✅ | ✅ | ✅ |
-| sandboxWf | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | 🚫 | 🚫 |
-| rag | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | 🚫 | 🚫 |
-| openRouter | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
-| ps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | 🚫 |
-| hr | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ |
-| organizationManagement | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
-| cultureValues | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
-| aiTypes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
-| kgraAgent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
-| communication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
-| pmCentral | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | 🚫 |
-| dataAnalysis | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
-
-## Warnings
-
-- `agentStudio` — agent-provider: declared-only (aiTypes.catalog port consumption)
-- `openRouter` — agent-provider: declared-only (aiTypes.catalog port consumption)
-- `aiTypes` — agent-provider: declared-only (aiTypes.catalog port consumption)
-- `kgraAgent` — agent-provider: declared-only (aiTypes.catalog port consumption)
-- `communication` — agent-provider: declared-only (aiTypes.catalog port consumption)
-
+No findings. Every declared lane has a runtime registration.
