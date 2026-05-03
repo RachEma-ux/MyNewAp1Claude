@@ -87,7 +87,7 @@ export default function AITypesShell() {
 
   return (
     <div
-      className="flex h-full w-full overflow-hidden min-w-0 max-w-full"
+      className="flex -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 overflow-hidden h-[calc(100dvh-4rem)] min-w-0 max-w-full"
     >
       <AITypesSidebar
         collapsed={sidebarCollapsed}

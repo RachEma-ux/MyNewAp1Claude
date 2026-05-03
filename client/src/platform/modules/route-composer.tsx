@@ -44,7 +44,10 @@
 import { Suspense } from "react";
 import { Route } from "wouter";
 import { listClientModules } from "./registry";
-import type { ClientModuleManifest } from "./types";
+import type { ClientModuleManifest, ModuleLayoutMode } from "./types";
+import MainLayout from "@/components/MainLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl, isOAuthConfigured } from "@/const";
 
 interface CapsuleEntry {
   manifest: ClientModuleManifest;
@@ -57,6 +60,45 @@ interface LegacyRouteEntry {
   component: NonNullable<ClientModuleManifest["routes"][number]["component"]>;
 }
 
+/**
+ * Renders a capsule with the same auth gating + chrome the legacy
+ * `<ProtectedRoute>` / `<ShellRoute>` helpers in App.tsx apply. Capsule
+ * mounts go through `<ModuleRoutes />` directly (not ProtectedRoute), so
+ * without this wrapper the platform header/sidebar are missing for any
+ * module-owned URL — the manifest's `layoutMode` decides which chrome to
+ * apply (default: render under `<MainLayout>`).
+ */
+function CapsuleHost({
+  Capsule,
+  layoutMode,
+}: {
+  Capsule: any;
+  layoutMode: ModuleLayoutMode;
+}) {
+  const { isAuthenticated, loading } = useAuth();
+  const wrap = (node: React.ReactNode) =>
+    layoutMode === "inside-main-layout" ? <MainLayout>{node}</MainLayout> : <>{node}</>;
+
+  if (!isOAuthConfigured()) {
+    return wrap(
+      <Suspense fallback={null}>
+        <Capsule />
+      </Suspense>,
+    );
+  }
+  if (loading) return null;
+  if (!isAuthenticated) {
+    const loginUrl = getLoginUrl();
+    if (loginUrl) window.location.href = loginUrl;
+    return null;
+  }
+  return wrap(
+    <Suspense fallback={null}>
+      <Capsule />
+    </Suspense>,
+  );
+}
+
 export function ModuleRoutes() {
   const modules = listClientModules();
   const { capsules, legacy } = partitionRoutes(modules);
@@ -65,6 +107,8 @@ export function ModuleRoutes() {
     <>
       {capsules.flatMap((c) => {
         const Capsule = c.manifest.capsuleEntrypoint as any;
+        const layoutMode: ModuleLayoutMode =
+          c.manifest.layoutMode ?? "inside-main-layout";
         // Mount both the bare baseRoute (`/foo`) and a splat
         // (`/foo/*`) so the capsule renders for the root and any
         // descendant. The wildcard `*` matches multi-segment tails
@@ -75,14 +119,10 @@ export function ModuleRoutes() {
           c.baseRoute === "/" ? "/*" : `${c.baseRoute}/*`;
         return [
           <Route key={`capsule:${c.manifest.key}:base`} path={c.baseRoute}>
-            <Suspense fallback={null}>
-              <Capsule />
-            </Suspense>
+            <CapsuleHost Capsule={Capsule} layoutMode={layoutMode} />
           </Route>,
           <Route key={`capsule:${c.manifest.key}:splat`} path={splatPath}>
-            <Suspense fallback={null}>
-              <Capsule />
-            </Suspense>
+            <CapsuleHost Capsule={Capsule} layoutMode={layoutMode} />
           </Route>,
         ];
       })}
