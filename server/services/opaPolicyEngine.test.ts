@@ -6,8 +6,13 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { OPAPolicyEngine } from './opaPolicyEngine';
+import { hasOpa, skipUnlessInfra } from '../../tests/_helpers/test-modes';
 
-describe('OPAPolicyEngine', () => {
+// This suite hits a live OPA endpoint via fetch(). With the
+// `opa.example.com` placeholder it fails with ENOTFOUND. In
+// local-unit mode we skip; in staging-integration mode we run
+// against the real configured OPA URL.
+describe.skipIf(skipUnlessInfra(hasOpa))('OPAPolicyEngine', () => {
   let engine: OPAPolicyEngine;
 
   beforeEach(() => {

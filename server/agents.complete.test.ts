@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getDb } from "./db";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { hasDb, skipUnlessInfra } from "../tests/_helpers/test-modes";
 
 let db: ReturnType<typeof drizzle>;
 import { agents, agent_proofs } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
-describe("Agent Governance - Complete Test Suite", () => {
+// This suite requires a live Postgres instance (DATABASE_URL).
+// In local-unit mode it is skipped; in staging-integration mode
+// it runs against the configured staging DB.
+describe.skipIf(skipUnlessInfra(hasDb))("Agent Governance - Complete Test Suite", () => {
   const testWorkspaceId = 999;
   const testUserId = 1;
   let testAgentId: number;

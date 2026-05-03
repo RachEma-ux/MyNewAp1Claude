@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import * as db from "../db";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
-describe("Workflow Execution Integration", () => {
+// Real-DB integration: createWorkflow / getWorkflowById /
+// updateWorkflow / deleteWorkflow hit Postgres directly. Skipped
+// in local-unit mode; runs against staging in
+// staging-integration mode.
+describe.skipIf(skipUnlessInfra(hasDb))("Workflow Execution Integration", () => {
   const userId = 1;
 
   it("should create workflow with default permissions", async () => {

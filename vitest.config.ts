@@ -22,6 +22,13 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "tests/**/*.test.ts", "client/**/*.test.tsx"],
+    // tests/integration/** require live staging infrastructure
+    // (DBs, OPA, workers). They are excluded from local-unit mode
+    // and only included when invoked via the staging-integration
+    // script which sets TEST_MODE=staging-integration.
+    exclude: process.env.TEST_MODE === "staging-integration"
+      ? ["**/node_modules/**", "**/dist/**"]
+      : ["**/node_modules/**", "**/dist/**", "tests/integration/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

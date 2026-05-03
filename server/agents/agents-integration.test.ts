@@ -9,8 +9,13 @@ import { createCaller } from "../routers";
 import { db } from "../db";
 import { agents } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
-describe("Agents Integration Tests", () => {
+// This suite exercises the live tRPC caller against a real DB.
+// Without DATABASE_URL it fails on schema validation and DB
+// inserts. In local-unit mode it is skipped; in
+// staging-integration mode it runs as a real assertion.
+describe.skipIf(skipUnlessInfra(hasDb))("Agents Integration Tests", () => {
   let caller: any;
   let testAgentId: string;
 

@@ -6,8 +6,13 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createCaller } from "../routers";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
-describe("Agents E2E Workflows", () => {
+// E2E suite — requires a live DB (it actually creates/deletes
+// agents through the tRPC caller). In local-unit mode it is
+// skipped; in staging-integration mode it runs as a real
+// assertion against the configured DB.
+describe.skipIf(skipUnlessInfra(hasDb))("Agents E2E Workflows", () => {
   let caller: any;
   let testAgents: string[] = [];
 
