@@ -232,7 +232,11 @@ describe("HR Phase 5 — Workspace Module Integration", () => {
     expect(procedures).toContain("getWorkspaceCoverage");
   });
 
-  it("modulesRouter includes hr sub-router", async () => {
+  it("modulesRouter includes hr sub-router", { timeout: 30_000 }, async () => {
+    // The modules router barrel transitively pulls in every module's
+    // dependency graph. In a parallel vitest run that import chain
+    // can exceed the default 5s timeout — the assertion itself is
+    // structural, not slow.
     const { modulesRouter } = await import("../../modules/router");
     const subs = Object.keys(modulesRouter._def.procedures);
     // The hr procedures will appear as hr.listStaff, hr.searchWorkers, etc.

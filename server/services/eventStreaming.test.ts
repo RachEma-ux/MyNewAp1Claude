@@ -1,7 +1,14 @@
 /**
  * Event Streaming Tests
- * 
- * Unit tests for EventStreamManager service
+ *
+ * Unit tests for EventStreamManager service.
+ *
+ * Notes:
+ *  - `EventStreamManager.emitEvent` dispatches to subscriber callbacks
+ *    synchronously, so callbacks fire before `emitEvent` returns. The
+ *    tests are therefore sync and don't need Promise/done plumbing.
+ *  - `unsubscribe(subscriberId)` takes a single string argument
+ *    (legacy two-arg form was removed).
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -49,26 +56,22 @@ describe('EventStreamManager', () => {
 
       expect(manager.getSubscriberCount(1)).toBe(1);
 
-      manager.unsubscribe(1, id);
+      // Current signature: unsubscribe(subscriberId).
+      manager.unsubscribe(id);
 
       expect(manager.getSubscriberCount(1)).toBe(0);
     });
 
     it('should handle invalid subscription IDs', () => {
       expect(() => {
-        manager.unsubscribe(1, 'invalid-id');
+        manager.unsubscribe('invalid-id');
       }).not.toThrow();
     });
   });
 
   describe('emitEvent', () => {
-    it('should emit events to subscribers', (done) => {
-      const callback = vi.fn((event) => {
-        expect(event.type).toBe('agent.started');
-        expect(event.workspaceId).toBe(1);
-        done();
-      });
-
+    it('should emit events to subscribers', () => {
+      const callback = vi.fn();
       manager.subscribe(1, ['agent.started'], callback);
 
       manager.emitEvent({
@@ -78,14 +81,15 @@ describe('EventStreamManager', () => {
         agentId: 1,
         data: {},
       });
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      const event = callback.mock.calls[0][0];
+      expect(event.type).toBe('agent.started');
+      expect(event.workspaceId).toBe(1);
     });
 
-    it('should filter events by type', (done) => {
-      let eventCount = 0;
-      const callback = vi.fn(() => {
-        eventCount++;
-      });
-
+    it('should filter events by type', () => {
+      const callback = vi.fn();
       manager.subscribe(1, ['agent.started'], callback);
 
       manager.emitEvent({
@@ -104,15 +108,11 @@ describe('EventStreamManager', () => {
         data: {},
       });
 
-      setTimeout(() => {
-        expect(eventCount).toBe(1);
-        done();
-      }, 50);
+      expect(callback).toHaveBeenCalledTimes(1);
     });
 
-    it('should not emit events to other workspaces', (done) => {
+    it('should not emit events to other workspaces', () => {
       const callback = vi.fn();
-
       manager.subscribe(1, ['agent.started'], callback);
 
       manager.emitEvent({
@@ -123,13 +123,10 @@ describe('EventStreamManager', () => {
         data: {},
       });
 
-      setTimeout(() => {
-        expect(callback).not.toHaveBeenCalled();
-        done();
-      }, 50);
+      expect(callback).not.toHaveBeenCalled();
     });
 
-    it('should emit to multiple subscribers', (done) => {
+    it('should emit to multiple subscribers', () => {
       const callback1 = vi.fn();
       const callback2 = vi.fn();
 
@@ -144,11 +141,8 @@ describe('EventStreamManager', () => {
         data: {},
       });
 
-      setTimeout(() => {
-        expect(callback1).toHaveBeenCalled();
-        expect(callback2).toHaveBeenCalled();
-        done();
-      }, 50);
+      expect(callback1).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -207,12 +201,9 @@ describe('EventStreamManager', () => {
   });
 
   describe('event data preservation', () => {
-    it('should preserve event data', (done) => {
+    it('should preserve event data', () => {
       const eventData = { detail: 'test data', value: 123 };
-      const callback = vi.fn((event) => {
-        expect(event.data).toEqual(eventData);
-        done();
-      });
+      const callback = vi.fn();
 
       manager.subscribe(1, ['agent.started'], callback);
 
@@ -223,14 +214,14 @@ describe('EventStreamManager', () => {
         agentId: 1,
         data: eventData,
       });
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback.mock.calls[0][0].data).toEqual(eventData);
     });
 
-    it('should preserve event timestamp', (done) => {
+    it('should preserve event timestamp', () => {
       const now = new Date();
-      const callback = vi.fn((event) => {
-        expect(event.timestamp).toEqual(now);
-        done();
-      });
+      const callback = vi.fn();
 
       manager.subscribe(1, ['agent.started'], callback);
 
@@ -241,6 +232,9 @@ describe('EventStreamManager', () => {
         agentId: 1,
         data: {},
       });
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback.mock.calls[0][0].timestamp).toEqual(now);
     });
   });
 
@@ -265,13 +259,13 @@ describe('EventStreamManager', () => {
   });
 
   describe('multiple event types', () => {
-    it('should handle multiple event types in subscription', (done) => {
-      let eventCount = 0;
-      const callback = vi.fn(() => {
-        eventCount++;
-      });
-
-      manager.subscribe(1, ['agent.started', 'agent.stopped', 'policy.updated'], callback);
+    it('should handle multiple event types in subscription', () => {
+      const callback = vi.fn();
+      manager.subscribe(
+        1,
+        ['agent.started', 'agent.stopped', 'policy.updated'],
+        callback,
+      );
 
       manager.emitEvent({
         type: 'agent.started',
@@ -297,10 +291,7 @@ describe('EventStreamManager', () => {
         data: {},
       });
 
-      setTimeout(() => {
-        expect(eventCount).toBe(3);
-        done();
-      }, 50);
+      expect(callback).toHaveBeenCalledTimes(3);
     });
   });
 });

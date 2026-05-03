@@ -54,7 +54,9 @@ describe("auth.logout", () => {
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
       secure: true,
-      sameSite: "none",
+      // Cookie policy was tightened: same-origin sessions use
+      // sameSite=lax (cross-site flow uses a separate flow).
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });
