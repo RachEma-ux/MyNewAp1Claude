@@ -1373,6 +1373,24 @@ const mcpRouter = router({
           tokenExpiresAt: tokens.expiresAt ?? null,
         },
       });
+      // MCP hardening Phase 1.2: tell the FSM the OAuth flow finished
+      // and trigger a reconnect. Without this, the row would stay
+      // `needs_auth` until the user manually clicked Connect — and the
+      // auto-reconnect loop ignores `needs_auth` (it only retries
+      // `error`-status rows). Both calls are best-effort: the OAuth
+      // exchange itself succeeded, so we never want to fail the
+      // mutation if the FSM/connect path stumbles.
+      try {
+        await mcpManager.notifyAuthProvided(input.serverId);
+      } catch {
+        /* FSM apply failure is non-fatal here */
+      }
+      mcpManager
+        .connectMcpServer({ serverId: input.serverId })
+        .catch(() => {
+          /* connect failure is non-fatal — auto-reconnect loop will
+             pick the row up if it lands in `error` */
+        });
       return { ok: true, expiresAt: tokens.expiresAt ?? null };
     }),
 });

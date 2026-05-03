@@ -26,6 +26,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpTool,
 } from "../types";
 import { McpError } from "../types";
@@ -120,6 +121,14 @@ export interface SdkConnectInput {
    * convention so users don't need a new column).
    */
   serverName?: string;
+  /**
+   * MCP hardening Phase 1.1: accepted for symmetry with stateful
+   * transports. SDK servers run in-process — they can't die
+   * independently of the host process — so this callback is never
+   * invoked. Future work could add per-SDK-server lifecycle hooks
+   * that call it for graceful in-process teardown.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 /**

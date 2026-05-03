@@ -6,6 +6,17 @@
  * connectors.
  */
 
+/**
+ * MCP hardening Phase 1.1: callback every transport invokes when its
+ * underlying transport dies AFTER the handshake has completed (process
+ * exit, socket close, websocket error). The mcp-manager builds a
+ * closure that drives the FSM through `mid_session_disconnect` so a
+ * dead connection no longer looks `connected` to the rest of the
+ * system. Transports that can't die independently (http: stateless,
+ * sdk: in-process) accept the prop for symmetry but don't invoke it.
+ */
+export type McpOnCloseCallback = (reason: string) => void;
+
 export interface McpTool {
   /** Tool name as advertised by the server */
   name: string;

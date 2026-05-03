@@ -27,6 +27,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpPrompt,
   McpResource,
   McpTool,
@@ -42,6 +43,12 @@ export interface WebSocketConnectInput {
   serverId: number;
   url: string;
   headers?: Record<string, string>;
+  /**
+   * MCP hardening Phase 1.1: invoked when the WebSocket dies after the
+   * connection was established (close/error). Fired exactly once per
+   * connection.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 export async function connectWebSocket(
@@ -142,6 +149,18 @@ export async function connectWebSocket(
   >();
   let nextId = 1;
   let closed = false;
+  // MCP hardening Phase 1.1: ensure onClose fires at most once even if
+  // both `close` and `error` events arrive.
+  let notifiedClose = false;
+  const fireOnClose = (reason: string) => {
+    if (notifiedClose) return;
+    notifiedClose = true;
+    try {
+      input.onClose?.(reason);
+    } catch {
+      /* never let an onClose handler crash the close path */
+    }
+  };
 
   // Route incoming frames to pending RPCs
   ws.on("message", (raw: Buffer | string) => {
@@ -172,6 +191,7 @@ export async function connectWebSocket(
       handler.reject(new McpError("connection_closed", "WebSocket closed"));
     }
     pending.clear();
+    fireOnClose("WebSocket closed");
   });
 
   ws.on("error", (err: Error) => {
@@ -180,6 +200,7 @@ export async function connectWebSocket(
       handler.reject(new McpError("connection_error", err.message));
     }
     pending.clear();
+    fireOnClose(`WebSocket error: ${err.message}`);
   });
 
   // Send an RPC and wait for response

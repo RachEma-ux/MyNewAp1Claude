@@ -19,6 +19,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpPrompt,
   McpResource,
   McpTool,
@@ -46,6 +47,13 @@ export interface StdioConnectInput {
   args?: string[];
   env?: Record<string, string>;
   cwd?: string;
+  /**
+   * MCP hardening Phase 1.1: invoked when the child process dies
+   * (close/error). Fired exactly once per connection, regardless of
+   * which event triggers first. The mcp-manager closure handles the
+   * connecting-vs-connected discrimination via FSM state.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 export async function connectStdio(
@@ -88,6 +96,19 @@ export async function connectStdio(
   >();
   let nextId = 1;
   let closed = false;
+  // MCP hardening Phase 1.1: ensure onClose fires at most once even if
+  // both `error` and `close` events arrive (Node typically emits
+  // `error` then `close` on a spawn failure).
+  let notifiedClose = false;
+  const fireOnClose = (reason: string) => {
+    if (notifiedClose) return;
+    notifiedClose = true;
+    try {
+      input.onClose?.(reason);
+    } catch {
+      /* never let an onClose handler crash the close path */
+    }
+  };
 
   child.stderr?.on("data", (chunk: Buffer) => {
     const text = chunk.toString("utf-8");
@@ -138,6 +159,7 @@ export async function connectStdio(
       handler.reject(new McpError("process_error", err.message));
     }
     pending.clear();
+    fireOnClose(`process error: ${err.message}`);
   });
   child.on("close", (code, signal) => {
     closed = true;
@@ -161,6 +183,7 @@ export async function connectStdio(
       handler.reject(new McpError("process_closed", message));
     }
     pending.clear();
+    fireOnClose(message);
   });
 
   const sendRpc = <T = unknown>(

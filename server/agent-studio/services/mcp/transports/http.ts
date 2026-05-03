@@ -12,6 +12,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpPrompt,
   McpResource,
   McpTool,
@@ -24,6 +25,15 @@ export interface HttpConnectInput {
   serverId: number;
   url: string;
   headers?: Record<string, string>;
+  /**
+   * MCP hardening Phase 1.1: accepted for symmetry with stateful
+   * transports. The HTTP transport is stateless (no long-lived
+   * connection), so there's no underlying socket that can die
+   * independently of an in-flight request — this callback is never
+   * invoked. Phase 2.4's heartbeat will fire it on consecutive ping
+   * failures.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 export async function connectHttp(
