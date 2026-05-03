@@ -221,7 +221,53 @@ EXTERNAL_ORCHESTRATOR_URL=https://orchestrator.staging.internal \
 pnpm run test:integration:staging
 ```
 
-## 5. Outstanding gaps (tracked elsewhere)
+## 5. Connector runtime evidence
+
+Phase 5 of the readiness report rated "External connectors" as
+PASS based on static checks: every port declared, gateway /
+event / handoff wiring clean, and the static
+`connector registry` test confirms each external connector
+reports `unconfigured` when its credentials are missing.
+
+What was missing: live evidence that, when credentials *are*
+present, the connector flips from `unconfigured` to `available`
+— i.e. the env-vars → status path actually works end-to-end.
+That's filled by `tests/integration/connectors/connector-runtime.test.ts`:
+
+* Built-in always-on connectors (`local`, `manual`, `webhook`)
+  must always report `available`. A staging regression here is
+  a real bug.
+* Each external connector with declared `envVars`
+  (`s3`, `gdrive`, `github`, `sensor`, `stream`) gets a runtime
+  block that fires only when every required env var is set.
+* A coverage assertion guards against forgetting to add a
+  runtime block for any new credentialed connector.
+
+Connector env vars and their gating effect:
+
+| Connector | Env vars to populate | What it unlocks |
+|---|---|---|
+| `s3` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET` | Object storage acquisition (S3 / S3-compatible) |
+| `gdrive` | `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN` | Google Drive ingestion |
+| `github` | `GITHUB_TOKEN` | Repo-as-source ingestion |
+| `sensor` | `SENSOR_BROKER_URL` | MQTT / CoAP / AMQP sensor streams |
+| `stream` | `STREAM_BROKER_URL` | Kafka / Pulsar / Redis Streams |
+
+Connectors with no declared `envVars` (`api`, `database`,
+`saas`, `web`, `objectStorage`) carry their auth on the source
+row at runtime. They're not exercised by this file because there
+is no env-driven activation to verify.
+
+To run the live connector probes against staging:
+
+```bash
+TEST_MODE=staging-integration \
+GITHUB_TOKEN=… \
+AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… S3_BUCKET=… \
+pnpm exec vitest run tests/integration/connectors/
+```
+
+## 6. Outstanding gaps (tracked elsewhere)
 
 | Item | Status | Owner |
 |---|---|---|
