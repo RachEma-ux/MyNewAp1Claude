@@ -7,8 +7,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { detectDrift, detectAgentDrift, getAgentDriftHistory } from "./drift-detector";
 import { computeSpecHash } from "../../features/agents-create/types/agent-schema";
+import { hasDb, skipUnlessInfra } from "../../tests/_helpers/test-modes";
 
-describe("Drift Detection", () => {
+// detectDrift / detectAgentDrift query the agents table
+// directly. Without DATABASE_URL the call throws
+// "Database unavailable". Skipped in local-unit mode; runs
+// against the staging DB in staging-integration mode.
+describe.skipIf(skipUnlessInfra(hasDb))("Drift Detection", () => {
   describe("detectDrift", () => {
     it("should detect policy drift when agent no longer complies", async () => {
       // Mock agent that violates current policy
