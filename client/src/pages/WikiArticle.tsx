@@ -4,7 +4,7 @@ import { trpc } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/_core/hooks/useAuth';
-import { Streamdown } from 'streamdown';
+import { AppStreamdown } from '@/components/markdown/AppStreamdown';
 import {
   ArrowLeft,
   Edit,
@@ -205,7 +205,7 @@ export default function WikiArticle() {
         )}
 
         <Card className="p-8 prose prose-invert max-w-none">
-          <Streamdown>{page.content}</Streamdown>
+          <AppStreamdown>{page.content}</AppStreamdown>
         </Card>
       </div>
 

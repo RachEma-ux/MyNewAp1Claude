@@ -11,7 +11,7 @@ import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Rout
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Streamdown } from "streamdown";
+import { AppStreamdown } from "@/components/markdown/AppStreamdown";
 import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
 import { ChatControlBox } from "@/components/ChatControlBox";
 import { useHeaderActions } from "@/components/MainLayout";
@@ -675,7 +675,7 @@ function ChatInner() {
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        <Streamdown>{msg.content}</Streamdown>
+                        <AppStreamdown>{msg.content}</AppStreamdown>
                       ) : (
                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       )}
@@ -698,7 +698,7 @@ function ChatInner() {
                       <Bot className="h-5 w-5 text-primary" />
                     </div>
                     <div className="bg-muted rounded-lg p-4 max-w-[80%]">
-                      <Streamdown>{streamingContent}</Streamdown>
+                      <AppStreamdown>{streamingContent}</AppStreamdown>
                       <div className="inline-block w-2 h-4 bg-primary/50 ml-1" />
                     </div>
                   </div>
