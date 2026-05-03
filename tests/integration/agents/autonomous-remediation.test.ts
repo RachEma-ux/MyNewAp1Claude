@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { autoRemediate, canAutoRemediate, getRemediationHistory } from "./autonomous-remediation";
+import { autoRemediate, canAutoRemediate, getRemediationHistory } from "../../../server/agents/autonomous-remediation";
 
 describe("Autonomous Remediation", () => {
   describe("canAutoRemediate", () => {

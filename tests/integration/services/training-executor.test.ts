@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { jobQueue } from "../job-queue";
-import { trainingExecutor } from "../training-executor";
+import { jobQueue } from "../../../server/services/job-queue";
+import { trainingExecutor } from "../../../server/services/training-executor";
 
 // Mock the database module
 vi.mock("../../db", () => ({

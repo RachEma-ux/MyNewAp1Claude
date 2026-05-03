@@ -15,12 +15,12 @@ import {
   findProviderBySlug,
   KNOWN_PROVIDERS,
   getProviderApiUrls,
-} from "../../shared/provider-registry";
+} from "../../../shared/provider-registry";
 import {
   mapDiscoveryError,
   domainToSlug,
   type DiscoverResult,
-} from "./discover-provider";
+} from "../../../server/routers/discover-provider";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Step 0 — Invariant: Discovery never writes to DB

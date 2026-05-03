@@ -23,11 +23,11 @@ import {
   toArtifactSummary,
   DISCOVERY_STAGES,
   type DiscoveryArtifactV1,
-} from "./discovery-artifact";
+} from "../../../server/governance/discovery-artifact";
 import {
   isLegacyDiscoveryEntry,
   type LegacyEntry,
-} from "./discovery-artifact-migration";
+} from "../../../server/governance/discovery-artifact-migration";
 
 // ============================================================================
 // Fixtures

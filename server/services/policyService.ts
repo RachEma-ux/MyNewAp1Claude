@@ -121,7 +121,7 @@ export async function hotReload(
     policyHash: newHash,
     bundle: bundle,
     loadedAt: new Date(),
-    loadedBy: actorId ?? parseInt(actor, 10) || 1,
+    loadedBy: actorId ?? (parseInt(actor, 10) || 1),
     isCurrent: true,
   });
 

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { jobQueue } from "../../services/job-queue";
+import { jobQueue } from "../../../server/services/job-queue";
 
 // Mock tRPC context
 const mockContext = {

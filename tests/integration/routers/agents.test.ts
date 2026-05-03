@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { agentsRouter } from "./agents";
+import { agentsRouter } from "../../../server/routers/agents";
 
 describe("Agents Router - Core Functionality", () => {
   let mockCtx: any;

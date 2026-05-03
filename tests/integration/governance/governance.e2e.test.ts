@@ -33,12 +33,12 @@ import {
   getFrozenSubjects,
   verifyBundleIntegrity,
   type GovernedSubject,
-} from "./scorecard";
-import { requireGate } from "./requireGate";
-import { lintCatalog } from "./catalog-lint";
-import { generateGateCoverage } from "./gate-coverage";
-import { FSStore, computeSha256, verifyIntegrity } from "./artifact-store";
-import type { LifecycleStage } from "./lifecycle-guard";
+} from "../../../server/governance/scorecard";
+import { requireGate } from "../../../server/governance/requireGate";
+import { lintCatalog } from "../../../server/governance/catalog-lint";
+import { generateGateCoverage } from "../../../server/governance/gate-coverage";
+import { FSStore, computeSha256, verifyIntegrity } from "../../../server/governance/artifact-store";
+import type { LifecycleStage } from "../../../server/governance/lifecycle-guard";
 
 // ============================================================================
 // Helpers
@@ -68,14 +68,14 @@ const testActor = { id: "test-user-1", role: "admin" };
 // ============================================================================
 
 describe("Governance Scorecard Engine — Acceptance Tests", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Clean up frozen state
     for (const f of await getFrozenSubjects()) {
       await unfreezeSubject(f.subjectId, "test-cleanup");
     }
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Clean up frozen state
     for (const f of await getFrozenSubjects()) {
       await unfreezeSubject(f.subjectId, "test-cleanup");
@@ -207,7 +207,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 7: UI bypass → backend blocks ────────────────────────────
-  it("7. requireGate blocks transitions regardless of caller", () => {
+  it("7. requireGate blocks transitions regardless of caller", async () => {
     // Even if UI tries to skip validation, requireGate enforces
     const subject = {
       id: 500,
@@ -227,7 +227,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 8: Background job bypass → blocked ───────────────────────
-  it("8. Background job cannot bypass requireGate", () => {
+  it("8. Background job cannot bypass requireGate", async () => {
     const systemActor = { id: "system-auto", role: "system" };
     const subject = {
       id: 600,
@@ -259,7 +259,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 10: Frozen subject → transition denied + audited ─────────
-  it("10. Frozen subject is blocked from transitions", () => {
+  it("10. Frozen subject is blocked from transitions", async () => {
     // Freeze the subject
     await freezeSubject(800, "frozen-test", "Critical drift detected", 30, "drift-detector");
 
@@ -312,7 +312,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 14: System-wide freeze blocks everything ─────────────────
-  it("14. System-wide freeze blocks all transitions", () => {
+  it("14. System-wide freeze blocks all transitions", async () => {
     await freezeSubject(0, "system", "Global drift freeze", 50, "drift-detector");
 
     const gateResult = await requireGate(

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppBlockerError } from "../_core/blockers";
-import { resolveCatalogAgentExecutionTarget } from "./execution";
+import { AppBlockerError } from "../../../server/_core/blockers";
+import { resolveCatalogAgentExecutionTarget } from "../../../server/ai-types/execution";
 
 const mocks = vi.hoisted(() => ({
   getCatalogEntryById: vi.fn(),

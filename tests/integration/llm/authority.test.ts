@@ -4,8 +4,8 @@ import {
   isRawLLMVersionRuntimeAuthority,
   onboardLLMVersionToCatalogCandidate,
   resolveCatalogLLMRuntimeAuthority,
-} from "./authority";
-import { catalogAuditEvents } from "../../drizzle/schema";
+} from "../../../server/llm/authority";
+import { catalogAuditEvents } from "../../../drizzle/schema";
 
 const mocks = vi.hoisted(() => ({
   db: null as any,

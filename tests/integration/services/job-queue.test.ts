@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { jobQueue, JobType, JobStatus } from "../job-queue";
+import { jobQueue, JobType, JobStatus } from "../../../server/services/job-queue";
 
 describe("JobQueue Service", () => {
   // Clear all jobs before each test

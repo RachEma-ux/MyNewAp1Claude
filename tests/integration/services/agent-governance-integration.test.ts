@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createSandbox, updateSandbox, listAgents } from "../agentService";
-import { promoteToGoverned } from "../promotionService";
-import { fetchSnapshot, hotReload } from "../policyService";
-import { executeRevalidation } from "../revalidationWorkflow";
-import { getGovernanceLogger } from "../governanceLogger";
-import { getGovernanceMetrics } from "../governanceMetrics";
+import { createSandbox, updateSandbox, listAgents } from "../../../server/services/agentService";
+import { promoteToGoverned } from "../../../server/services/promotionService";
+import { fetchSnapshot, hotReload } from "../../../server/services/policyService";
+import { executeRevalidation } from "../../../server/services/revalidationWorkflow";
+import { getGovernanceLogger } from "../../../server/services/governanceLogger";
+import { getGovernanceMetrics } from "../../../server/services/governanceMetrics";
 
 /**
  * Agent Governance Integration Tests

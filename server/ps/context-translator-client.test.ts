@@ -195,7 +195,11 @@ describe("Context Translator Client Types", () => {
 describe("normalizeTranslateResponse", () => {
   it("handles null/undefined input gracefully", () => {
     const result = normalizeTranslateResponse(null);
-    expect(result.decisionGate.status).toBe("CONTINUE");
+    // Contract: null input is routed through createFallbackResponse(""),
+    // which now correctly emits CLARIFICATION_NEEDED for empty input
+    // (input is too brief for meaningful analysis). The earlier
+    // CONTINUE-on-null behavior was a semantic bug.
+    expect(result.decisionGate.status).toBe("CLARIFICATION_NEEDED");
     expect(result.decisionGate.reason).toBeDefined();
     expect(result.problem.statement).toBeDefined();
   });
@@ -1349,10 +1353,13 @@ describe("QUESTIONS_TABLE completeness", () => {
   it("Step 11 has exactly 7 questions (one_page_summary)", () => {
     const step11 = QUESTIONS_TABLE.filter(q => q.stepKey === "one_page_summary");
     expect(step11.length).toBe(7);
+    // Default Array#sort is lexicographic by UTF-16 code unit, so
+    // "theOpportunity" sorts before "theProblem" (capital O = 0x4F,
+    // capital P = 0x50). The earlier expectation had them inverted.
     expect(step11.map(q => q.correspondingField).sort()).toEqual([
       "feasibilityInsights", "reasonForSelection",
-      "scenariosExplored", "selectedConcept", "theProblem",
-      "theOpportunity", "topIdeas",
+      "scenariosExplored", "selectedConcept",
+      "theOpportunity", "theProblem", "topIdeas",
     ]);
   });
 });
