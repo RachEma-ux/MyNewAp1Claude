@@ -69,6 +69,12 @@ const states = new Map<number, ConnectionState>();
 // ── Phase 17e: auto-reconnect ──────────────────────────────────────────────
 
 const RECONNECT_CHECK_INTERVAL_MS = 60_000;
+/**
+ * MCP hardening Phase 2.3: rows stuck in `needs_auth` longer than this
+ * get auto-failed so they no longer look like in-progress OAuth flows
+ * forever. The user can re-run OAuth at any time to recover.
+ */
+const NEEDS_AUTH_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24h
 let reconnectTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
@@ -90,20 +96,37 @@ function ensureReconnectLoopStarted() {
   if (reconnectTimer) return;
   reconnectTimer = setInterval(async () => {
     try {
+      const now = Date.now();
+
+      // Phase 2.3: sweep stale `needs_auth` rows. A row left in needs_auth
+      // for >24h without the user finishing OAuth gets pushed to `failed`
+      // so the UI can stop showing the auth banner. The user can always
+      // re-run OAuth to recover.
+      for (const [serverId, state] of states) {
+        if (state.kind !== "needs_auth") continue;
+        if (now - state.challengeReceivedAt < NEEDS_AUTH_TIMEOUT_MS) continue;
+        try {
+          await applyEvent(serverId, {
+            type: "connect_failed",
+            reason: "auth challenge ignored for >24h",
+          });
+        } catch {
+          /* ignore — illegal transitions are dev-only */
+        }
+      }
+
       // Walk every server row across all drafts (manager is process-wide).
       const allRows = await repo.listAllMcpServers();
-      const now = Date.now();
       for (const row of allRows) {
         // Skip rows we already have a live connection for
         if (connections.has(row.id)) continue;
-        // MCP hardening Phase 1.3: pick up two kinds of stuck rows.
-        //  (a) status="error" — a previous attempt failed
-        //      (column "error" projects from FSM `failed`). FSM-aware
-        //      backoff applies (see below).
-        //  (b) status="connecting" with no in-memory FSM entry — the
-        //      process restarted while a handshake was in flight.
-        //      Without this, the row would stay `connecting` forever
-        //      because nothing else triggers a retry.
+        // MCP hardening Phase 1.3 / 2.2:
+        //  (a) status="error" — a previous attempt failed (FSM `failed`)
+        //  (b) status="connecting" with no in-memory FSM entry — process
+        //      restart mid-handshake
+        //  Anything else (pending, connected, needs_auth, abandoned,
+        //  disabled) is intentionally skipped. `abandoned` in particular
+        //  requires manual user retry by design.
         const inMemState = states.get(row.id);
         const isError = row.status === "error";
         const isStaleConnecting =
@@ -207,6 +230,74 @@ export async function notifyAuthProvided(serverId: number): Promise<void> {
 }
 
 /**
+ * MCP hardening Phase 3.1: disable a server. Disconnects any live
+ * connection first, flips the `enabled` boolean column to false (so
+ * existing boot-time filters still work), and drives the FSM into
+ * `disabled`. Symmetric to `enableMcpServer`.
+ *
+ * The `enabled` column and the FSM `disabled` state stay in sync
+ * because every flip goes through this shim — direct UPDATEs of the
+ * column would leave the FSM out of date.
+ */
+export async function disableMcpServer(serverId: number): Promise<void> {
+  if (connections.has(serverId)) {
+    try {
+      await disconnectMcpServer(serverId);
+    } catch {
+      /* fall through — the FSM transition still needs to fire */
+    }
+  }
+  await repo.setMcpServerEnabled(serverId, false);
+  try {
+    await applyEvent(serverId, { type: "disable_requested" });
+  } catch {
+    /* ignore — illegal transitions are dev-only */
+  }
+}
+
+/**
+ * MCP hardening Phase 3.1: re-enable a server. Flips the `enabled`
+ * column back to true and drives the FSM `disabled → pending`. The
+ * row is then a normal candidate for the auto-reconnect loop on the
+ * next tick — no immediate connect attempt to keep enable cheap.
+ */
+export async function enableMcpServer(serverId: number): Promise<void> {
+  await repo.setMcpServerEnabled(serverId, true);
+  try {
+    await applyEvent(serverId, { type: "enable_requested" });
+  } catch {
+    /* ignore — already enabled / illegal transition */
+  }
+}
+
+/**
+ * MCP hardening Phase 5.2: admin force-purge. Use when in-memory and
+ * DB state get wedged out of sync (HMR + crashed children, etc.).
+ * Clears the live `connections` entry, the FSM state, the registry
+ * snapshot, and resets the DB column to `pending`. Does NOT flip the
+ * `enabled` column — purge is an operational reset, not a config
+ * change.
+ */
+export async function purgeMcpServer(serverId: number): Promise<void> {
+  const conn = connections.get(serverId);
+  if (conn) {
+    try {
+      await conn.close();
+    } catch {
+      /* ignore */
+    }
+    connections.delete(serverId);
+  }
+  registry.removeServer(serverId);
+  states.delete(serverId);
+  try {
+    await repo.updateMcpServerStatus(serverId, "pending");
+  } catch {
+    /* row may be deleted */
+  }
+}
+
+/**
  * Phase 19b: Snapshot all known FSM states. Used by the runs page
  * and admin dashboards. Returns one entry per serverId with state
  * in the in-memory map (excludes never-touched servers).
@@ -297,6 +388,28 @@ export async function connectMcpServer(
 
   let conn: McpConnection;
   try {
+    // MCP hardening Phase 2.1: resolve a fresh access token for OAuth-
+    // protected servers. Throws McpAuthRequiredError when refresh
+    // fails or no tokens are stored — the catch block below routes
+    // that into FSM `needs_auth` so the UI shows the OAuth banner.
+    // Stdio servers don't get a bearer token (the SDK convention is
+    // env-based auth for those); http/sse/websocket do.
+    let bearerToken: string | undefined;
+    if ((row as any).oauthConfig) {
+      const { getValidAccessToken } = await import("./auth");
+      const { encrypt, decrypt } = await import("../../../_core/encryption");
+      const token = await getValidAccessToken({
+        oauthConfig: (row as any).oauthConfig,
+        oauthState: (row as any).oauthState,
+        decrypt,
+        encrypt,
+        persist: async (oauthState) => {
+          await repo.updateMcpServerOAuth(input.serverId, { oauthState });
+        },
+      });
+      if (token) bearerToken = token;
+    }
+
     switch (row.transport) {
       case "stdio":
         if (!row.command) {
@@ -317,6 +430,7 @@ export async function connectMcpServer(
         conn = await connectHttp({
           serverId: row.id,
           url: row.url,
+          bearerToken,
           onClose,
         });
         break;
@@ -327,6 +441,8 @@ export async function connectMcpServer(
         conn = await connectSse({
           serverId: row.id,
           url: row.url,
+          bearerToken,
+          onClose,
         });
         break;
       // Phase 15a: Real WebSocket transport (replaces the previous scaffold)
@@ -337,6 +453,7 @@ export async function connectMcpServer(
         conn = await connectWebSocket({
           serverId: row.id,
           url: row.url,
+          bearerToken,
           onClose,
         });
         break;

@@ -1210,6 +1210,44 @@ const mcpRouter = router({
     .mutation(async ({ input }) => {
       return mcpManager.disconnectMcpServer(input.serverId);
     }),
+  // MCP hardening Phase 3.1: enable / disable a server. Both flip the
+  // `enabled` boolean column AND drive the FSM through enable_requested
+  // / disable_requested. Direct UPDATEs of the column elsewhere are
+  // forbidden — they'd leave the FSM out of sync.
+  enable: protectedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await mcpManager.enableMcpServer(input.serverId);
+      return { ok: true };
+    }),
+  disable: protectedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await mcpManager.disableMcpServer(input.serverId);
+      return { ok: true };
+    }),
+  // MCP hardening Phase 5.2: admin force-purge for wedged rows.
+  // Clears live connection + FSM + registry, resets DB column to
+  // pending. Operational reset only — does NOT change `enabled`.
+  purge: protectedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await mcpManager.purgeMcpServer(input.serverId);
+      return { ok: true };
+    }),
+  // MCP hardening Phase 5.1: read the recent FSM transitions for one
+  // server. Bounded to the last 100 by default so the response stays
+  // small.
+  getTransitionHistory: protectedProcedure
+    .input(
+      z.object({
+        serverId: z.number().int().positive(),
+        limit: z.number().int().min(1).max(500).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return repo.listMcpTransitions(input.serverId, input.limit ?? 100);
+    }),
   listConnectedTools: protectedProcedure
     .input(agentIdSchema)
     .query(async ({ input }) => {

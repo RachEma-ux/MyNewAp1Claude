@@ -1166,3 +1166,32 @@ export const agsChatMessages = pgTable(
     createdIdx: index("idx_ags_chat_messages_created").on(t.createdAt),
   })
 );
+
+
+/**
+ * MCP hardening Phase 5.1: persisted FSM transition log. Subscribed to
+ * `connection-events.onTransition` from boot.ts; capped per-server in
+ * the repo helper (the worst offender is a flapping server which would
+ * otherwise grow unbounded). Used by the MCP Manager UI's Connection
+ * History panel and ad-hoc forensics queries.
+ */
+export const agsMcpTransitions = pgTable(
+  "ags_mcp_transitions",
+  {
+    id: serial("id").primaryKey(),
+    serverId: integer("server_id").notNull(),
+    fromKind: varchar("from_kind", { length: 32 }).notNull(),
+    toKind: varchar("to_kind", { length: 32 }).notNull(),
+    eventType: varchar("event_type", { length: 64 }).notNull(),
+    /** Optional human-readable reason from the event payload */
+    reason: text("reason"),
+    ts: timestamp("ts").defaultNow().notNull(),
+  },
+  (t) => ({
+    serverTsIdx: index("idx_ags_mcp_transitions_server_ts").on(
+      t.serverId,
+      t.ts
+    ),
+  })
+);
+

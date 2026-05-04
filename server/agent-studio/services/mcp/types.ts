@@ -123,6 +123,18 @@ export type ConnectionState =
       attemptCount: number;
       nextRetryAt?: number;
     }
+  /**
+   * MCP hardening Phase 2.2: terminal-until-manual state. Reached when
+   * `attemptCount` hits MAX_RECONNECT_ATTEMPTS. The auto-reconnect
+   * loop ignores `abandoned` rows; only an explicit `connect_requested`
+   * (manual UI retry) or `disable_requested` can leave this state.
+   */
+  | {
+      kind: "abandoned";
+      reason: string;
+      lastAttemptAt: number;
+      attemptCount: number;
+    }
   | { kind: "disabled"; disabledAt: number };
 
 /**

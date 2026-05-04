@@ -55,6 +55,8 @@ import {
   agsMarketplaceInstalls,
   agsChatSessions,
   agsChatMessages,
+  // ── MCP hardening Phase 5.1: persisted FSM transition log ──
+  agsMcpTransitions,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -1534,12 +1536,80 @@ export async function updateMcpServerStatus(
     | "needs_auth"
     | "disconnected"
     | "error"
+    | "abandoned"
     | "disabled"
 ) {
   await db()
     .update(agsDraftMcpServers)
     .set({ status, updatedAt: new Date() })
     .where(eq(agsDraftMcpServers.id, serverId));
+}
+
+/**
+ * MCP hardening Phase 3.1: flip the `enabled` boolean column. Kept as a
+ * separate column from the FSM `disabled` state so existing code paths
+ * (boot.ts auto-connect filter, MCP Manager UI badges) keep working
+ * unchanged. The mcp-manager wraps both writes (this column + the FSM
+ * apply) in `enableMcpServer` / `disableMcpServer` so they stay in sync.
+ */
+export async function setMcpServerEnabled(
+  serverId: number,
+  enabled: boolean
+) {
+  await db()
+    .update(agsDraftMcpServers)
+    .set({ enabled, updatedAt: new Date() })
+    .where(eq(agsDraftMcpServers.id, serverId));
+}
+
+/**
+ * MCP hardening Phase 5.1: append one FSM transition row. Caps the
+ * per-server history at MCP_TRANSITION_CAP rows by trimming the
+ * oldest after each insert. A flapping server can otherwise generate
+ * thousands of rows per hour — the cap keeps the table bounded
+ * without a separate cleanup job.
+ */
+const MCP_TRANSITION_CAP = 500;
+
+export async function recordMcpTransition(
+  serverId: number,
+  fromKind: string,
+  toKind: string,
+  eventType: string,
+  reason?: string | null
+) {
+  const conn = db();
+  await conn.insert(agsMcpTransitions).values({
+    serverId,
+    fromKind,
+    toKind,
+    eventType,
+    reason: reason ?? null,
+  });
+  // Trim: keep newest MCP_TRANSITION_CAP for this server, delete the rest.
+  await conn.execute(sql`
+    DELETE FROM ags_mcp_transitions
+    WHERE server_id = ${serverId}
+      AND id NOT IN (
+        SELECT id FROM ags_mcp_transitions
+        WHERE server_id = ${serverId}
+        ORDER BY ts DESC
+        LIMIT ${MCP_TRANSITION_CAP}
+      )
+  `);
+}
+
+/**
+ * MCP hardening Phase 5.1: read recent FSM transitions for one
+ * server. Newest first. Caller passes the limit (router caps at 500).
+ */
+export async function listMcpTransitions(serverId: number, limit: number) {
+  return db()
+    .select()
+    .from(agsMcpTransitions)
+    .where(eq(agsMcpTransitions.serverId, serverId))
+    .orderBy(desc(agsMcpTransitions.ts))
+    .limit(limit);
 }
 
 /**
