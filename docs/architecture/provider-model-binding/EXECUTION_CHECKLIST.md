@@ -270,12 +270,12 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 16 — Agent Studio test runs through Model Access
 
-- [ ] Load active provider binding.
-- [ ] Create test run.
-- [ ] Call `openRouter.modelAccess.execute`.
-- [ ] Store output, latency/usage, provider/model refs.
-- [ ] Handle no binding, degraded binding, model access failure.
-- [ ] Add tests.
+- [x] Load active provider binding. *(`runTestWithBinding` calls `resolveForRun(draftId, role)` first; refuses to proceed unless ok=true)*
+- [x] Create test run. *(tRPC mutation `agentStudio.providerBindings.testRunWithBinding` invokes the new service; persistence beyond the call result is owned by Phase 22 export-candidate / Phase 17 chat history)*
+- [x] Call `openRouter.modelAccess.execute`. *(`gatewayCall` with `targetModule="openRouter", actionKey="openRouter.modelAccess.execute"` — first cross-module Model Access invocation)*
+- [x] Store output, latency/usage, provider/model refs. *(success result echoes `output`, `latencyMs`, `usage`, `providerConnectionId`, `providerCatalogEntryId`, `modelCatalogEntryId`, `modelRef`, `correlationId`)*
+- [x] Handle no binding, degraded binding, model access failure. *(BindingPolicyReason union flowed through: `binding_not_found` / `legacy_unresolved` / `binding_disabled` / `provider_connection_ineligible` / `validation_stale`; new `model_access_failed` reason for Model Access throws or `status="error"`; local-provider bindings rejected as `provider_connection_ineligible` per spec — no Model Access local adapter yet)*
+- [x] Add tests. *(`server/agent-studio/services/test-run-binding.test.ts`: 5 short-circuit cases + happy path with system prompt + happy path without system prompt + thrown-error + status=error → 9 cases)*
 
 ### Phase 17 — Agent Studio Expert chat through Model Access
 
