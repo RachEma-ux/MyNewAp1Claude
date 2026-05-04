@@ -174,15 +174,15 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 9 — Provider config migration design
 
-- [ ] Create `docs/architecture/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION.md`.
-- [ ] Define old shape with apiKey.
-- [ ] Define old shape with apiKeyEnvVar.
-- [ ] Define new `AgentProviderBinding`.
-- [ ] Define `legacy_unresolved`.
-- [ ] Define `statusReason = legacy_raw_api_key`.
-- [ ] Define `statusReason = legacy_env_var`.
-- [ ] Define migration rollback strategy.
-- [ ] Define no mixed-shape persistence after migration.
+- [x] Create `docs/architecture/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION.md`.
+- [x] Define old shape with apiKey. *(§2.1 — Shape A; LK-01..LK-03 risk)*
+- [x] Define old shape with apiKeyEnvVar. *(§2.2 — Shape B; LR-01 risk)*
+- [x] Define new `AgentProviderBinding`. *(§3 — full column list, lives in new ASDB table `ags_agent_provider_bindings`, NOT in providerConfig jsonb)*
+- [x] Define `legacy_unresolved`. *(§3.2 — `status` enum value; visible to operators; runtime refuses to call until resolved)*
+- [x] Define `statusReason = legacy_raw_api_key`. *(§3.3 — Shape A migration target; key is destroyed, operator must re-bind through Provider Connections)*
+- [x] Define `statusReason = legacy_env_var`. *(§3.3 — Shape B migration target; env var name preserved as `legacyEnvVarHint` for operator triage)*
+- [x] Define migration rollback strategy. *(§5 — evidence report is the rollback artifact; non-symmetric: secrets are NEVER restored, only non-secret metadata)*
+- [x] Define no mixed-shape persistence after migration. *(§6 — application-layer write filter + runtime read guard + Phase 12 lint enforcing secret denylist on every write)*
 
 ### Phase 10 — Provider config migration script
 
