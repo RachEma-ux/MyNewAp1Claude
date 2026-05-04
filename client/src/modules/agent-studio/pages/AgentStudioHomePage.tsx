@@ -218,6 +218,9 @@ export default function AgentStudioHomePage({
         <div className="lg:col-span-2 space-y-3">
           <Card>
             <CardContent className="p-3 space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                AS List
+              </h2>
               {/* Filter row */}
               <div className="flex flex-col gap-2 min-w-0 sm:flex-row sm:items-center">
                 <div className="relative flex-1 min-w-0">
