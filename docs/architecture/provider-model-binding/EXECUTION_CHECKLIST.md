@@ -142,19 +142,19 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 7 — AI Types provider/model availability contract
 
-- [ ] Add public read action `aiTypes.providerModels.listAvailable`.
-- [ ] Define `ListAvailableProviderModelsInput`.
-- [ ] Define `AvailableProviderModel`.
-- [ ] Return provider catalog entry ID.
-- [ ] Return provider slug/name.
-- [ ] Return model catalog entry ID where available.
-- [ ] Return model ref.
-- [ ] Return capabilities.
-- [ ] Return governance status.
-- [ ] Return restrictions.
-- [ ] Return no credentials.
-- [ ] Register action through public API/gateway if used cross-module.
-- [ ] Add tests.
+- [x] Add public read action `aiTypes.providerModels.listAvailable`. *(registered via `registerPublicApi` in `server/ai-types/manifest.ts` — risk=low, receiptRequired=false)*
+- [x] Define `ListAvailableProviderModelsInput`. *(`providerSlug?`, `capability?`, `workspaceId?`)*
+- [x] Define `AvailableProviderModel`. *(11 fields incl. `governanceStatus` + `restrictions` sub-objects)*
+- [x] Return provider catalog entry ID. *(joined from `catalog_entries` where `entryType=provider` AND `providerId=...`)*
+- [x] Return provider slug/name. *(plus `providerType` for adapter selection in Model Access)*
+- [x] Return model catalog entry ID where available. *(joined from `catalog_entries` where `entryType=model` AND `sourceType=ai_type_models`)*
+- [x] Return model ref. *(`apiModelId` first, falls back to `canonicalKey` (provider slug stripped) or `name`)*
+- [x] Return capabilities.
+- [x] Return governance status. *(`isCatalogEntryAvailableForAppUse` shared with Catalog Availability Authority; reasons enumerated)*
+- [x] Return restrictions. *(provider `policyTags`, model entry `frozen` + `freezeReason`)*
+- [x] Return no credentials. *(`FORBIDDEN_AVAILABILITY_KEYS` exported alongside the function; both unit-test suites assert the shape guard)*
+- [x] Register action through public API/gateway. *(both `aiTypes/manifest.ts` governance descriptor + `governance/action-key-map.ts` entry — keeps `check:governance-actions` at 67/67)*
+- [x] Add tests. *(`server/ai-types/provider-models-availability.test.ts` — 7 vitest cases covering shape guard, frozen/unapproved/disabled-provider filtering, modelRef fallback, sandbox no-DB short-circuit)*
 
 ### Phase 8 — Provider Connections active connection contract
 

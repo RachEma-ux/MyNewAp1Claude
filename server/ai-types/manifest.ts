@@ -37,6 +37,16 @@ export const aiTypesManifest: ModuleManifest = {
       risk: "high",
       receiptRequired: true,
     },
+    // Plan v3 Phase 7: read-only catalog availability surface used by
+    // Agent Studio + OpenRouter when constructing provider/model
+    // bindings. No credentials returned.
+    {
+      key: "aiTypes.providerModels.listAvailable",
+      description:
+        "List provider/model pairs available for binding (no credentials)",
+      risk: "low",
+      receiptRequired: false,
+    },
   ],
 
   routes: [{ path: "/ai-types", label: "AI Types" }],
@@ -81,6 +91,32 @@ export const aiTypesManifest: ModuleManifest = {
         description: "Publish a catalog entry",
         risk: "high",
         receiptRequired: true,
+      },
+    });
+
+    // Plan v3 Phase 7: aiTypes.providerModels.listAvailable.
+    // Returns the set of provider+model pairs that are catalog-
+    // approved (status=active, reviewState=approved, not frozen)
+    // for binding selection. Joined with Provider Connections
+    // active-set (Phase 8) at the call site.
+    registerPublicApi({
+      module: "aiTypes",
+      action: "aiTypes.providerModels.listAvailable",
+      handler: async (input) => {
+        const { listAvailableProviderModels } = await import(
+          "./provider-models-availability"
+        );
+        const payload = (input ?? {}) as Parameters<
+          typeof listAvailableProviderModels
+        >[0];
+        return listAvailableProviderModels(payload);
+      },
+      descriptor: {
+        key: "aiTypes.providerModels.listAvailable",
+        description:
+          "List provider/model pairs available for binding (no credentials)",
+        risk: "low",
+        receiptRequired: false,
       },
     });
   },
