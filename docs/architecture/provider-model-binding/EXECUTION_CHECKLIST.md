@@ -95,19 +95,19 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 4 — Create OpenRouter Model Access facade
 
-- [ ] Create `server/openrouter/model-access/`.
-- [ ] Add `execute`.
-- [ ] Add `stream`.
-- [ ] Add `validateBinding`.
-- [ ] Register gateway action `openRouter.modelAccess.execute`.
-- [ ] Register gateway action `openRouter.modelAccess.stream`.
-- [ ] Register gateway action `openRouter.modelAccess.validateBinding`.
-- [ ] Update OpenRouter manifest `ports.provided` with `openRouter.modelAccess`.
-- [ ] Ensure Model Access calls Provider Connections internal resolver.
-- [ ] Ensure Model Access owns runtime model-call execution, not provider catalog metadata.
-- [ ] Add error normalization.
-- [ ] Add latency/usage telemetry structure.
-- [ ] Add correlation ID support.
+- [x] Create `server/openrouter/model-access/`. *(types.ts, execute.ts, index.ts, execute.test.ts)*
+- [x] Add `execute`. *(non-streaming OpenAI + Anthropic adapters)*
+- [x] Add `stream`. *(OpenAI SSE streaming; Anthropic falls back to execute() and yields a single full chunk — full SSE for Anthropic and tool-call streaming deferred to Phase 17/18)*
+- [x] Add `validateBinding`. *(probes /v1/models; treats Anthropic absence as ok)*
+- [x] Register gateway action `openRouter.modelAccess.execute`.
+- [x] Register gateway action `openRouter.modelAccess.stream`. *(gateway form collects full stream and returns single ModelAccessResult; direct streaming consumers import `stream` directly)*
+- [x] Register gateway action `openRouter.modelAccess.validateBinding`.
+- [x] Update OpenRouter manifest `ports.provided` with `openRouter.modelAccess`. *(plus `openRouter.inferenceRouting`; `consumed: ["providerConnections.credential"]`)*
+- [x] Ensure Model Access calls Provider Connections internal resolver. *(via `withProviderCredential`; this is the only file outside `server/secrets/` that holds a decrypted PAT)*
+- [x] Ensure Model Access owns runtime model-call execution, not provider catalog metadata.
+- [x] Add error normalization. *(`ModelAccessError` with codes + branch-specific reason in `ModelAccessResult.error`)*
+- [x] Add latency/usage telemetry structure. *(`latencyMs` + `usage: { inputTokens, outputTokens, totalTokens }`)*
+- [x] Add correlation ID support. *(`correlationId` echoed back; auto-generated if not supplied)*
 
 ### Phase 5 — Enforce no-runtime-process.env provider key rule
 

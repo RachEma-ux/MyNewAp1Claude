@@ -28,6 +28,34 @@ export const openRouterManifest: ModuleManifest = {
       risk: "high",
       receiptRequired: true,
     },
+    // Plan v3 D4: Model Access lives at server/openrouter/model-access/.
+    // Receipt policy here matches Plan v3 Phase 20 (final receipt
+    // tiering). `execute` is medium-risk by default; receipt
+    // requirement at the action level is policy-based — callers
+    // pass through a governance gate before invoking. Phase 17/18
+    // will tighten the per-intent split (production external runs
+    // require receipt; agent-test runs are policy-based).
+    {
+      key: "openRouter.modelAccess.execute",
+      description:
+        "Execute a non-streaming provider model call via Model Access",
+      risk: "medium",
+      receiptRequired: false,
+    },
+    {
+      key: "openRouter.modelAccess.stream",
+      description:
+        "Execute a streaming provider model call via Model Access",
+      risk: "medium",
+      receiptRequired: false,
+    },
+    {
+      key: "openRouter.modelAccess.validateBinding",
+      description:
+        "Probe a Provider Connection + model ref for runtime readiness",
+      risk: "low",
+      receiptRequired: false,
+    },
   ],
 
   routes: [{ path: "/openrouter", label: "OpenRouter" }],
@@ -37,7 +65,20 @@ export const openRouterManifest: ModuleManifest = {
 
   publicApi: { path: "server/openrouter/public-api.ts" },
   events: { emits: ["openRouter.routing.config.updated"] },
-  ports: { provided: ["openRouter.route"], consumed: [] },
+  ports: {
+    provided: [
+      "openRouter.route",
+      // Plan v3 D4: OpenRouter hosts Model Access (no new RTLM).
+      "openRouter.modelAccess",
+      "openRouter.inferenceRouting",
+    ],
+    consumed: [
+      // Phase 4: Model Access reaches Provider Connections through
+      // the internal credential resolver. The boundary is enforced
+      // by scripts/check-provider-credential-resolver-boundary.ts.
+      "providerConnections.credential",
+    ],
+  },
   communication: { modes: ["port", "gateway", "event"] },
   boot: async () => {
     registerModuleHealthAction(openRouterManifest);
@@ -66,6 +107,86 @@ export const openRouterManifest: ModuleManifest = {
         description: "Update OpenRouter routing configuration",
         risk: "high",
         receiptRequired: true,
+      },
+    });
+
+    // Plan v3 Phase 4: Model Access facade. Per D4, OpenRouter hosts
+    // Model Access; per D2, this subtree is the only allowed importer
+    // of the Provider Connections internal credential resolver.
+    const { execute, validateBinding } = await import("./model-access");
+    // Note: `stream` is exposed through the `execute` adapter for
+    // gateway-call usage — the gateway returns a single value, not an
+    // async iterable. Streaming consumers (Phase 17/18) call the
+    // `stream()` function directly from inside OpenRouter.
+
+    registerPublicApi({
+      module: "openRouter",
+      action: "openRouter.modelAccess.execute",
+      handler: async (input) => {
+        const payload = input as Parameters<typeof execute>[0];
+        return execute(payload);
+      },
+      descriptor: {
+        key: "openRouter.modelAccess.execute",
+        description:
+          "Execute a non-streaming provider model call via Model Access",
+        risk: "medium",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "openRouter",
+      action: "openRouter.modelAccess.stream",
+      handler: async (input) => {
+        // Gateway-call form: collect the full stream and return as a
+        // single ModelAccessResult-shaped object. Direct streaming
+        // consumers should import `stream` from
+        // `server/openrouter/model-access` instead.
+        const { stream } = await import("./model-access");
+        const payload = input as Parameters<typeof stream>[0];
+        const start = Date.now();
+        let combined = "";
+        let finalUsage: undefined | NonNullable<Awaited<ReturnType<typeof execute>>["usage"]>;
+        let finishReason: string | undefined;
+        for await (const chunk of stream(payload)) {
+          combined += chunk.delta;
+          if (chunk.usage) finalUsage = chunk.usage;
+          if (chunk.done) finishReason = chunk.finishReason;
+        }
+        return {
+          status: "ok" as const,
+          providerConnectionId: payload.providerConnectionId,
+          modelRef: payload.modelRef,
+          latencyMs: Date.now() - start,
+          output: combined,
+          usage: finalUsage,
+          correlationId: payload.correlationId,
+          finishReason,
+        };
+      },
+      descriptor: {
+        key: "openRouter.modelAccess.stream",
+        description:
+          "Execute a streaming provider model call via Model Access (collected for gateway return)",
+        risk: "medium",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "openRouter",
+      action: "openRouter.modelAccess.validateBinding",
+      handler: async (input) => {
+        const payload = input as Parameters<typeof validateBinding>[0];
+        return validateBinding(payload);
+      },
+      descriptor: {
+        key: "openRouter.modelAccess.validateBinding",
+        description:
+          "Probe a Provider Connection + model ref for runtime readiness",
+        risk: "low",
+        receiptRequired: false,
       },
     });
   },
