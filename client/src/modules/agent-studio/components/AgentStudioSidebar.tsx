@@ -58,6 +58,8 @@ export type AgentStudioView =
   | "hooks"
   | "mcp"
   | "subagents"
+  // ── Plan v3 Phase 14: provider/model binding picker ──
+  | "binding"
   // ── Phase 13e: Catalog (global, no agent context) ──
   | "catalog-skills"
   | "catalog-tools"
@@ -119,6 +121,8 @@ const AGENT_GROUPS: SectionGroup[] = [
       { key: "workflows", label: "Workflows", icon: Workflow },
       // Phase 0d: Runtime config (provider/model/effort/maxTurns/etc)
       { key: "runtime", label: "Runtime", icon: Cpu },
+      // Plan v3 Phase 14: Bind to AI Types Catalog
+      { key: "binding", label: "Provider Binding", icon: Cpu },
       // Phase 0e: Hooks / MCP / Subagents (pages land in 0e)
       { key: "hooks", label: "Hooks", icon: Webhook },
       { key: "mcp", label: "MCP Servers", icon: Plug },

@@ -238,18 +238,19 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 14 — Agent Studio provider binding UI
 
-- [ ] Add "Add Provider Binding" UI.
-- [ ] Use label "Bind to AI Types" or "Select from AI Types Catalog".
-- [ ] Do not use "Import from AI Types".
-- [ ] Provider picker calls Agent Studio backend only.
-- [ ] Agent Studio backend fetches AI Types/provider connection options.
-- [ ] Show provider/model list.
-- [ ] Show active connections.
-- [ ] Disable validated-but-not-active connections.
-- [ ] Show degraded states.
-- [ ] Show legacy unresolved warning.
-- [ ] Save binding references only.
-- [ ] Add mobile-safe layout.
+- [x] Add "Add Provider Binding" UI. *(`AgentBindingPage.tsx`; new "Provider Binding" sidebar entry; routed via `case "binding":` in `AgentStudioShell.tsx`)*
+- [x] Use label "Bind to AI Types" or "Select from AI Types Catalog". *(page header reads "Bind to AI Types Catalog"; the word "Import" is intentionally avoided)*
+- [x] Do not use "Import from AI Types". *(verified in component literals)*
+- [x] Provider picker calls Agent Studio backend only. *(only `trpc.agentStudio.providerBindings.*` is hit from the page)*
+- [x] Agent Studio backend fetches AI Types/provider connection options. *(`pickerAvailableModels` and `pickerActiveConnections` procedures wrap gateway calls to `aiTypes.providerModels.listAvailable` (Phase 7) and `providerConnections.listActiveForProvider` (Phase 2))*
+- [x] Show provider/model list. *(grouped by `providerSlug`; second dropdown filtered to selected provider)*
+- [x] Show active connections. *(third dropdown; only fetched once a model is selected)*
+- [x] Disable validated-but-not-active connections. *(`<option disabled={!c.selectable}>` driven by Phase 8's `selectable` field)*
+- [x] Show degraded states. *(displays `degradedReason` inline on each option label, e.g. `provider_health_unknown`)*
+- [x] Show legacy unresolved warning. *(amber callout when `binding.status === "legacy_unresolved"` with `statusReason` + `legacyEnvVarHint` rendered)*
+- [x] Save binding references only. *(no API key / PAT / Authorization input field exists; mutation payload contains only catalog refs + connection id + modelRef)*
+- [x] Add mobile-safe layout. *(card/stack layout, no horizontal scroll, native `<select>` elements work on mobile by default)*
+- [x] Add tRPC sub-router. *(`server/agent-studio/api/provider-bindings-router.ts`: 9 procedures wrapping the Phase 12 functions + 2 picker option providers)*
 
 ### Phase 15 — Degraded state detection
 
