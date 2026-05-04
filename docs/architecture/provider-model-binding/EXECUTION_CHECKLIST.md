@@ -410,10 +410,10 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 27 — Governance verdict owner
 
-- [ ] Assign owner to `server/agent-studio/services/governance-adapter.ts`.
-- [ ] Add `computeExportGovernanceVerdict`.
-- [ ] Return status, computedBy, computedAt, receiptId, blockers.
-- [ ] Add tests.
+- [x] Assign owner to `server/agent-studio/services/governance-adapter.ts`. *(File header updated: Owner = Agent Studio. Phase 27 wires `computeExportGovernanceVerdict` as the canonical reader for Stage 8 export catalog Phases 29–32.)*
+- [x] Add `computeExportGovernanceVerdict`. *(Exported function in `governance-adapter.ts`; calls `evaluateGovernance` + `getAgentById`; sorts blockers alphabetically for stable diffs.)*
+- [x] Return status, computedBy, computedAt, receiptId, blockers. *(Plus `underlyingVerdict` for full per-rule detail without a second round-trip.)*
+- [x] Add tests. *(`server/agent-studio/services/governance-adapter.test.ts` — 8 tests: cleared, draft-exists blocker, destructive-tool blocker, lifecycle gate, missing agent, receiptId carriage, blocker sort, getAgentById error non-fatal.)*
 
 ### Phase 28 — Readiness owner
 

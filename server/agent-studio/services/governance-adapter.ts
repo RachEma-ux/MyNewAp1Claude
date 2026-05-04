@@ -9,6 +9,11 @@
  * `requireGovernedAction()` at the platform level. This service evaluates the
  * AI Agent Studio's *internal* readiness for governance, then surfaces the
  * verdict in the UI so users see issues before triggering platform gates.
+ *
+ * Owner: Agent Studio (Plan v3 Phase 27 — assigned `agent-studio` so the
+ * Stage 8 export catalog has a single point of truth for "is this agent
+ * cleared to export?"). The `computeExportGovernanceVerdict` export below
+ * is the canonical reader for downstream Phases 29–32.
  */
 
 import * as repo from "../repository";
@@ -293,4 +298,130 @@ export async function evaluateMcpPostInvoke(
     };
   }
   return { verdict: "allow" };
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Plan v3 Phase 27 — Export Governance Verdict
+// ───────────────────────────────────────────────────────────────────
+
+/**
+ * Status of an Agent Studio agent's export-readiness from a governance
+ * standpoint. Distinct from the more general `AgsGovernanceVerdict`
+ * because export has a stricter contract (no `warning` middle ground —
+ * the export catalog's listCandidates filter is binary).
+ */
+export type ExportGovernanceStatus = "cleared" | "blocked";
+
+export interface ExportGovernanceVerdict {
+  /** Final cleared/blocked status. `cleared` only when there are zero blockers. */
+  status: ExportGovernanceStatus;
+  /** Domain-typed identifier of who/what computed the verdict. */
+  computedBy: string;
+  /** ISO timestamp the verdict was computed. */
+  computedAt: string;
+  /**
+   * Receipt id from the platform governance layer when the caller passed
+   * one (e.g. when invoked under `governedProcedure`); else null. The export
+   * catalog action emits this on its audit trail.
+   */
+  receiptId: string | null;
+  /**
+   * The set of blockers preventing export. Always non-empty when
+   * `status="blocked"`; empty when `status="cleared"`.
+   * Derived from `evaluateGovernance(...)` reasons with severity="blocker"
+   * AND any export-specific gate (no draft, no published version, etc.).
+   */
+  blockers: ExportBlocker[];
+  /**
+   * Snapshot of the inner `evaluateGovernance` result that produced this
+   * verdict. Carried so callers can render the per-rule detail without a
+   * second round-trip.
+   */
+  underlyingVerdict: GovernanceVerdictResult;
+}
+
+export interface ExportBlocker {
+  /** Stable identifier for the blocker rule (e.g. "draft.exists"). */
+  rule: string;
+  /** Human-readable explanation. */
+  message: string;
+}
+
+export interface ComputeExportGovernanceVerdictInput {
+  agentId: number;
+  /**
+   * The user / system actor invoking the verdict. Stored on `computedBy`
+   * as `user:<id>` or `system:<name>`.
+   */
+  computedBy: string;
+  /**
+   * Optional governance receipt id when the caller is already inside a
+   * receipt-bearing flow. The export catalog action passes its own.
+   */
+  receiptId?: string | null;
+  /**
+   * Optional clock injection for tests. Defaults to `new Date()`.
+   */
+  now?: () => Date;
+}
+
+/**
+ * Plan v3 Phase 27 — canonical export-readiness verdict computer.
+ *
+ * Behavior:
+ *   1. Calls `evaluateGovernance(agentId)` for the per-rule analysis.
+ *   2. Adds export-specific gates (must have a `published` lifecycle
+ *      state with a non-null `publishedVersionId`).
+ *   3. If any blocker (severity="blocker") is present from either source,
+ *      returns `status="blocked"` with the union of blockers in stable
+ *      order (rule asc).
+ *   4. Otherwise returns `status="cleared"` with an empty blockers array.
+ *
+ * The function does NOT mutate any DB state — it only reads. Callers
+ * that need the verdict persisted use the export catalog action (Phase 30).
+ */
+export async function computeExportGovernanceVerdict(
+  input: ComputeExportGovernanceVerdictInput,
+): Promise<ExportGovernanceVerdict> {
+  const now = input.now ?? (() => new Date());
+  const computedAt = now().toISOString();
+
+  const underlying = await evaluateGovernance(input.agentId);
+  const blockers: ExportBlocker[] = underlying.reasons
+    .filter((r) => r.severity === "blocker")
+    .map((r) => ({ rule: r.rule, message: r.message }));
+
+  // Export-specific gate — the agent must be in a publishable state.
+  const agent = await repo.getAgentById(input.agentId).catch(() => null);
+  if (!agent) {
+    blockers.push({
+      rule: "export.agent_exists",
+      message: `Agent ${input.agentId} does not exist.`,
+    });
+  } else {
+    if (agent.lifecycleState !== "published") {
+      blockers.push({
+        rule: "export.lifecycle_published",
+        message: `Agent must be in lifecycleState='published' to export (current: ${agent.lifecycleState}).`,
+      });
+    }
+    if (agent.publishedVersionId == null) {
+      blockers.push({
+        rule: "export.published_version",
+        message: "Agent has no publishedVersionId; nothing to export.",
+      });
+    }
+  }
+
+  // Stable order — easy diffing in tests + UI.
+  blockers.sort((a, b) => a.rule.localeCompare(b.rule));
+
+  return {
+    status: blockers.length === 0 ? "cleared" : "blocked",
+    computedBy: input.computedBy,
+    computedAt,
+    receiptId: input.receiptId ?? null,
+    blockers,
+    underlyingVerdict: underlying,
+  };
 }
