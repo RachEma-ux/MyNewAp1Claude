@@ -30,6 +30,33 @@ export type ModelAccessIntent =
 export interface ModelAccessMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /**
+   * Plan v3 Phase 18 — when an `assistant` turn requested tool calls,
+   * the caller must echo them back on the same message so the model
+   * has matching tool responses on the next turn. OpenAI accepts the
+   * raw `tool_calls` array as it was returned. Opaque pass-through.
+   */
+  toolCalls?: ModelAccessToolCall[];
+  /**
+   * Plan v3 Phase 18 — for `tool` messages, the id of the tool_call
+   * this response satisfies. Required by OpenAI's chat-completions
+   * tool-loop protocol. Ignored on other roles.
+   */
+  toolCallId?: string;
+}
+
+/**
+ * Plan v3 Phase 18 — tool call returned by the model. Mirror the
+ * OpenAI shape (id, function-style name + JSON-string arguments)
+ * since both Anthropic and OpenAI map cleanly to this projection.
+ * Anthropic's `tool_use.input` (object) is JSON-stringified into
+ * `arguments` so callers can use a single decode path.
+ */
+export interface ModelAccessToolCall {
+  id: string;
+  name: string;
+  /** JSON-encoded arguments string. May be `"{}"` when the model called with no args. */
+  arguments: string;
 }
 
 export interface ModelAccessExecuteInput {
@@ -67,6 +94,15 @@ export interface ModelAccessResult {
   error?: string;
   /** Echoed back so callers can correlate logs / telemetry. */
   correlationId?: string;
+  /**
+   * Plan v3 Phase 18 — tool calls returned by the model on this turn.
+   * Empty / undefined when no tools were called or no tools were
+   * passed in. The chat-tools loop in Agent Studio re-emits these
+   * on the next turn paired with role="tool" responses.
+   */
+  toolCalls?: ModelAccessToolCall[];
+  /** Provider-reported finish reason, e.g. "stop", "tool_calls", "length". */
+  finishReason?: string;
 }
 
 /** Streaming chunk emitted by `stream()`. */

@@ -288,12 +288,12 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 18 — `runChatWithTools` through Model Access
 
-- [ ] Identify `runChatWithTools` provider call.
-- [ ] Route model execution through Model Access.
-- [ ] Preserve tool schema support.
-- [ ] Preserve streaming where needed.
-- [ ] Preserve MCP/tool integration.
-- [ ] Add tests.
+- [x] Identify `runChatWithTools` provider call. *(`server/agent-studio/services/chat.ts:runChatWithTools` — instantiated `new OpenAI({apiKey})` per turn and called `client.chat.completions.create({tools})`)*
+- [x] Route model execution through Model Access. *(new `runChatWithToolsViaBinding` calls `openRouter.modelAccess.execute` via `gatewayCall` per turn; `sendChatMessage` now routes ALL `binding_v1` + non-null PCID chats through the binding path, including tool-equipped agents)*
+- [x] Preserve tool schema support. *(extended `ModelAccessExecuteInput.tools`/`ModelAccessResult.toolCalls`/`ModelAccessMessage.toolCalls`/`ModelAccessMessage.toolCallId`; new typed `ModelAccessToolCall`. OpenAI `choice.message.tool_calls` and Anthropic `content[].tool_use` blocks are normalized to the same shape so downstream loops have a single decode path.)*
+- [x] Preserve streaming where needed. *(MVP chat is non-streaming; existing Phase 4 `stream()` is unchanged. Streaming-with-tools is a future Phase 19+ extension when the chat UI streams.)*
+- [x] Preserve MCP/tool integration. *(dispatcher path unchanged — `dispatchMcpToolCall` and the `mcp__server__tool` dispatch keys are reused verbatim. The new loop just builds `ModelAccessMessage[]` from the chat history's `toolPayload` and calls Model Access in place of the OpenAI SDK.)*
+- [x] Add tests. *(execute.test.ts: 4 new tool-call cases — OpenAI extract, OpenAI round-trip, Anthropic tool_use, plain-text no-tool. chat-binding.test.ts: 2 new cases — happy-path tool-loop with dispatcher, dispatcher-error continuation.)*
 
 ### Phase 19 — Classify legacy runtime paths
 
