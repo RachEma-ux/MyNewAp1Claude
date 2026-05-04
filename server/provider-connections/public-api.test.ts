@@ -77,12 +77,30 @@ describe("Provider Connections public API — no secret material in output shape
       healthStatus: "ok",
       modelCount: 5,
       capabilities: ["chat", "embeddings"],
+      selectable: true,
     };
     expect(() => assertNoForbiddenKeys(sample)).not.toThrow();
     // Sanity: assert known field names exist so refactors that drop
     // them don't silently pass this guard.
     expect(sample.providerConnectionId).toBe(1);
     expect(sample.healthStatus).toBe("ok");
+    expect(sample.selectable).toBe(true);
+  });
+
+  it("ProviderConnectionRef carries Phase 8 selection contract for unknown health", () => {
+    const sample: ProviderConnectionRef = {
+      providerConnectionId: 1,
+      providerCatalogEntryId: 2,
+      workspaceId: 3,
+      lifecycleStatus: "active",
+      healthStatus: "unknown",
+      modelCount: 0,
+      capabilities: [],
+      selectable: true,
+      degradedReason: "provider_health_unknown",
+    };
+    expect(() => assertNoForbiddenKeys(sample)).not.toThrow();
+    expect(sample.degradedReason).toBe("provider_health_unknown");
   });
 
   it("ConnectionStatusSummary shape contains no forbidden keys", () => {

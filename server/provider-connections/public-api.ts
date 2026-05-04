@@ -43,6 +43,26 @@ export interface ProviderConnectionRef {
   healthStatus: "ok" | "unreachable" | "unknown";
   modelCount: number;
   capabilities: string[];
+  /**
+   * Plan v3 Phase 8: selection contract.
+   *   - `selectable=true` iff `lifecycleStatus === "active"` AND
+   *     `healthStatus !== "unreachable"`. The picker may submit a
+   *     binding referencing this connection.
+   *   - `selectable=false` for `validated` (still visible — admins
+   *     promote to active before runtime use), `unreachable`, or
+   *     missing-secret rows. The picker shows them disabled or
+   *     filters them out entirely.
+   */
+  selectable: boolean;
+  /**
+   * When `selectable=true` but the connection is not in a fully
+   * green state, this carries a stable code the UI can render as
+   * a warning chip without leaking provider internals. Set to
+   * `"provider_health_unknown"` when health has not been probed
+   * yet (per Phase 8 contract: unknown health is allowed, but
+   * surfaces as degraded).
+   */
+  degradedReason?: "provider_health_unknown";
 }
 
 export interface ConnectionStatusSummary {
@@ -225,7 +245,18 @@ function toProviderConnectionRef(
   const lifecycleStatus: ProviderConnectionRef["lifecycleStatus"] =
     row.lifecycleStatus === "active" ? "active" : "validated";
 
-  return {
+  // Phase 8 contract: only `active` AND not `unreachable` is
+  // selectable for runtime binding. `unknown` health is permitted
+  // (some providers don't expose a probe endpoint) and surfaces as
+  // `degradedReason: "provider_health_unknown"`.
+  const selectable =
+    lifecycleStatus === "active" && healthStatus !== "unreachable";
+  const degradedReason: ProviderConnectionRef["degradedReason"] | undefined =
+    selectable && healthStatus === "unknown"
+      ? "provider_health_unknown"
+      : undefined;
+
+  const ref: ProviderConnectionRef = {
     providerConnectionId: row.id,
     providerCatalogEntryId: row.providerId,
     workspaceId: row.workspaceId,
@@ -233,5 +264,113 @@ function toProviderConnectionRef(
     healthStatus,
     modelCount: row.modelCount ?? 0,
     capabilities: row.capabilities ?? [],
+    selectable,
   };
+  if (degradedReason) ref.degradedReason = degradedReason;
+  return ref;
+}
+
+// ─── Binding-creation gate ───────────────────────────────────────────
+// Phase 8: every Agent Studio / OpenRouter binding writer (Phase 11+)
+// must call this before persisting a binding. It returns a typed
+// reason code instead of throwing so the caller can decide whether to
+// degrade or surface a user-facing error.
+
+export interface BindingEligibilityResult {
+  providerConnectionId: number;
+  /** True iff a binding may be created against this connection now. */
+  ok: boolean;
+  /**
+   * Stable reason code; populated when `ok=false`. UI strings are
+   * derived from this on the client.
+   */
+  reason?:
+    | "not_found"
+    | "not_active"
+    | "health_failed"
+    | "secret_missing"
+    | "validated_only";
+  lifecycleStatus?: ProviderConnectionRef["lifecycleStatus"];
+  healthStatus?: ProviderConnectionRef["healthStatus"];
+  /**
+   * When ok=true but the health is unknown, this surfaces the same
+   * `provider_health_unknown` code as `ProviderConnectionRef.degradedReason`.
+   * Callers may still create bindings, but should display a warning.
+   */
+  degradedReason?: "provider_health_unknown";
+}
+
+/**
+ * Phase 8 binding-creation gate. Returns ok=true ONLY when the
+ * connection is `lifecycleStatus="active"`, has a stored secret, and
+ * is not `unreachable`. `unknown` health passes with a `degradedReason`.
+ *
+ * Agent Studio binding writers (Phase 11+) MUST call this before
+ * persisting a binding. The function never returns secret material.
+ */
+export async function getBindingEligibility(
+  input: GetConnectionStatusInput,
+): Promise<BindingEligibilityResult> {
+  const validation = await validateConnection(input);
+  if (!validation.ok) {
+    // Map validateConnection reasons onto binding-eligibility reasons.
+    const reason: BindingEligibilityResult["reason"] = (() => {
+      switch (validation.reason) {
+        case "not_found":
+          return "not_found";
+        case "not_active":
+          // Distinguish "validated only" (visible but not yet promoted)
+          // from "disabled/failed" (filtered out at list time anyway).
+          return validation.lifecycleStatus === "validated"
+            ? "validated_only"
+            : "not_active";
+        case "secret_missing":
+          return "secret_missing";
+        case "health_failed":
+          return "health_failed";
+        default:
+          return "not_active";
+      }
+    })();
+    return {
+      providerConnectionId: input.providerConnectionId,
+      ok: false,
+      reason,
+      lifecycleStatus:
+        validation.lifecycleStatus === "active" ||
+        validation.lifecycleStatus === "validated"
+          ? validation.lifecycleStatus
+          : undefined,
+      healthStatus:
+        validation.healthStatus === "ok" ||
+        validation.healthStatus === "unreachable" ||
+        validation.healthStatus === "unknown"
+          ? validation.healthStatus
+          : undefined,
+    };
+  }
+
+  // validation.ok=true means lifecycleStatus="active" + secret exists.
+  // Final blocker: explicit unreachable health.
+  if (validation.healthStatus === "unreachable") {
+    return {
+      providerConnectionId: input.providerConnectionId,
+      ok: false,
+      reason: "health_failed",
+      lifecycleStatus: "active",
+      healthStatus: "unreachable",
+    };
+  }
+
+  const result: BindingEligibilityResult = {
+    providerConnectionId: input.providerConnectionId,
+    ok: true,
+    lifecycleStatus: "active",
+    healthStatus:
+      validation.healthStatus === "ok" ? "ok" : "unknown",
+  };
+  if (result.healthStatus === "unknown") {
+    result.degradedReason = "provider_health_unknown";
+  }
+  return result;
 }
