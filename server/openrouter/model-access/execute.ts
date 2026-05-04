@@ -26,6 +26,7 @@ import {
   type ValidateBindingInput,
   type ValidateBindingResult,
   type ModelAccessUsage,
+  type ModelAccessToolCall,
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -45,9 +46,33 @@ function isAnthropic(providerType: string, baseUrl: string): boolean {
 }
 
 function buildOpenAiBody(input: ModelAccessExecuteInput): Record<string, unknown> {
+  // Plan v3 Phase 18 — translate ModelAccessMessage → OpenAI shape.
+  // The `toolCalls` / `toolCallId` fields on assistant / tool messages
+  // map onto OpenAI's `tool_calls` and `tool_call_id` respectively.
+  const messages = input.messages.map((m) => {
+    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+      return {
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function" as const,
+          function: { name: tc.name, arguments: tc.arguments },
+        })),
+      };
+    }
+    if (m.role === "tool") {
+      return {
+        role: "tool" as const,
+        tool_call_id: m.toolCallId ?? "",
+        content: m.content,
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
   const body: Record<string, unknown> = {
     model: input.modelRef,
-    messages: input.messages,
+    messages,
     stream: input.stream ?? false,
   };
   if (typeof input.temperature === "number") body.temperature = input.temperature;
@@ -76,6 +101,7 @@ function extractOpenAiOutput(payload: any): {
   output?: string;
   usage?: ModelAccessUsage;
   finishReason?: string;
+  toolCalls?: ModelAccessToolCall[];
 } {
   const choice = payload?.choices?.[0];
   const output = choice?.message?.content ?? undefined;
@@ -87,10 +113,27 @@ function extractOpenAiOutput(payload: any): {
         totalTokens: u.total_tokens,
       }
     : undefined;
+  // Plan v3 Phase 18 — extract tool calls. OpenAI returns each call
+  // as `{id, type:"function", function:{name, arguments}}`.
+  let toolCalls: ModelAccessToolCall[] | undefined;
+  const rawToolCalls = choice?.message?.tool_calls;
+  if (Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
+    toolCalls = rawToolCalls
+      .filter((tc: any) => tc?.function?.name)
+      .map((tc: any) => ({
+        id: typeof tc.id === "string" ? tc.id : "",
+        name: String(tc.function.name),
+        arguments:
+          typeof tc.function.arguments === "string"
+            ? tc.function.arguments
+            : JSON.stringify(tc.function.arguments ?? {}),
+      }));
+  }
   return {
     output: typeof output === "string" ? output : undefined,
     usage,
     finishReason: choice?.finish_reason,
+    toolCalls,
   };
 }
 
@@ -98,12 +141,26 @@ function extractAnthropicOutput(payload: any): {
   output?: string;
   usage?: ModelAccessUsage;
   finishReason?: string;
+  toolCalls?: ModelAccessToolCall[];
 } {
   const blocks = Array.isArray(payload?.content) ? payload.content : [];
   const text = blocks
     .filter((b: any) => b?.type === "text" && typeof b?.text === "string")
     .map((b: any) => b.text)
     .join("");
+  // Plan v3 Phase 18 — extract `tool_use` blocks. Anthropic returns
+  // structured input as a JSON object; stringify it to keep the
+  // public shape uniform with OpenAI.
+  const toolUseBlocks = blocks.filter((b: any) => b?.type === "tool_use");
+  let toolCalls: ModelAccessToolCall[] | undefined;
+  if (toolUseBlocks.length > 0) {
+    toolCalls = toolUseBlocks.map((b: any) => ({
+      id: typeof b.id === "string" ? b.id : "",
+      name: typeof b.name === "string" ? b.name : "",
+      arguments:
+        typeof b.input === "string" ? b.input : JSON.stringify(b.input ?? {}),
+    }));
+  }
   const u = payload?.usage;
   const usage: ModelAccessUsage | undefined = u
     ? {
@@ -120,6 +177,7 @@ function extractAnthropicOutput(payload: any): {
     output: text || undefined,
     usage,
     finishReason: payload?.stop_reason,
+    toolCalls,
   };
 }
 
@@ -209,6 +267,8 @@ export async function execute(
           output: extracted.output,
           usage: extracted.usage,
           correlationId,
+          toolCalls: extracted.toolCalls,
+          finishReason: extracted.finishReason,
         };
         return result;
       },

@@ -317,3 +317,194 @@ describe("Model Access — validateBinding()", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+// ─── Plan v3 Phase 18 — tool-call extraction ─────────────────────────
+
+describe("Model Access — execute() tool-call schema (Phase 18)", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    mockedWith.mockReset();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("OpenAI: extracts tool_calls into ModelAccessToolCall[]", async () => {
+    mockedWith.mockImplementation(async (_id: number, fn: any) =>
+      fn({
+        baseUrl: "https://api.openai.com",
+        authHeaders: { Authorization: "Bearer x" },
+        providerType: "openai",
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_abc",
+                    type: "function",
+                    function: { name: "do_thing", arguments: '{"x":1}' },
+                  },
+                ],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const r = await execute({
+      providerConnectionId: 1,
+      modelRef: "gpt-x",
+      messages: [{ role: "user", content: "go" }],
+      tools: [{ type: "function", function: { name: "do_thing" } }],
+      intent: "chat",
+      workspaceId: 1,
+      actorId: 1,
+    });
+    expect(r.status).toBe("ok");
+    expect(r.toolCalls).toHaveLength(1);
+    expect(r.toolCalls?.[0].id).toBe("call_abc");
+    expect(r.toolCalls?.[0].name).toBe("do_thing");
+    expect(r.toolCalls?.[0].arguments).toBe('{"x":1}');
+    expect(r.finishReason).toBe("tool_calls");
+  });
+
+  it("OpenAI: round-trips assistant.toolCalls + tool.toolCallId into the request body", async () => {
+    mockedWith.mockImplementation(async (_id: number, fn: any) =>
+      fn({
+        baseUrl: "https://api.openai.com",
+        authHeaders: { Authorization: "Bearer x" },
+        providerType: "openai",
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "done" }, finish_reason: "stop" }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await execute({
+      providerConnectionId: 1,
+      modelRef: "gpt-x",
+      messages: [
+        { role: "user", content: "go" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            { id: "call_1", name: "do_thing", arguments: '{"x":1}' },
+          ],
+        },
+        { role: "tool", content: '{"ok":true}', toolCallId: "call_1" },
+      ],
+      intent: "chat",
+      workspaceId: 1,
+      actorId: 1,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const req = fetchSpy.mock.calls[0][1];
+    const body = JSON.parse(req.body as string);
+    const assistantTurn = body.messages.find(
+      (m: any) => m.role === "assistant",
+    );
+    expect(assistantTurn.tool_calls).toEqual([
+      {
+        id: "call_1",
+        type: "function",
+        function: { name: "do_thing", arguments: '{"x":1}' },
+      },
+    ]);
+    const toolTurn = body.messages.find((m: any) => m.role === "tool");
+    expect(toolTurn.tool_call_id).toBe("call_1");
+    expect(toolTurn.content).toBe('{"ok":true}');
+  });
+
+  it("Anthropic: extracts tool_use blocks into ModelAccessToolCall[]", async () => {
+    mockedWith.mockImplementation(async (_id: number, fn: any) =>
+      fn({
+        baseUrl: "https://api.anthropic.com",
+        authHeaders: { "x-api-key": "x" },
+        providerType: "anthropic",
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          content: [
+            { type: "text", text: "calling tool" },
+            {
+              type: "tool_use",
+              id: "tu_1",
+              name: "lookup",
+              input: { q: "x" },
+            },
+          ],
+          stop_reason: "tool_use",
+          usage: { input_tokens: 1, output_tokens: 2 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const r = await execute({
+      providerConnectionId: 1,
+      modelRef: "claude-x",
+      messages: [{ role: "user", content: "go" }],
+      tools: [{ name: "lookup" }],
+      intent: "chat",
+      workspaceId: 1,
+      actorId: 1,
+    });
+    expect(r.status).toBe("ok");
+    expect(r.toolCalls).toHaveLength(1);
+    expect(r.toolCalls?.[0]).toEqual({
+      id: "tu_1",
+      name: "lookup",
+      arguments: '{"q":"x"}',
+    });
+    expect(r.finishReason).toBe("tool_use");
+  });
+
+  it("returns no toolCalls field when the model returns plain text", async () => {
+    mockedWith.mockImplementation(async (_id: number, fn: any) =>
+      fn({
+        baseUrl: "https://api.openai.com",
+        authHeaders: { Authorization: "Bearer x" },
+        providerType: "openai",
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "plain reply" }, finish_reason: "stop" }],
+        }),
+        { status: 200 },
+      ),
+    );
+    const r = await execute({
+      providerConnectionId: 1,
+      modelRef: "gpt-x",
+      messages: [{ role: "user", content: "hi" }],
+      intent: "chat",
+      workspaceId: 1,
+      actorId: 1,
+    });
+    expect(r.status).toBe("ok");
+    expect(r.output).toBe("plain reply");
+    expect(r.toolCalls).toBeUndefined();
+  });
+});

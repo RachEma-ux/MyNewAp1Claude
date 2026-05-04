@@ -32,7 +32,7 @@ vi.mock("../../platform/modules/module-gateway", () => ({
 }));
 
 vi.mock("./mcp/registry", () => ({
-  getSnapshot: vi.fn(() => ({ servers: [] })),
+  getSnapshot: vi.fn(() => null),
 }));
 
 vi.mock("./mcp/dispatcher", () => ({
@@ -46,6 +46,8 @@ vi.mock("../adapters/openllm-runtime-adapter", () => ({
 import * as repo from "../repository";
 import { getAgentProviderBinding } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
+import { dispatchMcpToolCall } from "./mcp/dispatcher";
+import { getSnapshot } from "./mcp/registry";
 import { sendChatMessage } from "./chat";
 
 const mockedRepo = repo as unknown as Record<string, ReturnType<typeof vi.fn>>;
@@ -53,6 +55,10 @@ const mockedBinding = getAgentProviderBinding as unknown as ReturnType<
   typeof vi.fn
 >;
 const mockedGateway = gatewayCall as unknown as ReturnType<typeof vi.fn>;
+const mockedDispatch = dispatchMcpToolCall as unknown as ReturnType<
+  typeof vi.fn
+>;
+const mockedSnapshot = getSnapshot as unknown as ReturnType<typeof vi.fn>;
 
 function bindingPublic(overrides: Record<string, unknown> = {}) {
   return {
@@ -203,5 +209,178 @@ describe("sendChatMessage — binding path (Phase 17)", () => {
     );
 
     expect(mockedGateway).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Plan v3 Phase 18 — tool-equipped binding chat ─────────────────────
+
+describe("sendChatMessage — tool-call binding path (Phase 18)", () => {
+  beforeEach(() => {
+    mockedDispatch.mockReset();
+    mockedSnapshot.mockReset();
+    // One MCP server, connected, exposing a single tool.
+    mockedRepo.listMcpServers.mockResolvedValue([
+      { id: 7, name: "demo", enabled: true },
+    ]);
+    mockedSnapshot.mockReturnValue({
+      tools: [
+        {
+          name: "echo",
+          description: "echoes args",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    });
+  });
+
+  it("routes a tool-equipped binding through the gateway and dispatches the tool", async () => {
+    mockedBinding.mockResolvedValue(bindingPublic());
+
+    // History grows across the loop. We simulate two listings:
+    //   (1) initial pre-loop snapshot (1 user message)
+    //   (2) inside the loop after the assistant tool-call turn + tool result
+    //   (3) post-loop snapshot
+    let listCallCount = 0;
+    mockedRepo.listChatMessages.mockImplementation(async () => {
+      listCallCount++;
+      if (listCallCount === 1) {
+        // pre-loop count
+        return [{ role: "user", content: "go" }];
+      }
+      if (listCallCount === 2) {
+        // first turn: history is just the user message
+        return [{ role: "user", content: "go" }];
+      }
+      if (listCallCount === 3) {
+        // second turn: assistant tool-call + tool result are appended
+        return [
+          { role: "user", content: "go" },
+          {
+            role: "assistant",
+            content: "",
+            toolPayload: {
+              toolCalls: [
+                { id: "call_1", name: "demo__echo", arguments: '{"x":1}' },
+              ],
+            },
+          },
+          {
+            role: "tool",
+            content: '{"echoed":true}',
+            toolPayload: { toolCallId: "call_1" },
+          },
+        ];
+      }
+      // post-loop: + final assistant turn
+      return [
+        { role: "user", content: "go" },
+        { role: "assistant", content: "" },
+        { role: "tool", content: '{"echoed":true}' },
+        { role: "assistant", content: "All done." },
+      ];
+    });
+
+    // First gateway call returns tool_calls; second returns final text.
+    mockedGateway
+      .mockResolvedValueOnce({
+        status: "ok",
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        latencyMs: 100,
+        usage: { inputTokens: 5, outputTokens: 3 },
+        toolCalls: [
+          { id: "call_1", name: "demo__echo", arguments: '{"x":1}' },
+        ],
+        finishReason: "tool_calls",
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        latencyMs: 80,
+        usage: { inputTokens: 8, outputTokens: 4 },
+        output: "All done.",
+        finishReason: "stop",
+      });
+
+    mockedDispatch.mockResolvedValue({
+      ok: true,
+      result: { echoed: true },
+    });
+
+    const r = await sendChatMessage(
+      { sessionId: 1, userMessage: "go" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    expect(r.ok).toBe(true);
+    expect(r.assistantMessage?.content).toBe("All done.");
+    expect(mockedGateway).toHaveBeenCalledTimes(2);
+    expect(mockedDispatch).toHaveBeenCalledTimes(1);
+    const dispatchArgs = mockedDispatch.mock.calls[0][0];
+    expect(dispatchArgs.toolName).toBe("mcp__demo__echo");
+    expect(dispatchArgs.args).toEqual({ x: 1 });
+
+    // Cumulative usage from both turns.
+    expect(r.assistantMessage?.inputTokens).toBe(5 + 8);
+    expect(r.assistantMessage?.outputTokens).toBe(3 + 4);
+  });
+
+  it("surfaces dispatcher errors as role=tool error rows; loop continues", async () => {
+    mockedBinding.mockResolvedValue(bindingPublic());
+
+    let listCallCount = 0;
+    mockedRepo.listChatMessages.mockImplementation(async () => {
+      listCallCount++;
+      if (listCallCount <= 2) return [{ role: "user", content: "go" }];
+      return [
+        { role: "user", content: "go" },
+        { role: "assistant", content: "" },
+        {
+          role: "tool",
+          content: JSON.stringify({ error: "boom", code: "ERR_X" }),
+        },
+        { role: "assistant", content: "Recovered." },
+      ];
+    });
+
+    mockedGateway
+      .mockResolvedValueOnce({
+        status: "ok",
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        latencyMs: 100,
+        toolCalls: [
+          { id: "call_1", name: "demo__echo", arguments: "{}" },
+        ],
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        latencyMs: 50,
+        output: "Recovered.",
+      });
+
+    mockedDispatch.mockResolvedValue({
+      ok: false,
+      error: { message: "boom", code: "ERR_X" },
+    });
+
+    const r = await sendChatMessage(
+      { sessionId: 1, userMessage: "go" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    expect(r.ok).toBe(true);
+    expect(r.assistantMessage?.content).toBe("Recovered.");
+    // Tool result row written with error JSON.
+    const errorToolWrites = mockedRepo.appendChatMessage.mock.calls.filter(
+      (c: any[]) =>
+        c[0].role === "tool" &&
+        typeof c[0].content === "string" &&
+        c[0].content.includes('"error":"boom"'),
+    );
+    expect(errorToolWrites.length).toBe(1);
   });
 });

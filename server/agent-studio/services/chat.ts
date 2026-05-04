@@ -44,6 +44,7 @@ import type {
   ModelAccessExecuteInput,
   ModelAccessMessage,
   ModelAccessResult,
+  ModelAccessToolCall,
 } from "../../openrouter/model-access/types";
 
 export interface SendChatMessageInput {
@@ -379,6 +380,231 @@ export async function startChatSession(input: {
 }
 
 /**
+ * Plan v3 Phase 18 — binding-driven tool-call loop.
+ *
+ * Mirrors the legacy `runChatWithTools` but routes each turn through
+ * `openRouter.modelAccess.execute` via the platform gateway instead
+ * of `new OpenAI({apiKey})`. Closes LR-01 for tool-equipped chats:
+ * Agent Studio never holds a raw key; Model Access pulls credentials
+ * inside its D2 boundary.
+ *
+ * Exit conditions are identical to the legacy loop:
+ *   - Final assistant message with no further tool_calls → return.
+ *   - MAX_TOOL_TURNS reached → write a synthetic "(loop stopped…)"
+ *     assistant message and return.
+ *
+ * The dispatcher (`dispatchMcpToolCall`) is unchanged — Phase 18 is
+ * about the model-call boundary, not the MCP tool side.
+ */
+async function runChatWithToolsViaBinding(input: {
+  sessionId: number;
+  draftId: number;
+  providerConnectionId: number;
+  modelRef: string;
+  systemPrompt: string;
+  tools: ChatToolSpec[];
+  workspaceId: number;
+  actorId: number;
+  temperature: number;
+  maxTokens?: number;
+}) {
+  const dispatchKeyByOpenaiName = new Map<string, string>(
+    input.tools.map((t) => [t.openaiName, t.dispatchKey]),
+  );
+  const toolSchemas = input.tools.map((t) => t.schema);
+
+  const startMs = Date.now();
+  let cumulativeInputTokens = 0;
+  let cumulativeOutputTokens = 0;
+  let cumulativeCostMicrocents = 0;
+  // Cost is not surfaced by Model Access in Phase 4 / 18 — leave at 0
+  // and let Phase 20+ pricing rollup populate it.
+
+  for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+    const history = await repo.listChatMessages(input.sessionId);
+    const messages: ModelAccessMessage[] = [
+      { role: "system", content: input.systemPrompt },
+    ];
+    for (const m of history) {
+      if (m.role === "user") {
+        messages.push({ role: "user", content: m.content });
+      } else if (m.role === "assistant") {
+        const tp = (m.toolPayload ?? null) as any;
+        // toolPayload here may be either:
+        //   - {toolCalls: [...]} (new Phase 18 binding path) where each
+        //     call is already in {id, name, arguments} shape, OR
+        //   - {toolCalls: [...]} (legacy OpenAI shape) with
+        //     {id, type:"function", function:{name, arguments}} entries.
+        // We accept both: normalize to the Phase 18 shape.
+        if (tp?.toolCalls && Array.isArray(tp.toolCalls)) {
+          const normalized: ModelAccessToolCall[] = tp.toolCalls.map((c: any) => {
+            if (c?.function?.name) {
+              return {
+                id: c.id ?? "",
+                name: c.function.name,
+                arguments:
+                  typeof c.function.arguments === "string"
+                    ? c.function.arguments
+                    : JSON.stringify(c.function.arguments ?? {}),
+              };
+            }
+            return {
+              id: c?.id ?? "",
+              name: c?.name ?? "",
+              arguments:
+                typeof c?.arguments === "string"
+                  ? c.arguments
+                  : JSON.stringify(c?.arguments ?? {}),
+            };
+          });
+          messages.push({
+            role: "assistant",
+            content: m.content || "",
+            toolCalls: normalized,
+          });
+        } else {
+          messages.push({ role: "assistant", content: m.content });
+        }
+      } else if (m.role === "tool") {
+        const tp = (m.toolPayload ?? null) as any;
+        messages.push({
+          role: "tool",
+          content: m.content,
+          toolCallId: tp?.toolCallId ?? "",
+        });
+      }
+    }
+
+    const executeInput: ModelAccessExecuteInput = {
+      providerConnectionId: input.providerConnectionId,
+      modelRef: input.modelRef,
+      messages,
+      tools: toolSchemas,
+      intent: "chat",
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      temperature: input.temperature,
+      tokenBudget: input.maxTokens,
+    };
+
+    const result: ModelAccessResult = await gatewayCall<
+      ModelAccessExecuteInput,
+      ModelAccessResult
+    >({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.execute",
+        actorId: input.actorId,
+        workspaceId: input.workspaceId,
+      },
+      input: executeInput,
+    });
+
+    if (result.status !== "ok") {
+      throw new Error(result.error ?? "Model Access returned status=error");
+    }
+
+    cumulativeInputTokens += result.usage?.inputTokens ?? 0;
+    cumulativeOutputTokens += result.usage?.outputTokens ?? 0;
+
+    const toolCalls = result.toolCalls;
+    if (toolCalls && toolCalls.length > 0) {
+      // Persist the assistant turn carrying the tool_calls.
+      await repo.appendChatMessage({
+        sessionId: input.sessionId,
+        role: "assistant",
+        content: result.output ?? "",
+        toolPayload: { toolCalls },
+        model: input.modelRef,
+      });
+
+      for (const call of toolCalls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.arguments);
+        } catch {
+          args = {};
+        }
+        const dispatchKey = dispatchKeyByOpenaiName.get(call.name);
+        if (!dispatchKey) {
+          await repo.appendChatMessage({
+            sessionId: input.sessionId,
+            role: "tool",
+            content: JSON.stringify({ error: `unknown tool: ${call.name}` }),
+            toolPayload: { toolCallId: call.id, name: call.name },
+          });
+          continue;
+        }
+        const dispatchResult = await dispatchMcpToolCall({
+          agentDraftId: input.draftId,
+          toolName: dispatchKey,
+          args,
+          source: "live_runtime",
+        });
+        const toolContent = dispatchResult.ok
+          ? JSON.stringify(dispatchResult.result ?? null)
+          : JSON.stringify({
+              error: dispatchResult.error?.message ?? "dispatch failed",
+              code: dispatchResult.error?.code,
+            });
+        await repo.appendChatMessage({
+          sessionId: input.sessionId,
+          role: "tool",
+          content: toolContent,
+          toolPayload: { toolCallId: call.id, name: call.name },
+        });
+      }
+      continue;
+    }
+
+    // No tool calls — final answer.
+    const finalContent = result.output ?? "";
+    const durationMs = Date.now() - startMs;
+    const assistantRow = await repo.appendChatMessage({
+      sessionId: input.sessionId,
+      role: "assistant",
+      content: finalContent,
+      inputTokens: cumulativeInputTokens,
+      outputTokens: cumulativeOutputTokens,
+      costMicrocents: cumulativeCostMicrocents,
+      model: input.modelRef,
+      durationMs,
+    });
+    return {
+      assistantRow,
+      inputTokens: cumulativeInputTokens,
+      outputTokens: cumulativeOutputTokens,
+      costMicrocents: cumulativeCostMicrocents,
+      durationMs,
+      content: finalContent,
+    };
+  }
+
+  // Max turns hit.
+  const durationMs = Date.now() - startMs;
+  const capMsg = `(Tool loop stopped after ${MAX_TOOL_TURNS} turns without a final answer.)`;
+  const assistantRow = await repo.appendChatMessage({
+    sessionId: input.sessionId,
+    role: "assistant",
+    content: capMsg,
+    inputTokens: cumulativeInputTokens,
+    outputTokens: cumulativeOutputTokens,
+    costMicrocents: cumulativeCostMicrocents,
+    model: input.modelRef,
+    durationMs,
+  });
+  return {
+    assistantRow,
+    inputTokens: cumulativeInputTokens,
+    outputTokens: cumulativeOutputTokens,
+    costMicrocents: cumulativeCostMicrocents,
+    durationMs,
+    content: capMsg,
+  };
+}
+
+/**
  * Plan v3 Phase 17 — binding-driven Expert chat path.
  *
  * Resolves the agent's provider/model binding, then sends the
@@ -575,24 +801,90 @@ export async function sendChatMessage(
       .filter((s): s is string => typeof s === "string" && s.length > 0)
       .join("\n\n") || "You are a helpful assistant.";
 
-  // Plan v3 Phase 17: prefer the binding-driven Model Access path
-  // when (a) a binding_v1 row exists for this draft, and (b) the
-  // agent has NO attached MCP tools (tool-call round-tripping requires
-  // Phase 18's tool schema on Model Access).
+  // Plan v3 Phase 17/18: prefer the binding-driven Model Access path
+  // whenever a binding_v1 row exists for this draft AND it points at
+  // a hosted Provider Connection. The Phase 18 tool-call schema on
+  // Model Access lets us route tool-equipped chats through the same
+  // binding path — no special case for tools any more.
   //
-  // Falls through to the legacy OpenAI-direct path on any "not yet
-  // routable" condition (no binding, local-provider binding, tool-loop
-  // required) — same behavior as before, but the LR-01 surface
-  // shrinks to those cases.
+  // Falls through to the legacy OpenAI-direct path only when:
+  //   - no binding row exists,
+  //   - the binding is not `binding_v1` (legacy_unresolved / disabled),
+  //   - the binding is local-provider (providerConnectionId=null —
+  //     Model Access has no local adapter yet).
   try {
     const candidateBinding = await getAgentProviderBinding(draft.id, "primary");
-    const toolSpecsForRouting = await buildToolsForDraft(draft.id);
     const canUseBindingPath =
       candidateBinding !== null &&
       candidateBinding.status === "binding_v1" &&
-      candidateBinding.providerConnectionId !== null &&
-      toolSpecsForRouting.length === 0;
+      candidateBinding.providerConnectionId !== null;
     if (canUseBindingPath) {
+      const toolSpecsForRouting = await buildToolsForDraft(draft.id);
+      if (toolSpecsForRouting.length > 0) {
+        // Phase 18: tool-equipped binding chat. Mirrors the legacy
+        // tool-loop but each turn is a Model Access call.
+        const wsId = options.workspaceId ?? 1;
+        const actor = options.actorId ?? 1;
+        const tempForLoop =
+          typeof (draft.providerConfig as any)?.temperature === "number"
+            ? (draft.providerConfig as any).temperature
+            : 0.2;
+        const maxTokensForLoop =
+          typeof (draft.providerConfig as any)?.maxTokens === "number"
+            ? (draft.providerConfig as any).maxTokens
+            : undefined;
+        const preLoopCount = (
+          await repo.listChatMessages(input.sessionId)
+        ).length;
+        try {
+          const loopResult = await runChatWithToolsViaBinding({
+            sessionId: input.sessionId,
+            draftId: draft.id,
+            providerConnectionId: candidateBinding.providerConnectionId!,
+            modelRef: candidateBinding.modelRef,
+            systemPrompt: systemPromptForBinding,
+            tools: toolSpecsForRouting,
+            workspaceId: wsId,
+            actorId: actor,
+            temperature: tempForLoop,
+            maxTokens: maxTokensForLoop,
+          });
+          const postCount = (await repo.listChatMessages(input.sessionId))
+            .length;
+          // user turn (already persisted, not yet bumped) + everything
+          // the loop wrote. Same delta the legacy tool path computes.
+          const addedMessages = 1 + (postCount - preLoopCount);
+          const autoTitle =
+            !session.title && input.userMessage
+              ? input.userMessage.slice(0, 60).trim()
+              : undefined;
+          await repo.bumpChatSessionTotals({
+            sessionId: input.sessionId,
+            addInputTokens: loopResult.inputTokens,
+            addOutputTokens: loopResult.outputTokens,
+            addCostMicrocents: loopResult.costMicrocents,
+            addMessages: addedMessages,
+            title: autoTitle,
+          });
+          return {
+            ok: true,
+            assistantMessage: {
+              id: loopResult.assistantRow.id,
+              content: loopResult.content,
+              inputTokens: loopResult.inputTokens,
+              outputTokens: loopResult.outputTokens,
+              costMicrocents: loopResult.costMicrocents,
+              durationMs: loopResult.durationMs,
+              model: candidateBinding.modelRef,
+            },
+          };
+        } catch (e) {
+          return {
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          };
+        }
+      }
       return sendChatMessageViaBinding(input, {
         sessionId: input.sessionId,
         agentId: session.agentId,
