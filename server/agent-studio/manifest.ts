@@ -40,8 +40,16 @@ export const agentStudioManifest: ModuleManifest = {
   governanceActions: [
     {
       key: "agentStudio.agent.publish",
-      description: "Publish an agent to the catalog",
-      risk: "high",
+      description:
+        "Publish an agent (lifecycle-only flip + agsAgentReleases insert; no catalog writes)",
+      // Plan v3 Phase 20: downgraded from "high" to "medium". Publish
+      // is a lifecycle-only operation: it writes to the Agent
+      // Studio-owned `ags_agent_releases` table and flips
+      // `ags_agents.lifecycleState`. It does NOT write to the catalog
+      // (catalog registration lives behind `aiTypes.catalog.register`,
+      // wired in Phase 25). Receipt remains required because
+      // publishing affects production routing.
+      risk: "medium",
       receiptRequired: true,
     },
     {

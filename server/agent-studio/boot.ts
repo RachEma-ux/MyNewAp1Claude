@@ -120,8 +120,10 @@ export async function bootAgentStudio(): Promise<void> {
       },
       descriptor: {
         key: "agentStudio.agent.publish",
-        description: "Publish an agent to the catalog",
-        risk: "high",
+        description:
+          "Publish an agent (lifecycle-only flip + agsAgentReleases insert; no catalog writes)",
+        // Plan v3 Phase 20 — see RECEIPT_POLICY.md.
+        risk: "medium",
         receiptRequired: true,
       },
     });
