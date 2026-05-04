@@ -20,6 +20,10 @@ const SUITES = [
     "check:provider-credential-resolver-boundary",
     "scripts/check-provider-credential-resolver-boundary.ts",
   ],
+  [
+    "check:provider-key-env-boundary",
+    "scripts/check-provider-key-env-boundary.ts",
+  ],
   ["check:governance-actions", "scripts/check-governance-actions.ts"],
   // Live-cluster role check — auto-skips when DATABASE_URL is unset, so
   // it's safe to include in the suite for local sandboxes.

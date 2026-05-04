@@ -33,6 +33,7 @@ Columns: `ID | Path | Owner | Current violation | Reason retained | Risk | Targe
 | LR-03 | `server/documents/processor.ts:339` | Documents | Reads `process.env.OPENAI_API_KEY` for document processing. | Active runtime path. Documents pipeline is not in Plan v3 scope. | Medium. | Same as LR-02. | Phase 19 | TBD | open | Governance |
 | LR-04 | `server/operators/provider-hub.ts:78` | Operators | Reads `process.env.OPENAI_API_KEY` for operator runtime. | Active runtime path. Operators is not in Plan v3 scope. | Medium. | Same as LR-02. | Phase 19 | TBD | open | Governance |
 | LR-05 | `server/data-analysis/omnirag-adapter.ts:57` | Data Analysis | Reads `process.env.OMNIRAG_API_KEY`. | OmniRAG is a domain-specific service, not a Plan v3 provider. | Low — not a generic provider key. | May be exempted permanently (D1 covers provider keys, not arbitrary service tokens). Decision in Phase 19. | Phase 19 | TBD | open | Governance |
+| LR-06 | `server/_core/index.ts:120-140` | Platform | `autoProvisionProviders()` reads `process.env[OPENAI_API_KEY \| ANTHROPIC_API_KEY \| GOOGLE_API_KEY \| GROQ_API_KEY]` at boot to seed the legacy `providers` table. | Discovered while writing the Phase 5 boundary check. The block is the de facto boot-time seed Plan v3 wants, but it writes to the wrong table. | High — this IS the env-to-runtime path Decision D1 forbids; the Phase 5 lint allowlists it under `<dynamic>` so the rule can land. | Extract to `scripts/provider-connections/seed-from-env.ts`; switch target table to `provider_connections` with encrypted secret. | Phase 10 (Provider config migration script) | TBD | open | Reviewer + Governance |
 
 ### AI Types public-API boundary violations (D-N/A — covered by Phase 26)
 
@@ -82,9 +83,10 @@ The 21 importers from `CURRENT_REALITY_MAP.md §4` are not enumerated row-by-row
 ## Aggregate counts
 
 - **Open exceptions at Phase 0.3:** 18
-- **By risk:** High = 4, Medium = 8, Low = 4, Unknown = 2
-- **By deadline phase:** Phase 10 = 3, Phase 17 = 1, Phase 19 = 4, Phase 25 = 7, Phase 26 = 2, Phase 40 = 2
-- **By owner:** Agent Studio = 5, AI Types (declared events) = 2, Catalog Import = 1, Catalog Manage = 1, Documents = 1, Embeddings = 1, HQ = 1 (likely false positive), KGRA = 1, LLM Authority = 2, Operators = 1, Platform = 1, Data Analysis = 1, Automation = 1, Routers/Agents = 1 (pending verify)
+- **Open exceptions after Phase 5 (LR-06 added):** 19
+- **By risk:** High = 5, Medium = 8, Low = 4, Unknown = 2
+- **By deadline phase:** Phase 10 = 4, Phase 17 = 1, Phase 19 = 4, Phase 25 = 7, Phase 26 = 2, Phase 40 = 2
+- **By owner:** Agent Studio = 5, AI Types (declared events) = 2, Catalog Import = 1, Catalog Manage = 1, Documents = 1, Embeddings = 1, HQ = 1 (likely false positive), KGRA = 1, LLM Authority = 2, Operators = 1, Platform = 2, Data Analysis = 1, Automation = 1, Routers/Agents = 1 (pending verify)
 
 ## Format addendum — when to add a new row
 
