@@ -6,6 +6,13 @@
  *
  * Cross-section blockers surface globally (e.g., risky tool flagged in Tools
  * triggers a Governance warning AND a readiness penalty).
+ *
+ * Owner: Agent Studio (Plan v3 Phase 28 — assigned `agent-studio` so the
+ * Stage 8 export catalog has a single point of truth for "is this agent
+ * ready to export?"). The `computeAgentReadinessSnapshot` export below
+ * is the canonical reader for downstream Phases 29–32; the export catalog
+ * row carries `readinessScore` + `readinessComputedBy` + `readinessComputedAt`
+ * directly from the snapshot's return shape.
  */
 
 import * as repo from "../repository";
@@ -273,5 +280,70 @@ function emptyReport(reason: string): ReadinessReport {
     blockers: [{ section: "system", severity: "blocker", message: reason }],
     publishReady: false,
     sections: {},
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Plan v3 Phase 28 — Export-Catalog Readiness Snapshot
+// ───────────────────────────────────────────────────────────────────
+
+export interface AgentReadinessSnapshot {
+  /**
+   * Mirror of `ReadinessReport.score` (0–100) — surfaced under the
+   * export-catalog field name so consumers (Phase 29's
+   * `AgentStudioExportCandidate`) can read the field directly without
+   * remapping.
+   */
+  readinessScore: number;
+  /** Domain-typed identifier of who/what computed the snapshot. */
+  readinessComputedBy: string;
+  /** ISO timestamp the snapshot was computed. */
+  readinessComputedAt: string;
+  /**
+   * Snapshot of `publishReady` flag from the underlying report. The
+   * export catalog uses this independently of `readinessScore` to set
+   * the "ready to export" filter without re-running computation.
+   */
+  publishReady: boolean;
+  /**
+   * Full `ReadinessReport` so callers can render section-level detail
+   * without a second round-trip.
+   */
+  report: ReadinessReport;
+}
+
+export interface ComputeAgentReadinessSnapshotInput {
+  agentId: number;
+  /**
+   * The user / system actor invoking the snapshot. Stored on
+   * `readinessComputedBy` as `user:<id>` or `system:<name>`.
+   */
+  computedBy: string;
+  /**
+   * Optional clock injection for tests. Defaults to `new Date()`.
+   */
+  now?: () => Date;
+}
+
+/**
+ * Plan v3 Phase 28 — canonical export-readiness snapshot computer.
+ *
+ * Wraps `computeReadiness(agentId)` with the export-catalog naming
+ * convention (`readinessScore`, `readinessComputedBy`,
+ * `readinessComputedAt`) and a stable timestamp captured at the
+ * call boundary. Does NOT mutate any DB state — only reads.
+ */
+export async function computeAgentReadinessSnapshot(
+  input: ComputeAgentReadinessSnapshotInput,
+): Promise<AgentReadinessSnapshot> {
+  const now = input.now ?? (() => new Date());
+  const readinessComputedAt = now().toISOString();
+  const report = await computeReadiness(input.agentId);
+  return {
+    readinessScore: report.score,
+    readinessComputedBy: input.computedBy,
+    readinessComputedAt,
+    publishReady: report.publishReady,
+    report,
   };
 }

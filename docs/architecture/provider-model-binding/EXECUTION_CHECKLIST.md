@@ -417,9 +417,9 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 28 — Readiness owner
 
-- [ ] Confirm Agent Studio readiness service ownership.
-- [ ] Add `readinessScore`, `readinessComputedBy`, `readinessComputedAt`.
-- [ ] Add tests.
+- [x] Confirm Agent Studio readiness service ownership. *(File header annotated: Owner = Agent Studio. Phase 28 wires `computeAgentReadinessSnapshot` as the canonical reader for Stage 8 export catalog Phases 29–32.)*
+- [x] Add `readinessScore`, `readinessComputedBy`, `readinessComputedAt`. *(Exported via `computeAgentReadinessSnapshot` in `server/agent-studio/services/readiness.ts`; field names match the Phase 29 `AgentStudioExportCandidate` contract verbatim.)*
+- [x] Add tests. *(`server/agent-studio/services/readiness.test.ts` — 5 tests: missing-agent system blocker, score propagation, publishReady mirror, fresh-timestamp-per-call, computedBy verbatim.)*
 
 ### Phase 29 — Export Catalog contract
 
