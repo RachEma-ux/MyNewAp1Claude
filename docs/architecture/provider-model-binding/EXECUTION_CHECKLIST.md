@@ -57,17 +57,17 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 1 — Manifest Provider Connections as platform infrastructure
 
-- [ ] Create `server/provider-connections/manifest.ts`.
-- [ ] Set manifest key to `providerConnections`.
-- [ ] Set runtime mode to `shared`.
-- [ ] Set DB ownership to shared appdb provider tables.
-- [ ] Declare route `/providers/connections`.
-- [ ] Declare public API path `server/provider-connections/public-api.ts`.
-- [ ] Declare governance actions for validate/store, activate, rotate, disable, delete.
-- [ ] Register module health action.
-- [ ] Add to module registry if required.
-- [ ] Ensure it is not counted as RTLM #16.
-- [ ] Run wiring checks.
+- [x] Create `server/provider-connections/manifest.ts`.
+- [x] Set manifest key to `providerConnections`.
+- [x] Set runtime mode to `shared`.
+- [x] Set DB ownership to shared appdb provider tables. *(ownedTables: `provider_connections`, `provider_secrets`, `provider_audit_log`)*
+- [x] Declare route `/providers/connections`.
+- [x] Declare public API path `server/provider-connections/public-api.ts`.
+- [x] Declare governance actions for validate/store, activate, rotate, disable, delete. *(5 actions, governance-actions count 58 → 63)*
+- [x] Register module health action.
+- [x] Add to module registry if required. *(added to `ALL_MANIFESTS` in `server/platform/modules/manifests.ts` under "Platform infrastructure modules" section)*
+- [x] Ensure it is not counted as RTLM #16. *(intentionally NOT added to `KNOWN_MODULES` in `wiring-inventory.ts` — that list is RTLMs only per D3)*
+- [x] Run wiring checks. *(all green: architecture, wiring, frontend-modularity, TypeScript)*
 
 ### Phase 2 — Split Provider Connections public and internal surfaces
 
