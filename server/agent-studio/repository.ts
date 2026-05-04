@@ -672,6 +672,24 @@ export async function updatePublishRequestState(input: {
     .where(eq(agsPublishRequests.id, input.publishRequestId));
 }
 
+/**
+ * Plan v3 Phase 22 — lifecycle-only publish.
+ *
+ * Writes to:
+ *   - `ags_agent_releases` (Agent Studio-owned) — release row,
+ *     state="published", catalog_ready_at=now (export-candidate
+ *     marker for Phase 25).
+ *   - `ags_agents` (Agent Studio-owned) — flips lifecycleState
+ *     and pins publishedVersionId.
+ *
+ * Does NOT write to `catalog_entries` and does NOT call AI Types
+ * catalog write. Catalog registration is a separate concern handled
+ * by `aiTypes.catalog.register` (Phase 25), which reads the
+ * `catalog_ready_at` marker to find ready releases.
+ *
+ * Test guarantee: `tests/agent-studio/publish-no-catalog-write.test.ts`
+ * asserts no `catalog_entries` write happens during publish.
+ */
 export async function publishRelease(input: {
   agentId: number;
   versionId: number;
@@ -680,6 +698,7 @@ export async function publishRelease(input: {
   publishedBy?: number;
 }) {
   const conn = db();
+  const now = new Date();
   const [created] = await conn
     .insert(agsAgentReleases)
     .values({
@@ -689,7 +708,9 @@ export async function publishRelease(input: {
       state: "published",
       releaseNotes: input.releaseNotes,
       publishedBy: input.publishedBy,
-      publishedAt: new Date(),
+      publishedAt: now,
+      // Plan v3 Phase 22 — export-candidate marker.
+      catalogReadyAt: now,
     })
     .returning();
   await conn
@@ -698,7 +719,7 @@ export async function publishRelease(input: {
       publishedVersionId: input.versionId,
       lifecycleState: "published",
       environment: input.targetEnvironment,
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(agsAgents.id, input.agentId));
   return created;

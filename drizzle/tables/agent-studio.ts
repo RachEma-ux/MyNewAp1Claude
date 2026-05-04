@@ -188,6 +188,15 @@ export const agsAgentReleases = pgTable(
     publishedBy: integer("published_by"),
     publishedAt: timestamp("published_at"),
     archivedAt: timestamp("archived_at"),
+    /**
+     * Plan v3 Phase 22 — export-candidate marker. Set to `now` when
+     * `agentStudio.agent.publish` flips the agent to `published`.
+     * Phase 25's `aiTypes.catalog.register` reads this column to find
+     * Agent Studio releases that are ready to be registered in the
+     * catalog WITHOUT publish itself writing to `catalog_entries`.
+     * Null = not yet a catalog candidate (still in pre-publish lifecycle).
+     */
+    catalogReadyAt: timestamp("catalog_ready_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
