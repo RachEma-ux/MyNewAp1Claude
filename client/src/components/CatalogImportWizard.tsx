@@ -142,6 +142,13 @@ const METHODS = [
     enabled: true,
   },
   {
+    id: "agent_studio" as const,
+    label: "Import from Agent Studio",
+    description: "Register eligible Agent Studio agents as catalog entries",
+    icon: Bot,
+    enabled: true,
+  },
+  {
     id: "registry_sync" as const,
     label: "Registry Sync",
     description: "Sync from built-in provider registry",
@@ -939,6 +946,33 @@ export function CatalogImportWizard({
             )}
           </div>
         )}
+
+        {/* Step 2: Import from Agent Studio (pending backend wiring) */}
+        {step === 2 && method === "agent_studio" && (
+          <div className="space-y-4 py-4">
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Bot className="h-4 w-4" />
+                Agent Studio candidates
+              </div>
+              <p className="text-xs text-muted-foreground break-words">
+                Eligible Agent Studio agents will appear here once
+                {" "}
+                <code>aiTypes.catalog.register</code> is wired to an Agent
+                Studio public candidate-list action via the Module Gateway.
+              </p>
+              <p className="text-xs text-muted-foreground break-words">
+                This option will only show real Agent Studio export candidates
+                — no mock or placeholder entries are ever rendered as real.
+              </p>
+            </div>
+          </div>
+        )}
+        {/* TODO: Wire Import from Agent Studio to aiTypes.catalog.register
+            and an Agent Studio public candidate-list action exposed through
+            the Module Gateway. Until then the option is selectable but the
+            Step 2 panel intentionally shows an honest pending-integration
+            message instead of fake data. */}
 
         {/* Step 2: File Import */}
         {step === 2 && method === "file_upload" && (
