@@ -1,0 +1,127 @@
+/**
+ * Plan v3 Phase 25 — `aiTypes.catalog.register` action.
+ *
+ * Canonical write path for catalog_entries. Replaces the ad-hoc pattern
+ * where domain routers (`server/routers/agents.ts`, `server/llm/authority.ts`,
+ * `server/modules/pmt/*`) called `createCatalogEntry()` directly.
+ *
+ * Flow:
+ *   1. Run `checkDuplicateLegacyImport` against `(sourceType, sourceId)`.
+ *      - `would_duplicate_legacy` → throw. Caller must use `aiTypes.catalog.update`
+ *        (modern row) or `reconcileLegacyImport` (legacy unresolved).
+ *      - `modern_row_update_path` → call `updateCatalogEntry` on the existing id.
+ *      - `no_existing_row` → call `createCatalogEntry`.
+ *   2. Return `{entryId, action, legacyImportState}` so callers can branch on
+ *      whether they wrote a new row or updated an existing one.
+ *
+ * Receipt requirement: register is `medium`-risk + `receiptRequired: true` per
+ * Phase 20's receipt policy. Internal AI Types code paths (publishing.ts,
+ * projection.ts) bypass register and call `createCatalogEntry`/`updateCatalogEntry`
+ * directly — those are intra-module and not subject to the boundary.
+ */
+
+import {
+  checkDuplicateLegacyImport,
+  type DuplicateGuardResult,
+} from "./legacy-import";
+import {
+  createCatalogEntry,
+  updateCatalogEntry,
+  getCatalogEntryById,
+} from "./db";
+import type { CatalogEntry, InsertCatalogEntry } from "../../drizzle/schema";
+
+export interface RegisterCatalogEntryInput {
+  /** Domain type the entry represents: llm | model | bot | agent | provider. */
+  entryType: string;
+  /** Source-of-record kind. Required — the register path is for source-linked entries only. */
+  sourceType: string;
+  /** Source-of-record row id. Required. */
+  sourceId: number;
+  /** All other catalog fields (name, displayName, description, config, tags, etc.). */
+  fields: Omit<InsertCatalogEntry, "entryType" | "sourceType" | "sourceId">;
+  /** User id (or system actor) who initiated the register call. */
+  registeredBy: number;
+}
+
+export interface RegisterCatalogEntryResult {
+  entryId: number;
+  action: "created" | "updated";
+  /**
+   * Mirrors the column the row carries after the register call. Always
+   * `null` when `action="created"` (Plan v3-native rows). May be non-null
+   * when `action="updated"` against a pre-existing modern row whose state
+   * was already populated through other means.
+   */
+  legacyImportState: string | null;
+  /** Echo of the duplicate-guard's outcome for logging/audit. */
+  guardReason: string;
+}
+
+export class RegisterDuplicateError extends Error {
+  readonly existingEntryId: number;
+  readonly guardResult: DuplicateGuardResult;
+  constructor(guardResult: DuplicateGuardResult) {
+    super(
+      `aiTypes.catalog.register refused: ${guardResult.reason} (existing entry id ${guardResult.existingEntryId}). ` +
+        (guardResult.reason === "blocked_unresolved_use_reconcile"
+          ? "Use reconcileLegacyImport for unresolved rows."
+          : "Use aiTypes.catalog.update for modern rows you intend to modify."),
+    );
+    this.name = "RegisterDuplicateError";
+    this.existingEntryId = guardResult.existingEntryId!;
+    this.guardResult = guardResult;
+  }
+}
+
+/**
+ * Pure — DB handle is passed in so tests can inject a fake. The real
+ * binding to the platform DB happens at the manifest/action layer.
+ */
+export async function registerCatalogEntry(
+  db: any,
+  input: RegisterCatalogEntryInput,
+): Promise<RegisterCatalogEntryResult> {
+  const guard = await checkDuplicateLegacyImport(db, {
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+  });
+
+  if (!guard.ok) {
+    // Both "would_duplicate_legacy" and "blocked_unresolved_use_reconcile"
+    // refuse the register; the error class carries the reason for the caller.
+    throw new RegisterDuplicateError(guard);
+  }
+
+  if (guard.existingEntryId != null) {
+    // Modern row exists at (sourceType, sourceId) — this is an update.
+    await updateCatalogEntry(
+      guard.existingEntryId,
+      input.fields as any,
+      input.registeredBy,
+    );
+    const updated = await getCatalogEntryById(guard.existingEntryId);
+    return {
+      entryId: guard.existingEntryId,
+      action: "updated",
+      legacyImportState: (updated?.legacyImportState as string | null) ?? null,
+      guardReason: guard.reason,
+    };
+  }
+
+  // No existing row → create.
+  const created = await createCatalogEntry({
+    ...input.fields,
+    entryType: input.entryType,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    createdBy: input.registeredBy,
+  } as InsertCatalogEntry);
+
+  return {
+    entryId: (created as CatalogEntry).id,
+    action: "created",
+    legacyImportState: null,
+    guardReason: guard.reason,
+  };
+}
