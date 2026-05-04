@@ -188,13 +188,28 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
   );
 }
 
-export default function CandidatePage() {
+export type CandidatePageMode = "general" | "agentStudio";
+
+export default function CandidatePage({
+  mode = "general",
+}: {
+  mode?: CandidatePageMode;
+} = {}) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
     "catalog" | "validation" | "publishing" | "audit" | "discovery-ops"
   >("catalog");
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
+  // In agentStudio mode the type filter is locked to "agent" since AS only
+  // emits agent candidates. In general mode it remains user-controlled.
+  // TODO: Replace the entryType-only filter with a server-side
+  // `aiTypes.catalog.asCandidates` query that also filters by
+  // sourceModule === "agentStudio". The catalog_entries schema currently
+  // exposes sourceType/sourceId but no sourceModule field, so Agent Studio
+  // agents are not distinguishable from other agent entries in the API yet.
+  const [typeFilter, setTypeFilter] = useState<"all" | EntryType>(
+    mode === "agentStudio" ? "agent" : "all"
+  );
 
   // Import wizard state
   const [importWizardOpen, setImportWizardOpen] = useState(false);
@@ -869,15 +884,26 @@ export default function CandidatePage() {
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">
-            Candidate Pipeline
+            {mode === "agentStudio"
+              ? "AS Candidate Pipeline"
+              : "Candidate Pipeline"}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Submit, review, and promote catalog entries through a structured
-            approval workflow
+            {mode === "agentStudio"
+              ? "Submit, review, and promote Agent Studio catalog candidates through a structured approval workflow"
+              : "Submit, review, and promote catalog entries through a structured approval workflow"}
           </p>
         </div>
         <div className="flex gap-2 shrink-0 self-start" />
       </div>
+
+      {mode === "agentStudio" && (
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Showing all <span className="font-medium">agent</span> catalog entries.
+          A dedicated Agent Studio source filter is pending backend support
+          (see <code>aiTypes.catalog.asCandidates</code> TODO in code).
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)}>
         <div className="overflow-x-auto">
