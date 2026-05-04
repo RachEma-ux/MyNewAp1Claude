@@ -56,7 +56,9 @@ Phase 23 does NOT run any data writes. It ships:
 - This evidence report.
 - A schema-shape test that asserts the new columns exist.
 
-Phase 24's backfill script (`scripts/catalog/phase-24-backfill-legacy-import.ts` — pending) implements the rules above with a `--dry-run` default. The reconciliation output gets a separate evidence report that lands with the Phase 24 PR.
+Phase 24's backfill script (`scripts/catalog/phase-24-backfill-legacy-import.ts`) implements the rules above with a `--dry-run` default. Modes: `--dry-run` (scan only), `--apply` (writes `legacy_import_state` and `active_source_version_id`), `--validate` (post-apply assertion that no source-bearing row remains unclassified). Output lands at `docs/evidence/provider-model-binding/CATALOG_LEGACY_IMPORT_BACKFILL_REPORT.md`. Idempotent — re-running `--apply` on already-classified rows is a no-op.
+
+The classifier and the duplicate-prevention guard live in `server/ai-types/legacy-import.ts` (Plan v3 D6 — AI Types owns `catalog_entries`). Phase 25's `aiTypes.catalog.register` calls `checkDuplicateLegacyImport()` before INSERT to prevent a second row appearing on top of an already-imported `(sourceType, sourceId)` pair. The Reconcile Legacy Import action (`reconcileLegacyImport()`) is the only path that flips an `unresolved` row to `manually_reconciled`.
 
 ## What Phase 23 explicitly does NOT do
 
