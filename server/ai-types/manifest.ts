@@ -47,6 +47,17 @@ export const aiTypesManifest: ModuleManifest = {
       risk: "low",
       receiptRequired: false,
     },
+    // Plan v3 Phase 25: canonical catalog write surface. Replaces the
+    // ad-hoc `createCatalogEntry()` callers in domain routers (see
+    // CATALOG_WRITER_MIGRATION_MATRIX.md). Calls the duplicate-prevention
+    // guard from Phase 24 before write.
+    {
+      key: "aiTypes.catalog.register",
+      description:
+        "Register or update a catalog entry from a source-linked domain row",
+      risk: "medium",
+      receiptRequired: true,
+    },
   ],
 
   routes: [{ path: "/ai-types", label: "AI Types" }],
@@ -117,6 +128,38 @@ export const aiTypesManifest: ModuleManifest = {
           "List provider/model pairs available for binding (no credentials)",
         risk: "low",
         receiptRequired: false,
+      },
+    });
+
+    // Plan v3 Phase 25: aiTypes.catalog.register.
+    // Canonical write path for catalog_entries. Calls the Phase 24
+    // duplicate-prevention guard, then delegates to createCatalogEntry
+    // (new row) or updateCatalogEntry (existing modern row at the same
+    // sourceType+sourceId). Throws RegisterDuplicateError on legacy
+    // collisions — those callers must use reconcileLegacyImport instead.
+    registerPublicApi({
+      module: "aiTypes",
+      action: "aiTypes.catalog.register",
+      handler: async (input) => {
+        const { registerCatalogEntry } = await import("./register");
+        const { getDb } = await import("../db/connection");
+        const db = getDb();
+        if (!db) throw new Error("Database not available");
+        const payload = input as Parameters<typeof registerCatalogEntry>[1];
+        if (!payload?.sourceType) throw new Error("sourceType is required");
+        if (typeof payload?.sourceId !== "number")
+          throw new Error("sourceId is required");
+        if (!payload?.entryType) throw new Error("entryType is required");
+        if (typeof payload?.registeredBy !== "number")
+          throw new Error("registeredBy is required");
+        return registerCatalogEntry(db, payload);
+      },
+      descriptor: {
+        key: "aiTypes.catalog.register",
+        description:
+          "Register or update a catalog entry from a source-linked domain row",
+        risk: "medium",
+        receiptRequired: true,
       },
     });
   },

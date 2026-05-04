@@ -381,17 +381,17 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 25 — Direct catalog_entries writer migration matrix
 
-- [ ] Create `CATALOG_WRITER_MIGRATION_MATRIX.md`.
-- [ ] Add `server/catalog-import/router.ts`.
-- [ ] Add `server/llm/authority.ts`.
-- [ ] Add `server/routers/agents.ts`.
-- [ ] Add `server/routers/catalog-manage.ts` (multiple writes).
-- [ ] Add `server/kgra-agent/nodes.ts`.
-- [ ] Add any Agent Studio writer if found.
-- [ ] Resolve `LO-01` ownership ambiguity for `routers/catalog-manage.ts`.
-- [ ] Assign migration fate to each.
-- [ ] Add deadline PR for each exception.
-- [ ] Add tests/checks where migrated.
+- [x] Create `CATALOG_WRITER_MIGRATION_MATRIX.md`.
+- [x] Add `server/catalog-import/router.ts` (LC-01 + writer rows; fate MIGRATE_TO_REGISTER + MIGRATE_TO_PUBLIC_API_READ; deadline Phase 26).
+- [x] Add `server/llm/authority.ts` (LC-02 + LC-03; fates MIGRATE_TO_PUBLIC_API_READ + MIGRATE_TO_REGISTER; deadline Phase 26).
+- [x] Add `server/routers/agents.ts` (LC-05 verified read-only; fate MIGRATE_TO_PUBLIC_API_READ; deadline Phase 26).
+- [x] Add `server/routers/catalog-manage.ts` (LC-04; fate KEEP_AS_ADMIN_SURFACE — LO-01 resolution).
+- [x] Add `server/kgra-agent/nodes.ts` (LC-06; fate MIGRATE_TO_PUBLIC_API_READ; deadline Phase 26).
+- [x] Add any Agent Studio writer if found. *(Audit: no direct catalog_entries writes from Agent Studio after Phase 22 — `publishRelease` is lifecycle-only and reads/writes ASDB tables only. Confirmed in matrix preface.)*
+- [x] Resolve `LO-01` ownership ambiguity for `routers/catalog-manage.ts`. *(Resolved: AI Types admin surface in wrong directory. File-relocation tracked outside Plan v3 as a no-op refactor.)*
+- [x] Assign migration fate to each. *(All 8 LC-* + 3 intra-module entries have a fate column in the matrix.)*
+- [x] Add deadline PR for each exception. *(LR registry updated: LC-01,02,03,05,06 → Phase 26; LC-04, LC-07, LC-08, LO-01 → resolved this PR.)*
+- [x] Add tests/checks where migrated. *(`server/ai-types/register.test.ts` — 6 tests covering register's three branches + the duplicate guard wiring. `aiTypes.catalog.register` action wired into manifest with receipt-required descriptor.)*
 
 ### Phase 26 — AI Types public API boundary enforcement
 
