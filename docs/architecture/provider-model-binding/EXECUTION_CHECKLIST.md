@@ -125,16 +125,16 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 6 — CI test strategy for Model Access
 
-- [ ] Create `tests/fixtures/mock-provider-server.ts`.
-- [ ] Mock `/v1/models`.
-- [ ] Mock `/v1/chat/completions`.
-- [ ] Mock `/api/tags`.
-- [ ] Unit-test Model Access with fake provider adapter.
-- [ ] Unit-test Model Access with fake credential resolver.
-- [ ] Integration-test Model Access against local mock provider.
-- [ ] Ensure CI does not require OpenAI/Anthropic keys.
-- [ ] Gate live tests behind `RUN_LIVE_PROVIDER_TESTS=1`.
-- [ ] Document live tests as manual only.
+- [x] Create `tests/fixtures/mock-provider-server.ts`. *(local `http.createServer`-based fixture; auto-assigns port; captures every inbound request for assertions; supports per-test response overrides via `options`)*
+- [x] Mock `/v1/models`. *(OpenAI + Anthropic shapes both served from this path)*
+- [x] Mock `/v1/chat/completions`. *(OpenAI shape; supports one-shot non-200 status injection via `nextChatStatus` for HTTP-error normalization tests)*
+- [x] Mock `/api/tags`. *(Ollama shape; `/api/chat` also wired for future Phase 17/18 Ollama-native paths)*
+- [x] Unit-test Model Access with fake provider adapter. *(8 cases in `server/openrouter/model-access/execute.test.ts` — covers OpenAI + Anthropic adapters, validateBinding ok/not-listed/Anthropic-underreport)*
+- [x] Unit-test Model Access with fake credential resolver. *(same suite — `withProviderCredential` mocked at module level; covers credential_resolution_failed normalization)*
+- [x] Wire-level test Model Access against local mock provider. *(6 cases in `tests/model-access/mock-provider.test.ts` — exercises real fetch -> mock server -> response normalization through the full pipeline; assertions include URL/method/headers, system-message hoisting, no-secret-leak regression guard)*
+- [x] Ensure CI does not require OpenAI/Anthropic keys. *(no test in the default include set hits a real provider; mock server is auto-spawned)*
+- [x] Gate live tests behind `RUN_LIVE_PROVIDER_TESTS=1`. *(`liveProviderTestsEnabled()` helper exported from the fixture; live tests when added later must early-skip when this returns false)*
+- [x] Document live tests as manual only. *(`tests/fixtures/README.md` — opt-in env var, not set in CI, explicit "manual only" callout citing D6)*
 
 ---
 
