@@ -297,13 +297,13 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 19 — Classify legacy runtime paths
 
-- [ ] Create `RUNTIME_PATH_MIGRATION_MATRIX.md`.
-- [ ] Classify `/api/chat/stream`.
-- [ ] Classify `server/automation`.
-- [ ] Classify legacy chat-stream provider calls.
-- [ ] Mark each as migrated, temporary_exception, blocked, or removed.
-- [ ] Add deadline PR for every temporary exception.
-- [ ] Add to `LEGACY_EXCEPTION_REGISTER.md`.
+- [x] Create `RUNTIME_PATH_MIGRATION_MATRIX.md`. *(`docs/architecture/provider-model-binding/RUNTIME_PATH_MIGRATION_MATRIX.md`: 16 paths classified across Agent Studio + Other Runtime Paths sections.)*
+- [x] Classify `/api/chat/stream`. *(temporary_exception → LR-08 (NEW); migration to `agentStudio.providerBindings.resolveForRun` + `openRouter.modelAccess.execute|stream`; deadline Phase 27.)*
+- [x] Classify `server/automation`. *(`block-executors.ts:executeRunAgent` → temporary_exception, shares LR-08; `block-executors.ts:102` LC-07 verified as a SQL identifier whitelist for a DB-block executor (not an active read), reclassified to Phase 25.)*
+- [x] Classify legacy chat-stream provider calls. *(`runChatWithTools` legacy fallback in chat.ts and `services/simulation.ts` live-runtime branch — both temporary_exception under LR-01; deadline Phase 27.)*
+- [x] Mark each as migrated, temporary_exception, blocked, or removed. *(every row in the matrix has a classification + deadline phase + owning LR entry.)*
+- [x] Add deadline PR for every temporary exception. *(every temporary_exception row has a Phase column. Where a concrete PR # is known (e.g. Phase 17/18 narrowed surface), it's named; for downstream phases the deadline phase is the contract.)*
+- [x] Add to `LEGACY_EXCEPTION_REGISTER.md`. *(LR-08 + LR-09 added; LR-01/02/03/04/05/07 deadline columns updated; LR-01 status remains `in_progress` with surface narrative refreshed.)*
 
 ---
 
