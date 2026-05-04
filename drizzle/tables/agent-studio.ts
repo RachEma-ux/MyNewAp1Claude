@@ -1195,3 +1195,82 @@ export const agsMcpTransitions = pgTable(
   })
 );
 
+
+// ── Plan v3 Phase 11 — Provider/Model Binding ─────────────────────────────
+//
+// Migration spec: docs/architecture/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION.md
+//
+// This table replaces the legacy `ags_agent_drafts.provider_config` jsonb
+// shape (raw apiKey / apiKeyEnvVar). Columns mirror migration spec §3.1.
+//
+// Critical invariants:
+//   - NO secret-shaped column. Credentials live exclusively in
+//     `provider_secrets` (Provider Connections module). Phase 12's lint
+//     enforces this on every write call site.
+//   - `providerConnectionId` may be NULL only when status='legacy_unresolved'
+//     OR when the provider kind is local (Ollama/llama.cpp).
+//   - `legacyEnvVarHint` carries the env var NAME captured during migration,
+//     never the value. It is non-secret by definition.
+//
+export const agsAgentProviderBindings = pgTable(
+  "ags_agent_provider_bindings",
+  {
+    id: serial("id").primaryKey(),
+
+    workspaceId: integer("workspace_id").notNull(),
+    agentId: integer("agent_id").notNull(),
+    draftId: integer("draft_id").notNull(),
+    /**
+     * Plan v3 §3.1 — Phase 11 ships with role values:
+     *   "primary"   — the agent's chat/reasoning model (default)
+     *   "tools"     — tool-calling model (Phase 11+ multi-role; reserved)
+     *   "embedding" — embedding model (Phase 11+ multi-role; reserved)
+     */
+    role: varchar("role", { length: 32 }).notNull().default("primary"),
+
+    providerCatalogEntryId: integer("provider_catalog_entry_id"),
+    modelCatalogEntryId: integer("model_catalog_entry_id"),
+    providerConnectionId: integer("provider_connection_id"),
+    modelRef: varchar("model_ref", { length: 255 }).notNull(),
+
+    /**
+     * Plan v3 §3.2 — `binding_v1` | `legacy_unresolved` | `disabled` | `archived`.
+     * Stored as varchar so future status values can be added without
+     * a migration; the application layer enforces the enum.
+     */
+    status: varchar("status", { length: 32 }).notNull().default("binding_v1"),
+    /**
+     * Plan v3 §3.3 — `legacy_raw_api_key` | `legacy_env_var` |
+     * `legacy_no_credential` | `provider_slug_unknown` | `migration_skipped` | NULL.
+     */
+    statusReason: varchar("status_reason", { length: 64 }),
+
+    /**
+     * Non-secret env var NAME captured during Phase 10 migration. Set ONLY
+     * when statusReason='legacy_env_var'; null otherwise.
+     */
+    legacyEnvVarHint: varchar("legacy_env_var_hint", { length: 255 }),
+
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftRoleIdx: uniqueIndex("uniq_ags_agent_provider_bindings_draft_role").on(
+      t.draftId,
+      t.role,
+    ),
+    workspaceAgentIdx: index("idx_ags_agent_provider_bindings_ws_agent").on(
+      t.workspaceId,
+      t.agentId,
+    ),
+    providerConnectionIdx: index(
+      "idx_ags_agent_provider_bindings_provider_connection",
+    ).on(t.providerConnectionId),
+    statusIdx: index("idx_ags_agent_provider_bindings_status").on(t.status),
+  }),
+);
+
+export type AgsAgentProviderBinding = typeof agsAgentProviderBindings.$inferSelect;
+export type InsertAgsAgentProviderBinding =
+  typeof agsAgentProviderBindings.$inferInsert;
