@@ -1952,11 +1952,19 @@ const chatRouter = router({
       z.object({
         sessionId: z.number().int().positive(),
         userMessage: z.string().min(1),
+        // Plan v3 Phase 17 — used by the binding-driven Model Access
+        // path to stamp the call with the correct workspace. Optional
+        // for backward compat; defaults to the demo-workspace constant
+        // inside the service.
+        workspaceId: z.number().int().positive().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { sendChatMessage } = await import("../services/chat");
-      return sendChatMessage(input);
+      return sendChatMessage(
+        { sessionId: input.sessionId, userMessage: input.userMessage },
+        { workspaceId: input.workspaceId, actorId: ctx.user.id },
+      );
     }),
   deleteSession: protectedProcedure
     .input(z.object({ sessionId: z.number().int().positive() }))

@@ -38,6 +38,13 @@ import { resolveProviderApiKey } from "../adapters/openllm-runtime-adapter";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
 import { getSnapshot } from "./mcp/registry";
 import type { Message } from "../../providers/types";
+import { getAgentProviderBinding } from "../bindings";
+import { gatewayCall } from "../../platform/modules/module-gateway";
+import type {
+  ModelAccessExecuteInput,
+  ModelAccessMessage,
+  ModelAccessResult,
+} from "../../openrouter/model-access/types";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -372,14 +379,173 @@ export async function startChatSession(input: {
 }
 
 /**
+ * Plan v3 Phase 17 — binding-driven Expert chat path.
+ *
+ * Resolves the agent's provider/model binding, then sends the
+ * conversation through `openRouter.modelAccess.execute` via the
+ * platform gateway. Closes LR-01 for binding-equipped agents:
+ * Agent Studio never sees a raw key — Model Access pulls the
+ * credential through `withProviderCredential` inside the OpenRouter
+ * boundary, and only the no-secret reference projection crosses the
+ * module wire.
+ *
+ * Scope (intentional):
+ *   - No-tools path only. Tool-call round-tripping requires Model
+ *     Access to expose `toolCalls` on the result + a typed tool
+ *     schema on the input, which is Phase 18 work (per
+ *     `model-access/types.ts:35-44`). For agents with attached MCP
+ *     tools, `sendChatMessage` keeps using the legacy tool-loop
+ *     until that lands.
+ *   - Hosted-provider bindings only. Local-provider bindings
+ *     (`providerConnectionId=null`) still flow through the legacy
+ *     path — Model Access has no local adapter yet.
+ *
+ * Returns the same SendChatMessageResult shape as the legacy path
+ * so the caller (the tRPC mutation) doesn't need to branch on which
+ * path served the request.
+ */
+async function sendChatMessageViaBinding(
+  input: SendChatMessageInput,
+  ctx: {
+    sessionId: number;
+    agentId: number;
+    draftId: number;
+    workspaceId: number;
+    actorId: number;
+    systemPrompt: string;
+    sessionTitle: string | null;
+  },
+): Promise<SendChatMessageResult> {
+  const binding = await getAgentProviderBinding(ctx.draftId, "primary");
+  if (!binding) {
+    return {
+      ok: false,
+      error: "No provider binding configured for this agent. Open the binding picker first.",
+    };
+  }
+  if (binding.status !== "binding_v1") {
+    return {
+      ok: false,
+      error: `Binding status is "${binding.status}" — resolve via the picker before chatting.`,
+    };
+  }
+  if (binding.providerConnectionId === null) {
+    return {
+      ok: false,
+      error:
+        "Local-provider bindings can't yet route through Model Access. Use a hosted Provider Connection or wait for the Phase 18 chat upgrade.",
+    };
+  }
+
+  const history = await repo.listChatMessages(input.sessionId);
+  const messages: ModelAccessMessage[] = [
+    { role: "system", content: ctx.systemPrompt },
+    ...history
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map<ModelAccessMessage>((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+  ];
+
+  const executeInput: ModelAccessExecuteInput = {
+    providerConnectionId: binding.providerConnectionId,
+    modelRef: binding.modelRef,
+    messages,
+    intent: "chat",
+    workspaceId: ctx.workspaceId,
+    actorId: ctx.actorId,
+  };
+
+  let result: ModelAccessResult;
+  try {
+    result = await gatewayCall<ModelAccessExecuteInput, ModelAccessResult>({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.execute",
+        actorId: ctx.actorId,
+        workspaceId: ctx.workspaceId,
+      },
+      input: executeInput,
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  if (result.status !== "ok" || result.output == null) {
+    return {
+      ok: false,
+      error: result.error ?? "Model Access returned status=error",
+    };
+  }
+
+  const inputTokens = result.usage?.inputTokens ?? 0;
+  const outputTokens = result.usage?.outputTokens ?? 0;
+  // Cost is not surfaced by Model Access in Phase 4 — leave as 0
+  // (Phase 19+ feeds usage rollup into pricing). The session totals
+  // will accumulate accurately for token counts even without cost.
+  const costMicrocents = 0;
+  const durationMs = result.latencyMs;
+
+  const assistantRow = await repo.appendChatMessage({
+    sessionId: input.sessionId,
+    role: "assistant",
+    content: result.output,
+    inputTokens,
+    outputTokens,
+    costMicrocents,
+    model: binding.modelRef,
+    durationMs,
+  });
+
+  const autoTitle =
+    !ctx.sessionTitle && input.userMessage
+      ? input.userMessage.slice(0, 60).trim()
+      : undefined;
+  await repo.bumpChatSessionTotals({
+    sessionId: input.sessionId,
+    addInputTokens: inputTokens,
+    addOutputTokens: outputTokens,
+    addCostMicrocents: costMicrocents,
+    addMessages: 2,
+    title: autoTitle,
+  });
+
+  return {
+    ok: true,
+    assistantMessage: {
+      id: assistantRow.id,
+      content: result.output,
+      inputTokens,
+      outputTokens,
+      costMicrocents,
+      durationMs,
+      model: binding.modelRef,
+    },
+  };
+}
+
+/**
  * Send a user message in an existing chat session, get the
  * assistant's response, persist both, and return the assistant
  * message. Errors are returned in the result shape rather than
  * thrown so the caller can surface them in the UI without a
  * separate error-handling code path.
+ *
+ * Plan v3 Phase 17 routing:
+ *   - If the agent has a `binding_v1` binding to a hosted provider
+ *     AND no MCP tools are attached, the call routes through
+ *     `sendChatMessageViaBinding` (Model Access). NO raw key in
+ *     Agent Studio.
+ *   - Otherwise (no binding, local-provider binding, or tool-equipped
+ *     agent), falls back to the legacy direct-OpenAI path. The
+ *     LR-01 surface shrinks to those cases until Phase 18 lifts the
+ *     tool-loop into Model Access.
  */
 export async function sendChatMessage(
-  input: SendChatMessageInput
+  input: SendChatMessageInput,
+  options: { workspaceId?: number; actorId?: number } = {},
 ): Promise<SendChatMessageResult> {
   // 1. Load the session + its parent agent's draft
   const session = await repo.getChatSessionById(input.sessionId);
@@ -401,6 +567,47 @@ export async function sendChatMessage(
     role: "user",
     content: input.userMessage,
   });
+
+  // Build the system prompt up-front — needed by both the binding path
+  // (Phase 17) and the legacy path.
+  const systemPromptForBinding =
+    [draft.systemInstructions, draft.roleInstructions]
+      .filter((s): s is string => typeof s === "string" && s.length > 0)
+      .join("\n\n") || "You are a helpful assistant.";
+
+  // Plan v3 Phase 17: prefer the binding-driven Model Access path
+  // when (a) a binding_v1 row exists for this draft, and (b) the
+  // agent has NO attached MCP tools (tool-call round-tripping requires
+  // Phase 18's tool schema on Model Access).
+  //
+  // Falls through to the legacy OpenAI-direct path on any "not yet
+  // routable" condition (no binding, local-provider binding, tool-loop
+  // required) — same behavior as before, but the LR-01 surface
+  // shrinks to those cases.
+  try {
+    const candidateBinding = await getAgentProviderBinding(draft.id, "primary");
+    const toolSpecsForRouting = await buildToolsForDraft(draft.id);
+    const canUseBindingPath =
+      candidateBinding !== null &&
+      candidateBinding.status === "binding_v1" &&
+      candidateBinding.providerConnectionId !== null &&
+      toolSpecsForRouting.length === 0;
+    if (canUseBindingPath) {
+      return sendChatMessageViaBinding(input, {
+        sessionId: input.sessionId,
+        agentId: session.agentId,
+        draftId: draft.id,
+        workspaceId: options.workspaceId ?? 1,
+        actorId: options.actorId ?? 1,
+        systemPrompt: systemPromptForBinding,
+        sessionTitle: session.title ?? null,
+      });
+    }
+  } catch {
+    // Routing probe failed — never block on a probe; fall through to
+    // the legacy path below. The legacy path is its own complete
+    // implementation and doesn't depend on the binding probe.
+  }
 
   // 3. Resolve the provider config — always read from the LIVE draft,
   //    not the session's frozen snapshot.
