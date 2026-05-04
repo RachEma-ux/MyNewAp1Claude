@@ -46,6 +46,7 @@ import type {
   ModelAccessResult,
   ModelAccessToolCall,
 } from "../../openrouter/model-access/types";
+import { evaluateProviderUsePolicy } from "./provider-use-governance";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -407,11 +408,34 @@ async function runChatWithToolsViaBinding(input: {
   actorId: number;
   temperature: number;
   maxTokens?: number;
+  /** Plan v3 Phase 21 — passed through so the policy gate has refs. */
+  binding: import("../bindings").AgentProviderBindingPublic;
 }) {
   const dispatchKeyByOpenaiName = new Map<string, string>(
     input.tools.map((t) => [t.openaiName, t.dispatchKey]),
   );
   const toolSchemas = input.tools.map((t) => t.schema);
+
+  // Plan v3 Phase 21 — provider-use governance. Scan the static
+  // history once at loop entry; subsequent turns only add server-
+  // controlled tool outputs, so a re-scan would be redundant.
+  {
+    const initialHistory = await repo.listChatMessages(input.sessionId);
+    const initialMessages = [
+      { role: "system", content: input.systemPrompt },
+      ...initialHistory.map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content : "",
+      })),
+    ];
+    const policy = await evaluateProviderUsePolicy({
+      binding: input.binding,
+      messages: initialMessages,
+    });
+    if (policy.ok === false) {
+      throw new Error(`${policy.reason}: ${policy.detail}`);
+    }
+  }
 
   const startMs = Date.now();
   let cumulativeInputTokens = 0;
@@ -678,6 +702,18 @@ async function sendChatMessageViaBinding(
       })),
   ];
 
+  // Plan v3 Phase 21 — provider-use governance.
+  const policy = await evaluateProviderUsePolicy({
+    binding,
+    messages,
+  });
+  if (policy.ok === false) {
+    return {
+      ok: false,
+      error: `${policy.reason}: ${policy.detail}`,
+    };
+  }
+
   const executeInput: ModelAccessExecuteInput = {
     providerConnectionId: binding.providerConnectionId,
     modelRef: binding.modelRef,
@@ -859,6 +895,7 @@ export async function sendChatMessage(
             actorId: actor,
             temperature: tempForLoop,
             maxTokens: maxTokensForLoop,
+            binding: candidateBinding,
           });
           const postCount = (await repo.listChatMessages(input.sessionId))
             .length;

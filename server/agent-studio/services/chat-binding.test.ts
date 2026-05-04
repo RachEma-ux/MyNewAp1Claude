@@ -27,6 +27,18 @@ vi.mock("../bindings", () => ({
   getAgentProviderBinding: vi.fn(),
 }));
 
+vi.mock("../../provider-connections/public-api", () => ({
+  // Phase 21 — provider-use governance calls getBindingEligibility
+  // unless the caller passes skipEligibilityCheck. Default ok=true
+  // so the existing chat-binding tests don't fail on the new gate.
+  getBindingEligibility: vi.fn(async () => ({
+    providerConnectionId: 42,
+    ok: true,
+    lifecycleStatus: "active",
+    healthStatus: "ok",
+  })),
+}));
+
 vi.mock("../../platform/modules/module-gateway", () => ({
   gatewayCall: vi.fn(),
 }));
