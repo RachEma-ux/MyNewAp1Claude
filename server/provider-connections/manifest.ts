@@ -79,6 +79,16 @@ export const providerConnectionsManifest: ModuleManifest = {
       risk: "high",
       receiptRequired: true,
     },
+    // Plan v3 Phase 8 — binding-creation gate. Read-only; returns the
+    // typed eligibility result. Agent Studio binding writers (Phase 11+)
+    // call this before persisting a binding.
+    {
+      key: "providerConnections.getBindingEligibility",
+      description:
+        "Check whether a provider connection may be bound for runtime use (no credentials returned)",
+      risk: "low",
+      receiptRequired: false,
+    },
   ],
 
   routes: [{ path: "/providers/connections", label: "Provider Connections" }],
@@ -118,6 +128,7 @@ export const providerConnectionsManifest: ModuleManifest = {
       listActiveForProvider,
       getConnectionStatus,
       validateConnection,
+      getBindingEligibility,
     } = await import("./public-api");
 
     registerPublicApi({
@@ -166,6 +177,23 @@ export const providerConnectionsManifest: ModuleManifest = {
         key: "providerConnections.validateConnection",
         description:
           "Validate that a provider connection is active and has a stored secret. Reference-shape validation only — no upstream HTTP probe (that lives at openRouter.modelAccess.validateBinding).",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    // Plan v3 Phase 8 — binding-creation gate.
+    registerPublicApi({
+      module: "providerConnections",
+      action: "providerConnections.getBindingEligibility",
+      handler: async (input) => {
+        const payload = input as { providerConnectionId: number };
+        return getBindingEligibility(payload);
+      },
+      descriptor: {
+        key: "providerConnections.getBindingEligibility",
+        description:
+          "Check whether a provider connection may be bound for runtime use (no credentials returned)",
         risk: "low",
         receiptRequired: false,
       },

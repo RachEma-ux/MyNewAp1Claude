@@ -158,14 +158,15 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 8 — Provider Connections active connection contract
 
-- [ ] Add public read action `providerConnections.listActiveForProvider`.
-- [ ] Return only active/validated references.
-- [ ] Mark active as selectable.
-- [ ] Mark validated as visible but not selectable for runtime binding.
-- [ ] Hide or degrade disabled/failed in selection UI.
-- [ ] Reject binding creation unless connection is active.
-- [ ] Allow unknown health only as `degraded` with `provider_health_unknown`.
-- [ ] Add tests.
+- [x] Add public read action `providerConnections.listActiveForProvider`. *(landed in Phase 2 — Phase 8 adds the `selectable` + `degradedReason` fields to the returned ref)*
+- [x] Return only active/validated references. *(`VISIBLE_LIFECYCLE_STATUSES = ["active","validated"]` — disabled/failed filtered at the SELECT)*
+- [x] Mark active as selectable. *(`selectable = lifecycleStatus === "active" && healthStatus !== "unreachable"`)*
+- [x] Mark validated as visible but not selectable for runtime binding. *(validated rows return with `selectable: false`; binding-eligibility maps to reason `validated_only`)*
+- [x] Hide or degrade disabled/failed in selection UI. *(disabled/failed: filtered out of `listActiveForProvider`; unreachable: returned with `selectable: false`)*
+- [x] Reject binding creation unless connection is active. *(new `getBindingEligibility(input)` gate — returns typed `BindingEligibilityResult` with reason codes `not_found` | `not_active` | `validated_only` | `secret_missing` | `health_failed`; Agent Studio binding writers in Phase 11+ MUST call before persisting a binding)*
+- [x] Allow unknown health only as `degraded` with `provider_health_unknown`. *(active+unknown returns `ok=true` with `degradedReason="provider_health_unknown"`; Phase 8 contract: unknown is permitted, surfaces as warning, not a blocker)*
+- [x] Add tests. *(8 vitest cases in `binding-eligibility.test.ts` covering all branches; existing `public-api.test.ts` extended for the two new fields — 15/15 pass)*
+- [x] Register `providerConnections.getBindingEligibility` gateway action. *(low-risk, no receipt; `governance/action-key-map.ts` updated — 67 -> 68 actions, all covered)*
 
 ---
 

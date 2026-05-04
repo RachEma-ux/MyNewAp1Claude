@@ -69,6 +69,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "providerConnections.healthCheck": "providerConnection.healthCheck",
   "providerConnections.rotate": "providerConnection.rotate",
   "providerConnections.delete": "providerConnection.delete",
+  "providerConnections.getBindingEligibility": "providerConnections.getBindingEligibility",
 
   // ── Chat ─────────────────────────────────────────────────────────────────
   "chat.send": "chat.send",
