@@ -429,6 +429,10 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "openRouter.playground.chat": "openRouter.playground.execute",
   "openRouter.playground.embedding": "openRouter.playground.execute",
   "openRouter.playground.structured": "openRouter.playground.execute",
+  // Plan v3 Phase 4: Model Access facade gateway actions.
+  "openRouter.modelAccess.execute": "openRouter.modelAccess.execute",
+  "openRouter.modelAccess.stream": "openRouter.modelAccess.stream",
+  "openRouter.modelAccess.validateBinding": "openRouter.modelAccess.validateBinding",
 
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
