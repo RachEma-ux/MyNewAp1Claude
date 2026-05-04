@@ -279,12 +279,12 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 17 — Agent Studio Expert chat through Model Access
 
-- [ ] Identify current Agent Studio Expert chat path.
-- [ ] Replace direct SDK/key access with Model Access.
-- [ ] Preserve streaming if current UX streams.
-- [ ] Preserve tool-call support.
-- [ ] Ensure no raw key in Agent Studio.
-- [ ] Add tests.
+- [x] Identify current Agent Studio Expert chat path. *(`server/agent-studio/services/chat.ts:sendChatMessage` was the LR-01 caller — used `resolveProviderApiKey` + `new OpenAI({apiKey})` for the no-tools path and `runChatWithTools` for the tool-loop path)*
+- [x] Replace direct SDK/key access with Model Access. *(new `sendChatMessageViaBinding` calls `openRouter.modelAccess.execute` via `gatewayCall`; chat history is converted to `ModelAccessMessage[]`; intent stamped as `"chat"`. The legacy direct-OpenAI path remains as a fallback for non-binding agents.)*
+- [x] Preserve streaming if current UX streams. *(MVP chat is non-streaming per the chat.ts docstring; no streaming regression. Phase 18 will add streaming when Model Access tool-call schema lands.)*
+- [x] Preserve tool-call support. *(tool-loop path unchanged; routing only takes the binding path when `buildToolsForDraft(draft.id).length === 0`. Tool-equipped agents still flow through `runChatWithTools` until Model Access tool schema lands in Phase 18.)*
+- [x] Ensure no raw key in Agent Studio. *(for binding-equipped no-tool agents — the dominant Expert chat shape — Agent Studio never sees a raw key; Model Access pulls credentials inside its D2 boundary via `withProviderCredential`. LR-01 surface shrunk; register entry flipped to `in_progress` with the Phase 18 follow-up tracked.)*
+- [x] Add tests. *(`chat-binding.test.ts`: 5 cases — binding routes through Model Access; Model Access error surfaces; null-PCID falls through; missing binding falls through; legacy_unresolved falls through. Plus the existing chat.ts tests still cover the legacy path.)*
 
 ### Phase 18 — `runChatWithTools` through Model Access
 

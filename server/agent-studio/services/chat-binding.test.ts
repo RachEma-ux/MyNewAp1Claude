@@ -1,0 +1,207 @@
+/**
+ * Phase 17 — Expert chat binding routing tests.
+ *
+ * Asserts that `sendChatMessage` prefers the Model-Access (binding)
+ * path when the agent has a `binding_v1` row to a hosted Provider
+ * Connection AND no MCP tools are attached, and falls back to the
+ * legacy direct-OpenAI path on every other shape.
+ *
+ * The tests mock the repository, the binding read, the gateway, the
+ * MCP registry snapshot, and the dynamic OpenAIProvider import. The
+ * goal is to lock down the routing logic, NOT to exercise Model Access
+ * internals (covered by OpenRouter Phase 4 unit tests).
+ */
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("../repository", () => ({
+  getChatSessionById: vi.fn(),
+  getCurrentDraft: vi.fn(),
+  appendChatMessage: vi.fn(),
+  listChatMessages: vi.fn(),
+  bumpChatSessionTotals: vi.fn(),
+  listMcpServers: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock("../bindings", () => ({
+  getAgentProviderBinding: vi.fn(),
+}));
+
+vi.mock("../../platform/modules/module-gateway", () => ({
+  gatewayCall: vi.fn(),
+}));
+
+vi.mock("./mcp/registry", () => ({
+  getSnapshot: vi.fn(() => ({ servers: [] })),
+}));
+
+vi.mock("./mcp/dispatcher", () => ({
+  dispatchMcpToolCall: vi.fn(),
+}));
+
+vi.mock("../adapters/openllm-runtime-adapter", () => ({
+  resolveProviderApiKey: vi.fn(() => undefined),
+}));
+
+import * as repo from "../repository";
+import { getAgentProviderBinding } from "../bindings";
+import { gatewayCall } from "../../platform/modules/module-gateway";
+import { sendChatMessage } from "./chat";
+
+const mockedRepo = repo as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const mockedBinding = getAgentProviderBinding as unknown as ReturnType<
+  typeof vi.fn
+>;
+const mockedGateway = gatewayCall as unknown as ReturnType<typeof vi.fn>;
+
+function bindingPublic(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    workspaceId: 1,
+    agentId: 1,
+    draftId: 1,
+    role: "primary",
+    providerCatalogEntryId: 10,
+    modelCatalogEntryId: 20,
+    providerConnectionId: 42,
+    modelRef: "gpt-4o-mini",
+    status: "binding_v1" as const,
+    statusReason: null,
+    legacyEnvVarHint: null,
+    lastValidatedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+function defaultSession() {
+  return { id: 1, agentId: 1, title: null };
+}
+
+function defaultDraft() {
+  return {
+    id: 1,
+    agentId: 1,
+    systemInstructions: "Be helpful",
+    roleInstructions: null,
+    providerConfig: { provider: "openai", model: "gpt-4o-mini" },
+  };
+}
+
+beforeEach(() => {
+  for (const fn of Object.values(mockedRepo)) fn.mockReset?.();
+  mockedBinding.mockReset();
+  mockedGateway.mockReset();
+
+  mockedRepo.getChatSessionById.mockResolvedValue(defaultSession());
+  mockedRepo.getCurrentDraft.mockResolvedValue(defaultDraft());
+  mockedRepo.appendChatMessage.mockResolvedValue({ id: 99 });
+  mockedRepo.listChatMessages.mockResolvedValue([
+    { role: "user", content: "Hi" },
+  ]);
+  mockedRepo.bumpChatSessionTotals.mockResolvedValue(undefined);
+  mockedRepo.listMcpServers.mockResolvedValue([]);
+});
+
+describe("sendChatMessage — binding path (Phase 17)", () => {
+  it("routes through Model Access when binding_v1 + hosted PCID + no tools", async () => {
+    mockedBinding.mockResolvedValue(bindingPublic());
+    mockedGateway.mockResolvedValue({
+      status: "ok",
+      output: "Hello back",
+      providerConnectionId: 42,
+      modelRef: "gpt-4o-mini",
+      latencyMs: 90,
+      usage: { inputTokens: 12, outputTokens: 4, totalTokens: 16 },
+    });
+
+    const r = await sendChatMessage(
+      { sessionId: 1, userMessage: "Hi" },
+      { workspaceId: 7, actorId: 11 },
+    );
+
+    expect(r.ok).toBe(true);
+    expect(r.assistantMessage?.content).toBe("Hello back");
+    expect(r.assistantMessage?.inputTokens).toBe(12);
+    expect(r.assistantMessage?.outputTokens).toBe(4);
+    expect(r.assistantMessage?.model).toBe("gpt-4o-mini");
+
+    expect(mockedGateway).toHaveBeenCalledTimes(1);
+    const call = mockedGateway.mock.calls[0][0];
+    expect(call.ctx.targetModule).toBe("openRouter");
+    expect(call.ctx.actionKey).toBe("openRouter.modelAccess.execute");
+    expect(call.ctx.workspaceId).toBe(7);
+    expect(call.ctx.actorId).toBe(11);
+    expect(call.input.providerConnectionId).toBe(42);
+    expect(call.input.modelRef).toBe("gpt-4o-mini");
+    expect(call.input.intent).toBe("chat");
+    // System message + the persisted user message
+    expect(call.input.messages.length).toBeGreaterThanOrEqual(2);
+    expect(call.input.messages[0].role).toBe("system");
+  });
+
+  it("returns Model Access error verbatim", async () => {
+    mockedBinding.mockResolvedValue(bindingPublic());
+    mockedGateway.mockResolvedValue({
+      status: "error",
+      providerConnectionId: 42,
+      modelRef: "gpt-4o-mini",
+      latencyMs: 30,
+      error: "upstream 503",
+    });
+
+    const r = await sendChatMessage(
+      { sessionId: 1, userMessage: "Hi" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain("upstream 503");
+  });
+
+  it("rejects local-provider bindings (providerConnectionId=null)", async () => {
+    mockedBinding.mockResolvedValue(
+      bindingPublic({ providerConnectionId: null, modelRef: "llama3.1:8b" }),
+    );
+
+    const r = await sendChatMessage(
+      { sessionId: 1, userMessage: "Hi" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    // Should fall through to legacy path (no gateway call), and the
+    // legacy path will fail because resolveProviderApiKey is mocked
+    // to return undefined. The point of this test is that the gateway
+    // is NOT called for a null-PCID binding.
+    expect(mockedGateway).not.toHaveBeenCalled();
+    expect(r.ok).toBe(false);
+  });
+
+  it("falls through to legacy path when no binding row exists", async () => {
+    mockedBinding.mockResolvedValue(null);
+
+    await sendChatMessage(
+      { sessionId: 1, userMessage: "Hi" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    expect(mockedGateway).not.toHaveBeenCalled();
+  });
+
+  it("falls through to legacy path when binding is legacy_unresolved", async () => {
+    mockedBinding.mockResolvedValue(
+      bindingPublic({
+        status: "legacy_unresolved",
+        statusReason: "legacy_env_var",
+      }),
+    );
+
+    await sendChatMessage(
+      { sessionId: 1, userMessage: "Hi" },
+      { workspaceId: 1, actorId: 1 },
+    );
+
+    expect(mockedGateway).not.toHaveBeenCalled();
+  });
+});
