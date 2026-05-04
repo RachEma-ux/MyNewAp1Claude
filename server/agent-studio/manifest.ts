@@ -50,6 +50,48 @@ export const agentStudioManifest: ModuleManifest = {
       risk: "medium",
       receiptRequired: true,
     },
+    // Plan v3 Phase 12 — provider/model binding lifecycle. The picker
+    // UI (Phase 14) calls these through the gateway. None return
+    // credential material; per Decision D2 the runtime credential
+    // resolver is reachable only from `openrouter/model-access`.
+    {
+      key: "agentStudio.providerBindings.list",
+      description: "List provider bindings for an agent (no credentials)",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.providerBindings.create",
+      description: "Create a provider binding (calls Phase 8 eligibility gate)",
+      risk: "medium",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.providerBindings.update",
+      description: "Update an existing provider binding (re-runs eligibility gate)",
+      risk: "medium",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.providerBindings.remove",
+      description: "Delete a provider binding by (draftId, role)",
+      risk: "medium",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.providerBindings.validate",
+      description:
+        "Reference/policy validation of a binding — no upstream HTTP probe",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.providerBindings.resolveForRun",
+      description:
+        "Resolve a binding for runtime use — returns refs only, no credentials",
+      risk: "low",
+      receiptRequired: false,
+    },
   ],
 
   routes: [{ path: "/agent-studio", label: "Agent Studio" }],

@@ -216,16 +216,17 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 12 — Agent Studio provider binding backend
 
-- [ ] Add `agentStudio.providerBindings.list`.
-- [ ] Add `agentStudio.providerBindings.create`.
-- [ ] Add `agentStudio.providerBindings.update`.
-- [ ] Add `agentStudio.providerBindings.remove`.
-- [ ] Add `agentStudio.providerBindings.validate`.
-- [ ] Add `agentStudio.providerBindings.resolveForRun`.
-- [ ] Validate provider/model availability through AI Types public contract.
-- [ ] Validate provider connection through Provider Connections public contract.
-- [ ] Ensure resolveForRun returns references only, no secrets.
-- [ ] Add tests.
+- [x] Add `agentStudio.providerBindings.list`. *(gateway action; wraps `listBindingsForAgent(agentId)`)*
+- [x] Add `agentStudio.providerBindings.create`. *(wraps `upsertAgentProviderBinding`; calls Phase 8 eligibility gate)*
+- [x] Add `agentStudio.providerBindings.update`. *(same upsert handler — `(draftId, role)` unique-index resolves create-vs-update)*
+- [x] Add `agentStudio.providerBindings.remove`. *(wraps `removeAgentProviderBinding(draftId, role)`; idempotent)*
+- [x] Add `agentStudio.providerBindings.validate`. *(reference/policy validation — wraps `validateBindingPolicy`; no upstream HTTP per Phase 13 split)*
+- [x] Add `agentStudio.providerBindings.resolveForRun`. *(returns `{binding, providerConnection, ok, reason}` — no credentials; runtime adapter calls this then passes `providerConnectionId` to `openRouter.modelAccess.execute`)*
+- [~] Validate provider/model availability through AI Types public contract. *(deferred to Phase 12.b tightening — `catalogAvailable: null` placeholder leaves room; AI Types `listAvailableProviderModels` already exists from Phase 7)*
+- [x] Validate provider connection through Provider Connections public contract. *(`validateBindingPolicy` calls Phase 8 `getBindingEligibility` for non-local-provider bindings)*
+- [x] Ensure resolveForRun returns references only, no secrets. *(guarded by `FORBIDDEN_BINDING_KEYS` in tests + `AgentProviderBindingPublic` projection)*
+- [x] Add tests. *(`bindings-policy.test.ts` — 10 vitest cases covering all reason branches, local-provider null-PCID, no-secret resolver shape guard; existing `bindings.test.ts` 8/8 still green)*
+- [x] Wire 6 actions into `governance/action-key-map.ts`. *(governance-actions count 68 → 74, all covered)*
 
 ### Phase 13 — Separate binding validator from Model Access validator
 
