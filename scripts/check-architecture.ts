@@ -25,6 +25,13 @@ const SUITES = [
     "scripts/check-provider-key-env-boundary.ts",
   ],
   ["check:governance-actions", "scripts/check-governance-actions.ts"],
+  // Plan v3 Phase 26 — AI Types public-API boundary check.
+  // Baseline-allow: known offenders in scripts/baseline/ai-types-public-api-boundary.txt
+  // are warnings; new violations fail the run.
+  [
+    "check:ai-types-public-api-boundary",
+    "scripts/check-ai-types-public-api-boundary.ts",
+  ],
   // Live-cluster role check — auto-skips when DATABASE_URL is unset, so
   // it's safe to include in the suite for local sandboxes.
   ["check:db-roles", "scripts/check-db-roles.ts"],

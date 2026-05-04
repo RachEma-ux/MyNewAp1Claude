@@ -395,14 +395,14 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 26 — AI Types public API boundary enforcement
 
-- [ ] Strip `server/db.ts:34` and `server/db/index.ts:19` barrel re-exports of `ai-types/db` (LA-01).
-- [ ] Migrate the 18 callers in `LA-02` to either `aiTypes.*` gateway actions or `ai-types/public-api.ts`.
-- [ ] Create `scripts/check-ai-types-public-api-boundary.ts`.
-- [ ] Block imports from AI Types private internals.
-- [ ] Allow only public API/gateway contracts.
-- [ ] Inventory residual legacy violations.
-- [ ] Add temporary exceptions with deadlines.
-- [ ] Add to architecture checks.
+- [ ] Strip `server/db.ts:34` and `server/db/index.ts:19` barrel re-exports of `ai-types/db` (LA-01). *(Deferred to Phase 26.1 — strip + caller migration in one coordinated PR. Phase 26 lands the lint that blocks any NEW transitive caller in the meantime.)*
+- [ ] Migrate the 18 callers in `LA-02` to either `aiTypes.*` gateway actions or `ai-types/public-api.ts`. *(Deferred to Phase 26.1 — full inventory baselined this PR; LR row updated `in_progress`.)*
+- [x] Create `scripts/check-ai-types-public-api-boundary.ts`. *(Baseline-allow mode — exempts the 21 known callers via `scripts/baseline/ai-types-public-api-boundary.txt`; fails on any new violation.)*
+- [x] Block imports from AI Types private internals. *(The lint flags imports of `ai-types/{db,service,service-runtime,execution,invoke,import-normalizer,projection,availability,publishing,legacy-import,register,router,boot}` from outside `server/ai-types/`.)*
+- [x] Allow only public API/gateway contracts. *(The lint's `PUBLIC_SURFACE` set is `{public-api, manifest, types, contracts, events, ports}` — matches `server/ai-types/public-api.ts`.)*
+- [x] Inventory residual legacy violations. *(21 entries in baseline file; 27 import lines warned.)*
+- [x] Add temporary exceptions with deadlines. *(LR registry LA-01 + LA-02 both updated to `in_progress` with deadline phase Phase 26.1.)*
+- [x] Add to architecture checks. *(`scripts/check-architecture.ts` includes the new check; `npm run check:architecture` runs it; output: "Failures: 0, Baseline warnings: 27, OK".)*
 
 ---
 
