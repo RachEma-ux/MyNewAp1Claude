@@ -22,6 +22,7 @@ import {
   refreshBindingValidation,
   resolveForRun,
 } from "../bindings";
+import { runTestWithBinding } from "../services/test-run-binding";
 import { gatewayCall } from "../../platform/modules/module-gateway";
 import { getCurrentDraft } from "../repository";
 
@@ -201,6 +202,44 @@ export const providerBindingsRouter = router({
     )
     .query(async ({ input }) => {
       return resolveForRun(input);
+    }),
+
+  /**
+   * Plan v3 Phase 16 — binding-driven test run. Resolves the binding,
+   * gates on Phase 15 staleness, then calls
+   * `openRouter.modelAccess.execute` via the platform gateway.
+   * Returns either the model output + usage + refs, or a structured
+   * failure with the policy/Model-Access reason. No credentials.
+   */
+  testRunWithBinding: protectedProcedure
+    .input(
+      z.object({
+        draftId: z.number().int().positive(),
+        role: z.string().min(1).max(32).optional(),
+        workspaceId: z.number().int().positive(),
+        prompt: z.string().min(1),
+        systemPrompt: z.string().optional(),
+        intent: z
+          .enum(["agent-test", "agent-run", "evaluation", "chat"])
+          .optional(),
+        temperature: z.number().min(0).max(2).optional(),
+        tokenBudget: z.number().int().positive().optional(),
+        correlationId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return runTestWithBinding({
+        draftId: input.draftId,
+        role: input.role,
+        workspaceId: input.workspaceId,
+        actorId: ctx.user.id,
+        prompt: input.prompt,
+        systemPrompt: input.systemPrompt,
+        intent: input.intent,
+        temperature: input.temperature,
+        tokenBudget: input.tokenBudget,
+        correlationId: input.correlationId,
+      });
     }),
 
   // ─── Picker option providers ─────────────────────────────────────
