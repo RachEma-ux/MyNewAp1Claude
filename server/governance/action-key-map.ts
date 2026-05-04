@@ -461,6 +461,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "om.position.assign": "om.position.assign",
   "cv.value.publish": "cv.value.publish",
   "aiTypes.catalog.publish": "aiTypes.catalog.publish",
+  "aiTypes.providerModels.listAvailable": "aiTypes.providerModels.listAvailable",
   "kgra.run.execute": "kgra.run.execute",
   "communication.conversation.create": "communication.conversation.create",
   "communication.conversation.delete": "communication.conversation.delete",
