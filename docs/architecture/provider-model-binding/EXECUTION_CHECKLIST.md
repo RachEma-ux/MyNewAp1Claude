@@ -356,15 +356,19 @@ Wired into:
 
 ### Phase 23 — Catalog schema verification/backfill
 
-- [ ] Verify catalog_entries has entryType.
-- [ ] Verify catalog_entries has sourceModule or equivalent.
-- [ ] Verify catalog_entries has sourceRefId or equivalent.
-- [ ] Decide mapping from legacy sourceType/sourceId.
-- [ ] Add `activeSourceVersionId` or metadata equivalent.
-- [ ] Add `legacyImport` fields or metadata.
-- [ ] Backfill legacy Agent Studio rows where possible.
-- [ ] Mark ambiguous legacy rows.
-- [ ] Add evidence report.
+- [x] Verify catalog_entries has entryType. *(present since 0000 — confirmed in `CATALOG_SOURCE_MAPPING.md` schema verification table.)*
+- [x] Verify catalog_entries has sourceModule or equivalent. *(`sourceType varchar(50)` is the canonical source-module pointer; conventions documented in `CATALOG_SOURCE_MAPPING.md`.)*
+- [x] Verify catalog_entries has sourceRefId or equivalent. *(`sourceId integer`.)*
+- [x] Decide mapping from legacy sourceType/sourceId. *(see `CATALOG_SOURCE_MAPPING.md` — table covers `ags_agent`, `ai_type`, `provider`, `model`, `bot`, `llm`, and `null` admin-created entries.)*
+- [x] Add `activeSourceVersionId` or metadata equivalent. *(new column `catalog_entries.active_source_version_id integer`; for Agent Studio-sourced entries it points at `ags_agent_releases.id`.)*
+- [x] Add `legacyImport` fields or metadata. *(new column `catalog_entries.legacy_import_state varchar(50)` with index; values: null, `legacy_imported`, `legacy_imported_unresolved`.)*
+- [ ] Backfill legacy Agent Studio rows where possible. *(deferred to Phase 24's backfill script — Phase 23 lands the schema; Phase 24 owns the data write.)*
+- [ ] Mark ambiguous legacy rows. *(same — Phase 24.)*
+- [x] Add evidence report. *(`docs/architecture/provider-model-binding/CATALOG_SOURCE_MAPPING.md` — schema verification table + sourceType conventions + legacy mapping rules + Phase 23 vs Phase 24 split.)*
+
+Tests: `server/ai-types/catalog-schema.test.ts` — 6 cases asserting every Phase 23 spec column exists in the Drizzle table definition.
+
+Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns + the `legacy_import_state` lookup index.
 
 ### Phase 24 — Existing Agent Studio catalog rows reconciliation
 
