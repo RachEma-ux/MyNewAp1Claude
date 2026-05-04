@@ -147,6 +147,7 @@ const DeploymentStatus = lazy(() => import("@/pages/DeploymentStatus"));
 const DeployPage = lazy(() => import("@/pages/DeployPage"));
 const CatalogManagePage = lazy(() => import("@/pages/CatalogManagePage"));
 const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
+const ASCandidatePage = lazy(() => import("@/pages/ASCandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
@@ -441,6 +442,7 @@ function Router() {
       <Route path="/llm/new-provider" component={() => <ProtectedRoute component={NewProviderPage} />} />
       <Route path="/llm/catalogue/manage" component={() => <ProtectedRoute component={CatalogManagePage} />} />
       <Route path="/llm/catalogue/candidate" component={() => <ProtectedRoute component={CandidatePage} />} />
+      <Route path="/llm/catalogue/as-candidates" component={() => <ProtectedRoute component={ASCandidatePage} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
       {/* Deploy Page */}

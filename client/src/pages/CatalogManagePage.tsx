@@ -804,7 +804,7 @@ export default function CatalogManagePage() {
             Create, edit, and manage catalog entries
           </p>
         </div>
-        <div className="flex gap-2 shrink-0 self-start">
+        <div className="flex flex-wrap gap-2 shrink-0 self-start">
           <Button onClick={() => setNewEntryPopupOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Entry
@@ -815,6 +815,13 @@ export default function CatalogManagePage() {
           >
             <UserCheck className="h-4 w-4 mr-2" />
             Candidate
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/llm/catalogue/as-candidates")}
+          >
+            <Bot className="h-4 w-4 mr-2" />
+            AS Candidates
           </Button>
         </div>
       </div>
