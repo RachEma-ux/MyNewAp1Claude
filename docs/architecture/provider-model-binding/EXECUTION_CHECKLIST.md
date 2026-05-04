@@ -230,11 +230,11 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 13 — Separate binding validator from Model Access validator
 
-- [ ] Define `agentStudio.providerBindings.validate` as reference/policy validation.
-- [ ] Define `openRouter.modelAccess.validateBinding` as runtime execution validation.
-- [ ] Document when each is called.
-- [ ] Rename UI labels to avoid confusion.
-- [ ] Add tests for both validators.
+- [x] Define `agentStudio.providerBindings.validate` as reference/policy validation. *(`docs/architecture/provider-model-binding/VALIDATOR_SPLIT.md` §1 — cheap, DB only, called on every save/render/run preflight)*
+- [x] Define `openRouter.modelAccess.validateBinding` as runtime execution validation. *(VALIDATOR_SPLIT.md §2 — network round-trip, called on operator-driven "Test connection")*
+- [x] Document when each is called. *(VALIDATOR_SPLIT.md §1.3, §2.3, §4 — explicit decision-flow diagram)*
+- [x] Rename UI labels to avoid confusion. *(VALIDATOR_SPLIT.md §3 — "validate" reserved for cheap policy check; "Test connection" / "Test new credential" for network probe; binding-row chips: Active / Degraded / Blocked)*
+- [x] Add tests for both validators. *(both already exist from Phase 4 + Phase 12 — VALIDATOR_SPLIT.md §5 cross-references the test files)*
 
 ### Phase 14 — Agent Studio provider binding UI
 
