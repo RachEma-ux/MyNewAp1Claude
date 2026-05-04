@@ -497,6 +497,10 @@ async function runChatWithToolsViaBinding(input: {
         actionKey: "openRouter.modelAccess.execute",
         actorId: input.actorId,
         workspaceId: input.workspaceId,
+        // Plan v3 Phase 20 — see RECEIPT_POLICY.md. Per-turn receipt
+        // id is fine for the tool-loop; Phase 21 will register a
+        // single receipt for the whole loop.
+        governanceReceiptId: `chat-tools-${input.sessionId}-t${turn}-${Date.now()}`,
       },
       input: executeInput,
     });
@@ -692,6 +696,13 @@ async function sendChatMessageViaBinding(
         actionKey: "openRouter.modelAccess.execute",
         actorId: ctx.actorId,
         workspaceId: ctx.workspaceId,
+        // Plan v3 Phase 20 — `intent="chat"` requires a governance
+        // receipt per RECEIPT_POLICY.md. We mint a per-message
+        // receipt id stitched from the session id + timestamp; the
+        // full receipts pipeline (Phase 21) will replace this with
+        // a registered receipt row, but the id-shape contract is
+        // stable in the meantime.
+        governanceReceiptId: `chat-${ctx.sessionId}-${Date.now()}`,
       },
       input: executeInput,
     });

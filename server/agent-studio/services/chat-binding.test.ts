@@ -142,6 +142,9 @@ describe("sendChatMessage — binding path (Phase 17)", () => {
     expect(call.input.providerConnectionId).toBe(42);
     expect(call.input.modelRef).toBe("gpt-4o-mini");
     expect(call.input.intent).toBe("chat");
+    // Plan v3 Phase 20: chat intent requires a governance receipt.
+    expect(typeof call.ctx.governanceReceiptId).toBe("string");
+    expect(call.ctx.governanceReceiptId).toMatch(/^chat-/);
     // System message + the persisted user message
     expect(call.input.messages.length).toBeGreaterThanOrEqual(2);
     expect(call.input.messages[0].role).toBe("system");
