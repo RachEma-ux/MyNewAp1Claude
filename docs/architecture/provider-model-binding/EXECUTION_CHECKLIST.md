@@ -203,14 +203,16 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 11 — Agent Studio binding schema/storage
 
-- [ ] Add ASDB table or JSON storage for provider bindings.
-- [ ] Include workspaceId, agentId, draftId, role.
-- [ ] Include providerCatalogEntryId, modelCatalogEntryId, providerConnectionId, modelRef.
-- [ ] Include status, statusReason.
-- [ ] Include createdBy, createdAt, updatedAt.
-- [ ] Do not include secret fields.
-- [ ] Add migration.
-- [ ] Add repository functions.
+- [x] Add ASDB table or JSON storage for provider bindings. *(`ags_agent_provider_bindings` in `drizzle/tables/agent-studio.ts`; ASDB-owned alongside the rest of `ags_*`)*
+- [x] Include workspaceId, agentId, draftId, role. *(role defaults to "primary"; multi-role values reserved)*
+- [x] Include providerCatalogEntryId, modelCatalogEntryId, providerConnectionId, modelRef. *(modelRef is non-null; the rest are nullable per the migration spec invariants)*
+- [x] Include status, statusReason. *(status enum: binding_v1 | legacy_unresolved | disabled | archived; statusReason maps to migration spec §3.3)*
+- [x] Include createdBy, createdAt, updatedAt.
+- [x] Do not include secret fields. *(no apiKey/pat/Authorization/x-api-key columns; `legacyEnvVarHint` carries env var NAME only — non-secret per migration spec §3.4)*
+- [x] Add migration. *(`drizzle/0035_agent_provider_bindings.sql` + journal entry idx 35; idempotent CREATE IF NOT EXISTS for table + 4 indexes)*
+- [x] Add repository functions. *(`server/agent-studio/bindings.ts` — `upsertAgentProviderBinding` (calls `getBindingEligibility` Phase 8 gate before persisting binding_v1; throws `BindingEligibilityError` on rejection; supports `enforceEligibility:false` escape-hatch for the migration script + local-provider null-credential path), `getAgentProviderBinding`, `listBindingsForAgent`)*
+- [x] Add public-shape no-secret guard. *(`AgentProviderBindingPublic` projection + `FORBIDDEN_BINDING_KEYS` cross-checked by tests)*
+- [x] Add tests. *(`server/agent-studio/bindings.test.ts` — 8 vitest cases: gate called for binding_v1, gate skipped for legacy_unresolved, gate skipped via enforceEligibility:false, local-provider null-PCID accepted, BindingEligibilityError thrown on rejection, idempotent update on existing draft+role, no-secret read shape guard)*
 
 ### Phase 12 — Agent Studio provider binding backend
 

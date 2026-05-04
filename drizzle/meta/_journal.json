@@ -239,6 +239,13 @@
       "when": 1778976000000,
       "tag": "0034_data_acquisition",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779062400000,
+      "tag": "0035_agent_provider_bindings",
+      "breakpoints": true
     }
   ]
 }
