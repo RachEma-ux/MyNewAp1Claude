@@ -102,9 +102,27 @@ export interface AgentProviderBindingPublic {
   status: AgentProviderBindingStatus;
   statusReason: AgentProviderBindingStatusReason | null;
   legacyEnvVarHint: string | null;
+  /**
+   * Plan v3 Phase 15 — last successful policy validation timestamp.
+   * Null means never validated since Phase 15 landed (treated as
+   * stale on first read).
+   */
+  lastValidatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/**
+ * Plan v3 Phase 15 — staleness threshold. A binding whose
+ * `lastValidatedAt` is older than this is treated as `degraded`
+ * with `validation_stale`. Default: 5 minutes (matches the
+ * Plan v3 Phase 15 spec). Tunable via env for tests.
+ */
+export const VALIDATION_STALENESS_MS = (() => {
+  const raw = process.env.PMB_VALIDATION_STALENESS_MS;
+  if (raw && /^\d+$/.test(raw)) return Number(raw);
+  return 5 * 60 * 1000;
+})();
 
 /**
  * Forbidden field list — same shape guard as Phase 7's catalog
@@ -149,6 +167,7 @@ function toPublicBinding(
     agentId: row.agentId,
     draftId: row.draftId,
     role: row.role,
+    lastValidatedAt: row.lastValidatedAt ?? null,
     providerCatalogEntryId: row.providerCatalogEntryId,
     modelCatalogEntryId: row.modelCatalogEntryId,
     providerConnectionId: row.providerConnectionId,
@@ -334,7 +353,9 @@ export type BindingPolicyReason =
   | "provider_connection_ineligible"
   | "model_not_available"
   | "legacy_unresolved"
-  | "binding_disabled";
+  | "binding_disabled"
+  /** Plan v3 Phase 15 — last validation older than VALIDATION_STALENESS_MS. */
+  | "validation_stale";
 
 export interface ValidateBindingPolicyResult {
   draftId: number;
@@ -349,6 +370,39 @@ export interface ValidateBindingPolicyResult {
    * consulted in this environment (e.g. test sandbox without DB).
    */
   catalogAvailable?: boolean | null;
+  /**
+   * Plan v3 Phase 15 — `lastValidatedAt` echoed back so the UI can
+   * render "Last validated at" without a second round-trip. Updated
+   * to `now` when this call sets ok=true.
+   */
+  lastValidatedAt?: Date | null;
+  /**
+   * Plan v3 Phase 15 — true iff the prior `lastValidatedAt` is older
+   * than VALIDATION_STALENESS_MS. Independent of `ok`; the caller
+   * decides whether stale-and-otherwise-ok counts as ok (see
+   * `staleAsDegraded`).
+   */
+  staleAtCallTime?: boolean;
+}
+
+export interface ValidateBindingPolicyOptions {
+  /**
+   * Plan v3 Phase 15. When true (default), refresh `lastValidatedAt`
+   * on a successful validation. When false (operator clicked "view
+   * status", we just want to read the stored timestamp), leave it
+   * untouched.
+   */
+  refreshTimestamp?: boolean;
+  /**
+   * When true (default), treat staleness as a blocker — a binding
+   * whose `lastValidatedAt` is older than VALIDATION_STALENESS_MS
+   * returns ok=false with reason=`validation_stale` UNLESS this call
+   * is itself going to refresh the timestamp (refreshTimestamp=true).
+   * The runtime preflight passes `staleAsDegraded: true`; the UI
+   * status chip passes `staleAsDegraded: false` to render a warning
+   * without blocking the picker.
+   */
+  staleAsDegraded?: boolean;
 }
 
 export interface ResolveForRunInput {
@@ -395,6 +449,15 @@ export interface ResolveForRunResult {
  * - Status must be `binding_v1` (`legacy_unresolved` / `disabled` blocked).
  * - For non-local-provider bindings: `getBindingEligibility` must pass.
  *
+ * Plan v3 Phase 15 — staleness:
+ *   - `staleAtCallTime` is computed against the row's `lastValidatedAt`.
+ *   - When `options.staleAsDegraded === true` (default for runtime
+ *     preflight) AND the row is stale, the call returns ok=false with
+ *     reason=`validation_stale` UNLESS the call itself is going to
+ *     refresh the timestamp (`refreshTimestamp !== false`).
+ *   - When the result is otherwise ok and `refreshTimestamp !== false`,
+ *     the row's `lastValidatedAt` is updated to `now`.
+ *
  * AI Types catalog availability is deferred to a future Phase 12.b
  * tightening — Phase 12 returns `catalogAvailable: null` when the
  * model catalog ref is missing, leaving room for a future opt-in
@@ -403,7 +466,11 @@ export interface ResolveForRunResult {
 export async function validateBindingPolicy(
   draftId: number,
   role: string = "primary",
+  options: ValidateBindingPolicyOptions = {},
 ): Promise<ValidateBindingPolicyResult> {
+  const refreshTimestamp = options.refreshTimestamp ?? true;
+  const staleAsDegraded = options.staleAsDegraded ?? true;
+
   const binding = await getAgentProviderBinding(draftId, role);
   if (!binding) {
     return {
@@ -413,12 +480,21 @@ export async function validateBindingPolicy(
       reason: "binding_not_found",
     };
   }
+
+  const priorValidatedAt = binding.lastValidatedAt ?? null;
+  const nowMs = Date.now();
+  const staleAtCallTime =
+    priorValidatedAt === null ||
+    nowMs - priorValidatedAt.getTime() > VALIDATION_STALENESS_MS;
+
   if (binding.status === "legacy_unresolved") {
     return {
       draftId,
       role,
       ok: false,
       reason: "legacy_unresolved",
+      lastValidatedAt: priorValidatedAt,
+      staleAtCallTime,
     };
   }
   if (binding.status === "disabled" || binding.status === "archived") {
@@ -427,6 +503,8 @@ export async function validateBindingPolicy(
       role,
       ok: false,
       reason: "binding_disabled",
+      lastValidatedAt: priorValidatedAt,
+      staleAtCallTime,
     };
   }
 
@@ -442,8 +520,37 @@ export async function validateBindingPolicy(
         ok: false,
         reason: "provider_connection_ineligible",
         eligibility,
+        lastValidatedAt: priorValidatedAt,
+        staleAtCallTime,
       };
     }
+  }
+
+  // Stale-as-degraded gate: only blocks when the caller will NOT
+  // refresh the timestamp itself. Runtime preflight passes
+  // staleAsDegraded=true with refreshTimestamp=false, blocking until
+  // an operator clicks Refresh in the UI.
+  if (staleAsDegraded && staleAtCallTime && !refreshTimestamp) {
+    return {
+      draftId,
+      role,
+      ok: false,
+      reason: "validation_stale",
+      eligibility,
+      lastValidatedAt: priorValidatedAt,
+      staleAtCallTime,
+    };
+  }
+
+  let writtenAt: Date | null = priorValidatedAt;
+  if (refreshTimestamp) {
+    const now = new Date();
+    const db = getAsDb();
+    await db
+      .update(agsAgentProviderBindings)
+      .set({ lastValidatedAt: now, updatedAt: now })
+      .where(eq(agsAgentProviderBindings.id, binding.id));
+    writtenAt = now;
   }
 
   return {
@@ -452,7 +559,25 @@ export async function validateBindingPolicy(
     ok: true,
     eligibility,
     catalogAvailable: null,
+    lastValidatedAt: writtenAt,
+    staleAtCallTime,
   };
+}
+
+/**
+ * Plan v3 Phase 15 — operator-triggered refresh. Wraps
+ * `validateBindingPolicy` with `refreshTimestamp=true,
+ * staleAsDegraded=false` so a stale-but-otherwise-ok binding flips
+ * back to fresh on a successful re-check.
+ */
+export async function refreshBindingValidation(
+  draftId: number,
+  role: string = "primary",
+): Promise<ValidateBindingPolicyResult> {
+  return validateBindingPolicy(draftId, role, {
+    refreshTimestamp: true,
+    staleAsDegraded: false,
+  });
 }
 
 /**
@@ -470,7 +595,12 @@ export async function resolveForRun(
   input: ResolveForRunInput,
 ): Promise<ResolveForRunResult> {
   const role = input.role ?? "primary";
-  const policy = await validateBindingPolicy(input.draftId, role);
+  // Runtime preflight: do NOT refresh `lastValidatedAt` (that requires
+  // an operator action), and DO treat staleness as degraded.
+  const policy = await validateBindingPolicy(input.draftId, role, {
+    refreshTimestamp: false,
+    staleAsDegraded: true,
+  });
   if (!policy.ok) {
     const binding = await getAgentProviderBinding(input.draftId, role);
     return {
@@ -489,6 +619,7 @@ export async function resolveForRun(
           status: "legacy_unresolved",
           statusReason: null,
           legacyEnvVarHint: null,
+          lastValidatedAt: null,
           createdAt: new Date(0),
           updatedAt: new Date(0),
         } satisfies AgentProviderBindingPublic),

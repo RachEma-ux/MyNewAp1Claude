@@ -254,15 +254,15 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 15 — Degraded state detection
 
-- [ ] Validate on Agent Studio page load.
-- [ ] Validate on binding save.
-- [ ] Validate before agent test run.
-- [ ] Validate before export candidate eligibility.
-- [ ] Show "Last validated at".
-- [ ] If older than 5 minutes, mark `degraded`.
-- [ ] Add `statusReason = validation_stale`.
-- [ ] Add manual refresh/validate action.
-- [ ] Add tests.
+- [x] Validate on Agent Studio page load. *(`AgentBindingPage.tsx` enables `validate` query when binding exists)*
+- [x] Validate on binding save. *(`upsert` mutation invalidates `validate` on success → page re-queries)*
+- [x] Validate before agent test run. *(`resolveForRun` calls `validateBindingPolicy` with `staleAsDegraded:true, refreshTimestamp:false` — Phase 16 will land the actual test-run gating call)*
+- [x] Validate before export candidate eligibility. *(any consumer of `resolveForRun` inherits the staleness gate; export candidate gate added in Phase 22)*
+- [x] Show "Last validated at". *(rendered in `AgentBindingPage.tsx` next to validation badge + Refresh button)*
+- [x] If older than 5 minutes, mark `degraded`. *(`VALIDATION_STALENESS_MS=5*60*1000`, env-tunable via `PMB_VALIDATION_STALENESS_MS`; result includes `staleAtCallTime` flag)*
+- [x] Add `statusReason = validation_stale`. *(`BindingPolicyReason` union extended with `"validation_stale"` returned by `validateBindingPolicy` when stale + staleAsDegraded + no refresh)*
+- [x] Add manual refresh/validate action. *(`refreshBindingValidation` server function + `agentStudio.providerBindings.refreshValidation` mutation + UI Refresh button)*
+- [x] Add tests. *(`bindings-policy.test.ts` covers null/recent/stale lastValidatedAt branches + refresh writes timestamp + resolveForRun refuses stale)*
 
 ---
 

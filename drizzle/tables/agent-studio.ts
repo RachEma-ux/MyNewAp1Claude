@@ -1251,6 +1251,15 @@ export const agsAgentProviderBindings = pgTable(
      */
     legacyEnvVarHint: varchar("legacy_env_var_hint", { length: 255 }),
 
+    /**
+     * Plan v3 Phase 15 — last successful policy validation timestamp.
+     * Set every time `validateBindingPolicy()` returns ok=true. The
+     * "degraded if older than 5 min" rule reads this column.
+     * Null means "never validated since Phase 15 landed" → treated as
+     * stale on first read.
+     */
+    lastValidatedAt: timestamp("last_validated_at"),
+
     createdBy: integer("created_by").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
