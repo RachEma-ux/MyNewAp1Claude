@@ -84,14 +84,14 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 3 — Enforce credential resolver import boundary
 
-- [ ] Create `scripts/check-provider-credential-resolver-boundary.ts`.
-- [ ] Allow imports only from `server/openrouter/model-access/**`.
-- [ ] Fail if Agent Studio imports resolver.
-- [ ] Fail if AI Types imports resolver.
-- [ ] Fail if frontend imports resolver.
-- [ ] Fail if automation imports resolver directly.
-- [ ] Add script to `check:architecture` or equivalent.
-- [ ] Add a negative test fixture if the repo pattern supports it.
+- [x] Create `scripts/check-provider-credential-resolver-boundary.ts`.
+- [x] Allow imports only from `server/openrouter/model-access/**`. *(plus the resolver's own internal/ subtree for siblings)*
+- [x] Fail if Agent Studio imports resolver.
+- [x] Fail if AI Types imports resolver.
+- [x] Fail if frontend imports resolver.
+- [x] Fail if automation imports resolver directly.
+- [x] Add script to `check:architecture` or equivalent. *(both `package.json#check:provider-credential-resolver-boundary` and inside `scripts/check-architecture.ts` SUITES list)*
+- [x] Add a negative test fixture if the repo pattern supports it. *(`tests/check-provider-credential-resolver-boundary.test.ts` — 3 vitest cases assert the script's allow-list shape and the resolver-target classifier on 6 sample specs including 2 negative cases)*
 
 ### Phase 4 — Create OpenRouter Model Access facade
 

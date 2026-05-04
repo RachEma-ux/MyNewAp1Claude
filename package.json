@@ -37,6 +37,7 @@
     "check:sql-boundaries": "tsx scripts/check-cross-module-sql.ts",
     "check:db-ownership": "tsx scripts/check-module-db-ownership.ts",
     "check:coordinator-boundaries": "tsx scripts/check-coordinator-boundaries.ts",
+    "check:provider-credential-resolver-boundary": "tsx scripts/check-provider-credential-resolver-boundary.ts",
     "check:governance-actions": "tsx scripts/check-governance-actions.ts",
     "check:db-roles": "tsx scripts/check-db-roles.ts",
     "check:ports": "tsx scripts/check-port-registry.ts",
