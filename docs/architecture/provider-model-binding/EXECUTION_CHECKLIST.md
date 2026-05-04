@@ -346,13 +346,13 @@ Wired into:
 
 ### Phase 22 — Change `agentStudio.agent.publish`
 
-- [ ] Make `agentStudio.agent.publish` lifecycle-only.
-- [ ] Ensure it writes Agent Studio release state.
-- [ ] Ensure it marks release/export candidate as `catalog_ready`.
-- [ ] Ensure it does not write catalog_entries.
-- [ ] Ensure it does not call AI Types catalog write directly.
-- [ ] Add test: publish creates no catalog entry.
-- [ ] Add migration note.
+- [x] Make `agentStudio.agent.publish` lifecycle-only. *(verified — `repository.ts:publishRelease` writes only to `ags_agent_releases` and `ags_agents`; no catalog or AI Types write paths.)*
+- [x] Ensure it writes Agent Studio release state. *(`agsAgentReleases` insert with `state="published"`, `publishedAt=now`, plus `ags_agents.lifecycleState="published"` flip.)*
+- [x] Ensure it marks release/export candidate as `catalog_ready`. *(new column `ags_agent_releases.catalog_ready_at` (migration `0037_publish_catalog_ready.sql`); `publishRelease` sets it to `now` on publish. Phase 25's `aiTypes.catalog.register` will read this column to find ready candidates.)*
+- [x] Ensure it does not write catalog_entries. *(test guard — see below.)*
+- [x] Ensure it does not call AI Types catalog write directly. *(no AI Types import in `repository.ts:publishRelease`; static check passes.)*
+- [x] Add test: publish creates no catalog entry. *(`server/agent-studio/publish-no-catalog-write.test.ts`: 4 cases — release insert with `catalogReadyAt`; agent lifecycle flip; no catalog_entries write; exactly two writes total (1 insert + 1 update).)*
+- [x] Add migration note. *(migration file header comment + this checklist row + `RUNTIME_PATH_MIGRATION_MATRIX.md` cross-reference: `catalog_ready_at` is the export-candidate handle that Phase 25's `aiTypes.catalog.register` reads.)*
 
 ### Phase 23 — Catalog schema verification/backfill
 
