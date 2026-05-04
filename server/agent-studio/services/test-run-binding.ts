@@ -39,14 +39,19 @@ import type {
   ModelAccessMessage,
   ModelAccessResult,
 } from "../../openrouter/model-access/types";
+import {
+  evaluateProviderUsePolicy,
+  type ProviderUsePolicyReason,
+} from "./provider-use-governance";
 
 /**
  * Reason a test-run could not produce output. Either a binding-policy
- * problem (bubbled from `resolveForRun`) or a Model Access execution
- * failure.
+ * problem (bubbled from `resolveForRun`), a Phase 21 provider-use
+ * governance denial, or a Model Access execution failure.
  */
 export type TestRunBindingFailureReason =
   | BindingPolicyReason
+  | ProviderUsePolicyReason
   | "model_access_failed";
 
 export interface RunTestWithBindingInput {
@@ -153,6 +158,22 @@ export async function runTestWithBinding(
     messages.push({ role: "system", content: input.systemPrompt });
   }
   messages.push({ role: "user", content: input.prompt });
+
+  // Plan v3 Phase 21 — provider-use governance gates.
+  // resolveForRun (Phase 12) already checks Phase 8 eligibility, so
+  // we pass `skipEligibilityCheck: true`.
+  const policy = await evaluateProviderUsePolicy({
+    binding: resolved.binding,
+    messages,
+    skipEligibilityCheck: true,
+  });
+  if (policy.ok === false) {
+    return {
+      ok: false,
+      reason: policy.reason,
+      detail: policy.detail,
+    };
+  }
 
   const executeInput: ModelAccessExecuteInput = {
     providerConnectionId: resolved.providerConnection.providerConnectionId,

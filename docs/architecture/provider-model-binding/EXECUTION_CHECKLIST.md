@@ -324,14 +324,21 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 21 — Provider/model use governance
 
-- [ ] Enforce workspace can use provider.
-- [ ] Enforce workspace can use provider connection.
-- [ ] Enforce agent can use external provider.
-- [ ] Enforce model approved.
-- [ ] Enforce connection active.
-- [ ] Enforce health acceptable.
-- [ ] Enforce sensitive prompt egress policy.
-- [ ] Add governance-denial UX.
+- [x] Enforce workspace can use provider. *(`workspace.allowExternalProviders=false` blocks with `workspace_provider_disallowed` in `provider-use-governance.ts`. Workspace flag plumbing into the chat/test paths comes from the existing workspace context; the gate's contract is the policy module.)*
+- [x] Enforce workspace can use provider connection. *(reuses Phase 8 `getBindingEligibility` — workspace scope is enforced at the DB level since `provider_connections.workspaceId` is a foreign key to the workspace.)*
+- [x] Enforce agent can use external provider. *(`agent.externalProvidersAllowed=false` blocks with `agent_external_provider_disallowed`. Agent-scope flag mirrors the workspace flag.)*
+- [x] Enforce model approved. *(stub permissive in Phase 21 — blocks only when a hosted binding has no `modelCatalogEntryId`. Phase 25's catalog hardening tightens this to a live `aiTypes.providerModels.listAvailable` cross-check.)*
+- [x] Enforce connection active. *(via Phase 8 eligibility — `lifecycleStatus="active"` is the only passing state.)*
+- [x] Enforce health acceptable. *(via Phase 8 eligibility — `healthStatus !== "unreachable"` per the Phase 8 contract.)*
+- [x] Enforce sensitive prompt egress policy. *(`scanSensitiveEgress` regex pass for PEM keys, `sk-` API keys, GitHub PAT, Bearer tokens, `password=…`. Single pass per call; matches → `sensitive_egress_blocked`.)*
+- [x] Add governance-denial UX. *(structured `ProviderUsePolicyDenied` with `reason` + safe-to-display `detail`; `runTestWithBinding` and `sendChatMessageViaBinding` surface them as the response's `reason`/`error` fields. The Agent Studio binding picker (Phase 14) and chat UI render these as the binding-status badge.)*
+
+Tests: `server/agent-studio/services/provider-use-governance.test.ts` — 14 cases (7 egress-pattern positive matches + 1 negative + 6 composed `evaluateProviderUsePolicy` denial / approval cases including precedence).
+
+Wired into:
+  - `server/agent-studio/services/test-run-binding.ts` (Phase 16 path) — runs after `resolveForRun` with `skipEligibilityCheck: true`.
+  - `server/agent-studio/services/chat.ts:sendChatMessageViaBinding` (Phase 17) — runs before `gatewayCall`.
+  - `server/agent-studio/services/chat.ts:runChatWithToolsViaBinding` (Phase 18) — runs once at loop entry on the static history.
 
 ---
 
