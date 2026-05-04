@@ -111,15 +111,17 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 5 — Enforce no-runtime-process.env provider key rule
 
-- [ ] Create `scripts/check-provider-key-env-boundary.ts`.
-- [ ] Fail runtime reads of `process.env.OPENAI_API_KEY`.
-- [ ] Fail runtime reads of `process.env.ANTHROPIC_API_KEY`.
-- [ ] Fail runtime reads of generic `process.env.*API_KEY` in Agent Studio runtime paths.
-- [ ] Fail writes/mutations to `process.env` provider-key variables.
-- [ ] Allow only explicit boot-time seed script path.
-- [ ] Create optional `scripts/provider-connections/seed-from-env.ts`.
-- [ ] Seed script reads env once, validates provider, creates encrypted Provider Connection, and exits.
-- [ ] Add check to architecture validation.
+- [x] Create `scripts/check-provider-key-env-boundary.ts`.
+- [x] Fail runtime reads of `process.env.OPENAI_API_KEY`. *(literal dot + bracket form, with NON_PROVIDER_KEYS allowlist for FORGE + OMNIRAG)*
+- [x] Fail runtime reads of `process.env.ANTHROPIC_API_KEY`.
+- [x] Fail runtime reads of generic `process.env.*API_KEY` in Agent Studio runtime paths. *(dynamic-index zone scoped to `agent-studio/adapters/` + `runtime/` only — `services/`/`api/` excluded because their `process.env[key]` use is sandboxed-hook env passthrough, not provider auth)*
+- [x] Fail writes/mutations to `process.env` provider-key variables. *(envWriteRegex catches `=`, excludes `==`/`===`)*
+- [x] Allow only explicit boot-time seed script path. *(`<seed-script>` sentinel for `scripts/provider-connections/seed-from-env.ts`)*
+- [x] Create optional `scripts/provider-connections/seed-from-env.ts`. *(Phase 5 stub — full implementation lands in Phase 9–10; existing `_core/index.ts:120-140` block tracked as LR-06)*
+- [~] Seed script reads env once, validates provider, creates encrypted Provider Connection, and exits. *(deferred to Phase 9–10; stub exits non-zero so accidental usage is loud)*
+- [x] Add check to architecture validation. *(both `package.json#check:provider-key-env-boundary` and `scripts/check-architecture.ts` SUITES list)*
+- [x] Add LR-06 row to `LEGACY_EXCEPTION_REGISTER.md`. *(autoProvisionProviders boot block — High risk, deadline Phase 10)*
+- [x] Add negative-fixture test. *(`tests/check-provider-key-env-boundary.test.ts` — 8 vitest cases on classifier + script declarations + write-vs-equality regex)*
 
 ### Phase 6 — CI test strategy for Model Access
 
