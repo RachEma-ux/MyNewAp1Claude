@@ -107,9 +107,68 @@ export const providerConnectionsManifest: ModuleManifest = {
 
   boot: async () => {
     registerModuleHealthAction(providerConnectionsManifest);
-    // Phase 2 will register the public read actions
-    // (listActiveForProvider / getConnectionStatus / validateConnection)
-    // through registerPublicApi here. Phase 1 only ensures the module
-    // is manifested; no new gateway actions are wired yet.
+
+    // Phase 2: register public no-secret read actions through the
+    // Module Gateway. Per D2, these actions never return PAT, API
+    // key, encrypted secret payload, or secret env values.
+    const { registerPublicApi } = await import(
+      "../platform/modules/module-gateway"
+    );
+    const {
+      listActiveForProvider,
+      getConnectionStatus,
+      validateConnection,
+    } = await import("./public-api");
+
+    registerPublicApi({
+      module: "providerConnections",
+      action: "providerConnections.listActiveForProvider",
+      handler: async (input) => {
+        const payload = input as {
+          workspaceId: number;
+          providerCatalogEntryId: number;
+        };
+        return listActiveForProvider(payload);
+      },
+      descriptor: {
+        key: "providerConnections.listActiveForProvider",
+        description:
+          "List provider connections (active/validated) for a workspace + provider — no secret material returned.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "providerConnections",
+      action: "providerConnections.getConnectionStatus",
+      handler: async (input) => {
+        const payload = input as { providerConnectionId: number };
+        return getConnectionStatus(payload);
+      },
+      descriptor: {
+        key: "providerConnections.getConnectionStatus",
+        description:
+          "Return lifecycle + health summary for a single provider connection — no secret material returned.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "providerConnections",
+      action: "providerConnections.validateConnection",
+      handler: async (input) => {
+        const payload = input as { providerConnectionId: number };
+        return validateConnection(payload);
+      },
+      descriptor: {
+        key: "providerConnections.validateConnection",
+        description:
+          "Validate that a provider connection is active and has a stored secret. Reference-shape validation only — no upstream HTTP probe (that lives at openRouter.modelAccess.validateBinding).",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
   },
 };
