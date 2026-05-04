@@ -48,6 +48,8 @@ const AgentVersionsPage = lazy(() => import("../pages/AgentVersionsPage"));
 const AgentPublishPage = lazy(() => import("../pages/AgentPublishPage"));
 // Phase 0d: openllm-agent2 native parity pages
 const AgentRuntimePage = lazy(() => import("../pages/AgentRuntimePage"));
+// Plan v3 Phase 14: provider/model binding picker
+const AgentBindingPage = lazy(() => import("../pages/AgentBindingPage"));
 // Phase 0e: openllm-agent2 native parity pages
 const AgentHooksPage = lazy(() => import("../pages/AgentHooksPage"));
 const AgentMcpPage = lazy(() => import("../pages/AgentMcpPage"));
@@ -393,6 +395,9 @@ export default function AgentStudioShell() {
       // ── Phase 0d: Runtime config page ──
       case "runtime":
         return <AgentRuntimePage agentId={agentId!} />;
+      // Plan v3 Phase 14: provider/model binding picker
+      case "binding":
+        return <AgentBindingPage agentId={agentId!} />;
       // ── Phase 0e: Hooks / MCP / Subagents pages ──
       case "hooks":
         return <AgentHooksPage agentId={agentId!} />;
