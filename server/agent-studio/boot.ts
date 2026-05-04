@@ -155,6 +155,117 @@ export async function bootAgentStudio(): Promise<void> {
         receiptRequired: true,
       },
     });
+
+    // Plan v3 Phase 12 — provider/model binding gateway actions.
+    // All six wrap server/agent-studio/bindings.ts. None return any
+    // credential material.
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.list",
+      handler: async (input) => {
+        const { agentId } = input as { agentId: number };
+        if (typeof agentId !== "number") throw new Error("agentId is required");
+        const { listBindingsForAgent } = await import("./bindings");
+        return listBindingsForAgent(agentId);
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.list",
+        description: "List provider bindings for an agent (no credentials)",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.create",
+      handler: async (input) => {
+        const { upsertAgentProviderBinding } = await import("./bindings");
+        const payload = input as Parameters<
+          typeof upsertAgentProviderBinding
+        >[0];
+        return upsertAgentProviderBinding(payload);
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.create",
+        description:
+          "Create a provider binding (calls Phase 8 eligibility gate)",
+        risk: "medium",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.update",
+      handler: async (input) => {
+        const { upsertAgentProviderBinding } = await import("./bindings");
+        const payload = input as Parameters<
+          typeof upsertAgentProviderBinding
+        >[0];
+        return upsertAgentProviderBinding(payload);
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.update",
+        description:
+          "Update an existing provider binding (re-runs eligibility gate)",
+        risk: "medium",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.remove",
+      handler: async (input) => {
+        const { draftId, role } = input as { draftId: number; role?: string };
+        if (typeof draftId !== "number") throw new Error("draftId is required");
+        const { removeAgentProviderBinding } = await import("./bindings");
+        const removed = await removeAgentProviderBinding(draftId, role);
+        return { draftId, role: role ?? "primary", removed };
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.remove",
+        description: "Delete a provider binding by (draftId, role)",
+        risk: "medium",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.validate",
+      handler: async (input) => {
+        const { draftId, role } = input as { draftId: number; role?: string };
+        if (typeof draftId !== "number") throw new Error("draftId is required");
+        const { validateBindingPolicy } = await import("./bindings");
+        return validateBindingPolicy(draftId, role);
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.validate",
+        description:
+          "Reference/policy validation of a binding — no upstream HTTP probe",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.providerBindings.resolveForRun",
+      handler: async (input) => {
+        const { resolveForRun } = await import("./bindings");
+        const payload = input as Parameters<typeof resolveForRun>[0];
+        return resolveForRun(payload);
+      },
+      descriptor: {
+        key: "agentStudio.providerBindings.resolveForRun",
+        description:
+          "Resolve a binding for runtime use — returns refs only, no credentials",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-publicApi] registration skipped — ${message}`);

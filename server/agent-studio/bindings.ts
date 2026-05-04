@@ -294,3 +294,223 @@ export async function listBindingsForAgent(
     .where(eq(agsAgentProviderBindings.agentId, agentId));
   return rows.map(toPublicBinding);
 }
+
+/**
+ * Remove a binding row. Returns true iff a row was deleted. Idempotent.
+ */
+export async function removeAgentProviderBinding(
+  draftId: number,
+  role: string = "primary",
+): Promise<boolean> {
+  const db = getAsDb();
+  const result = await db
+    .delete(agsAgentProviderBindings)
+    .where(
+      and(
+        eq(agsAgentProviderBindings.draftId, draftId),
+        eq(agsAgentProviderBindings.role, role),
+      ),
+    )
+    .returning({ id: agsAgentProviderBindings.id });
+  return result.length > 0;
+}
+
+// ─── Phase 12 — validateBindingPolicy + resolveForRun ────────────────
+//
+// Plan v3 Phase 13 separates these two validators:
+//
+//   - `validateBindingPolicy` (this file) — REFERENCE/policy validation.
+//     Confirms the binding row exists, the Provider Connection is
+//     bind-eligible (Phase 8), and the AI Types catalog entry is
+//     available (Phase 7). Cheap; no upstream HTTP. Called by the
+//     binding picker UI before save.
+//   - `openRouter.modelAccess.validateBinding` (Phase 4) — RUNTIME
+//     execution validation. Probes the upstream provider for /v1/models.
+//
+// Phase 13 will add UI-label disambiguation; Phase 12 lands both.
+
+export type BindingPolicyReason =
+  | "binding_not_found"
+  | "provider_connection_ineligible"
+  | "model_not_available"
+  | "legacy_unresolved"
+  | "binding_disabled";
+
+export interface ValidateBindingPolicyResult {
+  draftId: number;
+  role: string;
+  ok: boolean;
+  reason?: BindingPolicyReason;
+  /** Eligibility result from Phase 8 — null when binding is local-provider. */
+  eligibility?: BindingEligibilityResult | null;
+  /**
+   * AI Types governance check — null when no catalog entry was provided
+   * (legacy-unresolved bindings) or when the catalog could not be
+   * consulted in this environment (e.g. test sandbox without DB).
+   */
+  catalogAvailable?: boolean | null;
+}
+
+export interface ResolveForRunInput {
+  draftId: number;
+  /** Defaults to "primary". */
+  role?: string;
+}
+
+/**
+ * Reference projection used by the runtime/router resolver. Carries
+ * everything the runtime needs to construct an `openRouter.modelAccess.execute`
+ * call EXCEPT the credential — which lives behind
+ * `withProviderCredential` and is fetched separately by Model Access.
+ *
+ * Forbidden keys (apiKey, pat, Authorization, etc.) are intentionally
+ * absent — guarded by FORBIDDEN_BINDING_KEYS.
+ */
+export interface ResolveForRunResult {
+  binding: AgentProviderBindingPublic;
+  /**
+   * Resolved Provider Connection reference (no secrets). Null when the
+   * binding is local-provider (no credential needed).
+   */
+  providerConnection: {
+    providerConnectionId: number;
+    providerCatalogEntryId: number;
+    workspaceId: number;
+    lifecycleStatus: string;
+    healthStatus: string | null;
+    selectable: boolean;
+  } | null;
+  /**
+   * Status flag — true iff every gate (eligibility, catalog) passed.
+   * False forces the runtime to refuse the call with `reason`.
+   */
+  ok: boolean;
+  reason?: BindingPolicyReason;
+}
+
+/**
+ * Reference/policy validation. Cheap; no upstream HTTP.
+ *
+ * - Binding must exist (`binding_not_found` if not).
+ * - Status must be `binding_v1` (`legacy_unresolved` / `disabled` blocked).
+ * - For non-local-provider bindings: `getBindingEligibility` must pass.
+ *
+ * AI Types catalog availability is deferred to a future Phase 12.b
+ * tightening — Phase 12 returns `catalogAvailable: null` when the
+ * model catalog ref is missing, leaving room for a future opt-in
+ * cross-check via `aiTypes.providerModels.listAvailable`.
+ */
+export async function validateBindingPolicy(
+  draftId: number,
+  role: string = "primary",
+): Promise<ValidateBindingPolicyResult> {
+  const binding = await getAgentProviderBinding(draftId, role);
+  if (!binding) {
+    return {
+      draftId,
+      role,
+      ok: false,
+      reason: "binding_not_found",
+    };
+  }
+  if (binding.status === "legacy_unresolved") {
+    return {
+      draftId,
+      role,
+      ok: false,
+      reason: "legacy_unresolved",
+    };
+  }
+  if (binding.status === "disabled" || binding.status === "archived") {
+    return {
+      draftId,
+      role,
+      ok: false,
+      reason: "binding_disabled",
+    };
+  }
+
+  let eligibility: BindingEligibilityResult | null = null;
+  if (binding.providerConnectionId !== null) {
+    eligibility = await getBindingEligibility({
+      providerConnectionId: binding.providerConnectionId,
+    });
+    if (!eligibility.ok) {
+      return {
+        draftId,
+        role,
+        ok: false,
+        reason: "provider_connection_ineligible",
+        eligibility,
+      };
+    }
+  }
+
+  return {
+    draftId,
+    role,
+    ok: true,
+    eligibility,
+    catalogAvailable: null,
+  };
+}
+
+/**
+ * Resolve a binding for runtime use. Returns the binding plus the
+ * Provider Connection reference (no secrets). The runtime adapter
+ * then passes `providerConnectionId` to `openRouter.modelAccess.execute`,
+ * which fetches the credential through `withProviderCredential`
+ * inside the Model Access boundary.
+ *
+ * If any gate fails, returns `ok=false` with a reason — the runtime
+ * MUST refuse to call. Local-provider bindings (`providerConnectionId=null`)
+ * pass through with `providerConnection=null`.
+ */
+export async function resolveForRun(
+  input: ResolveForRunInput,
+): Promise<ResolveForRunResult> {
+  const role = input.role ?? "primary";
+  const policy = await validateBindingPolicy(input.draftId, role);
+  if (!policy.ok) {
+    const binding = await getAgentProviderBinding(input.draftId, role);
+    return {
+      binding:
+        binding ??
+        ({
+          id: -1,
+          workspaceId: -1,
+          agentId: -1,
+          draftId: input.draftId,
+          role,
+          providerCatalogEntryId: null,
+          modelCatalogEntryId: null,
+          providerConnectionId: null,
+          modelRef: "",
+          status: "legacy_unresolved",
+          statusReason: null,
+          legacyEnvVarHint: null,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+        } satisfies AgentProviderBindingPublic),
+      providerConnection: null,
+      ok: false,
+      reason: policy.reason,
+    };
+  }
+
+  const binding = (await getAgentProviderBinding(input.draftId, role))!;
+
+  let providerConnection: ResolveForRunResult["providerConnection"] = null;
+  if (binding.providerConnectionId !== null && policy.eligibility) {
+    providerConnection = {
+      providerConnectionId: binding.providerConnectionId,
+      providerCatalogEntryId: binding.providerCatalogEntryId ?? -1,
+      workspaceId: binding.workspaceId,
+      lifecycleStatus: policy.eligibility.lifecycleStatus ?? "active",
+      healthStatus: policy.eligibility.healthStatus ?? null,
+      selectable: policy.eligibility.ok,
+    };
+  }
+
+  return { binding, providerConnection, ok: true };
+}
