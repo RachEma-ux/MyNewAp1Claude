@@ -117,6 +117,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    /* Prevent any descendant from pushing the page wider than the
+       viewport on mobile. `clip` (vs `hidden`) avoids creating a new
+       scroll container so `position: sticky` on the global header
+       continues to anchor against the viewport. */
+    overflow-x: clip;
+    max-width: 100%;
+  }
   body {
     @apply bg-background text-foreground;
   }

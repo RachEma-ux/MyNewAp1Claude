@@ -118,7 +118,7 @@ export default function AgentStudioHomePage({
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 pb-24 sm:pb-4 space-y-4 min-w-0 max-w-full">
       <PageHeader
         title="AI Agent Studio"
         subtitle="Standalone agent lifecycle module — design, simulate, govern, test, release"
@@ -219,18 +219,18 @@ export default function AgentStudioHomePage({
           <Card>
             <CardContent className="p-3 space-y-3">
               {/* Filter row */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-col gap-2 min-w-0 sm:flex-row sm:items-center">
+                <div className="relative flex-1 min-w-0">
                   <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/60" />
                   <Input
                     placeholder="Search by name, key, or description…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="h-7 text-xs pl-7"
+                    className="h-7 text-xs pl-7 w-full"
                   />
                 </div>
                 <select
-                  className="h-7 px-2 rounded border bg-background text-xs"
+                  className="h-7 px-2 rounded border bg-background text-xs w-full sm:w-auto"
                   value={stateFilter ?? ""}
                   onChange={(e) => setStateFilter(e.target.value || undefined)}
                 >
@@ -265,7 +265,8 @@ export default function AgentStudioHomePage({
                   }
                 />
               ) : (
-                <table className="w-full text-xs">
+                <div className="w-full max-w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] text-xs">
                   <thead className="text-[10px] uppercase tracking-wider text-muted-foreground/70 border-b">
                     <tr>
                       <th className="text-left py-1.5 font-semibold">Name</th>
@@ -331,6 +332,7 @@ export default function AgentStudioHomePage({
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </CardContent>
           </Card>

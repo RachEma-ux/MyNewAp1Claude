@@ -6,6 +6,17 @@
  * connectors.
  */
 
+/**
+ * MCP hardening Phase 1.1: callback every transport invokes when its
+ * underlying transport dies AFTER the handshake has completed (process
+ * exit, socket close, websocket error). The mcp-manager builds a
+ * closure that drives the FSM through `mid_session_disconnect` so a
+ * dead connection no longer looks `connected` to the rest of the
+ * system. Transports that can't die independently (http: stateless,
+ * sdk: in-process) accept the prop for symmetry but don't invoke it.
+ */
+export type McpOnCloseCallback = (reason: string) => void;
+
 export interface McpTool {
   /** Tool name as advertised by the server */
   name: string;
@@ -111,6 +122,18 @@ export type ConnectionState =
       lastAttemptAt: number;
       attemptCount: number;
       nextRetryAt?: number;
+    }
+  /**
+   * MCP hardening Phase 2.2: terminal-until-manual state. Reached when
+   * `attemptCount` hits MAX_RECONNECT_ATTEMPTS. The auto-reconnect
+   * loop ignores `abandoned` rows; only an explicit `connect_requested`
+   * (manual UI retry) or `disable_requested` can leave this state.
+   */
+  | {
+      kind: "abandoned";
+      reason: string;
+      lastAttemptAt: number;
+      attemptCount: number;
     }
   | { kind: "disabled"; disabledAt: number };
 

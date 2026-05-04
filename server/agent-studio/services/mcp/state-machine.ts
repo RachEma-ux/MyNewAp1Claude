@@ -38,6 +38,14 @@ import type { ConnectionState, ConnectionEvent } from "./types";
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const RECONNECT_MAX_BACKOFF_MS = 5 * 60 * 1000; // 5 min cap
+/**
+ * MCP hardening Phase 2.2: how many failed attempts before we give up
+ * automatically. After this many `connect_failed` events in a row,
+ * the FSM moves to `abandoned` instead of staying in `failed`. The
+ * auto-reconnect loop ignores abandoned rows; only an explicit user
+ * retry brings them back.
+ */
+export const MAX_RECONNECT_ATTEMPTS = 10;
 
 /**
  * Compute the next retry delay for a failed attempt.
@@ -103,6 +111,17 @@ export function transition(
           };
         case "connect_failed": {
           const newAttemptCount = current.attemptCount + 1;
+          // Phase 2.2: give up after MAX_RECONNECT_ATTEMPTS in a row
+          if (newAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+            return {
+              next: {
+                kind: "abandoned",
+                reason: event.reason,
+                lastAttemptAt: now,
+                attemptCount: newAttemptCount,
+              },
+            };
+          }
           return {
             next: {
               kind: "failed",
@@ -127,6 +146,16 @@ export function transition(
         case "mid_session_disconnect": {
           // Treat a disconnect during the connect handshake as a connect failure
           const newAttemptCount = current.attemptCount + 1;
+          if (newAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+            return {
+              next: {
+                kind: "abandoned",
+                reason: event.reason || "disconnected during connect",
+                lastAttemptAt: now,
+                attemptCount: newAttemptCount,
+              },
+            };
+          }
           return {
             next: {
               kind: "failed",
@@ -222,6 +251,28 @@ export function transition(
       }
     }
 
+    // ── abandoned (Phase 2.2) ──
+    // Reached after MAX_RECONNECT_ATTEMPTS consecutive failures. Auto-
+    // reconnect skips this state; only an explicit user action moves out.
+    case "abandoned": {
+      switch (event.type) {
+        case "connect_requested":
+          // Manual retry — reset attemptCount so the user gets a fresh
+          // budget rather than failing immediately on the next slip.
+          return {
+            next: {
+              kind: "connecting",
+              startedAt: now,
+              attemptCount: 0,
+            },
+          };
+        case "disable_requested":
+          return { next: { kind: "disabled", disabledAt: now } };
+        default:
+          return illegal(current, event);
+      }
+    }
+
     // ── disabled ──
     case "disabled": {
       switch (event.type) {
@@ -298,7 +349,14 @@ export function applyTransition(
  */
 export function projectStateToColumn(
   state: ConnectionState
-): "pending" | "connecting" | "connected" | "needs_auth" | "error" | "disabled" {
+):
+  | "pending"
+  | "connecting"
+  | "connected"
+  | "needs_auth"
+  | "error"
+  | "abandoned"
+  | "disabled" {
   switch (state.kind) {
     case "pending":
       return "pending";
@@ -310,6 +368,8 @@ export function projectStateToColumn(
       return "needs_auth";
     case "failed":
       return "error";
+    case "abandoned":
+      return "abandoned";
     case "disabled":
       return "disabled";
   }

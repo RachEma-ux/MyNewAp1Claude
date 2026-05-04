@@ -554,7 +554,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       sendEvent({
         type: "error",
         error:
-          "No OpenAI API key resolved. Set OPENAI_API_KEY in env or configure a key in the providers table.",
+          "No OpenAI API key resolved. Set OPENAI_API_KEY in your .env (or as a process env var) and restart the server.",
       });
       res.end();
       return;

@@ -74,6 +74,24 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ASDB] Agent Studio Expert seed failed: ${message}`);
   }
 
+  // Step 2b: Boot-time seed for the 5 fixture agents (legacy parity).
+  try {
+    const { seedLegacyFixtures } = await import("./db/seed-legacy-fixtures");
+    const result = await seedLegacyFixtures();
+    if (result.created > 0) {
+      console.log(
+        `[ASDB] Legacy fixtures seeded — ${result.created} created, ${result.skipped} already present (of ${result.total})`
+      );
+    } else if (result.total > 0) {
+      console.log(
+        `[ASDB] Legacy fixtures present — ${result.skipped}/${result.total} already seeded`
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ASDB] Legacy fixtures seed failed: ${message}`);
+  }
+
   // Step 3: Phase 10 scheduler — formalized boot path
   try {
     const { ensureSchedulerStarted } = await import("./services/scheduler");
@@ -189,6 +207,41 @@ export async function bootAgentStudio(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-handoff] acceptor registration skipped — ${message}`);
+  }
+
+  // Step 6: MCP hardening Phase 5.1 — subscribe the persisted transition
+  // log to the FSM event bus. Every successful FSM transition appends one
+  // row to ags_mcp_transitions (capped per server inside the repo helper).
+  // Subscriber runs async (decision #9b inside connection-events.ts) so a
+  // slow DB write cannot block the FSM critical path.
+  try {
+    const { onTransition } = await import("./services/mcp/connection-events");
+    const repo = await import("./repository");
+    onTransition((t) => {
+      const reason =
+        ("reason" in t.to ? (t.to as { reason?: string }).reason : undefined) ??
+        ("reason" in t.event
+          ? (t.event as { reason?: string }).reason
+          : undefined) ??
+        null;
+      void repo
+        .recordMcpTransition(
+          t.serverId,
+          t.from.kind,
+          t.to.kind,
+          t.event.type,
+          reason
+        )
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(
+            `[ags-mcp] transition log write failed for #${t.serverId}: ${msg}`
+          );
+        });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-mcp] transition subscriber skipped — ${message}`);
   }
 }
 

@@ -225,6 +225,124 @@ export async function exchangeCodeForTokens(input: {
 }
 
 /**
+ * MCP hardening Phase 2.1: resolve a usable access token for a server,
+ * refreshing transparently if the stored token is close to expiry.
+ *
+ * Returns:
+ *   - the access token string when OAuth is configured AND we have a
+ *     usable token (refreshes if `tokenExpiresAt < now + safetyMs`)
+ *   - `null` when OAuth is not configured for this server (so the
+ *     caller knows to skip the Authorization header)
+ *
+ * Throws `McpAuthRequiredError` when:
+ *   - OAuth is configured but no tokens have been persisted yet
+ *     (user needs to run the OAuth flow)
+ *   - The refresh attempt fails (refresh token expired/revoked)
+ *
+ * Persisted state shape (in `oauthState`):
+ *   {
+ *     ...prior fields (codeVerifier, state, ...),
+ *     encryptedTokens: <ciphertext>,   // JSON.stringify(OAuthTokens)
+ *     tokenExpiresAt: <epoch ms or null>,
+ *   }
+ */
+export async function getValidAccessToken(input: {
+  oauthConfig: Record<string, unknown> | null | undefined;
+  oauthState: Record<string, unknown> | null | undefined;
+  decrypt: (ciphertext: string) => string;
+  encrypt: (plaintext: string) => string;
+  persist: (oauthState: Record<string, unknown>) => Promise<void>;
+  /** Refresh when the access token expires within this many ms (default 60s). */
+  refreshSafetyMs?: number;
+  /** Injected for tests. Defaults to Date.now(). */
+  now?: () => number;
+}): Promise<string | null> {
+  const {
+    oauthConfig,
+    oauthState,
+    decrypt,
+    encrypt,
+    persist,
+    refreshSafetyMs = 60_000,
+    now = () => Date.now(),
+  } = input;
+
+  // OAuth not configured — caller should connect without a bearer token
+  if (!oauthConfig) return null;
+
+  if (!oauthState || typeof oauthState !== "object") {
+    // Will be caught by manager and turned into FSM `needs_auth`
+    const { McpAuthRequiredError } = await import("./types");
+    throw new McpAuthRequiredError(
+      "OAuth configured but no tokens persisted — run the OAuth flow first"
+    );
+  }
+
+  const encryptedTokens = (oauthState as any).encryptedTokens;
+  if (typeof encryptedTokens !== "string" || !encryptedTokens) {
+    const { McpAuthRequiredError } = await import("./types");
+    throw new McpAuthRequiredError(
+      "OAuth configured but no tokens persisted — run the OAuth flow first"
+    );
+  }
+
+  let tokens: OAuthTokens;
+  try {
+    tokens = JSON.parse(decrypt(encryptedTokens)) as OAuthTokens;
+  } catch (e) {
+    const { McpAuthRequiredError } = await import("./types");
+    throw new McpAuthRequiredError(
+      `Stored OAuth tokens unreadable (encryption key rotated?): ${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+  }
+
+  const expiresAt = tokens.expiresAt ?? (oauthState as any).tokenExpiresAt;
+  const needsRefresh =
+    typeof expiresAt === "number" &&
+    expiresAt > 0 &&
+    now() + refreshSafetyMs >= expiresAt;
+
+  if (!needsRefresh) {
+    return tokens.accessToken;
+  }
+
+  // Refresh path
+  if (!tokens.refreshToken) {
+    const { McpAuthRequiredError } = await import("./types");
+    throw new McpAuthRequiredError(
+      "Access token expired and no refresh token is available — re-run the OAuth flow"
+    );
+  }
+
+  let refreshed: OAuthTokens;
+  try {
+    refreshed = await refreshAccessToken({
+      config: oauthConfig as unknown as OAuthConfig,
+      refreshToken: tokens.refreshToken,
+    });
+  } catch (e) {
+    const { McpAuthRequiredError } = await import("./types");
+    throw new McpAuthRequiredError(
+      `OAuth refresh failed: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+
+  // Persist the refreshed tokens (idempotent — concurrent refreshes
+  // last-write-wins, both produce identical-shape tokens for the same
+  // refresh_token grant).
+  const newEncryptedTokens = encrypt(JSON.stringify(refreshed));
+  await persist({
+    ...oauthState,
+    encryptedTokens: newEncryptedTokens,
+    tokenExpiresAt: refreshed.expiresAt ?? null,
+  });
+
+  return refreshed.accessToken;
+}
+
+/**
  * Refresh an access token using a stored refresh token. Returns null
  * if no refresh token is available.
  */

@@ -2,22 +2,33 @@
  * AI Agent Studio — MCP Manager
  *
  * Phase 7 of the Agent Studio remaining-phases plan. Top-level API for
- * managing live MCP server connections. Per-process in-memory map keyed
- * by `agsDraftMcpServers.id`.
+ * managing live MCP server connections. Two process-local maps keyed
+ * by `agsDraftMcpServers.id`:
  *
- * Lifecycle:
- *  - connectMcpServer(row): dispatches to the right transport, stores
- *    the live connection in the map, updates the row's status to
- *    "connected" (or "error" on failure)
- *  - disconnectMcpServer(serverId): closes the connection, removes it
- *    from the map, updates the row's status to "disconnected"
- *  - listConnectedTools(draftId): returns flattened tool inventory
- *    from all connected servers attached to the draft
- *  - callMcpTool(serverId, name, args): convenience for the agent loop
+ *   - `connections`: live transport handles (close fn, callTool fn,
+ *     advertised tools/prompts/resources)
+ *   - `states`     : FSM `ConnectionState` discriminated union
  *
- * The map is process-local — restarting the dev server forgets all
- * connections. The row's `status` column is the durable side; the
- * runs page reflects whatever the row says.
+ * Both are wiped on every dev-server restart and on every HMR reload
+ * of this module.
+ *
+ * Source of truth (post-Phase-19b): the in-memory `states` map. The
+ * `agsDraftMcpServers.status` column is a string projection (see
+ * `projectStateToColumn` in state-machine.ts) for cross-process reads
+ * and UI hydration before the FSM repopulates after restart.
+ *
+ * Lifecycle (every transition flows through `applyEvent`):
+ *  - connectMcpServer(row): dispatches to the right transport. On
+ *    success, applies `connect_succeeded`. On failure, `connect_failed`
+ *    (or `auth_required` if the transport throws McpAuthRequiredError).
+ *    On mid-session death (Phase 1.1), the transport's onClose callback
+ *    drives `mid_session_disconnect`.
+ *  - disconnectMcpServer(serverId): closes the connection, removes
+ *    the snapshot, applies `disconnect_requested` (FSM → pending).
+ *  - listConnectedTools/Prompts/Resources(draftId): reads from the
+ *    versioned snapshot registry, not the live `connections` map.
+ *  - callMcpTool(serverId, name, args): legacy shim that delegates to
+ *    the dispatcher (Phase 19a) for governance + audit.
  *
  * Cleanup: on process exit we close every connection so MCP child
  * processes don't outlive the Studio.
@@ -58,6 +69,12 @@ const states = new Map<number, ConnectionState>();
 // ── Phase 17e: auto-reconnect ──────────────────────────────────────────────
 
 const RECONNECT_CHECK_INTERVAL_MS = 60_000;
+/**
+ * MCP hardening Phase 2.3: rows stuck in `needs_auth` longer than this
+ * get auto-failed so they no longer look like in-progress OAuth flows
+ * forever. The user can re-run OAuth at any time to recover.
+ */
+const NEEDS_AUTH_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24h
 let reconnectTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
@@ -79,19 +96,44 @@ function ensureReconnectLoopStarted() {
   if (reconnectTimer) return;
   reconnectTimer = setInterval(async () => {
     try {
+      const now = Date.now();
+
+      // Phase 2.3: sweep stale `needs_auth` rows. A row left in needs_auth
+      // for >24h without the user finishing OAuth gets pushed to `failed`
+      // so the UI can stop showing the auth banner. The user can always
+      // re-run OAuth to recover.
+      for (const [serverId, state] of states) {
+        if (state.kind !== "needs_auth") continue;
+        if (now - state.challengeReceivedAt < NEEDS_AUTH_TIMEOUT_MS) continue;
+        try {
+          await applyEvent(serverId, {
+            type: "connect_failed",
+            reason: "auth challenge ignored for >24h",
+          });
+        } catch {
+          /* ignore — illegal transitions are dev-only */
+        }
+      }
+
       // Walk every server row across all drafts (manager is process-wide).
       const allRows = await repo.listAllMcpServers();
-      const now = Date.now();
       for (const row of allRows) {
         // Skip rows we already have a live connection for
         if (connections.has(row.id)) continue;
-        // Only reconnect rows that were previously connected
-        // (column "error" projects from FSM `failed`; "pending" means
-        // never tried).
-        if (row.status !== "error") continue;
+        // MCP hardening Phase 1.3 / 2.2:
+        //  (a) status="error" — a previous attempt failed (FSM `failed`)
+        //  (b) status="connecting" with no in-memory FSM entry — process
+        //      restart mid-handshake
+        //  Anything else (pending, connected, needs_auth, abandoned,
+        //  disabled) is intentionally skipped. `abandoned` in particular
+        //  requires manual user retry by design.
+        const inMemState = states.get(row.id);
+        const isError = row.status === "error";
+        const isStaleConnecting =
+          row.status === "connecting" && inMemState == null;
+        if (!isError && !isStaleConnecting) continue;
         // FSM-aware backoff: if the in-memory state is `failed` and
         // `nextRetryAt` is in the future, skip this tick.
-        const inMemState = states.get(row.id);
         if (
           inMemState?.kind === "failed" &&
           inMemState.nextRetryAt != null &&
@@ -174,6 +216,88 @@ export function getConnectionState(serverId: number): ConnectionState {
 }
 
 /**
+ * MCP hardening Phase 1.2: drive the FSM through `auth_provided` after
+ * an external OAuth flow completes (typically from the `oauthExchange`
+ * tRPC mutation). The state-machine transitions `needs_auth →
+ * connecting`, but no transport is dispatched yet — the caller should
+ * follow up with `connectMcpServer` to actually re-handshake.
+ *
+ * Exists as a thin shim so the API router doesn't have to import the
+ * private `applyEvent` helper or the FSM event types directly.
+ */
+export async function notifyAuthProvided(serverId: number): Promise<void> {
+  await applyEvent(serverId, { type: "auth_provided" });
+}
+
+/**
+ * MCP hardening Phase 3.1: disable a server. Disconnects any live
+ * connection first, flips the `enabled` boolean column to false (so
+ * existing boot-time filters still work), and drives the FSM into
+ * `disabled`. Symmetric to `enableMcpServer`.
+ *
+ * The `enabled` column and the FSM `disabled` state stay in sync
+ * because every flip goes through this shim — direct UPDATEs of the
+ * column would leave the FSM out of date.
+ */
+export async function disableMcpServer(serverId: number): Promise<void> {
+  if (connections.has(serverId)) {
+    try {
+      await disconnectMcpServer(serverId);
+    } catch {
+      /* fall through — the FSM transition still needs to fire */
+    }
+  }
+  await repo.setMcpServerEnabled(serverId, false);
+  try {
+    await applyEvent(serverId, { type: "disable_requested" });
+  } catch {
+    /* ignore — illegal transitions are dev-only */
+  }
+}
+
+/**
+ * MCP hardening Phase 3.1: re-enable a server. Flips the `enabled`
+ * column back to true and drives the FSM `disabled → pending`. The
+ * row is then a normal candidate for the auto-reconnect loop on the
+ * next tick — no immediate connect attempt to keep enable cheap.
+ */
+export async function enableMcpServer(serverId: number): Promise<void> {
+  await repo.setMcpServerEnabled(serverId, true);
+  try {
+    await applyEvent(serverId, { type: "enable_requested" });
+  } catch {
+    /* ignore — already enabled / illegal transition */
+  }
+}
+
+/**
+ * MCP hardening Phase 5.2: admin force-purge. Use when in-memory and
+ * DB state get wedged out of sync (HMR + crashed children, etc.).
+ * Clears the live `connections` entry, the FSM state, the registry
+ * snapshot, and resets the DB column to `pending`. Does NOT flip the
+ * `enabled` column — purge is an operational reset, not a config
+ * change.
+ */
+export async function purgeMcpServer(serverId: number): Promise<void> {
+  const conn = connections.get(serverId);
+  if (conn) {
+    try {
+      await conn.close();
+    } catch {
+      /* ignore */
+    }
+    connections.delete(serverId);
+  }
+  registry.removeServer(serverId);
+  states.delete(serverId);
+  try {
+    await repo.updateMcpServerStatus(serverId, "pending");
+  } catch {
+    /* row may be deleted */
+  }
+}
+
+/**
  * Phase 19b: Snapshot all known FSM states. Used by the runs page
  * and admin dashboards. Returns one entry per serverId with state
  * in the in-memory map (excludes never-touched servers).
@@ -238,8 +362,54 @@ export async function connectMcpServer(
   // `connected` (on success) or `failed` (on transport error).
   await applyEvent(input.serverId, { type: "connect_requested" });
 
+  // MCP hardening Phase 1.1: build a single onClose closure passed to
+  // every transport. When the underlying transport dies after the
+  // handshake has put us into `connected`, this fires:
+  //   1. drop the dead connection from the live map
+  //   2. invalidate the registry snapshot so listConnectedTools stops
+  //      advertising tools the agent can no longer call
+  //   3. drive the FSM through `mid_session_disconnect`
+  // Idempotent via the `cur?.kind !== "connected"` guard — a transport
+  // that fires onClose during its own handshake (before the manager
+  // applies `connect_succeeded`) is a no-op here; the catch block
+  // below handles handshake failures.
+  const onClose = (reason: string) => {
+    const cur = states.get(input.serverId);
+    if (cur?.kind !== "connected") return;
+    connections.delete(input.serverId);
+    registry.removeServer(input.serverId);
+    applyEvent(input.serverId, {
+      type: "mid_session_disconnect",
+      reason,
+    }).catch(() => {
+      /* never let an FSM apply failure crash the close path */
+    });
+  };
+
   let conn: McpConnection;
   try {
+    // MCP hardening Phase 2.1: resolve a fresh access token for OAuth-
+    // protected servers. Throws McpAuthRequiredError when refresh
+    // fails or no tokens are stored — the catch block below routes
+    // that into FSM `needs_auth` so the UI shows the OAuth banner.
+    // Stdio servers don't get a bearer token (the SDK convention is
+    // env-based auth for those); http/sse/websocket do.
+    let bearerToken: string | undefined;
+    if ((row as any).oauthConfig) {
+      const { getValidAccessToken } = await import("./auth");
+      const { encrypt, decrypt } = await import("../../../_core/encryption");
+      const token = await getValidAccessToken({
+        oauthConfig: (row as any).oauthConfig,
+        oauthState: (row as any).oauthState,
+        decrypt,
+        encrypt,
+        persist: async (oauthState) => {
+          await repo.updateMcpServerOAuth(input.serverId, { oauthState });
+        },
+      });
+      if (token) bearerToken = token;
+    }
+
     switch (row.transport) {
       case "stdio":
         if (!row.command) {
@@ -250,6 +420,7 @@ export async function connectMcpServer(
           command: row.command,
           args: (row.args ?? []) as string[],
           env: (row.env ?? {}) as Record<string, string>,
+          onClose,
         });
         break;
       case "http":
@@ -259,6 +430,8 @@ export async function connectMcpServer(
         conn = await connectHttp({
           serverId: row.id,
           url: row.url,
+          bearerToken,
+          onClose,
         });
         break;
       case "sse":
@@ -268,6 +441,8 @@ export async function connectMcpServer(
         conn = await connectSse({
           serverId: row.id,
           url: row.url,
+          bearerToken,
+          onClose,
         });
         break;
       // Phase 15a: Real WebSocket transport (replaces the previous scaffold)
@@ -278,6 +453,8 @@ export async function connectMcpServer(
         conn = await connectWebSocket({
           serverId: row.id,
           url: row.url,
+          bearerToken,
+          onClose,
         });
         break;
       case "sdk":
@@ -287,6 +464,7 @@ export async function connectMcpServer(
         conn = await connectSdk({
           serverId: row.id,
           serverName: row.command ?? undefined,
+          onClose,
         });
         break;
       default:

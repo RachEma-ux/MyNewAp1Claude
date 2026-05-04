@@ -27,6 +27,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpPrompt,
   McpResource,
   McpTool,
@@ -37,11 +38,28 @@ const PROTOCOL_VERSION = "2024-11-05";
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const TOOLS_LIST_TIMEOUT_MS = 5_000;
 const OPEN_TIMEOUT_MS = 8_000;
+// MCP hardening Phase 2.4: send a WebSocket ping frame every interval
+// and fire onClose if no pong has been received in 2 * interval. The
+// `ws` package emits 'pong' events automatically when the peer responds.
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_TIMEOUT_MS = 65_000;
 
 export interface WebSocketConnectInput {
   serverId: number;
   url: string;
   headers?: Record<string, string>;
+  /**
+   * MCP hardening Phase 2.1: when present, sent as `Authorization:
+   * Bearer <token>` on the upgrade request. Resolved by the manager
+   * via getValidAccessToken so refresh logic stays in one place.
+   */
+  bearerToken?: string;
+  /**
+   * MCP hardening Phase 1.1: invoked when the WebSocket dies after the
+   * connection was established (close/error/heartbeat). Fired exactly
+   * once per connection.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 export async function connectWebSocket(
@@ -50,8 +68,12 @@ export async function connectWebSocket(
   // Open the socket
   let ws: WebSocket;
   try {
+    const upgradeHeaders: Record<string, string> = { ...(input.headers ?? {}) };
+    if (input.bearerToken) {
+      upgradeHeaders.Authorization = `Bearer ${input.bearerToken}`;
+    }
     ws = new WebSocket(input.url, {
-      headers: input.headers,
+      headers: upgradeHeaders,
     });
   } catch (e) {
     throw new McpError(
@@ -142,6 +164,18 @@ export async function connectWebSocket(
   >();
   let nextId = 1;
   let closed = false;
+  // MCP hardening Phase 1.1: ensure onClose fires at most once even if
+  // both `close` and `error` events arrive.
+  let notifiedClose = false;
+  const fireOnClose = (reason: string) => {
+    if (notifiedClose) return;
+    notifiedClose = true;
+    try {
+      input.onClose?.(reason);
+    } catch {
+      /* never let an onClose handler crash the close path */
+    }
+  };
 
   // Route incoming frames to pending RPCs
   ws.on("message", (raw: Buffer | string) => {
@@ -172,6 +206,7 @@ export async function connectWebSocket(
       handler.reject(new McpError("connection_closed", "WebSocket closed"));
     }
     pending.clear();
+    fireOnClose("WebSocket closed");
   });
 
   ws.on("error", (err: Error) => {
@@ -180,6 +215,7 @@ export async function connectWebSocket(
       handler.reject(new McpError("connection_error", err.message));
     }
     pending.clear();
+    fireOnClose(`WebSocket error: ${err.message}`);
   });
 
   // Send an RPC and wait for response
@@ -316,6 +352,35 @@ export async function connectWebSocket(
     resources = [];
   }
 
+  // Phase 2.4 heartbeat: post-handshake ping/pong liveness check. The
+  // existing ws.on("close")/("error") handlers already fire onClose
+  // for hard failures; this catches silent peer death where the TCP
+  // connection appears alive but no traffic flows.
+  let lastPongAt = Date.now();
+  ws.on("pong", () => {
+    lastPongAt = Date.now();
+  });
+  const heartbeat = setInterval(() => {
+    if (closed) return;
+    if (Date.now() - lastPongAt > HEARTBEAT_TIMEOUT_MS) {
+      try {
+        ws.terminate();
+      } catch {
+        /* ignore */
+      }
+      // The terminate() call will trigger ws.on("close") which calls
+      // fireOnClose with "WebSocket closed" — the FSM transition flows
+      // from there. No need to call fireOnClose here.
+      return;
+    }
+    try {
+      ws.ping();
+    } catch {
+      /* a failed ping just becomes a missed pong on the next tick */
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  if (typeof heartbeat.unref === "function") heartbeat.unref();
+
   return {
     serverId: input.serverId,
     transport: "websocket",
@@ -324,6 +389,7 @@ export async function connectWebSocket(
     resources,
     close: async () => {
       closed = true;
+      clearInterval(heartbeat);
       try {
         ws.close();
       } catch {

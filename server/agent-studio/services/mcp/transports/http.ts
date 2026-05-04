@@ -12,6 +12,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpOnCloseCallback,
   McpPrompt,
   McpResource,
   McpTool,
@@ -19,11 +20,33 @@ import type {
 import { McpError, McpAuthRequiredError } from "../types";
 
 const PROTOCOL_VERSION = "2024-11-05";
+// MCP hardening Phase 2.4: liveness heartbeat. Periodically call
+// `tools/list` (cheapest universally-supported RPC) to detect a server
+// that has gone away between user-driven calls. After
+// HEARTBEAT_FAILURES_BEFORE_CLOSE consecutive failures, fire `onClose`
+// so the manager drives the FSM to `failed` proactively.
+const HEARTBEAT_INTERVAL_MS = 60_000;
+const HEARTBEAT_FAILURES_BEFORE_CLOSE = 3;
 
 export interface HttpConnectInput {
   serverId: number;
   url: string;
   headers?: Record<string, string>;
+  /**
+   * MCP hardening Phase 2.1: when present, sent as `Authorization:
+   * Bearer <token>` on every request. Resolved by the manager via
+   * getValidAccessToken so the transport never touches encrypted
+   * storage or refresh logic directly.
+   */
+  bearerToken?: string;
+  /**
+   * MCP hardening Phase 1.1: accepted for symmetry with stateful
+   * transports. The HTTP transport is stateless (no long-lived
+   * connection), so there's no underlying socket that can die
+   * independently of an in-flight request — this callback is never
+   * invoked except by Phase 2.4's heartbeat on consecutive failures.
+   */
+  onClose?: McpOnCloseCallback;
 }
 
 export async function connectHttp(
@@ -35,6 +58,9 @@ export async function connectHttp(
     accept: "application/json",
     ...(input.headers ?? {}),
   };
+  if (input.bearerToken) {
+    baseHeaders.authorization = `Bearer ${input.bearerToken}`;
+  }
 
   const sendRpc = async <T = unknown>(
     method: string,
@@ -145,6 +171,33 @@ export async function connectHttp(
     resources = [];
   }
 
+  // Phase 2.4 heartbeat: started AFTER successful handshake so we
+  // never fire onClose during the connect path. Idempotent shutdown
+  // via `closed` flag.
+  let closed = false;
+  let heartbeatFails = 0;
+  const heartbeat = setInterval(async () => {
+    if (closed) return;
+    try {
+      await sendRpc("tools/list");
+      heartbeatFails = 0;
+    } catch {
+      heartbeatFails++;
+      if (heartbeatFails >= HEARTBEAT_FAILURES_BEFORE_CLOSE) {
+        clearInterval(heartbeat);
+        closed = true;
+        try {
+          input.onClose?.(
+            `heartbeat failed ${heartbeatFails} times in a row`
+          );
+        } catch {
+          /* never let onClose crash the heartbeat */
+        }
+      }
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  if (typeof heartbeat.unref === "function") heartbeat.unref();
+
   return {
     serverId: input.serverId,
     transport: "http",
@@ -152,7 +205,8 @@ export async function connectHttp(
     prompts,
     resources,
     close: async () => {
-      // Stateless — nothing to close
+      closed = true;
+      clearInterval(heartbeat);
     },
     callTool: async (name: string, args: Record<string, unknown>) => {
       return sendRpc("tools/call", { name, arguments: args });
