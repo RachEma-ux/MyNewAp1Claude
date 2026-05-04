@@ -71,16 +71,16 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 2 — Split Provider Connections public and internal surfaces
 
-- [ ] Create/update public no-secret surface.
-- [ ] Add `providerConnections.listActiveForProvider`.
-- [ ] Add `providerConnections.getConnectionStatus`.
-- [ ] Add `providerConnections.validateConnection`.
-- [ ] Ensure public outputs never include PAT, API key, encrypted secret, decrypted secret, or secret env values.
-- [ ] Create `server/provider-connections/internal/credential-resolver.ts`.
-- [ ] Implement `withProviderCredential(providerConnectionId, fn)`.
-- [ ] Ensure resolver never logs secret values.
-- [ ] Ensure resolver is not exported from router, index, or public API.
-- [ ] Add tests proving public API returns no secret material.
+- [x] Create/update public no-secret surface. *(public-api.ts populated with ProviderConnectionRef + 3 read fns)*
+- [x] Add `providerConnections.listActiveForProvider`. *(registered in manifest boot via registerPublicApi)*
+- [x] Add `providerConnections.getConnectionStatus`.
+- [x] Add `providerConnections.validateConnection`.
+- [x] Ensure public outputs never include PAT, API key, encrypted secret, decrypted secret, or secret env values. *(public-api.test.ts asserts on FORBIDDEN_PUBLIC_KEYS list including apiKey/pat/encryptedPat/Authorization/Bearer/x-api-key/etc.)*
+- [x] Create `server/provider-connections/internal/credential-resolver.ts`.
+- [x] Implement `withProviderCredential(providerConnectionId, fn)`. *(callback form per D2 — credential exists only inside fn closure)*
+- [x] Ensure resolver never logs secret values. *(no console/log statements; PAT scrubbed in finally)*
+- [x] Ensure resolver is not exported from router, index, or public API. *(internal/ subtree, not re-exported anywhere; lint enforcement lands in Phase 3)*
+- [x] Add tests proving public API returns no secret material. *(6 vitest cases pass — covers shape guards + nested-poison detection)*
 
 ### Phase 3 — Enforce credential resolver import boundary
 
