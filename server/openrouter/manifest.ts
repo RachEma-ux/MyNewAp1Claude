@@ -119,17 +119,38 @@ export const openRouterManifest: ModuleManifest = {
     // async iterable. Streaming consumers (Phase 17/18) call the
     // `stream()` function directly from inside OpenRouter.
 
+    // Plan v3 Phase 20 — per-intent receipt policy. The descriptor's
+    // `receiptRequired` flag is a single static boolean so we leave
+    // it `false` and enforce per-intent in the handler:
+    //   - `intent === "agent-test"` → no receipt required (sandboxed
+    //     test runs).
+    //   - any other intent (`agent-run` / `chat` / `evaluation`)
+    //     → receipt required; handler throws if missing.
+    // See `docs/architecture/provider-model-binding/RECEIPT_POLICY.md`.
+    const enforceModelAccessReceipt = (
+      intent: string,
+      sealed: { governanceReceiptId?: string },
+      action: "execute" | "stream",
+    ): void => {
+      if (intent === "agent-test") return;
+      if (sealed?.governanceReceiptId) return;
+      throw new Error(
+        `[ModelAccess] Action 'openRouter.modelAccess.${action}' with intent='${intent}' requires a governance receipt. Test intent ('agent-test') is exempt.`,
+      );
+    };
+
     registerPublicApi({
       module: "openRouter",
       action: "openRouter.modelAccess.execute",
-      handler: async (input) => {
+      handler: async (input, sealed) => {
         const payload = input as Parameters<typeof execute>[0];
+        enforceModelAccessReceipt(payload.intent, sealed ?? {}, "execute");
         return execute(payload);
       },
       descriptor: {
         key: "openRouter.modelAccess.execute",
         description:
-          "Execute a non-streaming provider model call via Model Access",
+          "Execute a non-streaming provider model call via Model Access (receipt required for non-test intents — see RECEIPT_POLICY.md)",
         risk: "medium",
         receiptRequired: false,
       },
@@ -138,13 +159,14 @@ export const openRouterManifest: ModuleManifest = {
     registerPublicApi({
       module: "openRouter",
       action: "openRouter.modelAccess.stream",
-      handler: async (input) => {
+      handler: async (input, sealed) => {
         // Gateway-call form: collect the full stream and return as a
         // single ModelAccessResult-shaped object. Direct streaming
         // consumers should import `stream` from
         // `server/openrouter/model-access` instead.
         const { stream } = await import("./model-access");
         const payload = input as Parameters<typeof stream>[0];
+        enforceModelAccessReceipt(payload.intent, sealed ?? {}, "stream");
         const start = Date.now();
         let combined = "";
         let finalUsage: undefined | NonNullable<Awaited<ReturnType<typeof execute>>["usage"]>;
@@ -168,7 +190,7 @@ export const openRouterManifest: ModuleManifest = {
       descriptor: {
         key: "openRouter.modelAccess.stream",
         description:
-          "Execute a streaming provider model call via Model Access (collected for gateway return)",
+          "Execute a streaming provider model call via Model Access (receipt required for non-test intents — see RECEIPT_POLICY.md)",
         risk: "medium",
         receiptRequired: false,
       },

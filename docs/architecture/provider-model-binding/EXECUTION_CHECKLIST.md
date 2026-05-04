@@ -311,16 +311,16 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 20 — Receipt policy table
 
-- [ ] Document receipt policy for every new action.
-- [ ] Set `providerConnections.validateAndStore` as high risk / receipt required.
-- [ ] Set `providerConnections.rotate` as high risk / receipt required.
-- [ ] Set `aiTypes.catalog.register` as high risk / receipt required.
-- [ ] Set `aiTypes.catalog.publish` as high risk / receipt required.
-- [ ] Set `agentStudio.agent.publish` as medium risk after lifecycle-only change.
-- [ ] Set `openRouter.modelAccess.execute` for test as policy-based.
-- [ ] Set `openRouter.modelAccess.execute` for production external run as high risk / receipt required.
-- [ ] Update manifests/governance action maps.
-- [ ] Add tests.
+- [x] Document receipt policy for every new action. *(`docs/architecture/provider-model-binding/RECEIPT_POLICY.md` — full table covering all Plan v3-touched actions plus enforcement notes.)*
+- [x] Set `providerConnections.validateAndStore` as high risk / receipt required. *(already set in `server/provider-connections/manifest.ts:53-56` — verified.)*
+- [x] Set `providerConnections.rotate` as high risk / receipt required. *(already set in `server/provider-connections/manifest.ts:65-68` — verified.)*
+- [x] Set `aiTypes.catalog.register` as high risk / receipt required. *(policy declared in RECEIPT_POLICY.md; the action handler is wired in Phase 25 — Phase 20 records the policy contract.)*
+- [x] Set `aiTypes.catalog.publish` as high risk / receipt required. *(already set in `server/ai-types/manifest.ts:35-38` — verified.)*
+- [x] Set `agentStudio.agent.publish` as medium risk after lifecycle-only change. *(downgraded from high to medium in both `server/agent-studio/manifest.ts` and `server/agent-studio/boot.ts`. Receipt remains required. publishRelease is already lifecycle-only — writes `ags_agent_releases` + flips `ags_agents.lifecycleState`, no catalog writes.)*
+- [x] Set `openRouter.modelAccess.execute` for test as policy-based. *(handler enforcement in `server/openrouter/manifest.ts`: `intent="agent-test"` is exempt from the receipt check.)*
+- [x] Set `openRouter.modelAccess.execute` for production external run as high risk / receipt required. *(handler throws with stable error `"requires a governance receipt"` for `intent ∈ {agent-run, chat, evaluation}` when no `governanceReceiptId` is on the sealed context. Same enforcement extended to `modelAccess.stream`.)*
+- [x] Update manifests/governance action maps. *(openRouter manifest descriptors' descriptions now reference the per-intent policy and link to RECEIPT_POLICY.md; agentStudio.agent.publish description updated to clarify lifecycle-only scope; governance-actions count remains 74/74.)*
+- [x] Add tests. *(`server/openrouter/manifest-receipt-policy.test.ts`: 7 cases — agent-test pass for execute + stream; agent-run / chat / evaluation refused for execute; agent-run refused for stream; chat WITH receipt accepted.)*
 
 ### Phase 21 — Provider/model use governance
 
