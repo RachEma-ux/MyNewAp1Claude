@@ -29,14 +29,6 @@ const PROVIDER_MAP: Record<string, string> = {
   groq: "groq",
 };
 
-// Map provider types to the env vars OpenCode serve mode actually reads
-const PROVIDER_ENV_MAP: Record<string, string> = {
-  openai: "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-  google: "GOOGLE_API_KEY",
-  groq: "GROQ_API_KEY",
-};
-
 /**
  * Read provider API keys from the app DB and write them to
  * OpenCode's auth.json. Preserves existing credentials not
@@ -100,19 +92,24 @@ export async function syncProviderKeysToOpenCode(): Promise<{
       } catch { /* proot overlay not available — keys still set via env vars */ }
     }
 
-    // Also set env vars on the current process so that any OpenCode serve
-    // instance spawned from here inherits the latest keys without restart.
-    for (const row of rows.rows || rows || []) {
-      const appType = row.type as string;
-      const envVar = PROVIDER_ENV_MAP[appType];
-      if (!envVar) continue;
-      try {
-        const config = typeof row.config === "string" ? JSON.parse(row.config) : row.config;
-        if (config?.apiKey) {
-          process.env[envVar] = config.apiKey;
-        }
-      } catch { /* skip */ }
-    }
+    // NOTE: previous revisions of this function also wrote
+    // `process.env[envVar] = config.apiKey` at the end so spawned
+    // OpenCode serve instances would inherit the keys. That mutation
+    // was a cross-module footgun: the providers table stores apiKey
+    // ENCRYPTED (via `encrypt()` in _core/index.ts:autoProvisionProviders),
+    // and writing the ciphertext into process.env clobbered the
+    // plaintext value loaded from .env at boot. Other modules
+    // (Agent Studio chat resolver, etc.) then read the encrypted blob
+    // from process.env and sent it verbatim to the LLM provider,
+    // which 401'd because it's not a valid key.
+    //
+    // Fix: never mutate process.env from this sync. If a child
+    // OpenCode process needs the keys, pass them explicitly through
+    // `spawn`'s env option using a decrypted value — don't pollute
+    // the parent's global env. Other code paths that resolve provider
+    // keys (Agent Studio's resolveProviderApiKey, etc.) continue to
+    // read the original .env / boot-time env that hasn't been
+    // tampered with.
 
   } catch (err: any) {
     errors.push(`DB access failed: ${err.message}`);
