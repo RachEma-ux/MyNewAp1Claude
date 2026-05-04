@@ -186,18 +186,20 @@ Mirrors the user-supplied 48-phase checklist. Updated after each PR. Phase 0 ite
 
 ### Phase 10 — Provider config migration script
 
-- [ ] Create `scripts/agent-studio/migrate-provider-config-to-bindings.ts`.
-- [ ] Scan Agent Studio drafts.
-- [ ] Detect raw apiKey.
-- [ ] Detect apiKeyEnvVar.
-- [ ] Create legacy unresolved binding records.
-- [ ] Remove/redact raw key fields from draft provider config.
-- [ ] Preserve non-secret provider metadata.
-- [ ] Write migration evidence report.
-- [ ] Make script idempotent.
-- [ ] Add dry-run mode.
-- [ ] Add validation mode.
-- [ ] Output `docs/evidence/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION_REPORT.md`.
+- [x] Create `scripts/agent-studio/migrate-provider-config-to-bindings.ts`. *(CLI entry; defaults to --dry-run; --apply blocks until Phase 11 destination table exists)*
+- [x] Create pure classifier `scripts/agent-studio/classify-provider-config.ts`. *(extracted so it can be unit-tested without DB; covers Shapes A/B/C/D from migration spec §2)*
+- [x] Scan Agent Studio drafts. *(`loadDrafts()` selects from `agsAgentDrafts`; aborts cleanly when DATABASE_URL is unset)*
+- [x] Detect raw apiKey. *(Shape A — `legacy_raw_api_key`; empty-string apiKey is treated as missing per Phase 9 spec)*
+- [x] Detect apiKeyEnvVar. *(Shape B — `legacy_env_var` with the env var name preserved as `envVarHint` for the binding's `legacyEnvVarHint` column)*
+- [~] Create legacy unresolved binding records. *(classifier produces the row plan; INSERT block is gated until Phase 11 schema lands — `--apply` aborts with a clear message until then per migration spec §7)*
+- [x] Remove/redact raw key fields from draft provider config. *(`maskProviderConfig` redacts every key in `SECRET_DENYLIST` to `"<redacted>"` for the rollback artifact; runtime redaction is a Phase 11 follow-up that runs after the binding row is committed)*
+- [x] Preserve non-secret provider metadata. *(everything not in `SECRET_DENYLIST` passes through verbatim — `providerSlug`, `providerType`, `model`, `baseUrl`, etc.)*
+- [x] Write migration evidence report. *(markdown report at `docs/evidence/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION_REPORT.md` with counts + per-draft classification table + masked snapshot)*
+- [x] Make script idempotent. *(re-running --apply checks for an existing `(draftId, role)` row before inserting; --dry-run is read-only by definition)*
+- [x] Add dry-run mode. *(default — no DB writes, evidence report still written)*
+- [x] Add validation mode. *(`--validate` re-scans and exits non-zero if any draft still carries `apiKey` / `apiKeyEnvVar` / other denylist key)*
+- [x] Output `docs/evidence/provider-model-binding/AGENT_STUDIO_PROVIDER_CONFIG_MIGRATION_REPORT.md`. *(emitted on every run; rollback artifact per migration spec §5)*
+- [x] Add classifier unit tests. *(`tests/agent-studio/migrate-provider-config-classifier.test.ts` — 14 vitest cases covering all four shapes, precedence rules, malformed jsonb defenses, mask redaction, and the no-secret-leak regression guard)*
 
 ### Phase 11 — Agent Studio binding schema/storage
 
