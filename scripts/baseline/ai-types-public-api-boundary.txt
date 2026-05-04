@@ -1,0 +1,44 @@
+# AI Types public-API boundary baseline
+#
+# Plan v3 Phase 26 deliverable. Each line is a server/-relative path
+# that imports from `server/ai-types/<private-module>` (i.e. anything
+# other than `public-api.ts`, `manifest.ts`, `types.ts`, `contracts.ts`,
+# `events.ts`, `ports.ts`).
+#
+# These 18 files are the LA-02 entry in LEGACY_EXCEPTION_REGISTER.md.
+# Each is flagged as a baseline WARNING by the boundary check; new
+# violations outside this list FAIL the check.
+#
+# Migration deadlines:
+#   - Phase 26.1 — full barrel-strip + caller migration (follow-up PR)
+#   - Stage 8 cleanup — any residual after Phase 26.1
+#
+# The barrel re-exports at server/db.ts:34 and server/db/index.ts:19
+# are NOT on this list — they are tracked separately as LA-01 and
+# stripping them is the Phase 26.1 deliverable.
+#
+# Ordering: alphabetical for review stability. Comments (#) and blank
+# lines are ignored by the check.
+
+server/_core/index.ts
+server/agents/executor.ts
+server/agents/stream.ts
+server/catalog-import/router.ts
+server/db.ts
+server/db/catalog.ts
+server/db/index.ts
+server/governance/router.ts
+server/llm/authority.ts
+server/modules/pmt/context-translator-agent.ts
+server/modules/pmt/idea-builder-agent.ts
+server/platform/modules/module-routers.ts
+server/providers/catalog-guard.ts
+server/providers/router.ts
+server/ps/context-translator-router.ts
+server/routers/agents.ts
+server/routers/bots.ts
+server/routers/catalog-manage.ts
+server/routers/catalog-registry.ts
+server/routers/conversations.ts
+server/routers/models.ts
+server/sandbox-wf/seed-orchestrator.ts
