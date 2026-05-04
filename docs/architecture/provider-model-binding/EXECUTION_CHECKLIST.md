@@ -423,9 +423,9 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 29 — Export Catalog contract
 
-- [ ] Define `AgentStudioExportCandidate`.
-- [ ] Include workspaceId, agentId, versionId, name, lifecycle state, readiness score, governance verdict, provider binding status, provider/model refs, capabilities, sourceModule = agentStudio, sourceRefId = agentId, activeSourceVersionId, export status.
-- [ ] Exclude internals and secrets.
+- [x] Define `AgentStudioExportCandidate`. *(`server/agent-studio/shared/export-candidate.ts` — types + `AGENT_STUDIO_EXPORT_CANDIDATE_KEYS` + `FORBIDDEN_EXPORT_CANDIDATE_KEYS`. Field naming follows Phase 27/28 conventions so candidates can be assembled directly from the snapshot fns.)*
+- [x] Include workspaceId, agentId, versionId, name, lifecycle state, readiness score, governance verdict, provider binding status, provider/model refs, capabilities, sourceModule = agentStudio, sourceRefId = agentId, activeSourceVersionId, export status. *(All fields present; readiness + governance + binding are nested objects so the contract test can lock their inner shapes too.)*
+- [x] Exclude internals and secrets. *(`FORBIDDEN_EXPORT_CANDIDATE_KEYS` enumerates apiKey, providerConfig, secret(s), credentials, bearerToken, releaseNotes, approvalStateJson, systemInstructions, roleInstructions, envVar/env/process. Test asserts none appear at any nesting level.)*
 
 ### Phase 30 — Export Catalog backend
 
