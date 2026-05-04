@@ -28,6 +28,7 @@ import { kgraAgentManifest } from "../../kgra-agent/manifest";
 import { communicationManifest } from "../../communication/manifest";
 import { pmCentralManifest } from "../../pm-central/manifest";
 import { dataAnalysisManifest } from "../../data-analysis/manifest";
+import { providerConnectionsManifest } from "../../provider-connections/manifest";
 
 export const ALL_MANIFESTS: ModuleManifest[] = [
   // Pilot modules (priority migration set)
@@ -48,6 +49,8 @@ export const ALL_MANIFESTS: ModuleManifest[] = [
   communicationManifest,
   pmCentralManifest,
   dataAnalysisManifest,
+  // Platform infrastructure modules (Plan v3 D3 — not RTLMs).
+  providerConnectionsManifest,
 ];
 
 let _registered = false;
