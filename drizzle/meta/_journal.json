@@ -260,6 +260,13 @@
       "when": 1779408000000,
       "tag": "0037_publish_catalog_ready",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1779494400000,
+      "tag": "0038_catalog_source_versioning",
+      "breakpoints": true
     }
   ]
 }

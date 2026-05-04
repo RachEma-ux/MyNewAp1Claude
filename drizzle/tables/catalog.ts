@@ -46,6 +46,33 @@ export const catalogEntries = pgTable("catalog_entries", {
   // Tags
   tags: json("tags").$type<string[]>(),
 
+  /**
+   * Plan v3 Phase 23 — active source version pointer.
+   *
+   * For Agent Studio-sourced catalog entries (`sourceType="ags_agent"`),
+   * this is the `ags_agent_releases.id` of the currently published
+   * release. Phase 25's `aiTypes.catalog.register` writes this when
+   * registering / updating from a `catalog_ready_at` candidate.
+   *
+   * Null until an entry is bound to a versioned source (e.g.
+   * legacy admin-created rows that pre-date Plan v3 versioning).
+   */
+  activeSourceVersionId: integer("active_source_version_id"),
+
+  /**
+   * Plan v3 Phase 23 — legacy-import classification.
+   *
+   * Marks rows that originated before Plan v3's `aiTypes.catalog.register`
+   * pipeline. Values:
+   *   - null            → modern Plan v3 entry (registered via `aiTypes.catalog.register`)
+   *   - "legacy_imported"        → backfilled from a legacy Agent Studio
+   *     write path with a confident sourceType + sourceId mapping
+   *   - "legacy_imported_unresolved" → row exists but source can't be
+   *     determined (e.g. sourceId points at a deleted ags_agent row).
+   *     Phase 24 reconciliation owns these.
+   */
+  legacyImportState: varchar("legacy_import_state", { length: 50 }),
+
   // Validation state
   lastValidatedAt: timestamp("lastValidatedAt"),
   validationStatus: varchar("validationStatus", { length: 50 }),
