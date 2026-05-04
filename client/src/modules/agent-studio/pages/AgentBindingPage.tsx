@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Link as LinkIcon, AlertTriangle } from "lucide-react";
+import { Loader2, Link as LinkIcon, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   PageHeader,
   LoadingState,
@@ -167,6 +167,28 @@ export default function AgentBindingPage({
     { enabled: existingBinding.data !== undefined && existingBinding.data !== null },
   );
 
+  const refreshMut =
+    trpc.agentStudio.providerBindings.refreshValidation.useMutation({
+      onSuccess: (res) => {
+        if (res.ok) {
+          toast.success("Binding revalidated");
+        } else {
+          toast.error(`Validation failed: ${res.reason ?? "unknown"}`);
+        }
+        utils.agentStudio.providerBindings.validate.invalidate({
+          draftId,
+          role: "primary",
+        });
+        utils.agentStudio.providerBindings.getForDraft.invalidate({
+          draftId,
+          role: "primary",
+        });
+      },
+      onError: (err) => {
+        toast.error(`Refresh failed: ${err.message}`);
+      },
+    });
+
   if (ctxQuery.isLoading || existingBinding.isLoading) return <LoadingState label="Loading binding…" />;
   if (ctxQuery.error) return <div className="text-sm text-destructive">{ctxQuery.error.message}</div>;
 
@@ -213,8 +235,16 @@ export default function AgentBindingPage({
     | {
         ok: boolean;
         reason?: string;
+        lastValidatedAt?: string | Date | null;
+        staleAtCallTime?: boolean;
       }
     | undefined;
+  const lastValidatedAt = (() => {
+    const raw = validation?.lastValidatedAt;
+    if (!raw) return null;
+    const d = typeof raw === "string" ? new Date(raw) : raw;
+    return isNaN(d.getTime()) ? null : d;
+  })();
 
   return (
     <div className="space-y-4">
@@ -340,7 +370,7 @@ export default function AgentBindingPage({
             )}
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={upsertMut.isPending}>
               {upsertMut.isPending ? (
                 <>
@@ -351,9 +381,48 @@ export default function AgentBindingPage({
               )}
             </Button>
             {validation && (
-              <Badge variant={validation.ok ? "default" : "destructive"}>
-                {validation.ok ? "Active" : `Blocked: ${validation.reason ?? "unknown"}`}
+              <Badge
+                variant={
+                  validation.ok && !validation.staleAtCallTime
+                    ? "default"
+                    : validation.staleAtCallTime
+                      ? "secondary"
+                      : "destructive"
+                }
+              >
+                {validation.ok && !validation.staleAtCallTime
+                  ? "Active"
+                  : validation.staleAtCallTime
+                    ? "Degraded: validation stale"
+                    : `Blocked: ${validation.reason ?? "unknown"}`}
               </Badge>
+            )}
+            {binding && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    refreshMut.mutate({ draftId, role: "primary" })
+                  }
+                  disabled={refreshMut.isPending}
+                >
+                  {refreshMut.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Refreshing…
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-3 w-3" /> Refresh validation
+                    </>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {lastValidatedAt
+                    ? `Last validated at ${lastValidatedAt.toLocaleString()}`
+                    : "Never validated since Phase 15 landed"}
+                </span>
+              </>
             )}
           </div>
         </CardContent>

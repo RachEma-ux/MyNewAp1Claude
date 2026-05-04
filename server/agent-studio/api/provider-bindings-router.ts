@@ -19,6 +19,7 @@ import {
   listBindingsForAgent,
   removeAgentProviderBinding,
   validateBindingPolicy,
+  refreshBindingValidation,
   resolveForRun,
 } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
@@ -150,6 +151,11 @@ export const providerBindingsRouter = router({
   /**
    * Reference/policy validation. Cheap, no upstream HTTP — see
    * docs/architecture/provider-model-binding/VALIDATOR_SPLIT.md.
+   *
+   * Plan v3 Phase 15 — does NOT refresh `lastValidatedAt`; the UI
+   * uses this query to render the binding's stored status (including
+   * staleAtCallTime). Use the `refreshValidation` mutation to do an
+   * operator-triggered re-check that writes the timestamp.
    */
   validate: protectedProcedure
     .input(
@@ -159,7 +165,26 @@ export const providerBindingsRouter = router({
       }),
     )
     .query(async ({ input }) => {
-      return validateBindingPolicy(input.draftId, input.role);
+      return validateBindingPolicy(input.draftId, input.role, {
+        refreshTimestamp: false,
+        staleAsDegraded: false,
+      });
+    }),
+
+  /**
+   * Plan v3 Phase 15 — operator-triggered refresh. Re-runs the policy
+   * validator and, on success, writes `lastValidatedAt = now` to the
+   * binding row. Returns the same shape as `validate`.
+   */
+  refreshValidation: protectedProcedure
+    .input(
+      z.object({
+        draftId: z.number().int().positive(),
+        role: z.string().min(1).max(32).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return refreshBindingValidation(input.draftId, input.role);
     }),
 
   /**

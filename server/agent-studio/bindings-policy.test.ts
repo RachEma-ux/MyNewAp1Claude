@@ -26,7 +26,9 @@ import { getAsDb } from "./db/connection";
 import { getBindingEligibility } from "../provider-connections/public-api";
 import {
   validateBindingPolicy,
+  refreshBindingValidation,
   resolveForRun,
+  VALIDATION_STALENESS_MS,
   FORBIDDEN_BINDING_KEYS,
 } from "./bindings";
 
@@ -35,14 +37,23 @@ const mockedEligibility = getBindingEligibility as unknown as ReturnType<
   typeof vi.fn
 >;
 
-function makeDbWithRow(row: unknown | null) {
+function makeDbWithRow(row: unknown | null, opts: { updateSpy?: ReturnType<typeof vi.fn> } = {}) {
   const select = vi.fn(() => {
     const b: any = {};
     b.from = vi.fn().mockReturnValue(b);
     b.where = vi.fn().mockResolvedValue(row ? [row] : []);
     return b;
   });
-  return { select };
+  const update = vi.fn(() => {
+    const b: any = {};
+    b.set = vi.fn((vals: Record<string, unknown>) => {
+      opts.updateSpy?.(vals);
+      return b;
+    });
+    b.where = vi.fn().mockResolvedValue([]);
+    return b;
+  });
+  return { select, update };
 }
 
 function bindingRow(overrides: Record<string, unknown> = {}) {
@@ -160,6 +171,84 @@ describe("validateBindingPolicy", () => {
     expect(r.ok).toBe(true);
     expect(mockedEligibility).not.toHaveBeenCalled();
   });
+
+  it("Phase 15: marks staleAtCallTime=true when lastValidatedAt is null", async () => {
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: null })),
+    );
+    mockedEligibility.mockResolvedValue({
+      providerConnectionId: 42,
+      ok: true,
+      lifecycleStatus: "active",
+      healthStatus: "ok",
+    });
+    const r = await validateBindingPolicy(1, "primary", {
+      refreshTimestamp: false,
+      staleAsDegraded: false,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.staleAtCallTime).toBe(true);
+    expect(r.lastValidatedAt).toBeNull();
+  });
+
+  it("Phase 15: marks staleAtCallTime=false when lastValidatedAt is recent", async () => {
+    const recent = new Date(Date.now() - 30_000); // 30s ago
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: recent })),
+    );
+    mockedEligibility.mockResolvedValue({
+      providerConnectionId: 42,
+      ok: true,
+      lifecycleStatus: "active",
+      healthStatus: "ok",
+    });
+    const r = await validateBindingPolicy(1, "primary", {
+      refreshTimestamp: false,
+      staleAsDegraded: false,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.staleAtCallTime).toBe(false);
+    expect(r.lastValidatedAt).toEqual(recent);
+  });
+
+  it("Phase 15: returns validation_stale when stale + staleAsDegraded + no refresh", async () => {
+    const old = new Date(Date.now() - VALIDATION_STALENESS_MS - 60_000);
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: old })),
+    );
+    mockedEligibility.mockResolvedValue({
+      providerConnectionId: 42,
+      ok: true,
+      lifecycleStatus: "active",
+      healthStatus: "ok",
+    });
+    const r = await validateBindingPolicy(1, "primary", {
+      refreshTimestamp: false,
+      staleAsDegraded: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("validation_stale");
+    expect(r.staleAtCallTime).toBe(true);
+  });
+
+  it("Phase 15: writes lastValidatedAt on refresh path", async () => {
+    const updateSpy = vi.fn();
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: null }), { updateSpy }),
+    );
+    mockedEligibility.mockResolvedValue({
+      providerConnectionId: 42,
+      ok: true,
+      lifecycleStatus: "active",
+      healthStatus: "ok",
+    });
+    const r = await refreshBindingValidation(1);
+    expect(r.ok).toBe(true);
+    expect(updateSpy).toHaveBeenCalled();
+    const writtenVals = updateSpy.mock.calls[0][0] as Record<string, unknown>;
+    expect(writtenVals.lastValidatedAt).toBeInstanceOf(Date);
+    expect(r.lastValidatedAt).toBeInstanceOf(Date);
+  });
 });
 
 describe("resolveForRun", () => {
@@ -169,7 +258,11 @@ describe("resolveForRun", () => {
   });
 
   it("returns ok=true with providerConnection ref when binding is healthy", async () => {
-    mockedGetAsDb.mockReturnValue(makeDbWithRow(bindingRow()));
+    // Phase 15: row must have a recent `lastValidatedAt` for runtime
+    // preflight to accept it (`staleAsDegraded:true, refreshTimestamp:false`).
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: new Date() })),
+    );
     mockedEligibility.mockResolvedValue({
       providerConnectionId: 42,
       ok: true,
@@ -190,7 +283,11 @@ describe("resolveForRun", () => {
   it("returns providerConnection=null for local-provider bindings", async () => {
     mockedGetAsDb.mockReturnValue(
       makeDbWithRow(
-        bindingRow({ providerConnectionId: null, modelRef: "llama3.1:8b" }),
+        bindingRow({
+          providerConnectionId: null,
+          modelRef: "llama3.1:8b",
+          lastValidatedAt: new Date(),
+        }),
       ),
     );
     const r = await resolveForRun({ draftId: 1 });
@@ -215,5 +312,22 @@ describe("resolveForRun", () => {
     expect(r.reason).toBe("binding_not_found");
     // Even on the not-found path, no credentials in the response.
     expect(() => assertNoForbiddenKeys(r)).not.toThrow();
+  });
+
+  it("Phase 15: refuses to resolve when binding is stale", async () => {
+    const old = new Date(Date.now() - VALIDATION_STALENESS_MS - 60_000);
+    mockedGetAsDb.mockReturnValue(
+      makeDbWithRow(bindingRow({ lastValidatedAt: old })),
+    );
+    mockedEligibility.mockResolvedValue({
+      providerConnectionId: 42,
+      ok: true,
+      lifecycleStatus: "active",
+      healthStatus: "ok",
+    });
+    const r = await resolveForRun({ draftId: 1 });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("validation_stale");
+    expect(r.providerConnection).toBeNull();
   });
 });
