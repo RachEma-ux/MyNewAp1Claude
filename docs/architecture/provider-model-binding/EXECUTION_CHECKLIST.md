@@ -372,12 +372,12 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 24 — Existing Agent Studio catalog rows reconciliation
 
-- [ ] Treat old Agent Studio-created catalog rows as `legacy_imported`.
-- [ ] Display them as "Imported (legacy)" in AS Candidate Pipeline.
-- [ ] Put ambiguous rows in Reconcile tab.
-- [ ] Do not auto-reimport legacy rows.
-- [ ] Add "Reconcile Legacy Import" action.
-- [ ] Add duplicate prevention tests.
+- [x] Treat old Agent Studio-created catalog rows as `legacy_imported`. *(Backfill script `scripts/catalog/phase-24-backfill-legacy-import.ts` writes `legacy_import_state` per the rules in `CATALOG_SOURCE_MAPPING.md`.)*
+- [ ] Display them as "Imported (legacy)" in AS Candidate Pipeline. *(Deferred to Stage 7 — the AS Candidate Pipeline page is built in Phases 27+. The classification column is in place; the page reads it when it lands.)*
+- [ ] Put ambiguous rows in Reconcile tab. *(Deferred for the same reason — `legacy_imported_unresolved` is the column value the Reconcile tab will filter on.)*
+- [x] Do not auto-reimport legacy rows. *(`checkDuplicateLegacyImport()` in `server/ai-types/legacy-import.ts` blocks re-import unless `reconcileMode=true`. Phase 25's `aiTypes.catalog.register` is wired to call this gate.)*
+- [x] Add "Reconcile Legacy Import" action. *(Backend: `reconcileLegacyImport()` in `server/ai-types/legacy-import.ts`. The tRPC procedure + UI button land with the AS Candidate Pipeline page in Stage 7 — Phase 24 ships the action core so the UI hookup is a one-liner later.)*
+- [x] Add duplicate prevention tests. *(`server/ai-types/legacy-import.test.ts` — 19 tests covering classifier rules, duplicate guard, and Reconcile flow.)*
 
 ### Phase 25 — Direct catalog_entries writer migration matrix
 
