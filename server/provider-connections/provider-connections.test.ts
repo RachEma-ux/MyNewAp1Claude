@@ -276,10 +276,13 @@ vi.mock("./db", () => ({
       updatedAt: new Date(),
     };
     _connections.push(conn);
-    return conn;
+    // Return a snapshot — like a real DB read — so callers can't
+    // observe later mutations through their captured reference.
+    return { ...conn };
   }),
   getConnectionById: vi.fn(async (id: number) => {
-    return _connections.find((c: any) => c.id === id) ?? null;
+    const found = _connections.find((c: any) => c.id === id);
+    return found ? { ...found } : null;
   }),
   getConnectionsByWorkspace: vi.fn(async (wsId: number) => {
     return _connections.filter((c: any) => c.workspaceId === wsId);
@@ -295,6 +298,14 @@ vi.mock("./db", () => ({
       conn.lifecycleStatus = status;
       conn.updatedAt = new Date();
       if (extra) Object.assign(conn, extra);
+    }
+  }),
+  updateConnectionInventory: vi.fn(async (id: number, inventory: any) => {
+    const conn = _connections.find((c: any) => c.id === id);
+    if (conn) {
+      conn.updatedAt = new Date();
+      if (inventory.modelCount !== undefined) conn.modelCount = inventory.modelCount;
+      if (inventory.capabilities !== undefined) conn.capabilities = inventory.capabilities;
     }
   }),
   deleteConnection: vi.fn(async (id: number) => {
@@ -384,6 +395,47 @@ describe("Service Orchestration", () => {
 
     // Audit trail should have 4+ entries
     expect(_auditLogs.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("activate → background syncModelInventory does NOT demote lifecycleStatus", async () => {
+    // Regression: activateConnection captures the connection BEFORE its
+    // own status update, then fires syncModelInventory(conn) async. If
+    // sync writes back conn.lifecycleStatus it demotes "active" → the
+    // stale "validated". Verify the row stays "active" after the sync.
+    let modelsResolve: (v: any) => void = () => {};
+    const modelsBlocker = new Promise((resolve) => {
+      modelsResolve = resolve;
+    });
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      // First call: testConnection during validateAndStore → return immediately.
+      // Subsequent calls: syncModelInventory after activate → block until we let go.
+      if ((globalThis.fetch as any).mock.calls.length > 1) {
+        await modelsBlocker;
+      }
+      return {
+        ok: true,
+        json: async () => ({ data: [{ id: "gpt-4" }, { id: "gpt-4o" }] }),
+      };
+    });
+
+    const conn = await createProviderConnection({
+      providerId: 1,
+      workspaceId: 1,
+      baseUrl: "https://api.openai.com",
+      createdBy: 1,
+    });
+    await validateAndStoreSecret({ connectionId: conn.id, pat: "sk-x", actor: 1 });
+    await activateConnection(conn.id, 1);
+    expect(_connections[0].lifecycleStatus).toBe("active");
+
+    // Let the deferred syncModelInventory complete and then settle.
+    modelsResolve(null);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Lifecycle must still be "active" — the inventory refresh should
+    // touch modelCount only, never lifecycleStatus.
+    expect(_connections[0].lifecycleStatus).toBe("active");
+    expect(_connections[0].modelCount).toBe(2);
   });
 
   it("validate fails → PAT is NOT stored", async () => {

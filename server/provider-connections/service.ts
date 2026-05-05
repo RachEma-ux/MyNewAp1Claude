@@ -19,6 +19,7 @@ import {
   getConnectionsByWorkspace,
   getActiveConnections,
   updateConnectionStatus,
+  updateConnectionInventory,
   deleteConnection,
   insertSecret,
   getLatestSecret,
@@ -336,9 +337,7 @@ async function syncModelInventory(conn: ProviderConnection): Promise<void> {
   }
 
   if (modelIds.length > 0) {
-    await updateConnectionStatus(conn.id, conn.lifecycleStatus as any, {
-      modelCount: modelIds.length,
-    });
+    await updateConnectionInventory(conn.id, { modelCount: modelIds.length });
     console.log(`[ProviderConnections] Synced ${modelIds.length} models for conn ${conn.id}`);
   }
 }
