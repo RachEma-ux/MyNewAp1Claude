@@ -258,15 +258,37 @@ export async function prepareExportRegisterPayload(
         displayName: candidate.name,
         description: null,
         scope: "app",
-        status: "active",
+        // Plan v3 Phase 37 — initial catalog state for fresh AS imports.
+        // Subsequent reviewer actions (approve/activate) are admin-driven
+        // through the existing catalog-manage tRPC surface.
+        status: "draft",
         origin: "agent_studio",
-        reviewState: "approved",
+        reviewState: "needs_review",
+        // Phase 23 — active_source_version_id is a top-level column on
+        // catalog_entries; the Phase 24 backfill rules + Phase 25
+        // register expect it there, not in config.
+        activeSourceVersionId: candidate.activeSourceVersionId,
+        // Phase 37 — store the full export DTO in config/metadata so the
+        // catalog row carries the export-time snapshot (governance verdict,
+        // readiness score, eligibility gates) without re-running the verdicts.
+        // The DTO is the AgentStudioExportCandidate shape from Phase 29 —
+        // already validated to exclude every secret-leak vector.
         config: {
-          versionId: candidate.versionId,
-          activeSourceVersionId: candidate.activeSourceVersionId,
-          binding: candidate.binding,
-          capabilities: candidate.capabilities,
-          readinessScore: candidate.readiness.readinessScore,
+          exportDto: {
+            versionId: candidate.versionId,
+            lifecycleState: candidate.lifecycleState,
+            readiness: candidate.readiness,
+            governance: candidate.governance,
+            binding: candidate.binding,
+            capabilities: candidate.capabilities,
+            sourceModule: candidate.sourceModule,
+            sourceRefId: candidate.sourceRefId,
+            activeSourceVersionId: candidate.activeSourceVersionId,
+          },
+          eligibilityGates: eligibility.gates.map((g) => ({
+            gate: g.gate,
+            pass: g.pass,
+          })),
         },
         tags: ["agent-studio-export", ...candidate.capabilities],
         createdBy: input.registeredBy,

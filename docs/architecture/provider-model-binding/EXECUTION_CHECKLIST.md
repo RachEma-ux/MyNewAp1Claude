@@ -507,13 +507,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 37 — Catalog entry creation from export DTO
 
-- [ ] Create/update one catalog entry per Agent Studio agent.
-- [ ] Dedup by entryType + sourceModule + sourceRefId.
-- [ ] Store active version as `activeSourceVersionId` or metadata.
-- [ ] Set initial status `draft`.
-- [ ] Set review state `needs_review`.
-- [ ] Store export DTO safely in config/metadata.
-- [ ] Add duplicate prevention tests.
+- [x] Create/update one catalog entry per Agent Studio agent. *(`prepareExportRegisterPayload` produces a single register payload per candidate; `aiTypes.catalog.register` (Phase 25) creates new or updates existing modern row at `(sourceType, sourceId)`.)*
+- [x] Dedup by entryType + sourceModule + sourceRefId. *(Two layers: Phase 24's `checkDuplicateLegacyImport` blocks legacy collisions inside register; Phase 31's `not_already_imported` gate blocks re-export of already-imported candidates.)*
+- [x] Store active version as `activeSourceVersionId` or metadata. *(Top-level `activeSourceVersionId` field on the register payload matches Phase 23's `catalog_entries.active_source_version_id` column.)*
+- [x] Set initial status `draft`. *(Phase 30 was setting `active`; Phase 37 corrects to `draft`. Existing `catalog-manage` admin tRPC routes promote draft → active after review.)*
+- [x] Set review state `needs_review`. *(Same correction — was `approved`, now `needs_review`.)*
+- [x] Store export DTO safely in config/metadata. *(Full `AgentStudioExportCandidate` (Phase 29) plus the `eligibilityGates` summary go into `config.exportDto` and `config.eligibilityGates`. The contract is already proven by Phase 29's recursive forbidden-key test — no secret leak path.)*
+- [x] Add duplicate prevention tests. *(Phase 31 `not_already_imported` test asserts re-export blocked; Phase 24 `checkDuplicateLegacyImport` tests already cover the lower-layer guard. Phase 37 adds 3 new tests on `prepareExportRegisterPayload`'s output: status/reviewState shape, activeSourceVersionId top-level, exportDto in config.)*
 
 ### Phase 38 — AI Types register action
 
