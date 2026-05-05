@@ -32,6 +32,7 @@ import {
   type AgentStatus,
 } from "@shared/agent-lifecycle";
 import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
+import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
 import { getAuditLogger } from "../services/auditLogger";
 
@@ -563,9 +564,18 @@ export const agentsRouter = router({
       };
     }),
 
+  /**
+   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
+   * Use the gateway action `aiTypes.catalog.register` (Phase 25) instead,
+   * which runs the duplicate-prevention guard, threads governance receipts,
+   * and emits `aiTypes.catalog.registered` for downstream subscribers.
+   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`.
+   * Removal is gated on caller migration (Phase 26.1).
+   */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
+      warnLegacyImportToCatalog("agents.importToCatalog");
       const db = getDb();
 
       const [agent] = await db
@@ -678,6 +688,9 @@ export const agentsRouter = router({
           reviewState: "needs_review",
           status: "draft",
           tags: ["candidate", "agent", "catalog-import", status],
+          // Plan v3 Phase 47 — legacy path marker so audit consumers
+          // can filter to spot calls that bypassed aiTypes.catalog.register.
+          deprecated: true,
         },
       });
 

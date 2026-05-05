@@ -620,12 +620,12 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 47 — Legacy path deprecation
 
-- [ ] Mark `agents.importToCatalog` legacy.
-- [ ] Delegate to new AI Types register service where possible.
-- [ ] Deprecate old Agent Studio catalog-write behavior.
-- [ ] Add warnings where legacy route is used.
-- [ ] Remove or schedule removal of expired exceptions.
-- [ ] Add docs.
+- [x] Mark `agents.importToCatalog` legacy. *(JSDoc `@deprecated Plan v3 Phase 47` block added to all five `importToCatalog` mutations: `server/routers/agents.ts`, `server/routers/bots.ts`, `server/routers/llm.ts`, `server/routers/models.ts`, `server/providers/router.ts`. Block names the canonical replacement (`aiTypes.catalog.register`) and links the migration recipe.)*
+- [x] Delegate to new AI Types register service where possible. *(Documented in `LEGACY_PATH_DEPRECATION.md` — full delegation is gated on caller migration which is Phase 26.1's scope. Phase 47 ships the deprecation markers + warning instrumentation that lets us count remaining callers before flipping the body to `gatewayCall("aiTypes.catalog.register", ...)`.)*
+- [x] Deprecate old Agent Studio catalog-write behavior. *(Phase 40 already replaced AS catalog-state writes with the event-sourced `agsCatalogSyncLog`. Phase 47 adds the explicit deprecation note in `LEGACY_PATH_DEPRECATION.md` covering the catalog-write retirement path.)*
+- [x] Add warnings where legacy route is used. *(New helper `server/governance/legacy-import-to-catalog-deprecation.ts` exposes `warnLegacyImportToCatalog(procedureKey)` — once-per-process per-key `console.warn` plus `__resetLegacyWarnSetForTests` for unit tests. Each of the five legacy mutations calls it at the top of the handler. Each handler also writes `deprecated: true` into its `LIFECYCLE_TRANSITION` audit metadata for after-the-fact telemetry. Unit tests in `server/governance/legacy-import-to-catalog-deprecation.test.ts` (4/4 pass) lock the dedup behavior.)*
+- [x] Remove or schedule removal of expired exceptions. *(Removal is gated on caller migration; the removal date is tracked in `LEGACY_PATH_DEPRECATION.md` "Removal gate" section. Phase 26.1 owns the actual deletion — once all five `importToCatalog` callers route through `aiTypes.catalog.register` the procedures and the warn helper are removed in one PR.)*
+- [x] Add docs. *(New `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md` documents: the five deprecated procedures, the canonical replacement path, the migration recipe, the audit/warning instrumentation, the removal gate, and the relationship to Phase 26.1.)*
 
 ### Phase 48 — Future frontend cross-module tRPC cleanup
 

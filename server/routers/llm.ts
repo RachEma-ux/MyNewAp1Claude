@@ -55,6 +55,7 @@ import {
   getLLMAuditEvents,
 } from "../db";
 import { getAuditLogger } from "../services/auditLogger";
+import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import "../services/training-executor"; // Initialize training executor
 
 import { llmProvidersProcedures } from "./llm-providers";
@@ -425,10 +426,15 @@ export const llmRouter = router({
    * Takes an LLM ID (not version ID), validates it has deployable versions,
    * creates a catalog entry with entryType "llm", status "draft", reviewState "needs_review".
    * Catalog owns candidate creation — this just hands off the governed LLM.
+   *
+   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
+   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`
+   * for the migration recipe. Removal is gated on caller migration (Phase 26.1).
    */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      warnLegacyImportToCatalog("llm.importToCatalog");
       const llm = await getLLMById(input.id);
       if (!llm) throw new Error("LLM not found");
 
