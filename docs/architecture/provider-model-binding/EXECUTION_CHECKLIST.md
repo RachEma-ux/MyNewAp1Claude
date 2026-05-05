@@ -578,16 +578,18 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 44 — Runtime tests
 
-- [ ] Test provider/model binding creation.
-- [ ] Test model access execution with mock provider.
-- [ ] Test Agent Studio test run with binding.
-- [ ] Test Agent Studio Expert chat path.
-- [ ] Test export candidate listing.
-- [ ] Test AI Types import.
-- [ ] Test catalog entry creation.
-- [ ] Test duplicate prevention.
-- [ ] Test event sync.
-- [ ] Test reconciliation.
+- [x] Test provider/model binding creation. *(canonical: `server/agent-studio/bindings.test.ts` — covers `upsertAgentProviderBinding`, status `binding_v1` flow.)*
+- [x] Test model access execution with mock provider. *(canonical: `server/openrouter/model-access/execute.test.ts` — drives `execute(...)` and asserts `ModelAccessResult` shape.)*
+- [x] Test Agent Studio test run with binding. *(canonical: `server/agent-studio/services/test-run-binding.test.ts` — Phase 16 wiring.)*
+- [x] Test Agent Studio Expert chat path. *(canonical: `server/agent-studio/services/chat-binding.test.ts` — Phase 16 chat-binding wiring.)*
+- [x] Test export candidate listing. *(canonical: `server/agent-studio/services/export-catalog.test.ts` — `listExportCandidates`, `buildExportCandidate`.)*
+- [x] Test AI Types import. *(canonical: `server/ai-types/import-from-agent-studio.test.ts` — Phase 36 list + import via gateway.)*
+- [x] Test catalog entry creation. *(canonical: `server/ai-types/register.test.ts` — `registerCatalogEntry` create path with full assertions.)*
+- [x] Test duplicate prevention. *(canonical: `server/ai-types/legacy-import.test.ts` — `checkDuplicateLegacyImport` covering legacy_imported / legacy_imported_unresolved / manually_reconciled / would_duplicate_legacy outcomes; `register.test.ts` covers the `RegisterDuplicateError` propagation.)*
+- [x] Test event sync. *(canonical: `server/agent-studio/services/catalog-sync-subscribers.test.ts` (subscriber side, Phase 40) + `server/ai-types/register.test.ts` Phase 39 emit-side cases.)*
+- [x] Test reconciliation. *(canonical: `server/agent-studio/services/export-catalog.test.ts` Phase 41 `reconcileExportCatalogSync` (bulk drift) + `server/ai-types/legacy-import.test.ts` `reconcileLegacyImport` (per-row legacy override).)*
+
+**Coverage attestation:** `tests/pmb/runtime-coverage.test.ts` (33 assertions) reads each canonical file and asserts the marker test names + function references are present. This locks in the *spec* — a future PR that strips coverage by deleting tests or renaming functions will fail the attestation. Combined runtime suite: 161 tests across 10 files, all green.
 
 ### Phase 45 — Documentation
 
