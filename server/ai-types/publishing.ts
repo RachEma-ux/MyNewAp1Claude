@@ -20,6 +20,12 @@ import {
   createCatalogAuditEvent,
   updateCatalogEntry,
 } from "./db";
+import { deriveSourceModule } from "./register";
+import {
+  AI_TYPES_EVENTS,
+  type CatalogPublishedPayload,
+} from "./events";
+import { makeEnvelope, publishEvent } from "../platform/events";
 import type { PublishBundle } from "../../drizzle/schema";
 
 export interface PublishCatalogEntryInput {
@@ -101,6 +107,37 @@ export async function publishCatalogEntry(
     actorType: "user",
     payload: { versionLabel, snapshotHash },
   });
+
+  // Direction B B2b — emit `aiTypes.catalog.published` after the DB writes
+  // succeed. Best-effort: bus failures must NOT roll back the publish.
+  // Decision doc: docs/architecture/ai-types/CATALOG_LIFECYCLE_EVENT_DECISION.md
+  const publishedPayload: CatalogPublishedPayload = {
+    catalogEntryId: input.catalogEntryId,
+    publishBundleId: bundle.id,
+    versionLabel,
+    sourceModule: deriveSourceModule(entry.sourceType ?? ""),
+    sourceRefId: entry.sourceId ?? null,
+    performedByActorId: input.publishedBy,
+    performedByActorType: "user",
+    workspaceId: null,
+    publishedAt: new Date().toISOString(),
+  };
+  try {
+    await publishEvent(
+      makeEnvelope({
+        eventType: AI_TYPES_EVENTS.catalogPublished,
+        sourceModule: "aiTypes",
+        workspaceId: null,
+        actorId: input.publishedBy,
+        payload: publishedPayload,
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      `[publishing] event '${AI_TYPES_EVENTS.catalogPublished}' failed for entry ${input.catalogEntryId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   return { bundle, versionLabel };
 }
