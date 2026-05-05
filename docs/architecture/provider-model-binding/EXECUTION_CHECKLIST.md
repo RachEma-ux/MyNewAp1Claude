@@ -629,11 +629,11 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 48 — Future frontend cross-module tRPC cleanup
 
-- [ ] Create backlog item / doc.
-- [ ] Inventory existing direct frontend cross-module tRPC calls.
-- [ ] Do not block current plan.
-- [ ] Apply strict rule only to new Agent Studio ↔ AI Types flows.
-- [ ] Schedule separate frontend boundary refactor.
+- [x] Create backlog item / doc. *(`docs/architecture/provider-model-binding/FUTURE_FRONTEND_TRPC_CLEANUP.md` — Phase 48 stub describing the future-track scope, the narrow Plan v3 rule, and the proposed sequencing for a separate Frontend Module-Gateway plan.)*
+- [x] Inventory existing direct frontend cross-module tRPC calls. *(Snapshot in the new doc — per-module namespace usage table + cross-module calls table + legacy `client/src/pages/` + `client/src/components/` counts. Snapshot taken against `main` post-Phase-47 (`849041c`).)*
+- [x] Do not block current plan. *(Confirmed — Phase 48 ships no code changes. The strict rule scoped to AS ↔ AI Types is already enforced by `tests/pmb/boundary.test.ts` invariant 7. Promotion to all-modules is explicitly deferred to a separate plan.)*
+- [x] Apply strict rule only to new Agent Studio ↔ AI Types flows. *(Locked — see "Scope of the strict rule" section in the new doc, and `tests/pmb/boundary.test.ts` invariant 7. Other module pairs are documented for the future-track refactor without an enforcement requirement.)*
+- [x] Schedule separate frontend boundary refactor. *(Sequenced in the new doc — five-step proposal covering descriptor format, lint extension, per-module migrations, legacy page migration, and final rule promotion. No commitment of dates; sizing only.)*
 
 ---
 
