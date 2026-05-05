@@ -605,14 +605,14 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 46 — Evidence
 
-- [ ] Create `docs/evidence/provider-model-binding/`.
-- [ ] Create `docs/evidence/ai-types-agent-studio-import/`.
-- [ ] Add validation command outputs.
-- [ ] Add test outputs.
-- [ ] Add boundary check outputs.
-- [ ] Add UI screenshots/manual notes if needed.
-- [ ] Add migration report.
-- [ ] Add legacy exception register snapshot.
+- [x] Create `docs/evidence/provider-model-binding/`. *(bundle index at `README.md`. Captured against main@8517385.)*
+- [x] Create `docs/evidence/ai-types-agent-studio-import/`. *(`IMPORT_FLOW_EVIDENCE.md` covers the end-to-end import flow, boundary invariants, receipt threading, best-effort posture.)*
+- [x] Add validation command outputs. *(`VALIDATION_OUTPUTS.md` — `npm run check`, `check:architecture` (81/81 governance covered, 27 baseline warnings), `check:wiring` (7 sub-checks all green), `check:frontend-modularity` (0 failures, 0 baseline warnings).)*
+- [x] Add test outputs. *(`TEST_OUTPUTS.md` — combined run across 16 PMB-relevant test files: 222 pass, ~68s. Per-file breakdown + 3 documented expected-stderr cases.)*
+- [x] Add boundary check outputs. *(`BOUNDARY_CHECK_OUTPUTS.md` — three layers: architecture scripts, Phase 42 static tests, Phase 22 runtime test. Cross-reference table maps each invariant to its enforcement layers.)*
+- [x] Add UI screenshots/manual notes if needed. *(N/A — Phase 35 UI is deferred; the evidence bundle is API-level. UI screenshots will land in their own evidence file when the UI ships.)*
+- [x] Add migration report. *(`CATALOG_LEGACY_IMPORT_BACKFILL_REPORT.md` — Phase 24 driver modes, classifier rules, dry-run shape, integration with Phase 25 register-guard and Phase 41 reconciliation.)*
+- [x] Add legacy exception register snapshot. *(`LEGACY_EXCEPTION_REGISTER_SNAPSHOT.md` — 16 open / 4 in_progress / 6 migrated/removed at the snapshot. Notable Plan-v3 closures: LE-01, LE-02 (Phase 40), LC-04, LC-07, LC-08, LO-01 (Phase 25). Aggregate count comparison from Phase 0.3 → snapshot.)*
 
 ---
 
