@@ -218,7 +218,7 @@ async function emitRegisterAudit(
  * Connections, internal admin scripts) should also pass it. This keeps the
  * register call site self-contained when a caller forgets.
  */
-function deriveSourceModule(sourceType: string): string {
+export function deriveSourceModule(sourceType: string): string {
   switch (sourceType) {
     case "agent":
       return "agentStudio";
