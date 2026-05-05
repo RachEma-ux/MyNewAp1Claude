@@ -568,13 +568,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 43 — Wiring tests
 
-- [ ] Test Provider Connections public gateway actions are registered.
-- [ ] Test AI Types provider/model action is registered.
-- [ ] Test Agent Studio provider binding actions are registered.
-- [ ] Test OpenRouter Model Access actions are registered.
-- [ ] Test Agent Studio Export Catalog actions are registered.
-- [ ] Test AI Types import actions are registered.
-- [ ] Run `check:wiring`.
+- [x] Test Provider Connections public gateway actions are registered. *(`tests/pmb/wiring.test.ts`: asserts the four no-secret read actions — `listActiveForProvider`, `getConnectionStatus`, `validateConnection`, `getBindingEligibility` — are wired in `server/provider-connections/manifest.ts`.)*
+- [x] Test AI Types provider/model action is registered. *(asserts `aiTypes.catalog.publish`, `aiTypes.providerModels.listAvailable`, `aiTypes.catalog.register` are registered in `server/ai-types/manifest.ts`.)*
+- [x] Test Agent Studio provider binding actions are registered. *(asserts all six binding lifecycle actions: list/create/update/remove/validate/resolveForRun are registered in `server/agent-studio/boot.ts`.)*
+- [x] Test OpenRouter Model Access actions are registered. *(asserts `openRouter.config.update`, `openRouter.modelAccess.execute/stream/validateBinding` in `server/openrouter/manifest.ts`.)*
+- [x] Test Agent Studio Export Catalog actions are registered. *(asserts all six: listCandidates/getCandidate/exportCandidate/markImported/reconcileImports + Phase 41's reconcileSync.)*
+- [x] Test AI Types import actions are registered. *(Phase 36's `listImportableAgentStudioCandidates` and `importAgentStudioCandidate` are exported public functions, not gateway actions — they are AI Types-side *consumers* that call `agentStudio.exportCatalog.*` via gatewayCall. Tests assert the exports exist and the file uses `gatewayCall` with no direct cross-module import.)*
+- [x] Run `check:wiring`. *(13 tests in `tests/pmb/wiring.test.ts` plus full `npm run check:wiring` (module + gateway + event + handoff + frontend + runtime + coordinator) — all green. Additional Phase 43 cross-checks: governance action-key-map covers every governance-tracked action (intentionally excludes the three Provider Connections public-read actions as a regression guard); receipt-required descriptors carry `receiptRequired: true`; Stage 10 catalog lifecycle events are declared in `events.emits` (AI Types) and `events.consumes` (Agent Studio) with literal `subscribeEvent("aiTypes.catalog.{registered|published|deprecated}", "agentStudio", ...)` calls in boot.ts.)*
 
 ### Phase 44 — Runtime tests
 
