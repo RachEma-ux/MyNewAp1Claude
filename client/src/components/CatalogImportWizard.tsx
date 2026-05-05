@@ -210,6 +210,16 @@ export function CatalogImportWizard({
   const [runtimeLlmSource, setRuntimeLlmSource] = useState<"" | "auto-selected" | "imported" | "platform-default" | "admin-override">("");
   const [runtimeModelSource, setRuntimeModelSource] = useState<"" | "auto-selected" | "imported" | "platform-default" | "admin-override">("");
   const [runtimeSectionVisible, setRuntimeSectionVisible] = useState(false);
+  // Direction B B3 — Agent Studio import state.
+  // selectedAsAgentIds: agentId set chosen for import in step 2.
+  // asImportResults: per-candidate result populated after step 3 → 4 transition.
+  const [selectedAsAgentIds, setSelectedAsAgentIds] = useState<Set<number>>(
+    () => new Set<number>(),
+  );
+  const [asImportResults, setAsImportResults] = useState<
+    Array<{ agentId: number; name: string; ok: boolean; reason: string }>
+  >([]);
+  const [asImporting, setAsImporting] = useState(false);
   const normalizeUrl = (u: string) => {
     const v = u.trim();
     if (!v) return v;
@@ -366,6 +376,58 @@ export function CatalogImportWizard({
     },
   });
 
+  // Direction B B3 — list AS export candidates only when wizard is in
+  // agent_studio method (otherwise the gateway call is wasted work).
+  const asCandidatesQuery = trpc.catalogImport.listAgentStudioCandidates.useQuery(
+    { status: "ready" },
+    { enabled: open && method === "agent_studio" },
+  );
+  const asCandidates: Array<Record<string, any>> =
+    (asCandidatesQuery.data?.candidates as Array<Record<string, any>>) ?? [];
+  const asImportMutation = trpc.catalogImport.importAgentStudioCandidate.useMutation();
+
+  /**
+   * Direction B B3 — import every AS agent in selectedAsAgentIds, one at a
+   * time, accumulating the per-candidate gateway result. Advances to step 4
+   * regardless of individual failures so the user sees what succeeded.
+   */
+  const handleAsImport = async () => {
+    if (selectedAsAgentIds.size === 0) {
+      setError("Select at least one Agent Studio candidate to import");
+      return;
+    }
+    setError(null);
+    setAsImporting(true);
+    const results: typeof asImportResults = [];
+    for (const agentId of selectedAsAgentIds) {
+      const candidate = asCandidates.find((c) => Number(c.agentId) === agentId);
+      const name =
+        (candidate?.name as string) ||
+        (candidate?.displayName as string) ||
+        `agent ${agentId}`;
+      try {
+        const r = await asImportMutation.mutateAsync({ agentId });
+        results.push({
+          agentId,
+          name,
+          ok: Boolean(r.ok),
+          reason: r.reason ?? (r.ok ? "exported" : "unknown"),
+        });
+      } catch (e: any) {
+        results.push({
+          agentId,
+          name,
+          ok: false,
+          reason: e?.message ?? "import failed",
+        });
+      }
+    }
+    setAsImportResults(results);
+    setAsImporting(false);
+    setStep(4);
+    trpcUtils.catalogManage.list.invalidate();
+  };
+
   const runBatchDiscovery = async () => {
     const urls = websiteUrl
       .split(/[,\n]+/)
@@ -484,6 +546,9 @@ export function CatalogImportWizard({
       setRuntimeLlmSource("");
       setRuntimeModelSource("");
       setRuntimeSectionVisible(false);
+      setSelectedAsAgentIds(new Set<number>());
+      setAsImportResults([]);
+      setAsImporting(false);
     }
     onOpenChange(isOpen);
   };
@@ -947,32 +1012,158 @@ export function CatalogImportWizard({
           </div>
         )}
 
-        {/* Step 2: Import from Agent Studio (pending backend wiring) */}
+        {/* Step 2: Import from Agent Studio — pick candidates */}
         {step === 2 && method === "agent_studio" && (
+          <div className="space-y-4 py-4">
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <Bot className="h-4 w-4" />
+                  Agent Studio candidates (ready to export)
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {asCandidatesQuery.isLoading
+                    ? "Loading…"
+                    : `${asCandidates.length} candidate${asCandidates.length === 1 ? "" : "s"}`}
+                </Badge>
+              </div>
+              {asCandidatesQuery.isError && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
+                  <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span className="break-words min-w-0">
+                    Could not list Agent Studio candidates: {String((asCandidatesQuery.error as any)?.message ?? "unknown error")}
+                  </span>
+                </div>
+              )}
+              {!asCandidatesQuery.isLoading &&
+                !asCandidatesQuery.isError &&
+                asCandidates.length === 0 && (
+                  <p className="text-xs text-muted-foreground break-words">
+                    No Agent Studio agents are currently in <code>ready</code> state. Mark a candidate ready inside Agent Studio to surface it here.
+                  </p>
+                )}
+              {asCandidates.length > 0 && (
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                  {asCandidates.map((c) => {
+                    const agentId = Number(c.agentId);
+                    if (!Number.isFinite(agentId)) return null;
+                    const checked = selectedAsAgentIds.has(agentId);
+                    return (
+                      <label
+                        key={agentId}
+                        className="flex items-start gap-3 p-3 rounded-md border border-border hover:bg-accent/30 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setSelectedAsAgentIds((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(agentId);
+                              else next.delete(agentId);
+                              return next;
+                            });
+                          }}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">
+                            {String(c.displayName ?? c.name ?? `agent ${agentId}`)}
+                          </div>
+                          <div className="text-xs text-muted-foreground break-words">
+                            {String(c.description ?? "")}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {c.activeReleaseLabel && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {String(c.activeReleaseLabel)}
+                              </Badge>
+                            )}
+                            {c.status && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {String(c.status)}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedAsAgentIds.size > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {selectedAsAgentIds.size} selected for import.
+                </div>
+              )}
+            </div>
+            {error && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
+                <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="break-words min-w-0">{error}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 3: Confirm AS import */}
+        {step === 3 && method === "agent_studio" && (
           <div className="space-y-4 py-4">
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2 font-medium text-sm">
                 <Bot className="h-4 w-4" />
-                Agent Studio candidates
+                Confirm Agent Studio import
               </div>
               <p className="text-xs text-muted-foreground break-words">
-                Eligible Agent Studio agents will appear here once
-                {" "}
-                <code>aiTypes.catalog.register</code> is wired to an Agent
-                Studio public candidate-list action via the Module Gateway.
+                Each selected agent will be exported through{" "}
+                <code>agentStudio.exportCatalog.exportCandidate</code>, which
+                in turn calls <code>aiTypes.catalog.register</code> via the
+                Module Gateway.
               </p>
-              <p className="text-xs text-muted-foreground break-words">
-                This option will only show real Agent Studio export candidates
-                — no mock or placeholder entries are ever rendered as real.
-              </p>
+              <ul className="text-sm space-y-1 max-h-[40vh] overflow-y-auto">
+                {Array.from(selectedAsAgentIds).map((agentId) => {
+                  const c = asCandidates.find((c) => Number(c.agentId) === agentId);
+                  return (
+                    <li key={agentId} className="flex items-center gap-2">
+                      <Bot className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {String(c?.displayName ?? c?.name ?? `agent ${agentId}`)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </div>
         )}
-        {/* TODO: Wire Import from Agent Studio to aiTypes.catalog.register
-            and an Agent Studio public candidate-list action exposed through
-            the Module Gateway. Until then the option is selectable but the
-            Step 2 panel intentionally shows an honest pending-integration
-            message instead of fake data. */}
+
+        {/* Step 4: AS import results */}
+        {step === 4 && method === "agent_studio" && (
+          <div className="space-y-4 py-4">
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Bot className="h-4 w-4" />
+                Import results
+              </div>
+              <ul className="text-sm space-y-1">
+                {asImportResults.map((r) => (
+                  <li key={r.agentId} className="flex items-start gap-2">
+                    {r.ok ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-green-400" />
+                    ) : (
+                      <XCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-400" />
+                    )}
+                    <span className="min-w-0 break-words">
+                      <span className="truncate">{r.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {r.reason}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* Step 2: File Import */}
         {step === 2 && method === "file_upload" && (
@@ -1422,7 +1613,16 @@ export function CatalogImportWizard({
                 )}
               </Button>
             )}
-            {step === 3 && (
+            {step === 2 && method === "agent_studio" && (
+              <Button
+                onClick={() => setStep(3)}
+                disabled={selectedAsAgentIds.size === 0 || asCandidatesQuery.isLoading}
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Continue ({selectedAsAgentIds.size})
+              </Button>
+            )}
+            {step === 3 && method !== "agent_studio" && (
               <Button
                 onClick={handleImport}
                 disabled={selectedCount === 0 || bulkCreateMutation.isPending}
@@ -1436,6 +1636,24 @@ export function CatalogImportWizard({
                   <>
                     <Download className="h-4 w-4 mr-2" />
                     Import {selectedCount} {selectedCount === 1 ? "Entry" : "Entries"}
+                  </>
+                )}
+              </Button>
+            )}
+            {step === 3 && method === "agent_studio" && (
+              <Button
+                onClick={handleAsImport}
+                disabled={selectedAsAgentIds.size === 0 || asImporting}
+              >
+                {asImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Import {selectedAsAgentIds.size} {selectedAsAgentIds.size === 1 ? "Agent" : "Agents"}
                   </>
                 )}
               </Button>

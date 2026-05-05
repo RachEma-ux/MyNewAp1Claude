@@ -38,6 +38,7 @@ export async function getCatalogEntries(filter?: {
   origin?: string;
   reviewState?: string;
   category?: string;
+  sourceType?: string;
 }): Promise<CatalogEntry[]> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
@@ -49,6 +50,7 @@ export async function getCatalogEntries(filter?: {
   if (filter?.origin) conditions.push(eq(catalogEntries.origin, filter.origin));
   if (filter?.reviewState) conditions.push(eq(catalogEntries.reviewState, filter.reviewState));
   if (filter?.category) conditions.push(eq(catalogEntries.category, filter.category));
+  if (filter?.sourceType) conditions.push(eq(catalogEntries.sourceType, filter.sourceType));
 
   const query = db.select().from(catalogEntries);
   const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;

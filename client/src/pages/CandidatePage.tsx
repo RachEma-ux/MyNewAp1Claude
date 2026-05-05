@@ -200,13 +200,10 @@ export default function CandidatePage({
     "catalog" | "validation" | "publishing" | "audit" | "discovery-ops"
   >("catalog");
   const [search, setSearch] = useState("");
-  // In agentStudio mode the type filter is locked to "agent" since AS only
-  // emits agent candidates. In general mode it remains user-controlled.
-  // TODO: Replace the entryType-only filter with a server-side
-  // `aiTypes.catalog.asCandidates` query that also filters by
-  // sourceModule === "agentStudio". The catalog_entries schema currently
-  // exposes sourceType/sourceId but no sourceModule field, so Agent Studio
-  // agents are not distinguishable from other agent entries in the API yet.
+  // In agentStudio mode the type filter is locked to "agent" since AS
+  // only emits agent candidates. The list query (below) additionally
+  // narrows to sourceType="ags_agent" so AS-sourced agents are
+  // distinguished from agents registered through other sources.
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>(
     mode === "agentStudio" ? "agent" : "all"
   );
@@ -350,12 +347,18 @@ export default function CandidatePage({
   const trpcUtils = trpc.useUtils();
 
   // Data queries
+  // Direction B B3 — in agentStudio mode, additionally filter by
+  // sourceType="ags_agent" so the AS Candidate Pipeline only shows
+  // catalog rows that originated from Agent Studio (sourceType + sourceId
+  // is the canonical source-of-record convention; see catalog table
+  // schema and CATALOG_SOURCE_MAPPING.md).
   const {
     data: entries = [],
     isLoading,
     refetch,
   } = trpc.catalogManage.list.useQuery({
     ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
+    ...(mode === "agentStudio" ? { sourceType: "ags_agent" } : {}),
   });
   const { data: versions = [] } = trpc.catalogManage.listVersions.useQuery(
     { catalogEntryId: versionsEntryId! },
@@ -899,9 +902,11 @@ export default function CandidatePage({
 
       {mode === "agentStudio" && (
         <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          Showing all <span className="font-medium">agent</span> catalog entries.
-          A dedicated Agent Studio source filter is pending backend support
-          (see <code>aiTypes.catalog.asCandidates</code> TODO in code).
+          Showing catalog entries with{" "}
+          <span className="font-medium">sourceType = ags_agent</span>{" "}
+          (Agent Studio-sourced agents). Use the Catalog Import Wizard ({" "}
+          <span className="font-medium">Import from Agent Studio</span>) to
+          register additional candidates.
         </div>
       )}
 
