@@ -60,19 +60,36 @@ into `shared/agent-studio-export.ts` if other consumers appear.
 
 ---
 
-## UI surface (Phase 35, deferred)
+## UI surface (Direction B B3 — shipped at PR #155 / `592ef62`)
 
-The Catalog Import Modal's "Import from Agent Studio" entry point
-calls these functions through the AI Types tRPC router. The modal
-is a UI deferral from Stage 8 — not Phase 36's responsibility. When
-it lands, it will:
+The Catalog Import Wizard's "Import from Agent Studio" branch calls
+the two functions above through the `catalogImport.*` tRPC router
+(`server/catalog-import/router.ts`):
 
-1. Call `listImportableAgentStudioCandidates({ status: "ready" })`
-   to populate the picker.
-2. On user select, call `importAgentStudioCandidate({ agentId,
-   importedBy })`.
-3. On success, refresh the catalog table to show the new draft
-   entry.
+- `catalogImport.listAgentStudioCandidates` (`protectedProcedure`
+  query) wraps `listImportableAgentStudioCandidates`.
+- `catalogImport.importAgentStudioCandidate` (`governedProcedure`
+  mutation) wraps `importAgentStudioCandidate`. Action key registered
+  in `config/governance/platform_action_registry.yaml` and
+  `server/governance/action-key-map.ts` (R2, capability
+  `catalog.manage`, no approval, no evidence — risk parity with
+  `catalogImport.bulkCreate`).
+
+`client/src/components/CatalogImportWizard.tsx` consumes both:
+
+1. Step 2 (`method === "agent_studio"`) — query `listAgentStudioCandidates({ status: "ready" })`,
+   render each candidate as a checkbox row.
+2. Step 3 — confirm selected agents.
+3. Step 4 — iterate `importAgentStudioCandidate({ agentId })` per
+   selected agent, accumulating `{ ok, reason }` per result.
+
+The AS Candidate Pipeline (`CandidatePage` `mode="agentStudio"`,
+mounted at `client/src/pages/ASCandidatePage.tsx`) additionally
+narrows its `aiTypes.catalog.list` query to `sourceType="ags_agent"`
+so it only shows AS-sourced rows.
+
+**Open follow-up:** no UI button for `agentStudio.exportCatalog.reconcileSync`
+(the Phase 41 sync-drift repair action) — admin-only via gateway today.
 
 ---
 
@@ -81,6 +98,10 @@ it lands, it will:
 - `server/ai-types/import-from-agent-studio.test.ts` — drives both
   functions through a mocked `gatewayCall`. Verifies request shape,
   receipt-id generation, and result-mapping behavior.
+- `server/catalog-import/agent-studio-import.test.ts` (Direction B B3) —
+  drives the two new tRPC procedures through `appRouter.createCaller`.
+  Verifies the procedure layer wraps the AI Types-side functions
+  correctly and rejects non-positive `agentId` at the schema.
 
 ---
 

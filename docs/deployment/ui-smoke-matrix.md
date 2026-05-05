@@ -120,6 +120,20 @@ happy flow; edge cases are the regressions worth catching.
   * Governance gate blocks unapproved publish.
   * Versions compare view.
   * Subagent / MCP manager flows.
+* **Direction B (PRs #152–#156) — Agent Studio → AI Types Catalog:**
+  * In Agent Studio, mark a candidate agent as ready-to-export.
+  * Navigate to **Catalog → Import** and pick the
+    "Import from Agent Studio" method. Step 2 lists the ready
+    candidates (via `catalogImport.listAgentStudioCandidates`);
+    select one, advance through Step 3 confirmation, complete in
+    Step 4 — verify the per-candidate ok/reason result row.
+  * Open the **AS Candidate Pipeline** (CandidatePage `mode="agentStudio"`).
+    Verify the list shows only `sourceType="ags_agent"` rows,
+    not all agent entries.
+  * Lifecycle event smoke: publish the imported entry from the
+    AI Types catalog → an `ags_catalog_sync_log` row should
+    record `eventType="published"`. Same for deprecate via
+    `deprecateCatalogEntry` (server-internal today).
 
 ### 11. Sandbox WF — `/automation/sandbox-wf`
 
