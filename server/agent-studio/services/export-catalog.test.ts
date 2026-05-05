@@ -262,29 +262,33 @@ describe("prepareExportRegisterPayload — Phase 30", () => {
     const r = await prepareExportRegisterPayload(
       { agentId: 1, registeredBy: 42 },
       makeLookups({ agents: [happyAgent] }),
+      { readinessScoreThreshold: 0 }, // Phase 30 fixture's score is intentionally low
     );
     expect(r.registerPayload.entryType).toBe("agent");
     expect(r.registerPayload.sourceType).toBe("agent");
     expect(r.registerPayload.sourceId).toBe(1);
     expect(r.registerPayload.registeredBy).toBe(42);
     expect(r.registerPayload.fields.tags).toContain("agent-studio-export");
+    expect(r.eligibility.eligible).toBe(true);
     // No secret-shaped fields leaked into config
     expect(JSON.stringify(r.registerPayload.fields)).not.toContain("apiKey");
   });
 
-  it("permits exportStatus=exported (re-register / update path)", async () => {
-    const r = await prepareExportRegisterPayload(
-      { agentId: 1, registeredBy: 42 },
-      makeLookups({
-        agents: [happyAgent],
-        catalogRow: {
-          id: 999,
-          legacyImportState: null,
-          activeSourceVersionId: 555,
-        },
-      }),
-    );
-    expect(r.candidate.exportStatus).toBe("exported");
+  it("Phase 31: blocks re-export of already-imported candidates", async () => {
+    await expect(
+      prepareExportRegisterPayload(
+        { agentId: 1, registeredBy: 42 },
+        makeLookups({
+          agents: [happyAgent],
+          catalogRow: {
+            id: 999,
+            legacyImportState: null,
+            activeSourceVersionId: 555,
+          },
+        }),
+        { readinessScoreThreshold: 0 },
+      ),
+    ).rejects.toThrow(/not_already_imported/);
   });
 });
 

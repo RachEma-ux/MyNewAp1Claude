@@ -439,16 +439,16 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 31 — Export eligibility rules
 
-- [ ] Require version/release.
-- [ ] Require valid provider binding.
-- [ ] Require active provider connection.
-- [ ] Require model approved.
-- [ ] Require readiness score threshold.
-- [ ] Require acceptable governance verdict.
-- [ ] Require metadata completeness.
-- [ ] Require not already imported.
-- [ ] Require no duplicate canonical catalog entry.
-- [ ] Add tests.
+- [x] Require version/release. *(`version_release` gate: `versionId > 0 && activeSourceVersionId != null`.)*
+- [x] Require valid provider binding. *(`provider_binding_valid` gate: `binding.status === "binding_v1"`.)*
+- [x] Require active provider connection. *(`provider_connection_active` gate: `binding.providerConnectionId != null`.)*
+- [x] Require model approved. *(`model_approved` gate: `binding.modelCatalogEntryId != null`.)*
+- [x] Require readiness score threshold. *(`readiness_score_threshold` gate: `readinessScore >= 70` default; configurable via `EvaluateExportEligibilityOptions.readinessScoreThreshold`.)*
+- [x] Require acceptable governance verdict. *(`governance_verdict_acceptable` gate: `governance.status === "cleared"`.)*
+- [x] Require metadata completeness. *(`metadata_complete` gate: name non-empty + capabilities array non-empty.)*
+- [x] Require not already imported. *(`not_already_imported` gate: `exportStatus !== "exported"`. Phase 30's `prepareExportRegisterPayload` now blocks re-export — separate from `aiTypes.catalog.update`.)*
+- [x] Require no duplicate canonical catalog entry. *(`no_duplicate_canonical_entry` gate; runs `hasDuplicateCanonicalEntry(sourceType, sourceId)` lookup when provided; passes conservatively when no lookup is wired.)*
+- [x] Add tests. *(`server/agent-studio/services/export-eligibility.test.ts` — 17 tests covering pass + fail variants of every gate, custom threshold, gate ordering, no short-circuit, firstFailure picks first.)*
 
 ---
 
