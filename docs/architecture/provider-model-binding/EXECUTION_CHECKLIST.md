@@ -536,13 +536,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 40 — Agent Studio event subscribers
 
-- [ ] Subscribe to `aiTypes.catalog.registered`.
-- [ ] Update Agent Studio export/import status.
-- [ ] Subscribe to `aiTypes.catalog.published`.
-- [ ] Update catalog status to published.
-- [ ] Subscribe to `aiTypes.catalog.deprecated`.
-- [ ] Update catalog status to deprecated.
-- [ ] Add tests.
+- [x] Subscribe to `aiTypes.catalog.registered`. *(Literal `subscribeEvent("aiTypes.catalog.registered", "agentStudio", ...)` call in `server/agent-studio/boot.ts` (Step 5.5). Manifest declares `events.consumes` with all three event types.)*
+- [x] Update Agent Studio export/import status. *(Each delivery is appended to a new `ags_catalog_sync_log` table — eventId-deduped via unique index, full payload preserved. Repo helpers `recordCatalogSyncEvent` and `getLatestCatalogSyncEvent`. Status is derived from the latest row's eventType via `deriveCatalogStatusFromEventType` — `registered`/`published`/`deprecated`/`unknown`.)*
+- [x] Subscribe to `aiTypes.catalog.published`. *(Subscriber wired in boot.ts. Filter rule: only persists events whose `payload.sourceModule === "agentStudio"` or `entryType === "agent"`.)*
+- [x] Update catalog status to published. *(Latest sync-log row for the entry → `published` status; query helper returns it.)*
+- [x] Subscribe to `aiTypes.catalog.deprecated`. *(Subscriber wired in boot.ts.)*
+- [x] Update catalog status to deprecated. *(Same derivation pattern via the sync log.)*
+- [x] Add tests. *(15 unit tests in `services/catalog-sync-subscribers.test.ts`: per-event-type recording, sourceModule/entryType filters, missing-catalogEntryId skip, recorder-throws best-effort, full-payload preservation, eventId dedupe pass-through, derive-status mapping. New event-payload contracts `CatalogPublishedPayload` + `CatalogDeprecatedPayload` declared in `server/ai-types/events.ts`.)*
 
 ### Phase 41 — Reconciliation fallback
 
