@@ -139,3 +139,59 @@ If your module needs data from another module:
 
 Digital HQ / AWI remain *observers* — they audit the wiring; they
 do not act as a routing layer.
+
+## Plan v3 PMB cross-module surfaces
+
+The Provider/Model Binding plan (Plan v3) introduced four
+cross-module flows that the frontend must respect. None of them
+allow a UI to call another module's tRPC namespace directly.
+
+### Provider Connections binding picker
+
+The Agent Binding page lives in
+`client/src/modules/agent-studio/pages/AgentBindingPage.tsx`. It
+shows the user's available provider connections plus the model
+catalog so they can compose a binding.
+
+- The picker calls `trpc.agentStudio.providerBindings.*` only.
+- Behind that, the AS backend calls
+  `providerConnections.listActiveForProvider` and
+  `aiTypes.providerModels.listAvailable` via the gateway.
+- Neither endpoint returns a credential. The picker never sees
+  PAT/API-key material; it shows only `ProviderConnectionRef`
+  shapes (id + display fields + selectable flag).
+- Refresh UX: the page's Refresh button calls
+  `trpc.agentStudio.providerBindings.validate` (Phase 15) which
+  refreshes `lastValidatedAt` so the binding survives the 5-minute
+  staleness window.
+
+### Catalog Import Modal — "Import from Agent Studio" (Phase 35)
+
+This entry point is a UI deferral. When it lands, it will:
+
+- Call `trpc.aiTypes.import.*` only.
+- Behind that, the AI Types backend invokes
+  `agentStudio.exportCatalog.listCandidates` and `.exportCandidate`
+  via the gateway. AI Types never imports `server/agent-studio/`
+  directly — verified by `tests/pmb/boundary.test.ts` invariant 3.
+
+### Agent Studio Export Catalog UI (Phase 33, deferred)
+
+The export-status table on the Agent Studio side will:
+
+- Call `trpc.agentStudio.exportCatalog.*` only.
+- Read derived `exportStatus` (`ready` / `exported` / `unresolved`
+  / `blocked`) from `agentStudio.exportCatalog.listCandidates`.
+- Never reach into AI Types' `catalog_entries` directly.
+
+### Test runs / chat against a bound model
+
+The Agent Studio test-run page and the in-app provider playground
+both call `openRouter.modelAccess.execute` (or `.stream`) through
+their own backend. The UI does not call OpenRouter's tRPC
+namespace.
+
+The Phase 20 hybrid receipt policy applies: production-intent calls
+require a receipt; test/playground intents waive it. The frontend
+is not responsible for the receipt — its backend supplies the
+receipt id when it forwards the call.

@@ -593,15 +593,15 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 45 — Documentation
 
-- [ ] Create `PROVIDER_MODEL_BINDING_BRIDGE.md`.
-- [ ] Create `MODEL_ACCESS_CONTRACT.md`.
-- [ ] Create `AGENT_STUDIO_EXPORT_CATALOG.md`.
-- [ ] Create `AI_TYPES_IMPORT_FROM_AGENT_STUDIO.md`.
-- [ ] Update `CROSS_MODULE_FRONTEND_BOUNDARIES.md`.
-- [ ] Update Provider Connections docs.
-- [ ] Update OpenRouter docs.
-- [ ] Update AI Types docs.
-- [ ] Update Agent Studio docs.
+- [x] Create `PROVIDER_MODEL_BINDING_BRIDGE.md`. *(End-to-end overview of the binding lifecycle from Provider Connections → AI Types catalog → Agent Studio binding → OpenRouter Model Access. Reference shape, lifecycle gates, gateway call shape, receipt policy, staleness window.)*
+- [x] Create `MODEL_ACCESS_CONTRACT.md`. *(D4 facade contract: three actions (execute/stream/validateBinding), hybrid receipt policy with `enforceModelAccessReceipt`, the `withProviderCredential` boundary, streaming variant, validation gate, test coverage map.)*
+- [x] Create `AGENT_STUDIO_EXPORT_CATALOG.md`. *(Six gateway actions, the Phase 29 export DTO and forbidden-key blocklist, Phase 31 nine-gate eligibility, Phase 37 catalog-write shape, Phase 40 sync mirror, Phase 41 reconciliation. Calls out the deliberate distinction between `reconcileImports` (Phase 30 per-row override) and `reconcileSync` (Phase 41 bulk drift scan).)*
+- [x] Create `AI_TYPES_IMPORT_FROM_AGENT_STUDIO.md`. *(Sister document: the AI Types-side consumer. Two public functions, D6 boundary, type sharing rule, deferred Phase 35 UI surface.)*
+- [x] Update `CROSS_MODULE_FRONTEND_BOUNDARIES.md`. *(New "Plan v3 PMB cross-module surfaces" section: provider-connections binding picker, Catalog Import Modal "Import from Agent Studio" (Phase 35 deferral), AS Export Catalog UI (Phase 33 deferral), test runs / chat. Each surface documents the trpc namespace + the gateway call shape behind it.)*
+- [x] Update Provider Connections docs. *(N/A — no per-module README exists for Provider Connections. The PMB-relevant context is captured in the manifest's leading comments and across the four new PMB docs above; the boundary tests in `tests/pmb/boundary.test.ts` enforce the no-secret public API contract referenced by `MODEL_ACCESS_CONTRACT.md`.)*
+- [x] Update OpenRouter docs. *(N/A — no per-module README. PMB context lives in `MODEL_ACCESS_CONTRACT.md` (this PR) and the manifest comments. The hybrid receipt policy is pinned by `manifest-receipt-policy.test.ts`.)*
+- [x] Update AI Types docs. *(`docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md` is the existing per-module governance doc — no updates needed because the new register/event paths are governed by the same descriptor + receipt rules already documented there. The new content lives in `AI_TYPES_IMPORT_FROM_AGENT_STUDIO.md` (this PR).)*
+- [x] Update Agent Studio docs. *(N/A — no per-module README. PMB context is captured in `AGENT_STUDIO_EXPORT_CATALOG.md` (this PR) plus the manifest's governanceActions comments.)*
 
 ### Phase 46 — Evidence
 
