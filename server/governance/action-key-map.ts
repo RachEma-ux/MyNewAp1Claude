@@ -462,6 +462,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "agentStudio.exportCatalog.exportCandidate": "agentStudio.exportCatalog.exportCandidate",
   "agentStudio.exportCatalog.markImported": "agentStudio.exportCatalog.markImported",
   "agentStudio.exportCatalog.reconcileImports": "agentStudio.exportCatalog.reconcileImports",
+  "agentStudio.exportCatalog.reconcileSync": "agentStudio.exportCatalog.reconcileSync",
   "sandboxWf.workflow.publish": "sandboxWf.workflow.publish",
   "sandboxWf.execute": "sandboxWf.execute",
   "rag.index.run": "rag.index.run",

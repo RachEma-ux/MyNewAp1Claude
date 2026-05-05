@@ -7,7 +7,10 @@
  */
 
 import { sql } from "drizzle-orm";
-import type { ExportCatalogLookups } from "./export-catalog";
+import type {
+  ExportCatalogLookups,
+  ReconcileSyncDriftLookups,
+} from "./export-catalog";
 
 export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
   const { getAsDb } = await import("../db/connection");
@@ -115,6 +118,58 @@ export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
         legacyImportState: r.legacyImportState ?? null,
         activeSourceVersionId: r.activeSourceVersionId ?? null,
       };
+    },
+  };
+}
+
+/**
+ * Plan v3 Phase 41 — live lookups for `reconcileExportCatalogSync`.
+ *
+ * Reuses the Phase 30 `listPublishedAgents` pattern but extends the
+ * catalog-row read with the `status` column (drift cases for
+ * published/deprecated need it). The sync log read + repair write hit
+ * the new `ags_catalog_sync_log` table on ASDB.
+ */
+export async function buildReconcileLookups(): Promise<ReconcileSyncDriftLookups> {
+  const { getAsDb } = await import("../db/connection");
+  const { getDb } = await import("../../db/connection");
+  const repo = await import("../repository");
+  const live = await buildLiveLookups();
+
+  return {
+    listPublishedAgents: live.listPublishedAgents,
+
+    async loadCatalogEntryForAgent(agentId) {
+      const mainDb = getDb();
+      if (!mainDb) return null;
+      const rows = (await mainDb.execute(
+        sql`SELECT id, legacy_import_state AS "legacyImportState",
+                   active_source_version_id AS "activeSourceVersionId",
+                   status
+            FROM catalog_entries
+            WHERE source_type = 'agent' AND source_id = ${agentId}
+            LIMIT 1`,
+      )) as any;
+      const list: any[] = Array.isArray(rows) ? rows : (rows.rows ?? []);
+      if (list.length === 0) return null;
+      const r = list[0];
+      return {
+        id: r.id,
+        legacyImportState: r.legacyImportState ?? null,
+        activeSourceVersionId: r.activeSourceVersionId ?? null,
+        status: (r.status as string | null) ?? null,
+      };
+    },
+
+    async getLatestSyncLogEventType(catalogEntryId) {
+      const asDb = getAsDb();
+      if (!asDb) return null;
+      const latest = await repo.getLatestCatalogSyncEvent(catalogEntryId);
+      return latest?.eventType ?? null;
+    },
+
+    async recordSyncLogRepair(input) {
+      await repo.recordCatalogSyncEvent(input);
     },
   };
 }

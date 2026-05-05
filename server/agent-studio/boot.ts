@@ -420,6 +420,47 @@ export async function bootAgentStudio(): Promise<void> {
         receiptRequired: true,
       },
     });
+
+    // Plan v3 Phase 41 — bulk drift scan + repair of the AS catalog sync log.
+    // Walks every published AS agent, joins to catalog_entries, compares
+    // against ags_catalog_sync_log, and writes synthetic sync rows for
+    // any drift case. Receipt-required because admins want a record
+    // of "who ran the scan when."
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.reconcileSync",
+      handler: async (input) => {
+        const { reconcileExportCatalogSync } = await import(
+          "./services/export-catalog"
+        );
+        const { buildReconcileLookups } = await import(
+          "./services/export-catalog-lookups"
+        );
+        const payload = (input ?? {}) as {
+          workspaceId?: number;
+          reconciledBy?: number;
+          dryRun?: boolean;
+        };
+        if (typeof payload?.reconciledBy !== "number") {
+          throw new Error("reconciledBy is required");
+        }
+        return reconcileExportCatalogSync(
+          {
+            workspaceId: payload.workspaceId,
+            reconciledBy: payload.reconciledBy,
+            dryRun: payload.dryRun === true,
+          },
+          await buildReconcileLookups(),
+        );
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.reconcileSync",
+        description:
+          "Bulk reconcile AS catalog sync log against catalog_entries (Phase 41 drift repair)",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-publicApi] registration skipped — ${message}`);

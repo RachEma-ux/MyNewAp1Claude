@@ -134,6 +134,14 @@ export const agentStudioManifest: ModuleManifest = {
       risk: "high",
       receiptRequired: true,
     },
+    // Plan v3 Phase 41 — bulk drift scan + repair of the AS catalog sync log.
+    {
+      key: "agentStudio.exportCatalog.reconcileSync",
+      description:
+        "Bulk reconcile AS catalog sync log against catalog_entries (Phase 41 drift repair)",
+      risk: "medium",
+      receiptRequired: true,
+    },
   ],
 
   routes: [{ path: "/agent-studio", label: "Agent Studio" }],
