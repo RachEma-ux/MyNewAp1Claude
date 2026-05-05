@@ -1,0 +1,50 @@
+
+ RUN  v2.1.9 /root/MyNewAp1Claude
+
+ ✓ server/ai-types/deprecate.test.ts (6 tests) 16ms
+ ✓ server/ai-types/publishing.test.ts (7 tests) 28ms
+stdout | server/catalog-import/agent-studio-import.test.ts
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+stdout | server/catalog-import/agent-studio-import.test.ts
+[EmbeddingEngine] Initialized with 5 models
+
+stdout | server/catalog-import/agent-studio-import.test.ts
+[QdrantService] Initialized with URL: http://localhost:6333
+
+stderr | server/catalog-import/agent-studio-import.test.ts
+Failed to obtain server version. Unable to check client-server compatibility. Set checkCompatibility=false to skip version check.
+
+stdout | server/catalog-import/agent-studio-import.test.ts
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+stdout | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > forwards agentId and ctx.user.id as registeredBy
+[Audit] GATE_CHECK system:0 → success
+
+stderr | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > forwards agentId and ctx.user.id as registeredBy
+[Database] DATABASE_URL environment variable is not set!
+
+stdout | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > returns the not-ok shape from the AI Types side untouched
+[Audit] GATE_CHECK system:0 → success
+
+stderr | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > returns the not-ok shape from the AI Types side untouched
+[Database] DATABASE_URL environment variable is not set!
+
+stdout | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > rejects non-positive agentId at the input schema
+[Audit] GATE_CHECK system:0 → success
+
+stderr | server/catalog-import/agent-studio-import.test.ts > catalogImport.importAgentStudioCandidate — Direction B B3 > rejects non-positive agentId at the input schema
+[Database] DATABASE_URL environment variable is not set!
+
+ ✓ server/catalog-import/agent-studio-import.test.ts (6 tests) 66ms
+
+ Test Files  3 passed (3)
+      Tests  19 passed (19)
+   Start at  19:57:36
+   Duration  53.24s (transform 27.68s, setup 6.55s, collect 56.83s, tests 110ms, environment 4ms, prepare 4.05s)
+

@@ -1,0 +1,5 @@
+
+> mynewap1claude@1.0.0 check:governance-actions /root/MyNewAp1Claude
+> tsx scripts/check-governance-actions.ts
+
+OK — governance-actions: 81 declared, 81 covered, 0 uncovered (warning).

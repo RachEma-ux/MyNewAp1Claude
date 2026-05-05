@@ -1,0 +1,5 @@
+
+> mynewap1claude@1.0.0 check:markdown-imports /root/MyNewAp1Claude
+> tsx scripts/check-markdown-imports.ts
+
+[markdown-imports] PASS — no direct streamdown or Shiki imports outside SlimShikiHighlighter (1963 files scanned).

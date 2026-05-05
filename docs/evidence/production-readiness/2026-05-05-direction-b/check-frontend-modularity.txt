@@ -1,0 +1,78 @@
+
+> mynewap1claude@1.0.0 check:frontend-modularity /root/MyNewAp1Claude
+> pnpm run check:client-capsules && pnpm run check:module-routes-conflict && pnpm run check:module-registration && pnpm run check:app-route-ownership && pnpm run check:module-route-inventory && pnpm run check:module-api-boundaries && pnpm run check:cross-module-links
+
+
+> mynewap1claude@1.0.0 check:client-capsules /root/MyNewAp1Claude
+> tsx scripts/check-client-capsules.ts
+
+Module Client Capsules
+======================
+
+Failures: 0
+Baseline warnings: 0
+OK — every migrated module has a complete capsule.
+
+> mynewap1claude@1.0.0 check:module-routes-conflict /root/MyNewAp1Claude
+> tsx scripts/check-module-routes-conflict.ts
+
+Module Routes Conflict
+======================
+  [warn] baseRoute /data-analysis/kgra-agent (kgraAgent) is nested under /data-analysis (dataAnalysis); resolved by longest-first matching
+
+Failures: 0
+Baseline warnings: 1
+OK — no conflicting canonical route ownership.
+
+> mynewap1claude@1.0.0 check:module-registration /root/MyNewAp1Claude
+> tsx scripts/check-module-registration.ts
+
+Module Registration
+===================
+
+Failures: 0
+Baseline warnings: 0
+OK — module registration consistent.
+
+> mynewap1claude@1.0.0 check:app-route-ownership /root/MyNewAp1Claude
+> tsx scripts/check-app-route-ownership.ts
+
+App Route Ownership
+===================
+App.tsx routes:        181
+App.tsx redirects:     25
+
+
+Failures: 0
+Baseline warnings: 0
+OK — App.tsx ownership within tolerance.
+
+> mynewap1claude@1.0.0 check:module-route-inventory /root/MyNewAp1Claude
+> tsx scripts/check-module-route-inventory.ts
+
+Module Route Inventory
+======================
+
+Failures: 0
+Baseline warnings: 0
+OK — route inventory consistent for migrated modules.
+
+> mynewap1claude@1.0.0 check:module-api-boundaries /root/MyNewAp1Claude
+> tsx scripts/check-module-api-boundaries.ts
+
+Module API Boundaries
+=====================
+
+Failures: 0
+Baseline warnings: 0
+OK — no cross-module boundary violations from migrated modules.
+
+> mynewap1claude@1.0.0 check:cross-module-links /root/MyNewAp1Claude
+> tsx scripts/check-cross-module-links.ts
+
+Cross-Module Links
+==================
+
+Failures: 0
+Baseline warnings: 0
+OK — no migrated-module link violations.

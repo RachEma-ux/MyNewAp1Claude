@@ -1,0 +1,71 @@
+
+> mynewap1claude@1.0.0 check:awi /root/MyNewAp1Claude
+> pnpm run check:wiring-inventory && pnpm run check:module-readiness && pnpm run check:dependency-graph
+
+
+> mynewap1claude@1.0.0 check:wiring-inventory /root/MyNewAp1Claude
+> tsx scripts/check-wiring-inventory.ts
+
+Application Wiring Inventory
+============================
+Modules:           16
+Fully wired:       11
+Mostly / partial:  5
+Declared-only:     0
+Blocked:           0
+Avg readiness:     93
+Missing required:  0
+
+  prm                      mostly-wired       86  
+  psm                      mostly-wired       86  
+  codeStudio               fully-wired        98  
+  agentStudio              fully-wired        98   warnings=1
+  sandboxWf                mostly-wired       87  
+  rag                      mostly-wired       83  
+  openRouter               fully-wired        94   warnings=1
+  ps                       fully-wired        96  
+  hr                       fully-wired        100 
+  organizationManagement   fully-wired        93  
+  cultureValues            fully-wired        93  
+  aiTypes                  fully-wired        98   warnings=1
+  kgraAgent                mostly-wired       85   warnings=1
+  communication            fully-wired        94   warnings=1
+  pmCentral                fully-wired        96  
+  dataAnalysis             fully-wired        95  
+
+Inventory machinery healthy.
+
+> mynewap1claude@1.0.0 check:module-readiness /root/MyNewAp1Claude
+> tsx scripts/check-module-readiness.ts
+
+Module readiness
+================
+  prm                        86  mostly-wired       blockers=0 warnings=0
+  psm                        86  mostly-wired       blockers=0 warnings=0
+  codeStudio                 98  fully-wired        blockers=0 warnings=0
+  agentStudio                98  fully-wired        blockers=0 warnings=1
+  sandboxWf                  87  mostly-wired       blockers=0 warnings=0
+  rag                        83  mostly-wired       blockers=0 warnings=0
+  openRouter                 94  fully-wired        blockers=0 warnings=1
+  ps                         96  fully-wired        blockers=0 warnings=0
+  hr                        100  fully-wired        blockers=0 warnings=0
+  organizationManagement     93  fully-wired        blockers=0 warnings=0
+  cultureValues              93  fully-wired        blockers=0 warnings=0
+  aiTypes                    98  fully-wired        blockers=0 warnings=1
+  kgraAgent                  85  mostly-wired       blockers=0 warnings=1
+  communication              94  fully-wired        blockers=0 warnings=1
+  pmCentral                  96  fully-wired        blockers=0 warnings=0
+  dataAnalysis               95  fully-wired        blockers=0 warnings=0
+
+Readiness scoring is internally consistent.
+
+> mynewap1claude@1.0.0 check:dependency-graph /root/MyNewAp1Claude
+> tsx scripts/check-dependency-graph.ts
+
+Dependency Graph
+================
+Nodes:  134
+Edges:  128
+Cycles: 0
+
+Graph healthy.

@@ -1,0 +1,16 @@
+
+ RUN  v2.1.9 /root/MyNewAp1Claude
+
+ ✓ tests/pmb/wiring.test.ts (13 tests) 268ms
+ ✓ tests/pmb/boundary.test.ts (15 tests) 2101ms
+   ✓ Phase 42 invariant 2 — Agent Studio does not write catalog_entries > no AS source file imports createCatalogEntry / updateCatalogEntry 425ms
+   ✓ Phase 42 invariant 2 — Agent Studio does not write catalog_entries > no AS source file contains raw SQL writing to catalog_entries 359ms
+   ✓ Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is locked to simulation only > no Agent Studio source outside the simulation allowlist reads process.env.<X>_API_KEY 320ms
+   ✓ Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is locked to simulation only > no Agent Studio source outside the simulation allowlist imports resolveProviderApiKey 331ms
+ ✓ tests/pmb/runtime-coverage.test.ts (33 tests) 266ms
+
+ Test Files  3 passed (3)
+      Tests  61 passed (61)
+   Start at  19:57:00
+   Duration  16.89s (transform 1.91s, setup 7.83s, collect 1.43s, tests 2.64s, environment 6ms, prepare 5.68s)
+

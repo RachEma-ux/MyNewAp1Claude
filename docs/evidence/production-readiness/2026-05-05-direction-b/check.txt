@@ -1,0 +1,4 @@
+
+> mynewap1claude@1.0.0 check /root/MyNewAp1Claude
+> tsc --noEmit
+
