@@ -28,6 +28,7 @@ import {
   createCatalogEntry,
   updateCatalogEntry,
   getCatalogEntryById,
+  createCatalogAuditEvent,
 } from "./db";
 import type { CatalogEntry, InsertCatalogEntry } from "../../drizzle/schema";
 
@@ -101,6 +102,15 @@ export async function registerCatalogEntry(
       input.registeredBy,
     );
     const updated = await getCatalogEntryById(guard.existingEntryId);
+    // Plan v3 Phase 38 — audit event for the register/update action.
+    // Best-effort: a failed audit insert must NOT roll back the catalog
+    // write (the catalog state is the source of truth; audit is forensics).
+    await emitRegisterAudit(
+      guard.existingEntryId,
+      "catalog.register.updated",
+      input,
+      guard,
+    );
     return {
       entryId: guard.existingEntryId,
       action: "updated",
@@ -118,10 +128,47 @@ export async function registerCatalogEntry(
     createdBy: input.registeredBy,
   } as InsertCatalogEntry);
 
+  // Plan v3 Phase 38 — audit event.
+  await emitRegisterAudit(
+    (created as CatalogEntry).id,
+    "catalog.register.created",
+    input,
+    guard,
+  );
+
   return {
     entryId: (created as CatalogEntry).id,
     action: "created",
     legacyImportState: null,
     guardReason: guard.reason,
   };
+}
+
+async function emitRegisterAudit(
+  catalogEntryId: number,
+  eventType: "catalog.register.created" | "catalog.register.updated",
+  input: RegisterCatalogEntryInput,
+  guard: DuplicateGuardResult,
+): Promise<void> {
+  try {
+    await createCatalogAuditEvent({
+      eventType,
+      catalogEntryId,
+      actor: input.registeredBy,
+      actorType: "user",
+      payload: {
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        entryType: input.entryType,
+        guardReason: guard.reason,
+      },
+    } as any);
+  } catch (err) {
+    // Audit must not block the register; surface the failure on stderr only.
+    // The catalog row is already written and is the source of truth.
+    console.warn(
+      `[register] audit event '${eventType}' failed for entry ${catalogEntryId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
