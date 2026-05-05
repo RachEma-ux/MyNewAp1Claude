@@ -1,0 +1,259 @@
+/**
+ * CAG store — DB CRUD for `ags_cag_capability_packs`.
+ *
+ * Pure I/O layer. No business logic, no validation, no rendering.
+ * Imports allowed:
+ *   - drizzle table imports
+ *   - getAsDb (ASDB connection)
+ *   - hashing utilities (same package)
+ *   - types (same package)
+ *
+ * Imports forbidden (P1E boundary check will enforce):
+ *   - server/agent-studio/services/mcp/dispatcher.ts (live tool execution)
+ *   - server/provider-connections/internal/credential-resolver.ts
+ *   - server/secrets/encryption.ts
+ *   - server/documents/* / server/embeddings/* / server/vectordb/*
+ */
+
+import { and, desc, eq } from "drizzle-orm";
+import { getAsDb } from "../../db/connection";
+import {
+  agsCagCapabilityPacks,
+} from "../../../../drizzle/tables/agent-studio";
+import {
+  aggregateManifestHash,
+  hashMapsEqual,
+  manifestToHashMap,
+} from "./hashing";
+import { appendPackEvent } from "./events";
+import type {
+  CagCapabilityPack,
+  CreatePackInput,
+  CreatePackResult,
+} from "./types";
+
+function rowToPack(row: typeof agsCagCapabilityPacks.$inferSelect): CagCapabilityPack {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    agentId: row.agentId,
+    agentDraftId: row.agentDraftId,
+    catalogEntryId: row.catalogEntryId ?? null,
+    packType: row.packType,
+    packVersion: row.packVersion,
+    status: row.status as CagCapabilityPack["status"],
+    contentJson: (row.contentJson ?? {}) as Record<string, unknown>,
+    compressedPrompt: row.compressedPrompt ?? null,
+    tokenEstimate: row.tokenEstimate ?? null,
+    sourceManifestJson: (row.sourceManifestJson ?? { entries: [] }) as CagCapabilityPack["sourceManifestJson"],
+    sourceHashesJson: (row.sourceHashesJson ?? {}) as Record<string, string>,
+    injectionPolicyJson: (row.injectionPolicyJson ?? null) as Record<string, unknown> | null,
+    riskSummaryJson: (row.riskSummaryJson ?? null) as Record<string, unknown> | null,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    expiresAt: row.expiresAt ?? null,
+    lastUsedAt: row.lastUsedAt ?? null,
+  };
+}
+
+/**
+ * Create a new pack OR return the existing latest pack if its
+ * `sourceHashesJson` matches the new manifest exactly. Idempotent.
+ *
+ * The `pack_version` column is the unique key alongside `agent_draft_id`;
+ * a new version is computed as `latest.packVersion + 1`. The first pack
+ * for a draft starts at version 1.
+ */
+export async function createPack(input: CreatePackInput): Promise<CreatePackResult> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const newHashMap = manifestToHashMap(input.sourceManifest);
+
+  const latest = await getLatestPack(input.agentDraftId);
+  if (latest && latest.status === "fresh" && hashMapsEqual(latest.sourceHashesJson, newHashMap)) {
+    return { pack: latest, reused: true };
+  }
+
+  const nextVersion = (latest?.packVersion ?? 0) + 1;
+
+  const inserted = await db
+    .insert(agsCagCapabilityPacks)
+    .values({
+      workspaceId: input.workspaceId,
+      agentId: input.agentId,
+      agentDraftId: input.agentDraftId,
+      catalogEntryId: input.catalogEntryId ?? null,
+      packType: input.packType ?? "capability_v1",
+      packVersion: nextVersion,
+      status: "fresh",
+      contentJson: input.contentJson,
+      compressedPrompt: input.compressedPrompt ?? null,
+      tokenEstimate: input.tokenEstimate ?? null,
+      sourceManifestJson: { entries: input.sourceManifest } as Record<string, unknown>,
+      sourceHashesJson: newHashMap,
+      injectionPolicyJson: input.injectionPolicy ?? null,
+      riskSummaryJson: input.riskSummary ?? null,
+      createdBy: input.createdBy,
+      expiresAt: input.expiresAt ?? null,
+    })
+    .returning();
+
+  const pack = rowToPack(inserted[0]);
+
+  await appendPackEvent({
+    workspaceId: pack.workspaceId,
+    agentDraftId: pack.agentDraftId,
+    packId: pack.id,
+    eventType: "pack_created",
+    eventSeverity: "info",
+    newHash: aggregateManifestHash(input.sourceManifest),
+    actorType: "system",
+    packVersion: pack.packVersion,
+    createdBy: input.createdBy,
+  });
+
+  return { pack, reused: false };
+}
+
+/**
+ * Return the most recent pack (by packVersion DESC) for a draft, or null.
+ */
+export async function getLatestPack(agentDraftId: number): Promise<CagCapabilityPack | null> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const rows = await db
+    .select()
+    .from(agsCagCapabilityPacks)
+    .where(eq(agsCagCapabilityPacks.agentDraftId, agentDraftId))
+    .orderBy(desc(agsCagCapabilityPacks.packVersion))
+    .limit(1);
+
+  return rows[0] ? rowToPack(rows[0]) : null;
+}
+
+/**
+ * Return all packs for a draft, newest first. Includes archived/stale.
+ */
+export async function listPacks(agentDraftId: number): Promise<CagCapabilityPack[]> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const rows = await db
+    .select()
+    .from(agsCagCapabilityPacks)
+    .where(eq(agsCagCapabilityPacks.agentDraftId, agentDraftId))
+    .orderBy(desc(agsCagCapabilityPacks.packVersion));
+
+  return rows.map(rowToPack);
+}
+
+/**
+ * Lookup a pack by id, scoped by workspace for isolation. Returns null
+ * if the pack doesn't exist OR exists in a different workspace.
+ */
+export async function getPackById(
+  workspaceId: number,
+  packId: number,
+): Promise<CagCapabilityPack | null> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const rows = await db
+    .select()
+    .from(agsCagCapabilityPacks)
+    .where(
+      and(
+        eq(agsCagCapabilityPacks.id, packId),
+        eq(agsCagCapabilityPacks.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ? rowToPack(rows[0]) : null;
+}
+
+/**
+ * Mark a pack stale. Idempotent — already-stale packs are no-op
+ * (no event written), already-archived packs throw `pack_archived`.
+ */
+export async function markPackStale(
+  packId: number,
+  reason: string,
+  actorId: number,
+): Promise<void> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const rows = await db
+    .select()
+    .from(agsCagCapabilityPacks)
+    .where(eq(agsCagCapabilityPacks.id, packId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new Error(`Pack ${packId} not found`);
+  if (row.status === "archived") throw new Error("pack_archived");
+  if (row.status === "stale") return;
+
+  await db
+    .update(agsCagCapabilityPacks)
+    .set({
+      status: "stale",
+      updatedAt: new Date(),
+    })
+    .where(eq(agsCagCapabilityPacks.id, packId));
+
+  await appendPackEvent({
+    workspaceId: row.workspaceId,
+    agentDraftId: row.agentDraftId,
+    packId,
+    eventType: "pack_marked_stale",
+    eventSeverity: "warn",
+    reason,
+    actorType: "system",
+    packVersion: row.packVersion,
+    createdBy: actorId,
+  });
+}
+
+/**
+ * Stamp `lastUsedAt` on a pack. Used by P1C resolver to track which
+ * packs are actually injected into runtime calls (vs orphaned).
+ */
+export async function touchPackLastUsed(packId: number): Promise<void> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  await db
+    .update(agsCagCapabilityPacks)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(agsCagCapabilityPacks.id, packId));
+}
+
+/**
+ * List packs in a workspace + agent. Used by `agentStudio.cag.listPacks`
+ * preview API in P1D. Workspace-scoped — never returns cross-workspace data.
+ */
+export async function listPacksForAgent(
+  workspaceId: number,
+  agentId: number,
+): Promise<CagCapabilityPack[]> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const rows = await db
+    .select()
+    .from(agsCagCapabilityPacks)
+    .where(
+      and(
+        eq(agsCagCapabilityPacks.workspaceId, workspaceId),
+        eq(agsCagCapabilityPacks.agentId, agentId),
+      ),
+    )
+    .orderBy(desc(agsCagCapabilityPacks.packVersion));
+
+  return rows.map(rowToPack);
+}
