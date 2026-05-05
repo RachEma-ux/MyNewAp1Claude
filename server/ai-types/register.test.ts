@@ -14,11 +14,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const createCatalogEntryMock = vi.fn();
 const updateCatalogEntryMock = vi.fn();
 const getCatalogEntryByIdMock = vi.fn();
+const createCatalogAuditEventMock = vi.fn();
 
 vi.mock("./db", () => ({
   createCatalogEntry: (...args: any[]) => createCatalogEntryMock(...args),
   updateCatalogEntry: (...args: any[]) => updateCatalogEntryMock(...args),
   getCatalogEntryById: (...args: any[]) => getCatalogEntryByIdMock(...args),
+  createCatalogAuditEvent: (...args: any[]) =>
+    createCatalogAuditEventMock(...args),
 }));
 
 import { registerCatalogEntry, RegisterDuplicateError } from "./register";
@@ -60,6 +63,8 @@ describe("registerCatalogEntry — Phase 25", () => {
     createCatalogEntryMock.mockReset();
     updateCatalogEntryMock.mockReset();
     getCatalogEntryByIdMock.mockReset();
+    createCatalogAuditEventMock.mockReset();
+    createCatalogAuditEventMock.mockResolvedValue({ id: 1 });
   });
 
   it("creates a new catalog entry when no row exists", async () => {
@@ -147,5 +152,45 @@ describe("registerCatalogEntry — Phase 25", () => {
     } catch (e: any) {
       expect(e.existingEntryId).toBe(555);
     }
+  });
+
+  it("Phase 38: emits 'catalog.register.created' audit on create path", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    await registerCatalogEntry(makeFakeDb([]), baseInput);
+    expect(createCatalogAuditEventMock).toHaveBeenCalledTimes(1);
+    const auditArgs = createCatalogAuditEventMock.mock.calls[0][0];
+    expect(auditArgs.eventType).toBe("catalog.register.created");
+    expect(auditArgs.catalogEntryId).toBe(999);
+    expect(auditArgs.actor).toBe(1);
+    expect(auditArgs.actorType).toBe("user");
+    expect(auditArgs.payload.sourceType).toBe("agent");
+    expect(auditArgs.payload.sourceId).toBe(42);
+    expect(auditArgs.payload.guardReason).toBe("no_existing_row");
+  });
+
+  it("Phase 38: emits 'catalog.register.updated' audit on update path", async () => {
+    getCatalogEntryByIdMock.mockResolvedValue({
+      id: 100,
+      legacyImportState: null,
+    });
+    await registerCatalogEntry(
+      makeFakeDb([{ id: 100, legacyImportState: null }]),
+      baseInput,
+    );
+    expect(createCatalogAuditEventMock).toHaveBeenCalledTimes(1);
+    expect(createCatalogAuditEventMock.mock.calls[0][0].eventType).toBe(
+      "catalog.register.updated",
+    );
+    expect(createCatalogAuditEventMock.mock.calls[0][0].catalogEntryId).toBe(
+      100,
+    );
+  });
+
+  it("Phase 38: audit failure does NOT block the register (best-effort)", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    createCatalogAuditEventMock.mockRejectedValue(new Error("audit DB down"));
+    const r = await registerCatalogEntry(makeFakeDb([]), baseInput);
+    expect(r.action).toBe("created");
+    expect(r.entryId).toBe(999);
   });
 });

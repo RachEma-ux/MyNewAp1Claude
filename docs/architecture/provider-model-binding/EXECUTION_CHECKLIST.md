@@ -517,13 +517,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 38 — AI Types register action
 
-- [ ] Add `aiTypes.catalog.register`.
-- [ ] Require governance receipt.
-- [ ] Create/update catalog entry.
-- [ ] Return catalog entry ID.
-- [ ] Return imported/updated status.
-- [ ] Add audit event.
-- [ ] Add tests.
+- [x] Add `aiTypes.catalog.register`. *(Already landed in Phase 25 (PR #129) — registered via `registerPublicApi` in `server/ai-types/manifest.ts`.)*
+- [x] Require governance receipt. *(Phase 25 — descriptor `receiptRequired: true`; gateway enforces.)*
+- [x] Create/update catalog entry. *(Phase 25 — `registerCatalogEntry` delegates to `createCatalogEntry` (new) or `updateCatalogEntry` (existing modern row).)*
+- [x] Return catalog entry ID. *(Phase 25 — `RegisterCatalogEntryResult.entryId`.)*
+- [x] Return imported/updated status. *(Phase 25 — `RegisterCatalogEntryResult.action: "created" | "updated"`.)*
+- [x] Add audit event. *(Phase 38 — `emitRegisterAudit` writes `catalog.register.created` or `catalog.register.updated` via `createCatalogAuditEvent`. Best-effort: a failed audit insert does NOT roll back the catalog write.)*
+- [x] Add tests. *(Phase 25 — 6 register tests; Phase 38 — 3 additional audit tests: created path, updated path, audit-failure-non-fatal.)*
 
 ---
 
