@@ -268,6 +268,158 @@ export async function bootAgentStudio(): Promise<void> {
         receiptRequired: false,
       },
     });
+
+    // Plan v3 Phase 30 — Export Catalog gateway actions.
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.listCandidates",
+      handler: async (input) => {
+        const { listExportCandidates } = await import(
+          "./services/export-catalog"
+        );
+        const { buildLiveLookups } = await import(
+          "./services/export-catalog-lookups"
+        );
+        const payload = (input ?? {}) as Parameters<typeof listExportCandidates>[0];
+        return listExportCandidates(payload, await buildLiveLookups());
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.listCandidates",
+        description: "List Agent Studio export candidates (no credentials)",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.getCandidate",
+      handler: async (input) => {
+        const { getExportCandidate } = await import(
+          "./services/export-catalog"
+        );
+        const { buildLiveLookups } = await import(
+          "./services/export-catalog-lookups"
+        );
+        const { agentId } = input as { agentId: number };
+        if (typeof agentId !== "number") throw new Error("agentId is required");
+        return getExportCandidate(agentId, await buildLiveLookups());
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.getCandidate",
+        description: "Get a single Agent Studio export candidate",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.exportCandidate",
+      handler: async (input) => {
+        const { prepareExportRegisterPayload } = await import(
+          "./services/export-catalog"
+        );
+        const { buildLiveLookups } = await import(
+          "./services/export-catalog-lookups"
+        );
+        const { gatewayCall } = await import(
+          "../platform/modules/module-gateway"
+        );
+        const payload = input as { agentId: number; registeredBy: number };
+        if (typeof payload?.agentId !== "number")
+          throw new Error("agentId is required");
+        if (typeof payload?.registeredBy !== "number")
+          throw new Error("registeredBy is required");
+        const prepared = await prepareExportRegisterPayload(
+          { agentId: payload.agentId, registeredBy: payload.registeredBy },
+          await buildLiveLookups(),
+        );
+        const registerResult = await gatewayCall({
+          ctx: {
+            sourceModule: "agentStudio",
+            targetModule: "aiTypes",
+            actionKey: "aiTypes.catalog.register",
+            governanceReceiptId:
+              (input as any)?.governanceReceiptId ??
+              `ags-export-${payload.agentId}-${Date.now()}`,
+          },
+          input: prepared.registerPayload,
+        });
+        return {
+          ok: true,
+          candidate: prepared.candidate,
+          registerResult,
+        };
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.exportCandidate",
+        description:
+          "Export a candidate via aiTypes.catalog.register (writes catalog_entries)",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.markImported",
+      handler: async (input) => {
+        const { markCandidateImported } = await import(
+          "./services/export-catalog"
+        );
+        const payload = input as { agentId: number; catalogEntryId: number };
+        if (typeof payload?.agentId !== "number")
+          throw new Error("agentId is required");
+        if (typeof payload?.catalogEntryId !== "number")
+          throw new Error("catalogEntryId is required");
+        return markCandidateImported(payload);
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.markImported",
+        description:
+          "Confirm a successful import for a candidate (advisory marker)",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.exportCatalog.reconcileImports",
+      handler: async (input) => {
+        const { reconcileCandidateImports } = await import(
+          "./services/export-catalog"
+        );
+        const { getDb } = await import("../db/connection");
+        const db = getDb();
+        if (!db) throw new Error("Database not available");
+        const payload = input as {
+          agentId: number;
+          catalogEntryId: number;
+          sourceVersionId: number;
+          reconciledBy: number;
+        };
+        if (
+          typeof payload?.agentId !== "number" ||
+          typeof payload?.catalogEntryId !== "number" ||
+          typeof payload?.sourceVersionId !== "number" ||
+          typeof payload?.reconciledBy !== "number"
+        ) {
+          throw new Error(
+            "agentId, catalogEntryId, sourceVersionId, reconciledBy are required",
+          );
+        }
+        return reconcileCandidateImports(db, payload);
+      },
+      descriptor: {
+        key: "agentStudio.exportCatalog.reconcileImports",
+        description:
+          "Admin override: reconcile a legacy_imported_unresolved catalog row to a specific source version",
+        risk: "high",
+        receiptRequired: true,
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-publicApi] registration skipped — ${message}`);
