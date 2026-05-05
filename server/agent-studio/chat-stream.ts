@@ -41,9 +41,16 @@
  */
 
 import type { Request, Response } from "express";
-import OpenAI from "openai";
 import * as repo from "./repository";
-import { resolveProviderApiKey } from "./adapters/openllm-runtime-adapter";
+import { getAgentProviderBinding } from "./bindings";
+import { gatewayCall } from "../platform/modules/module-gateway";
+import type {
+  ModelAccessExecuteInput,
+  ModelAccessMessage,
+  ModelAccessResult,
+  ModelAccessStreamChunk,
+  ModelAccessToolCall,
+} from "../openrouter/model-access/types";
 import { dispatchMcpToolCall } from "./services/mcp/dispatcher";
 import { getSnapshot } from "./services/mcp/registry";
 
@@ -127,20 +134,11 @@ async function buildToolsForDraft(draftId: number): Promise<ToolSpec[]> {
 
 // ── Streaming tool-call loop ─────────────────────────────────────────────────
 
-/**
- * Accumulator for a single tool_call as it streams in across chunks.
- * OpenAI streams the `id`, `type`, `function.name` in the first chunk
- * that introduces the tool call, then streams `function.arguments` as
- * partial JSON across subsequent chunks.
- */
-interface StreamingToolCall {
-  id: string;
-  type: "function";
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
+// Phase 27.3 — `StreamingToolCall` accumulator was an OpenAI-stream-shape
+// helper used by the deleted client.chat.completions.create(stream:true)
+// loop. The Model Access tool path now uses non-streaming execute, which
+// returns `result.toolCalls` as a complete array, so the accumulator is
+// no longer needed.
 
 interface LoopStats {
   inputTokens: number;
@@ -150,18 +148,30 @@ interface LoopStats {
 }
 
 /**
- * Run the streaming tool-call loop. Persists the final assistant row
- * via appendChatMessage and returns its id + cumulative stats so the
- * caller can bump session totals and emit `done`.
+ * Phase 27.3 — Run the tool-call loop via Model Access.
+ *
+ * Each turn calls `openRouter.modelAccess.execute` (non-streaming) and
+ * emits the assistant content for that turn as a single SSE `token`
+ * event. This is honestly degraded vs. token-by-token streaming; the
+ * trade-off is that Direction A is exclusive (no raw provider key in
+ * Agent Studio runtime). Tool-call streaming on Model Access is
+ * deferred to a future phase that adds tool-call streaming to the
+ * Model Access stream contract.
+ *
+ * Persists the final assistant row via appendChatMessage and returns
+ * its id + cumulative stats so the caller can bump session totals
+ * and emit `done`.
  */
 async function runStreamingToolLoop(args: {
-  client: OpenAI;
-  model: string;
+  providerConnectionId: number;
+  modelRef: string;
   temperature: number;
   maxTokens: number | undefined;
   systemPrompt: string;
   sessionId: number;
   draftId: number;
+  workspaceId: number;
+  actorId: number;
   tools: ToolSpec[];
   sendEvent: SseSend;
 }): Promise<{
@@ -170,16 +180,20 @@ async function runStreamingToolLoop(args: {
   stats: LoopStats;
 }> {
   const {
-    client,
-    model,
+    providerConnectionId,
+    modelRef,
     temperature,
     maxTokens,
     systemPrompt,
     sessionId,
     draftId,
+    workspaceId,
+    actorId,
     tools,
     sendEvent,
   } = args;
+  // Local alias kept for code locality with the persistence calls below.
+  const model = modelRef;
 
   const dispatchKeyByOpenaiName = new Map<string, string>(
     tools.map((t) => [t.openaiName, t.dispatchKey])
@@ -196,96 +210,87 @@ async function runStreamingToolLoop(args: {
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     // Rebuild messages from history so previous tool turns are in
-    // scope for the next call
+    // scope for the next call. Map our internal shape onto
+    // ModelAccessMessage[].
     const history = await repo.listChatMessages(sessionId);
-    const messagesForApi: any[] = [
+    const messagesForModelAccess: ModelAccessMessage[] = [
       { role: "system", content: systemPrompt },
     ];
     for (const m of history) {
       if (m.role === "user") {
-        messagesForApi.push({ role: "user", content: m.content });
+        messagesForModelAccess.push({ role: "user", content: m.content });
       } else if (m.role === "assistant") {
         const tp = (m.toolPayload ?? null) as any;
         if (tp?.toolCalls && Array.isArray(tp.toolCalls)) {
-          messagesForApi.push({
+          messagesForModelAccess.push({
             role: "assistant",
-            content: m.content || null,
-            tool_calls: tp.toolCalls,
+            content: m.content || "",
+            toolCalls: tp.toolCalls.map((c: any) => ({
+              id: String(c.id ?? ""),
+              name: String(c.function?.name ?? c.name ?? ""),
+              arguments: String(c.function?.arguments ?? c.arguments ?? "{}"),
+            })),
           });
         } else {
-          messagesForApi.push({ role: "assistant", content: m.content });
+          messagesForModelAccess.push({ role: "assistant", content: m.content });
         }
       } else if (m.role === "tool") {
         const tp = (m.toolPayload ?? null) as any;
-        messagesForApi.push({
+        messagesForModelAccess.push({
           role: "tool",
-          tool_call_id: tp?.toolCallId ?? "",
           content: m.content,
+          toolCallId: String(tp?.toolCallId ?? ""),
         });
       }
     }
 
-    // Open streaming completion
-    const stream = await client.chat.completions.create({
-      model,
-      messages: messagesForApi,
+    // Phase 27.3 — non-streaming Model Access execute per turn.
+    // Tool-call streaming on Model Access is deferred to a future
+    // phase; we honestly degrade by emitting the turn's assistant
+    // content as one SSE `token` event after the call returns.
+    const turnStartMs = Date.now();
+    const executeInput: ModelAccessExecuteInput = {
+      providerConnectionId,
+      modelRef,
+      messages: messagesForModelAccess,
+      tools: toolSchemas as unknown as unknown[],
+      stream: false,
+      tokenBudget: maxTokens,
       temperature,
-      ...(maxTokens != null ? { max_completion_tokens: maxTokens } : {}),
-      tools: toolSchemas,
-      tool_choice: "auto",
-      stream: true,
-      stream_options: { include_usage: true },
+      intent: "chat",
+      workspaceId,
+      actorId,
+    };
+    const result: ModelAccessResult = await gatewayCall<
+      ModelAccessExecuteInput,
+      ModelAccessResult
+    >({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.execute",
+        actorId,
+        workspaceId,
+        // Per-turn governance receipt (Phase 20 hybrid policy).
+        governanceReceiptId: `chat-stream-tools-${sessionId}-t${turn}-${Date.now()}`,
+      },
+      input: executeInput,
     });
 
-    // Accumulate content + tool calls across chunks
-    let contentAccum = "";
-    const toolCallAccum = new Map<number, StreamingToolCall>();
-    let finishReason: string | null = null;
-    let turnPromptTokens = 0;
-    let turnCompletionTokens = 0;
+    if (result.status !== "ok") {
+      throw new Error(result.error ?? "Model Access returned status=error");
+    }
 
-    for await (const chunk of stream) {
-      const choice = chunk.choices[0];
-      if (!choice) {
-        // Final chunk in include_usage mode has no choices, just usage
-        if ((chunk as any).usage) {
-          turnPromptTokens = (chunk as any).usage.prompt_tokens ?? 0;
-          turnCompletionTokens = (chunk as any).usage.completion_tokens ?? 0;
-        }
-        continue;
-      }
-      const delta = choice.delta;
-      if (delta?.content) {
-        contentAccum += delta.content;
-        sendEvent({ type: "token", content: delta.content });
-      }
-      if (delta?.tool_calls) {
-        for (const tcDelta of delta.tool_calls) {
-          const idx = tcDelta.index ?? 0;
-          let acc = toolCallAccum.get(idx);
-          if (!acc) {
-            acc = {
-              id: tcDelta.id ?? "",
-              type: "function",
-              function: {
-                name: tcDelta.function?.name ?? "",
-                arguments: "",
-              },
-            };
-            toolCallAccum.set(idx, acc);
-          } else {
-            // Later chunks may refine id or name (rare but possible)
-            if (tcDelta.id) acc.id = tcDelta.id;
-            if (tcDelta.function?.name) acc.function.name = tcDelta.function.name;
-          }
-          if (tcDelta.function?.arguments) {
-            acc.function.arguments += tcDelta.function.arguments;
-          }
-        }
-      }
-      if (choice.finish_reason) {
-        finishReason = choice.finish_reason;
-      }
+    const contentAccum = result.output ?? "";
+    const turnPromptTokens = result.usage?.inputTokens ?? 0;
+    const turnCompletionTokens = result.usage?.outputTokens ?? 0;
+    const finishReason: string | null = result.finishReason ?? null;
+    const modelAccessToolCalls: ModelAccessToolCall[] = result.toolCalls ?? [];
+
+    // Emit the turn's content as a single SSE token chunk (degraded
+    // from token-by-token; see function-level comment).
+    if (contentAccum.length > 0) {
+      sendEvent({ type: "token", content: contentAccum });
     }
 
     // Update cumulative stats
@@ -295,27 +300,32 @@ async function runStreamingToolLoop(args: {
       (turnPromptTokens / 1_000_000) * INPUT_COST_PER_1M +
       (turnCompletionTokens / 1_000_000) * OUTPUT_COST_PER_1M;
     stats.costMicrocents += Math.round(turnCost * 1_000_000);
+    void turnStartMs; // reserved for future per-turn duration telemetry
 
-    const toolCalls = Array.from(toolCallAccum.values()).sort((a, b) => {
-      // keyed by index; stable order by accumulator map insertion
-      return 0;
-    });
-
-    if (finishReason === "tool_calls" && toolCalls.length > 0) {
-      // Persist assistant turn with tool_calls (may have partial content
-      // too — some models interleave reasoning with tool_calls)
+    if (
+      (finishReason === "tool_calls" || modelAccessToolCalls.length > 0) &&
+      modelAccessToolCalls.length > 0
+    ) {
+      // Re-shape ModelAccessToolCall onto the historical OpenAI-style
+      // tool_calls shape that the on-disk toolPayload column expects;
+      // this preserves history compatibility with prior turns.
+      const persistedToolCalls = modelAccessToolCalls.map((tc) => ({
+        id: tc.id,
+        type: "function" as const,
+        function: { name: tc.name, arguments: tc.arguments },
+      }));
       await repo.appendChatMessage({
         sessionId,
         role: "assistant",
         content: contentAccum,
-        toolPayload: { toolCalls },
+        toolPayload: { toolCalls: persistedToolCalls },
         model,
       });
 
       // Dispatch every tool call and persist results as role=tool
-      for (const call of toolCalls) {
-        const openaiName = call.function.name;
-        const rawArgs = call.function.arguments;
+      for (const call of modelAccessToolCalls) {
+        const openaiName = call.name;
+        const rawArgs = call.arguments;
         let parsedArgs: Record<string, unknown> = {};
         try {
           parsedArgs = JSON.parse(rawArgs || "{}");
@@ -413,25 +423,45 @@ async function runStreamingToolLoop(args: {
 
 // ── Pure (no-tools) streaming path ───────────────────────────────────────────
 
+/**
+ * Phase 27.3 — No-tools streaming via Model Access.
+ *
+ * Token-by-token streaming is preserved for the no-tools path because
+ * `openRouter.modelAccess.stream` exposes an SSE-style async-iterable
+ * that yields {delta, done, usage} chunks. The chat-stream SSE format
+ * is unchanged: each non-empty `delta` becomes a `token` event.
+ */
 async function runPureStream(args: {
-  client: OpenAI;
-  model: string;
+  providerConnectionId: number;
+  modelRef: string;
   temperature: number;
   maxTokens: number | undefined;
   systemPrompt: string;
   sessionId: number;
+  workspaceId: number;
+  actorId: number;
   sendEvent: SseSend;
 }): Promise<{
   assistantRowId: number;
   content: string;
   stats: LoopStats;
 }> {
-  const { client, model, temperature, maxTokens, systemPrompt, sessionId, sendEvent } =
-    args;
+  const {
+    providerConnectionId,
+    modelRef,
+    temperature,
+    maxTokens,
+    systemPrompt,
+    sessionId,
+    workspaceId,
+    actorId,
+    sendEvent,
+  } = args;
+  const model = modelRef;
 
   const history = await repo.listChatMessages(sessionId);
-  const messagesForApi = [
-    { role: "system" as const, content: systemPrompt },
+  const messagesForModelAccess: ModelAccessMessage[] = [
+    { role: "system", content: systemPrompt },
     ...history
       .filter((m: any) => m.role === "user" || m.role === "assistant")
       .map((m: any) => ({
@@ -445,25 +475,44 @@ async function runPureStream(args: {
   let promptTokens = 0;
   let completionTokens = 0;
 
-  const stream = await client.chat.completions.create({
-    model,
-    messages: messagesForApi,
-    temperature,
-    ...(maxTokens != null ? { max_completion_tokens: maxTokens } : {}),
-    stream: true,
-    stream_options: { include_usage: true },
+  // Use Model Access stream via the gateway. Tool-less path; D2 boundary
+  // resolves the credential inside OpenRouter; no apiKey ever crosses
+  // back into Agent Studio.
+  const chunks: AsyncIterable<ModelAccessStreamChunk> = await gatewayCall<
+    ModelAccessExecuteInput,
+    AsyncIterable<ModelAccessStreamChunk>
+  >({
+    ctx: {
+      sourceModule: "agentStudio",
+      targetModule: "openRouter",
+      actionKey: "openRouter.modelAccess.stream",
+      actorId,
+      workspaceId,
+      governanceReceiptId: `chat-stream-pure-${sessionId}-${Date.now()}`,
+    },
+    input: {
+      providerConnectionId,
+      modelRef,
+      messages: messagesForModelAccess,
+      stream: true,
+      tokenBudget: maxTokens,
+      temperature,
+      intent: "chat",
+      workspaceId,
+      actorId,
+    },
   });
 
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta;
-    if (delta?.content) {
-      accumulated += delta.content;
-      sendEvent({ type: "token", content: delta.content });
+  for await (const chunk of chunks) {
+    if (chunk.delta && chunk.delta.length > 0) {
+      accumulated += chunk.delta;
+      sendEvent({ type: "token", content: chunk.delta });
     }
-    if ((chunk as any).usage) {
-      promptTokens = (chunk as any).usage.prompt_tokens ?? 0;
-      completionTokens = (chunk as any).usage.completion_tokens ?? 0;
+    if (chunk.usage) {
+      promptTokens = chunk.usage.inputTokens ?? promptTokens;
+      completionTokens = chunk.usage.outputTokens ?? completionTokens;
     }
+    if (chunk.done) break;
   }
 
   const durationMs = Date.now() - startMs;
@@ -532,38 +581,54 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     }
 
     const providerConfig = (draft.providerConfig ?? {}) as Record<string, unknown>;
-    const provider =
-      typeof providerConfig.provider === "string" ? providerConfig.provider : undefined;
-    const model =
-      typeof providerConfig.model === "string" ? providerConfig.model : undefined;
     const temperature =
       typeof providerConfig.temperature === "number" ? providerConfig.temperature : 0.2;
     const maxTokens =
       typeof providerConfig.maxTokens === "number" ? providerConfig.maxTokens : undefined;
 
-    if (provider !== "openai") {
-      sendEvent({
-        type: "error",
-        error: `Chat only supports provider=openai, got provider=${provider ?? "(none)"}.`,
-      });
-      res.end();
-      return;
-    }
-    const apiKey = resolveProviderApiKey(providerConfig);
-    if (!apiKey) {
+    // Phase 27.3 — binding-required. Streaming Expert chat no longer
+    // resolves provider keys directly. Every runtime path goes through
+    // OpenRouter Model Access (D2), which means an active Provider
+    // Connection bound to this draft is now mandatory.
+    const binding = await getAgentProviderBinding(draft.id, "primary");
+    if (
+      !binding ||
+      binding.status !== "binding_v1" ||
+      !binding.providerConnectionId
+    ) {
       sendEvent({
         type: "error",
         error:
-          "No OpenAI API key resolved. Set OPENAI_API_KEY in your .env (or as a process env var) and restart the server.",
+          "No active provider binding configured for this agent. " +
+          "Open the Provider Binding page in Agent Studio and bind a provider/model " +
+          "from the AI Types catalog before starting an Expert chat.",
+        code: "binding_required",
       });
       res.end();
       return;
     }
-    if (!model) {
-      sendEvent({ type: "error", error: "Agent's providerConfig is missing `model`." });
+    const providerConnectionId = binding.providerConnectionId;
+    const modelRef = binding.modelRef;
+    if (!modelRef || modelRef.length === 0) {
+      sendEvent({
+        type: "error",
+        error: "Provider binding is missing modelRef.",
+        code: "binding_missing_model",
+      });
       res.end();
       return;
     }
+    const model = modelRef;
+
+    // Plan v3 Phase 15 staleness check is enforced inside Model Access's
+    // resolve path; we don't need to duplicate it here. Workspace and
+    // actor are required for the gatewayCall sealed context.
+    const workspaceId =
+      typeof (draft as any).workspaceId === "number" ? (draft as any).workspaceId : 1;
+    const actorId =
+      typeof (session as any).createdBy === "number"
+        ? (session as any).createdBy
+        : 1;
 
     // Persist user message FIRST so it survives LLM failures
     await repo.appendChatMessage({
@@ -577,31 +642,33 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         .filter((s): s is string => typeof s === "string" && s.length > 0)
         .join("\n\n") || "You are a helpful assistant.";
 
-    const client = new OpenAI({ apiKey });
-
     // Pick path based on whether any MCP server for this draft has
     // a live registry snapshot (i.e. is actually connected)
     const toolSpecs = await buildToolsForDraft(draft.id);
     const pathResult =
       toolSpecs.length > 0
         ? await runStreamingToolLoop({
-            client,
-            model,
+            providerConnectionId,
+            modelRef,
             temperature,
             maxTokens,
             systemPrompt,
             sessionId,
             draftId: draft.id,
+            workspaceId,
+            actorId,
             tools: toolSpecs,
             sendEvent,
           })
         : await runPureStream({
-            client,
-            model,
+            providerConnectionId,
+            modelRef,
             temperature,
             maxTokens,
             systemPrompt,
             sessionId,
+            workspaceId,
+            actorId,
             sendEvent,
           });
 

@@ -273,6 +273,95 @@ describe("Phase 42 invariant 5 — Model Access does not read process.env provid
 });
 
 // ────────────────────────────────────────────────────────────────────
+// Invariant 5b — Phase 27.7 broader Agent Studio scan
+// ────────────────────────────────────────────────────────────────────
+//
+// After Phase 27.3 (chat-stream → Model Access) and 27.5 (services/chat.ts
+// fallback removal), the only remaining LR-01 reader of provider env vars
+// in Agent Studio is the simulation engine (sole approved Phase 27
+// exception, documented in PHASE_27_SIMULATION_ENGINE_DECISION.md). This
+// invariant locks that scope: any *new* Agent Studio file that reads
+// `process.env.<X>_API_KEY` or instantiates `new OpenAI({...})` is a
+// regression and must fail CI.
+
+describe("Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is locked to simulation only", () => {
+  const ALLOWED_AS_PATHS = new Set<string>([
+    // The shared resolver. Its sole runtime caller after 27.3/27.5 is
+    // simulation; the resolver itself is allowlisted in the boundary
+    // script with the LR-01 register link.
+    "server/agent-studio/adapters/openllm-runtime-adapter.ts",
+    // Simulation live-runtime branch — the explicit Phase 27.6 exception.
+    "server/agent-studio/services/simulation.ts",
+    // Adapter modules invoked exclusively by simulation.
+    "server/agent-studio/adapters/openai-direct-adapter.ts",
+  ]);
+
+  const NON_PROVIDER_KEYS = new Set(["BUILT_IN_FORGE_API_KEY", "OMNIRAG_API_KEY"]);
+
+  it("no Agent Studio source outside the simulation allowlist reads process.env.<X>_API_KEY", () => {
+    const files = walkTs("server/agent-studio", { skipTests: true });
+    expect(files.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    const re =
+      /process\.env(?:\.([A-Z0-9_]+)|\[\s*["']([A-Z0-9_]+)["']\s*\])/g;
+    for (const f of files) {
+      const rel = relPath(f);
+      if (ALLOWED_AS_PATHS.has(rel)) continue;
+      const src = readFileSync(f, "utf8");
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src))) {
+        const key = m[1] ?? m[2];
+        if (!key) continue;
+        if (!key.endsWith("_API_KEY")) continue;
+        if (NON_PROVIDER_KEYS.has(key)) continue;
+        offenders.push(`${rel} (process.env.${key})`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("no Agent Studio source outside the simulation allowlist instantiates `new OpenAI(`", () => {
+    const files = walkTs("server/agent-studio", { skipTests: true });
+    const offenders: string[] = [];
+    // Match `new OpenAI(` — the SDK class instantiation that takes an
+    // apiKey. Comments and imports never match this exact form.
+    const re = /\bnew\s+OpenAI\s*\(/;
+    for (const f of files) {
+      const rel = relPath(f);
+      if (ALLOWED_AS_PATHS.has(rel)) continue;
+      const src = readFileSync(f, "utf8");
+      // Strip comments first so docstrings mentioning "new OpenAI(" don't trigger.
+      const stripped = src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*/g, "");
+      if (re.test(stripped)) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("no Agent Studio source outside the simulation allowlist imports resolveProviderApiKey", () => {
+    const files = walkTs("server/agent-studio", { skipTests: true });
+    const offenders: string[] = [];
+    for (const f of files) {
+      const rel = relPath(f);
+      if (ALLOWED_AS_PATHS.has(rel)) continue;
+      const src = readFileSync(f, "utf8");
+      // Match a real import of resolveProviderApiKey (not a doc/comment).
+      const stripped = src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*/g, "");
+      if (/\bimport\b[^;]*\bresolveProviderApiKey\b/.test(stripped)) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
 // Invariant 6 — Provider Connections public API returns no secrets
 // ────────────────────────────────────────────────────────────────────
 

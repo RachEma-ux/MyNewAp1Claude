@@ -41,6 +41,18 @@ Sister bundle in `docs/evidence/ai-types-agent-studio-import/`:
    migrated/removed entries. All Plan v3-owned closures are
    accounted for.
 
+> **Wording note (2026-05-05, Phase 27.0):** earlier framing of D1 in
+> some Plan v3 docs read as *"runtime never reads provider API keys
+> from `process.env`."* That overstates the post-Plan-v3 state. The
+> accurate framing is: **runtime provider-key access is blocked for
+> NEW paths; legacy paths LR-01 / LR-02 / LR-03 / LR-04 / LR-06 /
+> LR-08 / LK-01 + simulation engine remain baseline-allowlisted in
+> `scripts/check-provider-key-env-boundary.ts` until Phase 27 is
+> complete.** Phase 27.7 removes the allowlist entries and promotes
+> Direction A to exclusive. See `DIRECTION_A_VERIFICATION_REPORT.md`
+> for the audit that surfaced this and `PHASE_27_*` for the Phase 27
+> deliverables.
+
 ---
 
 ## How to refresh this bundle

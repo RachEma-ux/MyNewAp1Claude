@@ -202,14 +202,135 @@ async function main(): Promise<void> {
       );
       process.exit(2);
     }
+    // Phase 27.2B — actual apply path. For each draft with a non-empty
+    // classification, ensure a binding row exists and redact the source
+    // jsonb. Idempotent: skips drafts that already have a (draftId, role)
+    // binding row.
+    const { getDb } = await import("../../server/db");
+    const { agsAgentDrafts, agsAgentProviderBindings, agsAgentVersions } =
+      await import("../../drizzle/tables/agent-studio");
+    const { eq, and } = await import("drizzle-orm");
+    const dbInst = getDb();
+    if (!dbInst) {
+      console.error("[error] DATABASE_URL not set; cannot --apply.");
+      process.exit(2);
+    }
+    let bindingsCreated = 0;
+    let bindingsSkipped = 0;
+    let draftsRedacted = 0;
+    let releasesRedacted = 0;
+    for (const r of results) {
+      const c = r.classification;
+      // (a) Ensure a binding row exists when the classification produces one.
+      if (c.produceBindingRow) {
+        const existing = await dbInst
+          .select({ id: agsAgentProviderBindings.id })
+          .from(agsAgentProviderBindings)
+          .where(
+            and(
+              eq(agsAgentProviderBindings.draftId, r.draft.id),
+              eq(agsAgentProviderBindings.role, "primary"),
+            ),
+          )
+          .limit(1);
+        if (existing.length === 0) {
+          await dbInst.insert(agsAgentProviderBindings).values({
+            workspaceId: r.draft.workspaceId,
+            agentId: r.draft.agentId,
+            draftId: r.draft.id,
+            role: "primary",
+            providerCatalogEntryId: r.providerCatalogEntryId,
+            modelCatalogEntryId: null,
+            providerConnectionId: r.providerConnectionId,
+            modelRef:
+              typeof (r.draft.providerConfig as Record<string, unknown> | null)
+                ?.model === "string"
+                ? ((r.draft.providerConfig as Record<string, unknown>)
+                    .model as string)
+                : "",
+            status: c.resultingStatus ?? "legacy_unresolved",
+            statusReason: c.resultingStatusReason,
+            legacyEnvVarHint: c.envVarHint,
+            createdBy: r.draft.createdBy,
+          });
+          bindingsCreated += 1;
+        } else {
+          bindingsSkipped += 1;
+        }
+      }
+      // (b) Redact the draft source jsonb if it carries any secret-shaped
+      // key. Idempotent: a clean providerConfig is a no-op.
+      const cfg = (r.draft.providerConfig ?? {}) as Record<string, unknown>;
+      const cleaned: Record<string, unknown> = {};
+      let dirty = false;
+      for (const [key, value] of Object.entries(cfg)) {
+        if (
+          (SECRET_DENYLIST as readonly string[]).includes(key) ||
+          key === ENV_VAR_FIELD
+        ) {
+          dirty = true;
+          continue;
+        }
+        cleaned[key] = value;
+      }
+      if (dirty) {
+        await dbInst
+          .update(agsAgentDrafts)
+          .set({ providerConfig: cleaned, updatedAt: new Date() })
+          .where(eq(agsAgentDrafts.id, r.draft.id));
+        draftsRedacted += 1;
+      }
+    }
+    // (c) Phase 27.2B — also scan version snapshots. Versions freeze a
+    // draft's config at publish time; older versions may carry the same
+    // raw-key shape (releases reference versionId, the snapshot lives on
+    // agsAgentVersions). Redact in-place. We do NOT create binding rows
+    // from versions — versions are immutable historical records; only
+    // the current draft drives the runtime binding choice.
+    const versions = await dbInst.select().from(agsAgentVersions);
+    for (const rel of versions) {
+      const snap = rel.snapshot as Record<string, unknown> | null;
+      if (!snap || typeof snap !== "object") continue;
+      // Some snapshot shapes nest providerConfig under draft.providerConfig
+      // or runtime_config.providerConfig. Walk the snapshot looking for
+      // any object whose own keys include a forbidden key, and redact.
+      const visit = (node: unknown): { node: unknown; dirty: boolean } => {
+        if (!node || typeof node !== "object" || Array.isArray(node)) {
+          return { node, dirty: false };
+        }
+        const obj = node as Record<string, unknown>;
+        let dirty = false;
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(obj)) {
+          if (
+            (SECRET_DENYLIST as readonly string[]).includes(k) ||
+            k === ENV_VAR_FIELD
+          ) {
+            dirty = true;
+            continue;
+          }
+          const sub = visit(v);
+          if (sub.dirty) dirty = true;
+          out[k] = sub.node;
+        }
+        return { node: out, dirty };
+      };
+      const visited = visit(snap);
+      if (visited.dirty) {
+        await dbInst
+          .update(agsAgentVersions)
+          .set({ snapshot: visited.node as Record<string, unknown> })
+          .where(eq(agsAgentVersions.id, rel.id));
+        releasesRedacted += 1;
+      }
+    }
     console.error(
-      "[warn] --apply path is the Phase 11 follow-up — Phase 10 ships the dry-run + classifier; the binding INSERT/UPDATE block lands when the destination table is added.",
+      `[info] apply: bindingsCreated=${bindingsCreated} bindingsSkipped=${bindingsSkipped} draftsRedacted=${draftsRedacted} versionSnapshotsRedacted=${releasesRedacted}`,
     );
-    process.exit(2);
   }
 
   if (mode === "validate") {
-    const offenders: Array<{ id: number; keys: string[] }> = [];
+    const offenders: Array<{ kind: "draft" | "version"; id: number; keys: string[] }> = [];
     for (const r of results) {
       const cfg = r.draft.providerConfig ?? {};
       const found = SECRET_DENYLIST.filter((k) =>
@@ -218,14 +339,49 @@ async function main(): Promise<void> {
       if (Object.prototype.hasOwnProperty.call(cfg, ENV_VAR_FIELD)) {
         found.push(ENV_VAR_FIELD);
       }
-      if (found.length > 0) offenders.push({ id: r.draft.id, keys: found });
+      if (found.length > 0)
+        offenders.push({ kind: "draft", id: r.draft.id, keys: found });
+    }
+    // Phase 27.2B — also validate version snapshots.
+    try {
+      const { getDb } = await import("../../server/db");
+      const { agsAgentVersions } = await import(
+        "../../drizzle/tables/agent-studio"
+      );
+      const dbInst = getDb();
+      if (dbInst) {
+        const versions = await dbInst.select().from(agsAgentVersions);
+        const scan = (node: unknown): string[] => {
+          if (!node || typeof node !== "object" || Array.isArray(node)) return [];
+          const obj = node as Record<string, unknown>;
+          const found: string[] = [];
+          for (const [k, v] of Object.entries(obj)) {
+            if (
+              (SECRET_DENYLIST as readonly string[]).includes(k) ||
+              k === ENV_VAR_FIELD
+            ) {
+              found.push(k);
+            }
+            const sub = scan(v);
+            if (sub.length > 0) found.push(...sub);
+          }
+          return found;
+        };
+        for (const v of versions) {
+          const found = scan(v.snapshot);
+          if (found.length > 0)
+            offenders.push({ kind: "version", id: v.id, keys: found });
+        }
+      }
+    } catch {
+      /* DB unavailable; draft-only validate still ran */
     }
     if (offenders.length > 0) {
       console.error(
-        `[error] ${offenders.length} draft(s) still carry secret-shaped keys:`,
+        `[error] ${offenders.length} row(s) still carry secret-shaped keys:`,
       );
       for (const o of offenders) {
-        console.error(`        draft ${o.id}: ${o.keys.join(", ")}`);
+        console.error(`        ${o.kind} ${o.id}: ${o.keys.join(", ")}`);
       }
       process.exit(1);
     }

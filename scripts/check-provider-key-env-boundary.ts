@@ -78,51 +78,68 @@ interface AllowedOccurrence {
 }
 
 const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
-  // LR-06 (added in Phase 5): the existing autoProvisionProviders
-  // boot block in `_core/index.ts` reads provider keys at startup
-  // to seed the legacy `providers` table. Plan v3 will extract this
-  // into `scripts/provider-connections/seed-from-env.ts` (Phase 9–10).
+  // LR-06: the existing autoProvisionProviders boot block in
+  // `_core/index.ts` reads provider keys at startup to seed the
+  // legacy `providers` table. Plan v3 RETIRE decision (Phase 27.4
+  // matrix item #8): replace with `scripts/provider-connections/seed-from-env.ts`.
+  // The actual extract requires moving the encrypted-secret write
+  // target from the legacy `providers` table to `provider_connections`,
+  // which is a focused Phase 28 follow-up.
   {
     file: "server/_core/index.ts",
     envKey: "<dynamic>",
     registerId: "LR-06",
-    deadlinePhase: "Phase 10",
+    deadlinePhase: "Phase 28",
     reason:
-      "autoProvisionProviders ENV_PROVIDER_MAP boot seed — extracted into seed-from-env.ts during Phase 9–10.",
+      "autoProvisionProviders ENV_PROVIDER_MAP boot seed. Phase 27.4 decision: RETIRE; extract owned by Phase 28.",
   },
-  // LR-01: Agent Studio runtime adapter — `process.env[pc.apiKeyEnvVar]`.
+  // LR-01 (Phase 27.7 narrowed): Agent Studio runtime adapter —
+  // `process.env[pc.apiKeyEnvVar]`. After Phase 27.3 (chat-stream)
+  // and Phase 27.5 (services/chat.ts) closed their callers,
+  // `resolveProviderApiKey` has exactly ONE remaining caller: the
+  // simulation engine's live-mode runtime branch
+  // (`services/simulation.ts:808, 826` via `runViaOpenAIDirect` /
+  // `runViaOpenllmAgent`). The deferral is a deliberate, deadline-bound
+  // exception documented in `PHASE_27_SIMULATION_ENGINE_DECISION.md`
+  // (Option C). Allowlist scope is intentionally retained at the
+  // adapter file because the resolver is shared infrastructure; the
+  // Phase 28 acceptance criterion is "Model Access exposes a streaming-
+  // with-tool-calls + MCP-bridge primitive that simulation can call
+  // via gatewayCall."
   {
     file: "server/agent-studio/adapters/openllm-runtime-adapter.ts",
     envKey: "<dynamic>",
     registerId: "LR-01",
-    deadlinePhase: "Phase 17",
+    deadlinePhase: "Phase 28",
     reason:
-      "Active Expert chat path; replaced when Expert chat moves through Model Access.",
+      "Simulation engine live-runtime branch only (sole remaining LR-01 caller after 27.3/27.5). See PHASE_27_SIMULATION_ENGINE_DECISION.md.",
   },
-  // LR-02: Embeddings.
+  // LR-02: Embeddings. Phase 27.4 decision: TEMPORARY_EXCEPTION_WITH_DEADLINE.
+  // Deferred to Phase 28 alongside the Model Access embedding-execute
+  // primitive (Model Access today is chat/stream/validateBinding only).
   {
     file: "server/embeddings/service.ts",
     envKey: "OPENAI_API_KEY",
     registerId: "LR-02",
-    deadlinePhase: "Phase 19",
+    deadlinePhase: "Phase 28",
     reason:
-      "Embeddings runtime; classified for Model Access migration in Phase 19.",
+      "Embeddings runtime; deferred to Phase 28 — depends on Model Access embedding-execute primitive.",
   },
-  // LR-03: Documents.
+  // LR-03: Documents. Same shape and deadline as LR-02.
   {
     file: "server/documents/processor.ts",
     envKey: "OPENAI_API_KEY",
     registerId: "LR-03",
-    deadlinePhase: "Phase 19",
-    reason: "Document processor; classified in Phase 19.",
+    deadlinePhase: "Phase 28",
+    reason: "Document processor; same Model Access embedding-endpoint dependency as LR-02.",
   },
-  // LR-04: Operators hub.
+  // LR-04: Operators hub. Same shape and deadline as LR-02.
   {
     file: "server/operators/provider-hub.ts",
     envKey: "OPENAI_API_KEY",
     registerId: "LR-04",
-    deadlinePhase: "Phase 19",
-    reason: "Operator runtime; classified in Phase 19.",
+    deadlinePhase: "Phase 28",
+    reason: "Operator runtime; same Model Access embedding-endpoint dependency as LR-02.",
   },
   // The Phase 5 seed script itself — once created, it is the ONE
   // legitimate reader of provider env vars by design.

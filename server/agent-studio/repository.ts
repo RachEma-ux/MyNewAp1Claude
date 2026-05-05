@@ -261,9 +261,22 @@ export async function updateDraft(
   const conn = db();
   const draft = await getCurrentDraft(agentId);
   if (!draft) throw new Error(`No current draft for agent ${agentId}`);
+  // Phase 27.2A — strip raw provider keys before persistence (LK-01).
+  // The cloning path passes `providerConfig` here verbatim; guard catches it.
+  let safePatch: typeof patch = patch;
+  if (patch.providerConfig !== undefined) {
+    const { sanitizeProviderConfig } = await import("./services/provider-config-guard");
+    safePatch = {
+      ...patch,
+      providerConfig: sanitizeProviderConfig(
+        patch.providerConfig as Record<string, unknown>,
+        { agentId, draftId: draft.id, source: "repository.updateDraft" },
+      ),
+    };
+  }
   await conn
     .update(agsAgentDrafts)
-    .set({ ...patch, updatedAt: new Date() })
+    .set({ ...safePatch, updatedAt: new Date() })
     .where(eq(agsAgentDrafts.id, draft.id));
   return getCurrentDraft(agentId);
 }
@@ -2115,7 +2128,14 @@ export async function updateRuntimeConfig(
   if (patch.permissionMode !== undefined) set.permissionMode = patch.permissionMode;
   if (patch.workingDirectories !== undefined)
     set.workingDirectories = patch.workingDirectories;
-  if (patch.providerConfig !== undefined) set.providerConfig = patch.providerConfig;
+  if (patch.providerConfig !== undefined) {
+    // Phase 27.2A — strip raw provider keys before persistence (LK-01).
+    const { sanitizeProviderConfig } = await import("./services/provider-config-guard");
+    set.providerConfig = sanitizeProviderConfig(patch.providerConfig, {
+      agentId,
+      source: "repository.updateRuntimeConfig",
+    });
+  }
   if (patch.outputStyle !== undefined) set.outputStyle = patch.outputStyle;
   if (patch.statusLineConfig !== undefined)
     set.statusLineConfig = patch.statusLineConfig;
