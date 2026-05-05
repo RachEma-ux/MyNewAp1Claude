@@ -531,8 +531,8 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 39 — Catalog registered event
 
-- [ ] Define `aiTypes.catalog.registered`.
-- [ ] Include catalogEntryId, entryType, sourceModule, sourceRefId, activeSourceVersionId, initiatedByUserId, performedByActorId, performedByActorType, workspaceId, correlationId, registeredAt.
+- [x] Define `aiTypes.catalog.registered`. *(`server/ai-types/events.ts` adds `AI_TYPES_EVENTS.catalogRegistered` and the `CatalogRegisteredPayload` type. Manifest `events.emits` updated.)*
+- [x] Include catalogEntryId, entryType, sourceModule, sourceRefId, activeSourceVersionId, initiatedByUserId, performedByActorId, performedByActorType, workspaceId, correlationId, registeredAt. *(`emitCatalogRegisteredEvent` in `register.ts` emits via `publishEvent(makeEnvelope({...}))` after both create and update paths. Best-effort: bus failures do NOT roll back the catalog write. `RegisterCatalogEntryInput` extended with optional `sourceModule`, `workspaceId`, `correlationId`, `actorType`, `initiatedByUserId`; `sourceModule` falls back to a derivation from `sourceType` (agent → agentStudio, provider/llm/model → providerConnections). 7 new tests in `register.test.ts` cover create-emit, update-emit, sourceModule derivation, system actor, bus-failure-doesn't-block, and no-emit-on-RegisterDuplicateError.)*
 
 ### Phase 40 — Agent Studio event subscribers
 

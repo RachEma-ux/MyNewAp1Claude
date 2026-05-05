@@ -167,7 +167,13 @@ export const aiTypesManifest: ModuleManifest = {
   health: async () => okHealth("AI Types ready"),
 
   publicApi: { path: "server/ai-types/public-api.ts" },
-  events: { emits: ["aiTypes.catalog.published", "aiTypes.catalog.deprecated"] },
+  events: {
+    emits: [
+      "aiTypes.catalog.registered",
+      "aiTypes.catalog.published",
+      "aiTypes.catalog.deprecated",
+    ],
+  },
   ports: { provided: ["aiTypes.catalog"], consumed: [] },
   communication: { modes: ["port", "event"] },
 };
