@@ -89,6 +89,7 @@ import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
+import { ASReconcilePanel } from "@/components/ASReconcilePanel";
 import { toast } from "sonner";
 import {
   toUserSafeGovernanceDetail,
@@ -197,7 +198,12 @@ export default function CandidatePage({
 } = {}) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
-    "catalog" | "validation" | "publishing" | "audit" | "discovery-ops"
+    | "catalog"
+    | "validation"
+    | "publishing"
+    | "audit"
+    | "discovery-ops"
+    | "reconcile"
   >("catalog");
   const [search, setSearch] = useState("");
   // In agentStudio mode the type filter is locked to "agent" since AS
@@ -918,6 +924,9 @@ export default function CandidatePage({
             <TabsTrigger value="publishing">Publish</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
             <TabsTrigger value="discovery-ops">Discovery</TabsTrigger>
+            {mode === "agentStudio" && (
+              <TabsTrigger value="reconcile">Reconcile</TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -2031,6 +2040,12 @@ export default function CandidatePage({
         <TabsContent value="discovery-ops" className="mt-4">
           <DiscoveryHealthPanel />
         </TabsContent>
+
+        {mode === "agentStudio" && (
+          <TabsContent value="reconcile" className="mt-4">
+            <ASReconcilePanel />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Create/Edit Dialog */}

@@ -262,6 +262,8 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "catalogImport.resolveConflict": "catalogImport.resolveConflict",
   "catalogImport.importAgentStudioCandidate":
     "catalogImport.importAgentStudioCandidate",
+  "catalogImport.reconcileAgentStudioSync":
+    "catalogImport.reconcileAgentStudioSync",
 
   // ── Discovery Ops ────────────────────────────────────────────────────────
   "discoveryOps.markInReview": "discoveryOps.markInReview",

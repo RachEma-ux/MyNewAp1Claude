@@ -603,4 +603,64 @@ export const catalogImportRouter = router({
       });
       return result;
     }),
+
+  /**
+   * Direction B follow-up — bulk drift scan + best-effort repair of the
+   * AS catalog sync log. Wraps `agentStudio.exportCatalog.reconcileSync`
+   * (Phase 41 gateway action, medium-risk, receipt-required). Used by
+   * the AS Candidate Pipeline's Reconcile tab.
+   *
+   * `dryRun=true` returns the drift report without writing any sync-log
+   * rows. `dryRun=false` writes synthetic repair rows and is the apply
+   * action.
+   */
+  reconcileAgentStudioSync: governedProcedure
+    .input(
+      z.object({
+        workspaceId: z.number().int().optional(),
+        dryRun: z.boolean().default(true),
+      }).optional()
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { gatewayCall } = await import(
+        "../platform/modules/module-gateway"
+      );
+      const { randomUUID } = await import("crypto");
+      const reconciledBy = ctx.user?.id ?? 1;
+      const dryRun = input?.dryRun ?? true;
+      const receiptId = `aitypes-reconcile-${reconciledBy}-${Date.now()}`;
+      const result = await gatewayCall<
+        unknown,
+        {
+          scanned: number;
+          inSync: number;
+          drift: number;
+          repaired: number;
+          dryRun: boolean;
+          items: Array<{
+            agentId: number;
+            catalogEntryId: number | null;
+            driftCase: string;
+            latestSyncEventType: string | null;
+            catalogStatus: string | null;
+            repaired: boolean;
+          }>;
+        }
+      >({
+        ctx: {
+          sourceModule: "aiTypes",
+          targetModule: "agentStudio",
+          actionKey: "agentStudio.exportCatalog.reconcileSync",
+          actorId: reconciledBy,
+          governanceReceiptId: receiptId,
+          correlationId: randomUUID(),
+        },
+        input: {
+          workspaceId: input?.workspaceId,
+          reconciledBy,
+          dryRun,
+        },
+      });
+      return result;
+    }),
 });
