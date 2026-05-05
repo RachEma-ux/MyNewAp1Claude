@@ -24,6 +24,27 @@ vi.mock("./db", () => ({
     createCatalogAuditEventMock(...args),
 }));
 
+// Plan v3 Phase 39 — mock the event bus so the catalog.registered emit
+// doesn't try to hit a real bus or persistence layer in tests.
+const publishEventMock = vi.fn();
+vi.mock("../platform/events", () => ({
+  publishEvent: (...args: any[]) => publishEventMock(...args),
+  makeEnvelope: (input: any) => ({
+    eventId: "evt-test",
+    eventType: input.eventType,
+    sourceModule: input.sourceModule,
+    priority: input.priority ?? "normal",
+    workspaceId: input.workspaceId ?? null,
+    actorId: input.actorId ?? null,
+    correlationId: input.correlationId ?? "corr-test",
+    schemaVersion: input.schemaVersion ?? "1.0.0",
+    payload: input.payload,
+    createdAt: "2026-05-04T00:00:00.000Z",
+    governanceReceiptId: input.governanceReceiptId,
+    idempotencyKey: input.idempotencyKey,
+  }),
+}));
+
 import { registerCatalogEntry, RegisterDuplicateError } from "./register";
 
 function makeFakeDb(rows: Array<{ id: number; legacyImportState: string | null }>) {
@@ -65,6 +86,8 @@ describe("registerCatalogEntry — Phase 25", () => {
     getCatalogEntryByIdMock.mockReset();
     createCatalogAuditEventMock.mockReset();
     createCatalogAuditEventMock.mockResolvedValue({ id: 1 });
+    publishEventMock.mockReset();
+    publishEventMock.mockResolvedValue(undefined);
   });
 
   it("creates a new catalog entry when no row exists", async () => {
@@ -192,5 +215,108 @@ describe("registerCatalogEntry — Phase 25", () => {
     const r = await registerCatalogEntry(makeFakeDb([]), baseInput);
     expect(r.action).toBe("created");
     expect(r.entryId).toBe(999);
+  });
+
+  it("Phase 39: emits 'aiTypes.catalog.registered' event on create", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    await registerCatalogEntry(makeFakeDb([]), {
+      ...baseInput,
+      sourceModule: "agentStudio",
+      workspaceId: 7,
+      correlationId: "corr-abc",
+      fields: { ...baseInput.fields, activeSourceVersionId: 42 } as any,
+    });
+
+    expect(publishEventMock).toHaveBeenCalledTimes(1);
+    const env = publishEventMock.mock.calls[0][0];
+    expect(env.eventType).toBe("aiTypes.catalog.registered");
+    expect(env.sourceModule).toBe("aiTypes");
+    expect(env.workspaceId).toBe(7);
+    expect(env.correlationId).toBe("corr-abc");
+    expect(env.actorId).toBe(1);
+
+    const p = env.payload;
+    expect(p.catalogEntryId).toBe(999);
+    expect(p.entryType).toBe("agent");
+    expect(p.sourceModule).toBe("agentStudio");
+    expect(p.sourceRefId).toBe(42);
+    expect(p.activeSourceVersionId).toBe(42);
+    expect(p.initiatedByUserId).toBe(1);
+    expect(p.performedByActorId).toBe(1);
+    expect(p.performedByActorType).toBe("user");
+    expect(p.workspaceId).toBe(7);
+    expect(p.correlationId).toBe("corr-abc");
+    expect(p.action).toBe("created");
+    expect(typeof p.registeredAt).toBe("string");
+  });
+
+  it("Phase 39: emits 'aiTypes.catalog.registered' event on update", async () => {
+    getCatalogEntryByIdMock.mockResolvedValue({
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+    });
+    await registerCatalogEntry(
+      makeFakeDb([{ id: 100, legacyImportState: null }]),
+      baseInput,
+    );
+
+    expect(publishEventMock).toHaveBeenCalledTimes(1);
+    const env = publishEventMock.mock.calls[0][0];
+    expect(env.eventType).toBe("aiTypes.catalog.registered");
+    expect(env.payload.catalogEntryId).toBe(100);
+    expect(env.payload.action).toBe("updated");
+    expect(env.payload.activeSourceVersionId).toBe(17);
+  });
+
+  it("Phase 39: derives sourceModule when not passed (agent → agentStudio)", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    await registerCatalogEntry(makeFakeDb([]), baseInput);
+
+    const p = publishEventMock.mock.calls[0][0].payload;
+    expect(p.sourceModule).toBe("agentStudio");
+  });
+
+  it("Phase 39: derives sourceModule for provider/llm/model → providerConnections", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    await registerCatalogEntry(makeFakeDb([]), {
+      ...baseInput,
+      entryType: "model",
+      sourceType: "model",
+    });
+
+    const p = publishEventMock.mock.calls[0][0].payload;
+    expect(p.sourceModule).toBe("providerConnections");
+  });
+
+  it("Phase 39: event publish failure does NOT block the register (best-effort)", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    publishEventMock.mockRejectedValue(new Error("event bus down"));
+    const r = await registerCatalogEntry(makeFakeDb([]), baseInput);
+    expect(r.action).toBe("created");
+    expect(r.entryId).toBe(999);
+  });
+
+  it("Phase 39: actorType=system threads through to event payload", async () => {
+    createCatalogEntryMock.mockResolvedValue({ id: 999 });
+    await registerCatalogEntry(makeFakeDb([]), {
+      ...baseInput,
+      actorType: "system",
+      initiatedByUserId: null,
+    });
+
+    const p = publishEventMock.mock.calls[0][0].payload;
+    expect(p.performedByActorType).toBe("system");
+    expect(p.initiatedByUserId).toBeNull();
+  });
+
+  it("Phase 39: no event emitted when register throws RegisterDuplicateError", async () => {
+    await expect(
+      registerCatalogEntry(
+        makeFakeDb([{ id: 200, legacyImportState: "legacy_imported" }]),
+        baseInput,
+      ),
+    ).rejects.toBeInstanceOf(RegisterDuplicateError);
+    expect(publishEventMock).not.toHaveBeenCalled();
   });
 });

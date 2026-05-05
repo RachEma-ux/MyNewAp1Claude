@@ -30,6 +30,11 @@ import {
   getCatalogEntryById,
   createCatalogAuditEvent,
 } from "./db";
+import { makeEnvelope, publishEvent } from "../platform/events";
+import {
+  AI_TYPES_EVENTS,
+  type CatalogRegisteredPayload,
+} from "./events";
 import type { CatalogEntry, InsertCatalogEntry } from "../../drizzle/schema";
 
 export interface RegisterCatalogEntryInput {
@@ -43,6 +48,22 @@ export interface RegisterCatalogEntryInput {
   fields: Omit<InsertCatalogEntry, "entryType" | "sourceType" | "sourceId">;
   /** User id (or system actor) who initiated the register call. */
   registeredBy: number;
+  /**
+   * Plan v3 Phase 39 — module that initiated the register call. Used as the
+   * `sourceModule` field in the `aiTypes.catalog.registered` event payload.
+   * When omitted, falls back to a value derived from `sourceType`
+   * (`agent` → `agentStudio`, `provider`/`llm`/`model` → `providerConnections`,
+   * everything else → `unknown`).
+   */
+  sourceModule?: string;
+  /** Optional workspace context for the event payload. */
+  workspaceId?: number | null;
+  /** Optional correlation id threaded through from the upstream flow. */
+  correlationId?: string | null;
+  /** Actor type for the event payload. Defaults to `"user"`. */
+  actorType?: "user" | "system";
+  /** Initiator user id when distinct from the executing actor. Defaults to `registeredBy`. */
+  initiatedByUserId?: number | null;
 }
 
 export interface RegisterCatalogEntryResult {
@@ -111,6 +132,14 @@ export async function registerCatalogEntry(
       input,
       guard,
     );
+    // Plan v3 Phase 39 — emit `aiTypes.catalog.registered` event.
+    await emitCatalogRegisteredEvent({
+      catalogEntryId: guard.existingEntryId,
+      action: "updated",
+      activeSourceVersionId:
+        ((updated as any)?.activeSourceVersionId as number | null) ?? null,
+      input,
+    });
     return {
       entryId: guard.existingEntryId,
       action: "updated",
@@ -135,6 +164,15 @@ export async function registerCatalogEntry(
     input,
     guard,
   );
+
+  // Plan v3 Phase 39 — emit `aiTypes.catalog.registered` event.
+  await emitCatalogRegisteredEvent({
+    catalogEntryId: (created as CatalogEntry).id,
+    action: "created",
+    activeSourceVersionId:
+      ((input.fields as any)?.activeSourceVersionId as number | null) ?? null,
+    input,
+  });
 
   return {
     entryId: (created as CatalogEntry).id,
@@ -168,6 +206,83 @@ async function emitRegisterAudit(
     // The catalog row is already written and is the source of truth.
     console.warn(
       `[register] audit event '${eventType}' failed for entry ${catalogEntryId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
+ * Plan v3 Phase 39 — fallback `sourceModule` derivation for callers that
+ * don't pass it explicitly. The Phase 30 export-catalog gateway path passes
+ * `sourceModule="agentStudio"` directly, and direct router callers (Provider
+ * Connections, internal admin scripts) should also pass it. This keeps the
+ * register call site self-contained when a caller forgets.
+ */
+function deriveSourceModule(sourceType: string): string {
+  switch (sourceType) {
+    case "agent":
+      return "agentStudio";
+    case "provider":
+    case "llm":
+    case "model":
+      return "providerConnections";
+    default:
+      return "unknown";
+  }
+}
+
+/**
+ * Plan v3 Phase 39 — emits `aiTypes.catalog.registered` after the catalog
+ * row is written. Best-effort: bus failures must NOT roll back the catalog
+ * write. Failures log to stderr for forensic follow-up.
+ */
+async function emitCatalogRegisteredEvent(args: {
+  catalogEntryId: number;
+  action: "created" | "updated";
+  activeSourceVersionId: number | null;
+  input: RegisterCatalogEntryInput;
+}): Promise<void> {
+  const { catalogEntryId, action, activeSourceVersionId, input } = args;
+  const performedByActorType: "user" | "system" = input.actorType ?? "user";
+  const sourceModule =
+    input.sourceModule ?? deriveSourceModule(input.sourceType);
+  const initiatedByUserId =
+    input.initiatedByUserId === undefined
+      ? input.registeredBy
+      : input.initiatedByUserId;
+  const correlationId = input.correlationId ?? null;
+  const workspaceId = input.workspaceId ?? null;
+  const registeredAt = new Date().toISOString();
+
+  const payload: CatalogRegisteredPayload = {
+    catalogEntryId,
+    entryType: input.entryType,
+    sourceModule,
+    sourceRefId: input.sourceId,
+    activeSourceVersionId,
+    initiatedByUserId,
+    performedByActorId: input.registeredBy,
+    performedByActorType,
+    workspaceId,
+    correlationId,
+    registeredAt,
+    action,
+  };
+
+  try {
+    await publishEvent(
+      makeEnvelope({
+        eventType: AI_TYPES_EVENTS.catalogRegistered,
+        sourceModule: "aiTypes",
+        workspaceId,
+        actorId: input.registeredBy,
+        correlationId: correlationId ?? undefined,
+        payload,
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      `[register] event '${AI_TYPES_EVENTS.catalogRegistered}' failed for entry ${catalogEntryId}:`,
       err instanceof Error ? err.message : err,
     );
   }
