@@ -35,9 +35,13 @@ describe("check-provider-key-env-boundary — script declarations", () => {
     }
     // LR-05 (OmniRAG) is exempted globally via NON_PROVIDER_KEYS, not
     // a per-file allowlist row, so it is intentionally absent here.
-    expect(scriptSrc).toContain("Phase 10");
-    expect(scriptSrc).toContain("Phase 17");
-    expect(scriptSrc).toContain("Phase 19");
+    // Phase 27.7 flipped LR-01/02/03/04/06 deadlines to Phase 28; the
+    // test asserts the contract (every entry has a `deadlinePhase`),
+    // not the specific calendar phase, so a future deadline flip
+    // doesn't fail this test again.
+    const deadlineMatches = scriptSrc.match(/deadlinePhase:\s*"Phase \d+"/g) ?? [];
+    expect(deadlineMatches.length, "every allowlist row carries a Phase N deadline").toBeGreaterThanOrEqual(ids.length);
+    expect(scriptSrc).toContain("Phase 28");
   });
 
   it("flags writes to process.env provider keys (regression guard for PR #100)", () => {

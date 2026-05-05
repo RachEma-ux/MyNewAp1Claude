@@ -1,0 +1,22 @@
+=== Phase 2 — baseline commands present ===
+Tue May  5 04:40:50 PM UTC 2026
+commit: f89ffed5155af6a18033049a84fe885d3f4adbc9
+---
+[OK] check  =>  tsc --noEmit
+[OK] check:architecture  =>  tsx scripts/check-architecture.ts && tsx scripts/check-markdown-imports.ts
+[OK] check:wiring  =>  tsx scripts/check-module-wiring.ts && tsx scripts/check-gateway-wiring.ts && tsx scripts/check-event-wiring.ts && tsx scripts/check-handoff-wiring.ts && tsx scripts/check-frontend-module-wiring.ts && tsx scripts/check-runtime-wiring.ts && tsx scripts/check-coordinator-wiring.ts
+[OK] check:awi  =>  pnpm run check:wiring-inventory && pnpm run check:module-readiness && pnpm run check:dependency-graph
+[OK] check:ports  =>  tsx scripts/check-port-registry.ts
+[OK] check:frontend-modularity  =>  pnpm run check:client-capsules && pnpm run check:module-routes-conflict && pnpm run check:module-registration && pnpm run check:app-route-ownership && pnpm run check:module-route-inventory && pnpm run check:module-api-boundaries && pnpm run check:cross-module-links
+[OK] check:bundle-budget  =>  tsx scripts/check-bundle-budget.ts
+[OK] check:markdown-imports  =>  tsx scripts/check-markdown-imports.ts
+[OK] check:governance-actions  =>  tsx scripts/check-governance-actions.ts
+[OK] check:db-roles  =>  tsx scripts/check-db-roles.ts
+[OK] check:provider-key-env-boundary  =>  tsx scripts/check-provider-key-env-boundary.ts
+[OK] check:provider-credential-resolver-boundary  =>  tsx scripts/check-provider-credential-resolver-boundary.ts
+[OK] check:cross-module-links  =>  tsx scripts/check-cross-module-links.ts
+[OK] check:readiness-phase-gate  =>  tsx scripts/check-readiness-phase-gate.ts
+[OK] build  =>  rm -rf dist client/dist .vite && vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && cp -r schemas dist/
+[OK] test  =>  vitest run
+[OK] test:integration:staging  =>  TEST_MODE=staging-integration tsx scripts/run-staging-integration-tests.ts
+[OK] audit:production-readiness  =>  tsx scripts/check-readiness-phase-gate.ts --mode=production-readiness

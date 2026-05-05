@@ -21,6 +21,12 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
+    // Cold-start `await import("...")` of routers/heavy modules can
+    // take 4–8 s on slower boxes (Termux, CI agents under load),
+    // tripping vitest's default 5 s testTimeout intermittently. The
+    // 30 s ceiling is a safe upper bound — anything that genuinely
+    // hangs still fails, but legitimate cold-imports succeed.
+    testTimeout: 30_000,
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "tests/**/*.test.ts", "client/**/*.test.tsx"],
     // tests/integration/** require live staging infrastructure
     // (DBs, OPA, workers). They are excluded from local-unit mode

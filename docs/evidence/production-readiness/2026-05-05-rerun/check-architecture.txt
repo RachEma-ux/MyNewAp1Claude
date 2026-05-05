@@ -1,0 +1,77 @@
+=== check:architecture ===
+Tue May  5 04:41:21 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:architecture /root/MyNewAp1Claude
+> tsx scripts/check-architecture.ts && tsx scripts/check-markdown-imports.ts
+
+
+=== check:modules ===
+[1/5] Checking manifest files exist…
+[2/5] Checking barrel files exist…
+[3/5] Loading manifest barrel + registry (may pull in module side-effects)…
+[4/5] Validating strong-module DB declarations and health()…
+[5/5] Validating MODULE_ROUTERS keys…
+OK — modules check passed.
+
+=== check:boundaries ===
+OK — boundary check passed (0 warning(s)).
+
+=== check:sql-boundaries ===
+OK — cross-module SQL/connection check passed.
+
+=== check:db-ownership ===
+OK — DB ownership check passed.
+
+=== check:coordinator-boundaries ===
+OK — coordinator boundary check passed.
+
+=== check:provider-credential-resolver-boundary ===
+OK — provider-credential-resolver boundary check passed (D2).
+
+=== check:provider-key-env-boundary ===
+OK — provider-key-env boundary check passed (D1).
+
+=== check:governance-actions ===
+OK — governance-actions: 81 declared, 81 covered, 0 uncovered (warning).
+
+=== check:ai-types-public-api-boundary ===
+AI Types Public-API Boundary
+=============================
+  [warn] server/_core/index.ts:14 — imports ai-types/execution (private)
+  [warn] server/_core/index.ts:15 — imports ai-types/invoke (private)
+  [warn] server/_core/index.ts:30 — imports ai-types/boot (private)
+  [warn] server/agents/executor.ts:10 — imports ai-types/execution (private)
+  [warn] server/agents/stream.ts:5 — imports ai-types/invoke (private)
+  [warn] server/catalog-import/router.ts:21 — imports ai-types/service (private)
+  [warn] server/catalog-import/router.ts:22 — imports ai-types/import-normalizer (private)
+  [warn] server/catalog-import/router.ts:23 — imports ai-types/projection (private)
+  [warn] server/db/catalog.ts:36 — imports ai-types/db (private)
+  [warn] server/db/index.ts:19 — imports ai-types/db (private)
+  [warn] server/db.ts:34 — imports ai-types/db (private)
+  [warn] server/governance/router.ts:27 — imports ai-types/db (private)
+  [warn] server/llm/authority.ts:4 — imports ai-types/db (private)
+  [warn] server/modules/pmt/context-translator-agent.ts:23 — imports ai-types/db (private)
+  [warn] server/modules/pmt/idea-builder-agent.ts:19 — imports ai-types/db (private)
+  [warn] server/platform/modules/module-routers.ts:24 — imports ai-types/router (private)
+  [warn] server/providers/catalog-guard.ts:8 — imports ai-types/db (private)
+  [warn] server/providers/router.ts:21 — imports ai-types/db (private)
+  [warn] server/ps/context-translator-router.ts:27 — imports ai-types/service-runtime (private)
+  [warn] server/ps/context-translator-router.ts:28 — imports ai-types/db (private)
+  [warn] server/routers/agents.ts:34 — imports ai-types/db (private)
+  [warn] server/routers/bots.ts:33 — imports ai-types/db (private)
+  [warn] server/routers/catalog-manage.ts:92 — imports ai-types/service (private)
+  [warn] server/routers/catalog-registry.ts:17 — imports ai-types/execution (private)
+  [warn] server/routers/conversations.ts:30 — imports ai-types/execution (private)
+  [warn] server/routers/models.ts:30 — imports ai-types/db (private)
+  [warn] server/sandbox-wf/seed-orchestrator.ts:22 — imports ai-types/db (private)
+
+Failures: 0
+Baseline warnings: 27
+OK — no new AI Types public-API boundary violations beyond the baseline.
+
+=== check:db-roles ===
+[skip] check:db-roles — DATABASE_URL is not set. Local dev sandboxes are allowed.
+
+OK — all architecture checks passed.
+[markdown-imports] PASS — no direct streamdown or Shiki imports outside SlimShikiHighlighter (1959 files scanned).
+exit=0

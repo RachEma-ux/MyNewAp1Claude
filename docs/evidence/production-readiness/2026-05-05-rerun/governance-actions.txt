@@ -1,0 +1,8 @@
+=== check:governance-actions ===
+Tue May  5 04:43:07 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:governance-actions /root/MyNewAp1Claude
+> tsx scripts/check-governance-actions.ts
+
+OK — governance-actions: 81 declared, 81 covered, 0 uncovered (warning).
+exit=0

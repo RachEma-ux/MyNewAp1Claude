@@ -1,0 +1,123 @@
+=== vitest run (full unit suite) ===
+Tue May  5 04:45:02 PM UTC 2026
++   const serverFiles = listSourceFiles(join(REPO_ROOT, "server"));
++   const scriptFiles = listSourceFiles(join(REPO_ROOT, "scripts"));
++   const allFiles = [...serverFiles, ...scriptFiles];
++
++   for (const file of allFiles) {
++     const fileRel = fileRelOf(file);
++
++     // The boundary script and its tests describe the rule — they
++     // mention env-key names in string form, not as live process.env
++     // reads. Skip them.
++     if (fileRel === "scripts/check-provider-key-env-boundary.ts") continue;
++     if (
++       fileRel ===
++       "tests/check-provider-key-env-boundary.test.ts"
++     ) {
++       continue;
++     }
++
++     const src = readFile(file);
++
++     // Rule 1 — literal reads.
++     envLiteralReadRegex.lastIndex = 0;
++     let match: RegExpExecArray | null;
++     while ((match = envLiteralReadRegex.exec(src)) !== null) {
++       const key = match[1] ?? match[2];
++       if (!key) continue;
++       if (!isProviderKey(key)) continue;
++       // Skip if this is actually the start of an assignment — the
++       // write rule will handle it (avoid double-flagging).
++       const tail = src.slice(match.index + match[0].length);
++       if (/^\s*=(?!=)/.test(tail)) continue;
++       const allowed = isAllowed(fileRel, key);
++       if (allowed) continue;
++       const line = computeLine(src, match.index);
++       violations.push({
++         rule: "provider-key-env-boundary",
++         file: fileRel,
++         line,
++         severity: "error",
++         message: `Reads provider API key from process.env (${key}). Per Plan v3 Decision D1, runtime code must obtain provider credentials through OpenRouter Model Access (withProviderCredential). Use the seed script (scripts/provider-connections/seed-from-env.ts) to import .env keys at boot, then read encrypted Provider Connections at runtime.`,
++       });
++     }
++
++     // Rule 2 — writes/mutations.
++     envWriteRegex.lastIndex = 0;
++     while ((match = envWriteRegex.exec(src)) !== null) {
++       const key = match[1] ?? match[2];
++       if (!key) continue;
++       if (!isProviderKey(key)) continue;
++       const allowed = isAllowed(fileRel, key);
++       if (allowed) continue;
++       const line = computeLine(src, match.index);
++       violations.push({
++         rule: "provider-key-env-boundary",
++         file: fileRel,
++         line,
++         severity: "error",
++         message: `Writes to process.env (${key}). Per Plan v3 Decision D1, the runtime must not mutate provider env vars. PR #100 fixed exactly this pollution path; do not reintroduce it.`,
++       });
++     }
++
++     // Rule 3 — dynamic `process.env[<expr>]` reads in the Agent
++     // Studio runtime zone. The variable name cannot be validated
++     // statically, so the indirection itself is forbidden in this
++     // zone. Allowlisted files (LR-01) opt out by listing
++     // `envKey: "<dynamic>"` above.
++     if (inAgentStudioDynamicZone(fileRel)) {
++       envDynamicReadRegex.lastIndex = 0;
++       while ((match = envDynamicReadRegex.exec(src)) !== null) {
++         // Skip if this dynamic read is inside an allowlisted file.
++         const allowed = isAllowed(fileRel, "<dynamic>");
++         if (allowed) break; // whole-file pass — stop scanning rule 3
++         const line = computeLine(src, match.index);
++         violations.push({
++           rule: "provider-key-env-boundary",
++           file: fileRel,
++           line,
++           severity: "error",
++           message: `Dynamic process.env[<expr>] read in an Agent Studio runtime path. Per Plan v3 Decision D1, the runtime must not resolve provider credentials via env-var indirection. Use Provider Connections through Model Access.`,
++         });
++       }
++     }
++   }
++
++   for (const v of violations) {
++     console.error(
++       `[ERROR] ${v.rule} :: ${v.file}:${v.line}\n        ${v.message}`,
++     );
++   }
++
++   if (violations.length > 0) {
++     console.error(
++       `\n${violations.length} provider-key-env boundary violation(s).`,
++     );
++     process.exit(1);
++   }
++
++   console.log("OK — provider-key-env boundary check passed (D1).");
++   process.exit(0);
++ }
++
++ main();
++
+
+ ❯ tests/check-provider-key-env-boundary.test.ts:38:23
+     36|     // LR-05 (OmniRAG) is exempted globally via NON_PROVIDER_KEYS, not
+     37|     // a per-file allowlist row, so it is intentionally absent here.
+     38|     expect(scriptSrc).toContain("Phase 10");
+       |                       ^
+     39|     expect(scriptSrc).toContain("Phase 17");
+     40|     expect(scriptSrc).toContain("Phase 19");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ Test Files  3 failed | 175 passed | 23 skipped (201)
+      Tests  3 failed | 3178 passed | 183 skipped (3364)
+   Start at  16:45:04
+   Duration  200.36s (transform 84.54s, setup 200.32s, collect 519.91s, tests 105.96s, environment 30.54s, prepare 135.05s)
+
+ ELIFECYCLE  Test failed. See above for more details.
+---exit=1

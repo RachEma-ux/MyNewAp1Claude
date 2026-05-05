@@ -1,0 +1,8 @@
+=== check:db-roles ===
+Tue May  5 04:43:15 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:db-roles /root/MyNewAp1Claude
+> tsx scripts/check-db-roles.ts
+
+[skip] check:db-roles — DATABASE_URL is not set. Local dev sandboxes are allowed.
+exit=0
