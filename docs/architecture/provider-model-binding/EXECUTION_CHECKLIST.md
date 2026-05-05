@@ -498,12 +498,12 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 36 — Import-from-Agent-Studio gateway flow
 
-- [ ] AI Types backend calls `agentStudio.exportCatalog.listCandidates`.
-- [ ] AI Types backend calls `agentStudio.exportCatalog.exportCandidate`.
-- [ ] Use Module Gateway only.
-- [ ] Do not import Agent Studio private files.
-- [ ] Do not query ASDB.
-- [ ] Add tests.
+- [x] AI Types backend calls `agentStudio.exportCatalog.listCandidates`. *(`listImportableAgentStudioCandidates` in `server/ai-types/import-from-agent-studio.ts`.)*
+- [x] AI Types backend calls `agentStudio.exportCatalog.exportCandidate`. *(`importAgentStudioCandidate` in same file; threads governance receipt id, defaults stub `aitypes-import-<agentId>-<ts>`.)*
+- [x] Use Module Gateway only. *(Both functions invoke `gatewayCall` from `server/platform/modules/module-gateway`.)*
+- [x] Do not import Agent Studio private files. *(File header documents the rule; static check via Phase 26 boundary lint.)*
+- [x] Do not query ASDB. *(No DB connector imported; the file is pure gateway client.)*
+- [x] Add tests. *(`server/ai-types/import-from-agent-studio.test.ts` — 10 tests: gateway ctx shape, default + explicit status filter, defensive null result, workspaceId forwarding, correlation id, receipt id stub + caller-supplied, error → ok=false, no internal payload leak.)*
 
 ### Phase 37 — Catalog entry creation from export DTO
 
