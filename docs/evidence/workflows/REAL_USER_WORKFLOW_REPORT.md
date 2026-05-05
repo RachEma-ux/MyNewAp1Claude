@@ -355,6 +355,57 @@ covered by 8/8 strict checks (Phase 5).
 
 ---
 
+### 10. Agent Studio → AI Types Catalog (Direction B end-to-end import)
+
+**Intended path.** A user clicks "Import from Agent Studio" in the
+Catalog Import Wizard. The wizard lists ready-to-export AS candidates,
+the user selects one or more, the import path goes through the Module
+Gateway: AS `exportCatalog.exportCandidate` → AI Types
+`catalog.register` → catalog row + `aiTypes.catalog.registered`
+event → AS subscriber records sync log. Later publish/deprecate
+on the catalog row emits `aiTypes.catalog.{published,deprecated}` →
+AS subscriber records sync log.
+
+**Discovered API (real):**
+
+| Layer | Identifier | Source location |
+|---|---|---|
+| Wizard UI | `CatalogImportWizard` agent_studio branch | `client/src/components/CatalogImportWizard.tsx` (Step 2-4) |
+| AS Candidate Pipeline UI | `CandidatePage` `mode="agentStudio"` | `client/src/pages/{ASCandidatePage,CandidatePage}.tsx` |
+| List endpoint | `catalogImport.listAgentStudioCandidates` | `server/catalog-import/router.ts` |
+| Import endpoint | `catalogImport.importAgentStudioCandidate` | `server/catalog-import/router.ts` (governed) |
+| Source filter | `aiTypes.catalog.list({ sourceType: "ags_agent" })` | `server/ai-types/db.ts` `getCatalogEntries` |
+| Gateway hop 1 | `agentStudio.exportCatalog.exportCandidate` | `server/agent-studio/manifest.ts` |
+| Gateway hop 2 | `aiTypes.catalog.register` | `server/ai-types/register.ts` |
+| Lifecycle emitters | `aiTypes.catalog.{registered,published,deprecated}` | `register.ts:273` / `publishing.ts` / `deprecate.ts` |
+| AS subscriber | `processCatalogSyncEvent` → `ags_catalog_sync_log` | `server/agent-studio/services/catalog-sync-subscribers.ts` |
+
+**Status:** **EXECUTABLE_NOW** (unit-level).
+
+Direction B (PRs #152–#156, merged 2026-05-05) shipped every link
+in the chain. Unit tests cover each link:
+
+- `server/ai-types/import-from-agent-studio.test.ts` — gateway
+  round-trip for list + import (10 cases).
+- `server/ai-types/publishing.test.ts` — published emit (7 cases).
+- `server/ai-types/deprecate.test.ts` — deprecate transition + emit
+  (6 cases).
+- `server/catalog-import/agent-studio-import.test.ts` — tRPC procedure
+  layer (6 cases).
+- `server/agent-studio/services/catalog-sync-subscribers.test.ts` —
+  subscriber records sync log on registered/published/deprecated.
+
+**Evidence path.**
+- `docs/evidence/ai-types-agent-studio-import/DIRECTION_B_REVERIFICATION_REPORT.md`
+- `docs/architecture/ai-types/CATALOG_LIFECYCLE_EVENT_DECISION.md`
+- `docs/architecture/provider-model-binding/AI_TYPES_IMPORT_FROM_AGENT_STUDIO.md`
+
+**Remediation needed.** None for the import flow itself. Open
+follow-up: no UI button for `agentStudio.exportCatalog.reconcileSync`
+(Phase 41 sync-drift repair) — admin-only via gateway today.
+
+---
+
 ## Summary
 
 | Workflow | Status | Has live test? | Has staging dependency? |
@@ -368,9 +419,10 @@ covered by 8/8 strict checks (Phase 5).
 | 7. Port reservation | EXECUTABLE_NOW | yes (existing) | none |
 | 8. Cross-module event | EXECUTABLE_NOW | yes (existing + PR #10) | none |
 | 9. Module gateway action | EXECUTABLE_NOW | yes (existing) | none |
+| 10. AS → AI Types Catalog (Direction B) | EXECUTABLE_NOW | yes (PRs #152–#156) | none for import; reconcileSync UI deferred |
 
 **Phase 9 verdict:**
-- 5 of 9 workflows have live executable tests.
+- 6 of 10 workflows have live executable tests (Direction B added one).
 - 3 are PARTIAL (platform primitive tested, end-to-end blocked
   on staging seed data or an architectural decision).
 - 1 is BLOCKED on a missing service URL.
