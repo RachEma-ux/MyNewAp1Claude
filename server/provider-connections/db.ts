@@ -94,6 +94,32 @@ export async function updateConnectionStatus(
     .where(eq(providerConnections.id, id));
 }
 
+/**
+ * Update inventory-only fields (modelCount, capabilities) without
+ * touching `lifecycleStatus`. The fire-and-forget model sync runs
+ * AFTER `activateConnection` flips the row to "active"; if the sync
+ * passed back its captured (pre-activation) status it would demote
+ * the row. This helper is the safe path for background refreshes.
+ */
+export async function updateConnectionInventory(
+  id: number,
+  inventory: { modelCount?: number; capabilities?: unknown },
+): Promise<void> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(providerConnections)
+    .set({
+      ...(inventory.modelCount !== undefined ? { modelCount: inventory.modelCount } : {}),
+      ...(inventory.capabilities !== undefined
+        ? { capabilities: inventory.capabilities as InsertProviderConnection["capabilities"] }
+        : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(providerConnections.id, id));
+}
+
 export async function deleteConnection(id: number): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
