@@ -1292,3 +1292,53 @@ export const agsAgentProviderBindings = pgTable(
 export type AgsAgentProviderBinding = typeof agsAgentProviderBindings.$inferSelect;
 export type InsertAgsAgentProviderBinding =
   typeof agsAgentProviderBindings.$inferInsert;
+
+// ── Plan v3 Phase 40: catalog-sync log ──────────────────────────────────────
+//
+// Persisted log of `aiTypes.catalog.{registered,published,deprecated}` events
+// the Agent Studio module receives from the AI Types module. Acts as the
+// AS-side mirror of catalog lifecycle so:
+//
+//   1. The Phase 30 export-status derivation can answer "what happened to
+//      this agent's catalog row" without a cross-DB join (the audit row is
+//      now AS-local).
+//   2. Phase 41 reconciliation can replay the latest event per
+//      (agentId, catalogEntryId) to detect drift between AS and AI Types.
+//
+// Append-only: one row per delivered event. Subscribers in
+// `services/catalog-sync-subscribers.ts` write rows; nothing else mutates
+// or deletes them. The dedupe key is the `eventId` from the envelope —
+// duplicate deliveries are skipped via the unique index.
+export const agsCatalogSyncLog = pgTable(
+  "ags_catalog_sync_log",
+  {
+    id: serial("id").primaryKey(),
+    /** envelope.eventId — unique-indexed for dedupe across retries. */
+    eventId: varchar("event_id", { length: 64 }).notNull(),
+    /** "aiTypes.catalog.registered" | "aiTypes.catalog.published" | "aiTypes.catalog.deprecated". */
+    eventType: varchar("event_type", { length: 64 }).notNull(),
+    /** payload.catalogEntryId. */
+    catalogEntryId: integer("catalog_entry_id").notNull(),
+    /** payload.sourceModule (the module that initiated the catalog write). */
+    sourceModule: varchar("source_module", { length: 64 }).notNull(),
+    /** payload.sourceRefId — the agent id when sourceModule="agentStudio". */
+    sourceRefId: integer("source_ref_id"),
+    /** Mirror of payload.action ("created"|"updated") for registered events. */
+    action: varchar("action", { length: 32 }),
+    /** Full event payload preserved for forensic + reconciliation use. */
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}),
+    /** Wall-clock receive time at the AS subscriber. */
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    eventIdIdx: uniqueIndex("uniq_ags_catalog_sync_log_event_id").on(t.eventId),
+    catalogEntryIdx: index("idx_ags_catalog_sync_log_catalog_entry").on(
+      t.catalogEntryId,
+    ),
+    sourceRefIdx: index("idx_ags_catalog_sync_log_source_ref").on(t.sourceRefId),
+    eventTypeIdx: index("idx_ags_catalog_sync_log_event_type").on(t.eventType),
+  }),
+);
+
+export type AgsCatalogSyncLog = typeof agsCatalogSyncLog.$inferSelect;
+export type InsertAgsCatalogSyncLog = typeof agsCatalogSyncLog.$inferInsert;

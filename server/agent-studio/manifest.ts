@@ -164,7 +164,17 @@ export const agentStudioManifest: ModuleManifest = {
   },
 
   publicApi: { path: "server/agent-studio/public-api.ts" },
-  events: { emits: ["agentStudio.run.completed", "agentStudio.run.failed"] },
+  events: {
+    emits: ["agentStudio.run.completed", "agentStudio.run.failed"],
+    // Plan v3 Phase 40 — Agent Studio listens for AI Types catalog
+    // lifecycle events to keep its export-status mirror in sync without
+    // polling. Subscribers are wired in boot.ts via subscribeEvent().
+    consumes: [
+      "aiTypes.catalog.registered",
+      "aiTypes.catalog.published",
+      "aiTypes.catalog.deprecated",
+    ],
+  },
   handoffs: { accepts: ["agentStudio.run.requested"], produces: ["agentStudio.codeStudio.handoff"] },
   ports: { provided: ["agentStudio.run"], consumed: ["codeStudio.run", "sandboxWf.execute"] },
   runtimePorts: [

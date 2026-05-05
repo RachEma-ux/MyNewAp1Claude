@@ -474,6 +474,58 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-handoff] acceptor registration skipped — ${message}`);
   }
 
+  // Step 5.5: Plan v3 Phase 40 — subscribe to AI Types catalog lifecycle events.
+  //
+  // Three subscriptions wire AS to the catalog event bus so the AS-side
+  // export-status mirror stays current without polling. Each handler
+  // appends to ags_catalog_sync_log via `recordCatalogSyncEvent` — the
+  // shared filter/parse logic lives in services/catalog-sync-subscribers.ts
+  // (`processCatalogSyncEvent`) so the handlers here stay small and the
+  // unit tests can drive synthetic envelopes without booting the module.
+  //
+  // Literal event type strings used so check:wiring:event can verify
+  // statically; AI_TYPES_EVENTS in server/ai-types/events.ts is the
+  // canonical constant.
+  try {
+    const { subscribeEvent } = await import("../platform/events");
+    const { processCatalogSyncEvent } = await import(
+      "./services/catalog-sync-subscribers"
+    );
+    const repo = await import("./repository");
+    const recorder = async (input: any) =>
+      repo.recordCatalogSyncEvent(input);
+    subscribeEvent(
+      "aiTypes.catalog.registered",
+      "agentStudio",
+      async (env) => {
+        await processCatalogSyncEvent(
+          "aiTypes.catalog.registered",
+          env,
+          recorder,
+        );
+      },
+    );
+    subscribeEvent("aiTypes.catalog.published", "agentStudio", async (env) => {
+      await processCatalogSyncEvent(
+        "aiTypes.catalog.published",
+        env,
+        recorder,
+      );
+    });
+    subscribeEvent("aiTypes.catalog.deprecated", "agentStudio", async (env) => {
+      await processCatalogSyncEvent(
+        "aiTypes.catalog.deprecated",
+        env,
+        recorder,
+      );
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-catalog-sync] subscriber registration skipped — ${message}`,
+    );
+  }
+
   // Step 6: MCP hardening Phase 5.1 — subscribe the persisted transition
   // log to the FSM event bus. Every successful FSM transition appends one
   // row to ags_mcp_transitions (capped per server inside the repo helper).

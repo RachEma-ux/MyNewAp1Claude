@@ -57,6 +57,8 @@ import {
   agsChatMessages,
   // ── MCP hardening Phase 5.1: persisted FSM transition log ──
   agsMcpTransitions,
+  // ── Plan v3 Phase 40: catalog-sync log ──
+  agsCatalogSyncLog,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -2822,4 +2824,69 @@ export async function appendChatMessage(input: {
     })
     .returning();
   return created;
+}
+
+// ── Plan v3 Phase 40: catalog-sync log ──────────────────────────────────────
+
+export interface RecordCatalogSyncEventInput {
+  eventId: string;
+  eventType: string;
+  catalogEntryId: number;
+  sourceModule: string;
+  sourceRefId: number | null;
+  action: string | null;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Plan v3 Phase 40 — append a row to ags_catalog_sync_log.
+ *
+ * Idempotent on `event_id` via the unique index — duplicate deliveries
+ * (bus retries, replay) silently skip the insert via ON CONFLICT DO NOTHING.
+ * The catalog-sync subscribers in `services/catalog-sync-subscribers.ts`
+ * call this; nothing else writes to the log.
+ */
+export async function recordCatalogSyncEvent(
+  input: RecordCatalogSyncEventInput,
+): Promise<void> {
+  await db()
+    .insert(agsCatalogSyncLog)
+    .values({
+      eventId: input.eventId,
+      eventType: input.eventType,
+      catalogEntryId: input.catalogEntryId,
+      sourceModule: input.sourceModule,
+      sourceRefId: input.sourceRefId,
+      action: input.action,
+      payload: input.payload,
+    })
+    .onConflictDoNothing({ target: agsCatalogSyncLog.eventId });
+}
+
+/**
+ * Plan v3 Phase 40 — return the most recent catalog-sync log row for a
+ * given (catalog_entry_id) pair, or null when no events have been
+ * received. Used by Phase 41 reconciliation and by the export-status
+ * derivation when an AS-side mirror is preferred over a cross-DB join.
+ */
+export async function getLatestCatalogSyncEvent(
+  catalogEntryId: number,
+): Promise<{
+  eventType: string;
+  action: string | null;
+  receivedAt: Date;
+} | null> {
+  const conn = getAsDb();
+  if (!conn) return null;
+  const rows = await conn
+    .select({
+      eventType: agsCatalogSyncLog.eventType,
+      action: agsCatalogSyncLog.action,
+      receivedAt: agsCatalogSyncLog.receivedAt,
+    })
+    .from(agsCatalogSyncLog)
+    .where(eq(agsCatalogSyncLog.catalogEntryId, catalogEntryId))
+    .orderBy(desc(agsCatalogSyncLog.receivedAt))
+    .limit(1);
+  return rows[0] ?? null;
 }

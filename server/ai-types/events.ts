@@ -81,3 +81,39 @@ export interface CatalogRegisteredPayload {
   registeredAt: string;
   action: "created" | "updated";
 }
+
+/**
+ * Plan v3 Phase 40 — payload contract for `aiTypes.catalog.published`.
+ *
+ * Phase 39 only emitted `registered`. The `published`/`deprecated` events
+ * are declared but not yet emitted from the publishing service; defining
+ * the payload here gives downstream subscribers (Agent Studio, Provider
+ * Connections) a typed contract to bind against ahead of the producer
+ * being wired in a follow-up phase.
+ */
+export interface CatalogPublishedPayload {
+  catalogEntryId: number;
+  publishBundleId: number | null;
+  versionLabel: string | null;
+  /** Module that originally registered the entry (mirrors registered.sourceModule). */
+  sourceModule: string;
+  /** Source-of-record row id (mirrors registered.sourceRefId). */
+  sourceRefId: number | null;
+  performedByActorId: number | null;
+  performedByActorType: "user" | "system";
+  workspaceId: number | null;
+  publishedAt: string;
+}
+
+/** Plan v3 Phase 40 — payload contract for `aiTypes.catalog.deprecated`. */
+export interface CatalogDeprecatedPayload {
+  catalogEntryId: number;
+  /** Reason code or free-form note from the deprecation flow. */
+  reason: string | null;
+  sourceModule: string;
+  sourceRefId: number | null;
+  performedByActorId: number | null;
+  performedByActorType: "user" | "system";
+  workspaceId: number | null;
+  deprecatedAt: string;
+}
