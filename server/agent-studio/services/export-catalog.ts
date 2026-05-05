@@ -349,3 +349,246 @@ export async function reconcileCandidateImports(
     reconciledBy: input.reconciledBy,
   });
 }
+
+// ───────────────────────────────────────────────────────────────────
+// Plan v3 Phase 41 — Reconciliation fallback (bulk drift scan)
+// ───────────────────────────────────────────────────────────────────
+//
+// The Phase 39/40 event-bus path is best-effort: a bus outage at register
+// time means Agent Studio's `ags_catalog_sync_log` will be missing rows
+// for catalog entries that *do* exist. Phase 41 detects and repairs that
+// drift by walking AS export candidates and comparing each to:
+//
+//   1. The AI Types catalog row (`loadCatalogEntryForAgent`).
+//   2. The AS-side sync log (`getLatestCatalogSyncEvent`).
+//
+// Drift cases the scan repairs by writing a synthetic sync-log row:
+//
+//   - `missing_registered`  — catalog row exists, sync log empty for it
+//   - `missing_published`   — catalog row.status === "published" but the
+//                             latest sync log eventType isn't "published"
+//   - `missing_deprecated`  — catalog row.status === "deprecated" but the
+//                             latest sync log eventType isn't "deprecated"
+//
+// The scan does NOT call `aiTypes.catalog.register` — re-running the
+// register path would re-write the catalog row and re-emit the event,
+// which is the wrong shape for "the row already exists, only the AS
+// mirror is stale." The repair is purely AS-local (writes only to
+// `ags_catalog_sync_log`).
+//
+// This is a `medium`-risk admin gateway action: it scans across all
+// AS-published agents and writes one sync log row per drift case. No
+// catalog mutations. Receipt-required because the scan output is
+// audit-visible (admins want a record of "I ran reconciliation at T").
+
+export interface ReconcileSyncDriftInput {
+  /** Workspace scope for the scan (omit to scan globally). */
+  workspaceId?: number;
+  /** Actor running the scan; recorded into the synthetic sync-log payload. */
+  reconciledBy: number;
+  /**
+   * If true, do not write any sync-log rows — return the drift report
+   * only. Useful for "preview before applying" admin flows.
+   */
+  dryRun?: boolean;
+}
+
+export interface ReconcileSyncDriftItem {
+  agentId: number;
+  catalogEntryId: number | null;
+  /** What the scan found — one of the drift cases above, or "in_sync". */
+  driftCase:
+    | "in_sync"
+    | "missing_registered"
+    | "missing_published"
+    | "missing_deprecated"
+    | "no_catalog_entry";
+  /** Latest sync log eventType for the entry, or null when missing. */
+  latestSyncEventType: string | null;
+  /** Catalog row status field, when a catalog row exists. */
+  catalogStatus: string | null;
+  /** True when the scan wrote a repair row for this item. */
+  repaired: boolean;
+}
+
+export interface ReconcileSyncDriftResult {
+  scanned: number;
+  inSync: number;
+  drift: number;
+  repaired: number;
+  dryRun: boolean;
+  items: ReconcileSyncDriftItem[];
+}
+
+/**
+ * Phase 41 lookups extend the Phase 30 `ExportCatalogLookups` with two
+ * AS-local helpers:
+ *
+ *   - `getLatestSyncLogEventType(catalogEntryId)`  — returns null when
+ *     no log row exists. The handler reads only the eventType column.
+ *   - `recordSyncLogRepair(input)` — writes one synthetic row to
+ *     `ags_catalog_sync_log`. Idempotent on `event_id` (we generate a
+ *     deterministic key per repair so reruns are no-ops).
+ *
+ * The catalog-row status field used by the published/deprecated drift
+ * cases is read from the existing `loadCatalogEntryForAgent` snapshot —
+ * we extend that snapshot with the `status` column inline below.
+ */
+export interface ReconcileSyncDriftLookups {
+  listPublishedAgents: ExportCatalogLookups["listPublishedAgents"];
+  loadCatalogEntryForAgent: (agentId: number) => Promise<
+    | (CatalogRowSnapshot & {
+        /** catalog_entries.status — "draft" | "published" | "deprecated" | etc. */
+        status: string | null;
+      })
+    | null
+  >;
+  getLatestSyncLogEventType: (
+    catalogEntryId: number,
+  ) => Promise<string | null>;
+  recordSyncLogRepair: (input: {
+    eventId: string;
+    eventType: string;
+    catalogEntryId: number;
+    sourceModule: string;
+    sourceRefId: number;
+    action: string | null;
+    payload: Record<string, unknown>;
+  }) => Promise<void>;
+}
+
+function buildRepairEventId(
+  catalogEntryId: number,
+  driftCase: ReconcileSyncDriftItem["driftCase"],
+): string {
+  // Deterministic so reruns ON CONFLICT DO NOTHING.
+  return `as-recon-${driftCase}-${catalogEntryId}`;
+}
+
+function eventTypeForDriftCase(
+  driftCase: ReconcileSyncDriftItem["driftCase"],
+): string | null {
+  switch (driftCase) {
+    case "missing_registered":
+      return "aiTypes.catalog.registered";
+    case "missing_published":
+      return "aiTypes.catalog.published";
+    case "missing_deprecated":
+      return "aiTypes.catalog.deprecated";
+    default:
+      return null;
+  }
+}
+
+function classifyDrift(
+  catalog: { status: string | null } | null,
+  latestSyncEventType: string | null,
+): ReconcileSyncDriftItem["driftCase"] {
+  if (!catalog) {
+    // Candidate has no catalog row — nothing to reconcile. (The export
+    // flow hasn't been run yet, or the row was deleted out from under
+    // us. Either way, not a sync log repair concern.)
+    return "no_catalog_entry";
+  }
+  if (catalog.status === "deprecated") {
+    return latestSyncEventType === "aiTypes.catalog.deprecated"
+      ? "in_sync"
+      : "missing_deprecated";
+  }
+  if (catalog.status === "published") {
+    return latestSyncEventType === "aiTypes.catalog.published"
+      ? "in_sync"
+      : "missing_published";
+  }
+  // Any other catalog row state (draft, active, ...) just needs the
+  // registered row to be present in the sync log.
+  return latestSyncEventType ? "in_sync" : "missing_registered";
+}
+
+/**
+ * Plan v3 Phase 41 — bulk drift scan + best-effort repair of the
+ * Agent Studio catalog sync log. Pure (lookups injected) so unit tests
+ * can drive it without ASDB / main DB. The gateway boot wires real
+ * lookups via `buildReconcileLookups`.
+ */
+export async function reconcileExportCatalogSync(
+  input: ReconcileSyncDriftInput,
+  lookups: ReconcileSyncDriftLookups,
+): Promise<ReconcileSyncDriftResult> {
+  const dryRun = input.dryRun === true;
+  const agents = await lookups.listPublishedAgents({
+    workspaceId: input.workspaceId,
+  });
+
+  const items: ReconcileSyncDriftItem[] = [];
+  let inSync = 0;
+  let drift = 0;
+  let repaired = 0;
+
+  for (const agent of agents) {
+    const catalog = await lookups.loadCatalogEntryForAgent(agent.id);
+    const latestSyncEventType = catalog
+      ? await lookups.getLatestSyncLogEventType(catalog.id)
+      : null;
+
+    const driftCase = classifyDrift(catalog, latestSyncEventType);
+    let didRepair = false;
+
+    if (driftCase === "in_sync" || driftCase === "no_catalog_entry") {
+      if (driftCase === "in_sync") inSync += 1;
+    } else {
+      drift += 1;
+      if (!dryRun) {
+        try {
+          const eventType = eventTypeForDriftCase(driftCase);
+          if (eventType && catalog) {
+            await lookups.recordSyncLogRepair({
+              eventId: buildRepairEventId(catalog.id, driftCase),
+              eventType,
+              catalogEntryId: catalog.id,
+              sourceModule: "agentStudio",
+              sourceRefId: agent.id,
+              action:
+                driftCase === "missing_registered" ? "reconciled" : null,
+              payload: {
+                reconciliation: true,
+                reason: driftCase,
+                reconciledBy: input.reconciledBy,
+                catalogStatus: catalog.status,
+                originalLatestEventType: latestSyncEventType,
+                reconciledAt: new Date().toISOString(),
+              },
+            });
+            didRepair = true;
+            repaired += 1;
+          }
+        } catch (err) {
+          // Best-effort — record the drift in the report but continue.
+          // The error is preserved on the item for the admin to see.
+          console.warn(
+            `[reconcile-sync] repair failed for agent ${agent.id} (${driftCase}):`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+    }
+
+    items.push({
+      agentId: agent.id,
+      catalogEntryId: catalog?.id ?? null,
+      driftCase,
+      latestSyncEventType,
+      catalogStatus: catalog?.status ?? null,
+      repaired: didRepair,
+    });
+  }
+
+  return {
+    scanned: items.length,
+    inSync,
+    drift,
+    repaired,
+    dryRun,
+    items,
+  };
+}

@@ -546,11 +546,11 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 41 — Reconciliation fallback
 
-- [ ] Implement `agentStudio.exportCatalog.reconcileImports`.
-- [ ] Compare Agent Studio export candidates with AI Types catalog entries.
-- [ ] Repair missed registered events.
-- [ ] Repair missed published/deprecated events.
-- [ ] Add tests.
+- [x] Implement `agentStudio.exportCatalog.reconcileImports`. *(The `.reconcileImports` gateway action shipped in Phase 30 as a per-row admin override for `legacy_imported_unresolved` rows. Phase 41 adds a **separate** bulk-drift gateway action `agentStudio.exportCatalog.reconcileSync` (medium-risk, receipt-required) — the two are intentionally distinct: per-row legacy override vs. bulk catalog↔sync-log drift detection. Both live in `services/export-catalog.ts`.)*
+- [x] Compare Agent Studio export candidates with AI Types catalog entries. *(`reconcileExportCatalogSync` walks `listPublishedAgents` → `loadCatalogEntryForAgent` → `getLatestSyncLogEventType`. Each candidate is classified as `in_sync` / `missing_registered` / `missing_published` / `missing_deprecated` / `no_catalog_entry`.)*
+- [x] Repair missed registered events. *(When `catalog_entries` row exists but `ags_catalog_sync_log` has no row for it, the scan writes a synthetic `aiTypes.catalog.registered` row with `action="reconciled"` and `payload.reconciliation=true`. Deterministic `event_id = "as-recon-missing_registered-<catalogEntryId>"` so reruns ON CONFLICT DO NOTHING.)*
+- [x] Repair missed published/deprecated events. *(When `catalog.status="published"` (or `"deprecated"`) but the latest sync-log eventType is stale, the scan writes the matching synthetic event. `dryRun:true` returns the report without writing — preview before applying. Failures are caught per-item so one bad write doesn't stop the scan.)*
+- [x] Add tests. *(11 new unit tests in `services/export-catalog.test.ts` covering: scanned=0, in_sync, each drift case + repair payload shape, dryRun, no_catalog_entry, multi-agent mixed scan, workspaceId filter, repair-failure-doesn't-stop-scan, deterministic eventId for idempotent reruns. Phase 30 + Phase 41 file total: 31 tests.)*
 
 ---
 

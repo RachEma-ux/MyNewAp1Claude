@@ -44,7 +44,9 @@ import {
   prepareExportRegisterPayload,
   markCandidateImported,
   reconcileCandidateImports,
+  reconcileExportCatalogSync,
   type ExportCatalogLookups,
+  type ReconcileSyncDriftLookups,
 } from "./export-catalog";
 
 function makeLookups(opts: {
@@ -378,5 +380,346 @@ describe("reconcileCandidateImports — Phase 30", () => {
     });
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("row_not_in_unresolved_state");
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
+// Plan v3 Phase 41 — bulk drift scan / reconcileExportCatalogSync
+// ────────────────────────────────────────────────────────────────────
+
+interface SyncDriftFixtureCatalog {
+  id: number;
+  legacyImportState: string | null;
+  activeSourceVersionId: number | null;
+  status: string | null;
+}
+
+function makeReconcileLookups(opts: {
+  agents: Array<{
+    id: number;
+    workspaceId: number;
+    name: string;
+    lifecycleState: string;
+    publishedVersionId: number | null;
+    capabilities?: string[];
+  }>;
+  catalogByAgent?: Map<number, SyncDriftFixtureCatalog | null>;
+  syncByCatalog?: Map<number, string | null>;
+  recordImpl?: (input: any) => Promise<void>;
+}): {
+  lookups: ReconcileSyncDriftLookups;
+  recordCalls: any[];
+} {
+  const recordCalls: any[] = [];
+  const lookups: ReconcileSyncDriftLookups = {
+    listPublishedAgents: vi.fn(async (filter) => {
+      const all = opts.agents;
+      if (filter.workspaceId == null) return all;
+      return all.filter((a) => a.workspaceId === filter.workspaceId);
+    }),
+    loadCatalogEntryForAgent: vi.fn(async (agentId) => {
+      return opts.catalogByAgent?.get(agentId) ?? null;
+    }),
+    getLatestSyncLogEventType: vi.fn(async (catalogEntryId) => {
+      return opts.syncByCatalog?.get(catalogEntryId) ?? null;
+    }),
+    recordSyncLogRepair: vi.fn(async (input) => {
+      recordCalls.push(input);
+      if (opts.recordImpl) await opts.recordImpl(input);
+    }),
+  };
+  return { lookups, recordCalls };
+}
+
+describe("reconcileExportCatalogSync — Phase 41", () => {
+  it("returns scanned=0 when no published agents exist", async () => {
+    const { lookups } = makeReconcileLookups({ agents: [] });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.scanned).toBe(0);
+    expect(r.inSync).toBe(0);
+    expect(r.drift).toBe(0);
+    expect(r.repaired).toBe(0);
+  });
+
+  it("classifies in_sync when catalog row + matching latest sync event present", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+    const syncByCatalog = new Map<number, string>();
+    syncByCatalog.set(100, "aiTypes.catalog.registered");
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+      syncByCatalog,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.scanned).toBe(1);
+    expect(r.inSync).toBe(1);
+    expect(r.drift).toBe(0);
+    expect(r.repaired).toBe(0);
+    expect(recordCalls).toHaveLength(0);
+    expect(r.items[0].driftCase).toBe("in_sync");
+  });
+
+  it("classifies missing_registered and writes a synthetic registered row", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+    // syncByCatalog empty → no log row present.
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 42 },
+      lookups,
+    );
+    expect(r.drift).toBe(1);
+    expect(r.repaired).toBe(1);
+    expect(r.items[0].driftCase).toBe("missing_registered");
+    expect(r.items[0].repaired).toBe(true);
+
+    expect(recordCalls).toHaveLength(1);
+    const w = recordCalls[0];
+    expect(w.eventType).toBe("aiTypes.catalog.registered");
+    expect(w.catalogEntryId).toBe(100);
+    expect(w.sourceModule).toBe("agentStudio");
+    expect(w.sourceRefId).toBe(1);
+    expect(w.action).toBe("reconciled");
+    expect(w.eventId).toBe("as-recon-missing_registered-100"); // deterministic
+    expect(w.payload.reconciliation).toBe(true);
+    expect(w.payload.reconciledBy).toBe(42);
+  });
+
+  it("classifies missing_published when catalog row.status='published' but log not yet at published", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "published",
+    });
+    const syncByCatalog = new Map<number, string>();
+    syncByCatalog.set(100, "aiTypes.catalog.registered"); // stale
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+      syncByCatalog,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.items[0].driftCase).toBe("missing_published");
+    expect(recordCalls[0].eventType).toBe("aiTypes.catalog.published");
+    expect(recordCalls[0].action).toBeNull();
+  });
+
+  it("classifies missing_deprecated when catalog row.status='deprecated' but log stale", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "deprecated",
+    });
+    const syncByCatalog = new Map<number, string>();
+    syncByCatalog.set(100, "aiTypes.catalog.published");
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+      syncByCatalog,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.items[0].driftCase).toBe("missing_deprecated");
+    expect(recordCalls[0].eventType).toBe("aiTypes.catalog.deprecated");
+  });
+
+  it("does NOT write any rows when dryRun=true (preview mode)", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1, dryRun: true },
+      lookups,
+    );
+    expect(r.dryRun).toBe(true);
+    expect(r.drift).toBe(1);
+    expect(r.repaired).toBe(0);
+    expect(recordCalls).toHaveLength(0);
+    expect(r.items[0].repaired).toBe(false);
+  });
+
+  it("classifies no_catalog_entry when catalog row is missing entirely", async () => {
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      // catalogByAgent empty → loadCatalogEntryForAgent returns null
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.items[0].driftCase).toBe("no_catalog_entry");
+    expect(r.items[0].catalogEntryId).toBeNull();
+    expect(r.repaired).toBe(0);
+    expect(recordCalls).toHaveLength(0);
+    // no_catalog_entry isn't in_sync but also isn't a fixable drift —
+    // it's "the export flow hasn't been run for this agent yet."
+    expect(r.inSync).toBe(0);
+  });
+
+  it("scans across multiple agents with mixed drift states", async () => {
+    const agentA = { ...happyAgent, id: 1 };
+    const agentB = { ...happyAgent, id: 2 };
+    const agentC = { ...happyAgent, id: 3 };
+
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+    catalogByAgent.set(2, {
+      id: 200,
+      legacyImportState: null,
+      activeSourceVersionId: 18,
+      status: "published",
+    });
+    // agent 3 has no catalog row.
+
+    const syncByCatalog = new Map<number, string>();
+    syncByCatalog.set(100, "aiTypes.catalog.registered"); // in_sync
+    // 200 has no log → missing_published
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [agentA, agentB, agentC],
+      catalogByAgent,
+      syncByCatalog,
+    });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    expect(r.scanned).toBe(3);
+    expect(r.inSync).toBe(1);
+    expect(r.drift).toBe(1); // only agent B is fixable drift
+    expect(r.repaired).toBe(1);
+    expect(recordCalls).toHaveLength(1);
+    expect(r.items.find((i) => i.agentId === 1)?.driftCase).toBe("in_sync");
+    expect(r.items.find((i) => i.agentId === 2)?.driftCase).toBe(
+      "missing_published",
+    );
+    expect(r.items.find((i) => i.agentId === 3)?.driftCase).toBe(
+      "no_catalog_entry",
+    );
+  });
+
+  it("respects workspaceId filter on listPublishedAgents", async () => {
+    const a = { ...happyAgent, id: 1, workspaceId: 100 };
+    const b = { ...happyAgent, id: 2, workspaceId: 200 };
+    const { lookups } = makeReconcileLookups({ agents: [a, b] });
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1, workspaceId: 100 },
+      lookups,
+    );
+    expect(r.scanned).toBe(1);
+    expect(r.items[0].agentId).toBe(1);
+  });
+
+  it("repair failures are caught and don't stop the scan (best-effort)", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+    catalogByAgent.set(2, {
+      id: 200,
+      legacyImportState: null,
+      activeSourceVersionId: 18,
+      status: "draft",
+    });
+
+    let calls = 0;
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [
+        { ...happyAgent, id: 1 },
+        { ...happyAgent, id: 2 },
+      ],
+      catalogByAgent,
+      recordImpl: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("ASDB write failed");
+      },
+    });
+
+    const r = await reconcileExportCatalogSync(
+      { reconciledBy: 1 },
+      lookups,
+    );
+    // Both saw drift, both attempted repair; first failed, second succeeded.
+    expect(r.scanned).toBe(2);
+    expect(r.drift).toBe(2);
+    expect(r.repaired).toBe(1);
+    expect(recordCalls).toHaveLength(2); // recorder was called twice
+    // First item didn't repair, second did.
+    const repairedItems = r.items.filter((i) => i.repaired);
+    expect(repairedItems).toHaveLength(1);
+  });
+
+  it("eventId is deterministic per (catalogEntryId, driftCase) so reruns are no-ops", async () => {
+    const catalogByAgent = new Map<number, SyncDriftFixtureCatalog>();
+    catalogByAgent.set(1, {
+      id: 100,
+      legacyImportState: null,
+      activeSourceVersionId: 17,
+      status: "draft",
+    });
+
+    const { lookups, recordCalls } = makeReconcileLookups({
+      agents: [happyAgent],
+      catalogByAgent,
+    });
+
+    await reconcileExportCatalogSync({ reconciledBy: 1 }, lookups);
+    await reconcileExportCatalogSync({ reconciledBy: 1 }, lookups);
+
+    // Recorder called twice, same eventId both times — the unique
+    // index on event_id makes the DB-side a no-op even though the
+    // service-level recorder was invoked.
+    expect(recordCalls).toHaveLength(2);
+    expect(recordCalls[0].eventId).toBe(recordCalls[1].eventId);
   });
 });
