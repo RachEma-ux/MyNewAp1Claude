@@ -551,4 +551,56 @@ export const catalogImportRouter = router({
         unresolvedEntries: unresolved,
       };
     }),
+
+  /**
+   * Direction B B3 — list Agent Studio export candidates available for
+   * import. Wraps `listImportableAgentStudioCandidates`, which calls the
+   * Module Gateway's `agentStudio.exportCatalog.listCandidates` action.
+   *
+   * Returns opaque candidate DTOs — the wizard renders them as-is and
+   * passes their `agentId` back to `importAgentStudioCandidate`.
+   */
+  listAgentStudioCandidates: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.number().int().optional(),
+        status: z
+          .enum(["not_started", "ready", "exported", "blocked", "unresolved"])
+          .optional(),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const { listImportableAgentStudioCandidates } = await import(
+        "../ai-types/import-from-agent-studio"
+      );
+      const candidates = await listImportableAgentStudioCandidates({
+        actorId: ctx.user?.id ?? 1,
+        workspaceId: input?.workspaceId,
+        status: input?.status,
+      });
+      return { candidates };
+    }),
+
+  /**
+   * Direction B B3 — import a single Agent Studio export candidate via the
+   * Module Gateway. The gateway's `agentStudio.exportCatalog.exportCandidate`
+   * action calls back into `aiTypes.catalog.register` so the catalog row
+   * write happens under the canonical Phase 25 register path.
+   */
+  importAgentStudioCandidate: governedProcedure
+    .input(
+      z.object({
+        agentId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { importAgentStudioCandidate } = await import(
+        "../ai-types/import-from-agent-studio"
+      );
+      const result = await importAgentStudioCandidate({
+        agentId: input.agentId,
+        registeredBy: ctx.user?.id ?? 1,
+      });
+      return result;
+    }),
 });

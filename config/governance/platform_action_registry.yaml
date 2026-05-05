@@ -1665,6 +1665,18 @@ actions:
     approval: role_any
     evidence: { required: true, types: [reason] }
 
+  # Direction B B3 — import a single Agent Studio export candidate.
+  # Wraps `agentStudio.exportCatalog.exportCandidate` via the gateway,
+  # which calls back into `aiTypes.catalog.register`. Risk parity with
+  # bulkCreate (R2): one row written per call, no high-blast operations.
+  catalogImport.importAgentStudioCandidate:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # DISCOVERY OPS
   # ═══════════════════════════════════════════════════════════════════════════

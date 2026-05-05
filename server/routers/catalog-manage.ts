@@ -157,6 +157,9 @@ export const catalogManageRouter = router({
         origin: originSchema.optional(),
         reviewState: z.enum(["needs_review", "approved", "rejected"]).optional(),
         category: z.string().optional(),
+        // Direction B B3 — scope listing to a single source-of-record kind.
+        // For AS Candidate Pipeline mode, callers pass "ags_agent".
+        sourceType: z.string().optional(),
       }).optional()
     )
     .query(async ({ input }) => {
