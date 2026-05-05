@@ -31,6 +31,7 @@ import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createBot, getAllBots, getBotById, updateBot, isDeployable, getBlockingReasons } from "../db/bots";
 import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
+import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogState } from "@shared/catalog-state";
 
@@ -222,10 +223,15 @@ export const botsRouter = router({
   /**
    * Import a deployable bot into the Catalog as a candidate.
    * Mirrors models.importToCatalog and agents.importToCatalog.
+   *
+   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
+   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`
+   * for the migration recipe. Removal is gated on caller migration (Phase 26.1).
    */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
+      warnLegacyImportToCatalog("bots.importToCatalog");
       const bot = await getBotById(input.id);
       if (!bot) throw new Error("Bot not found");
 

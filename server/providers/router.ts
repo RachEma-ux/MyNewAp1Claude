@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
+import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import { getProviderRegistry } from "./registry";
 import * as providerDb from "./db";
 import type { ProviderType } from "./types";
@@ -984,10 +985,15 @@ export const providerRouter = router({
   /**
    * Import a deployable provider into the Catalog as a candidate.
    * Mirrors models.importToCatalog, bots.importToCatalog, agents.importToCatalog.
+   *
+   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
+   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`
+   * for the migration recipe. Removal is gated on caller migration (Phase 26.1).
    */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
+      warnLegacyImportToCatalog("providers.importToCatalog");
       const provider = await providerDb.getProviderById(input.id);
       if (!provider) throw new Error("Provider not found");
 
