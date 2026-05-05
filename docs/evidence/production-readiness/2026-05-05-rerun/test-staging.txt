@@ -1,0 +1,44 @@
+=== test:integration:staging (BLOCKED reporter) ===
+Tue May  5 04:44:55 PM UTC 2026
+
+> mynewap1claude@1.0.0 test:integration:staging /root/MyNewAp1Claude
+> TEST_MODE=staging-integration tsx scripts/run-staging-integration-tests.ts
+
+Staging preflight — mode: staging-integration
+
+Required infra:
+  [--] DATABASE_URL (mynewap1claude staging DSN)
+         Set DATABASE_URL to the staging mynewap1claude Postgres DSN.
+  [--] OPA_URL (real endpoint, not opa.example.com placeholder)
+         Set OPA_URL to the staging OPA endpoint. opa.example.com is rejected.
+  [--] ENCRYPTION_KEY
+         Set ENCRYPTION_KEY. See docs/deployment/staging-runtime-foundation.md for generator.
+  [--] SECRETS_ENCRYPTION_KEY
+         Set SECRETS_ENCRYPTION_KEY. See docs/deployment/staging-runtime-foundation.md.
+  [--] COOKIE_SECRET
+         Set COOKIE_SECRET. See docs/deployment/staging-runtime-foundation.md.
+  [--] JWT_SECRET
+         Set JWT_SECRET. See docs/deployment/staging-runtime-foundation.md.
+
+Optional infra (component-scoped; missing → deferred, not blocked):
+  [..] GRAPHRAG_WORKER_URL (Phase 4)
+  [..] DATA_ACQUISITION_WORKER_URL (Phase 4)
+  [..] EXTERNAL_ORCHESTRATOR_URL (Phase 4)
+  [..] REDIS_URL (worker queue)
+  [..] WORKER_QUEUE_URL (worker queue alt)
+  [..] S3 connector envs (Phase 5)
+  [..] GDrive connector envs (Phase 5)
+  [..] GitHub connector envs (Phase 5)
+
+Result: BLOCKED — required infra missing:
+  - DATABASE_URL
+  - OPA_URL
+  - ENCRYPTION_KEY
+  - SECRETS_ENCRYPTION_KEY
+  - COOKIE_SECRET
+  - JWT_SECRET
+
+This is a real gap, not a skip. Provision staging and re-run.
+See docs/deployment/staging-runtime-foundation.md.
+ ELIFECYCLE  Command failed with exit code 2.
+exit=2

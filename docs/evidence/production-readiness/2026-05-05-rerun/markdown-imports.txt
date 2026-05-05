@@ -1,0 +1,8 @@
+=== check:markdown-imports ===
+Tue May  5 04:44:25 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:markdown-imports /root/MyNewAp1Claude
+> tsx scripts/check-markdown-imports.ts
+
+[markdown-imports] PASS — no direct streamdown or Shiki imports outside SlimShikiHighlighter (1959 files scanned).
+exit=0

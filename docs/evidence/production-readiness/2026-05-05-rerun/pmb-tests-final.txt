@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 /root/MyNewAp1Claude
+
+ ✓ tests/check-provider-key-env-boundary.test.ts (8 tests) 14ms
+ ✓ tests/pmb/runtime-coverage.test.ts (33 tests) 42ms
+ ✓ tests/pmb/wiring.test.ts (13 tests) 37ms
+ ✓ tests/pmb/boundary.test.ts (15 tests) 407ms
+
+ Test Files  4 passed (4)
+      Tests  69 passed (69)
+   Start at  17:04:12
+   Duration  3.51s (transform 353ms, setup 2.88s, collect 293ms, tests 499ms, environment 2ms, prepare 2.34s)
+
+---exit=0

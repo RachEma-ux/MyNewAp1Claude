@@ -1,0 +1,15 @@
+=== check:ports ===
+Tue May  5 04:42:41 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:ports /root/MyNewAp1Claude
+> tsx scripts/check-port-registry.ts
+
+Port Registry Audit
+===================
+Declarations: 11
+Conflicts:    0
+Blockers:     0
+High:         0
+
+All declarations valid; no conflicts detected.
+exit=0

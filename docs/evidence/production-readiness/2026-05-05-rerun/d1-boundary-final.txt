@@ -1,0 +1,6 @@
+
+> mynewap1claude@1.0.0 check:provider-key-env-boundary /root/MyNewAp1Claude
+> tsx scripts/check-provider-key-env-boundary.ts
+
+OK — provider-key-env boundary check passed (D1).
+exit=0

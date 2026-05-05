@@ -1,0 +1,8 @@
+=== check:provider-credential-resolver-boundary ===
+Tue May  5 04:43:05 PM UTC 2026
+
+> mynewap1claude@1.0.0 check:provider-credential-resolver-boundary /root/MyNewAp1Claude
+> tsx scripts/check-provider-credential-resolver-boundary.ts
+
+OK — provider-credential-resolver boundary check passed (D2).
+exit=0

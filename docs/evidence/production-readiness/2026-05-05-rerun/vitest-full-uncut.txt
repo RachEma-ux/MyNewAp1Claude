@@ -1,0 +1,1314 @@
+
+> mynewap1claude@1.0.0 test /root/MyNewAp1Claude
+> vitest run
+
+
+ RUN  v2.1.9 /root/MyNewAp1Claude
+
+ ✓ server/catalog-import/file-parser.test.ts (53 tests) 68ms
+stderr | server/agent-studio/services/export-catalog.test.ts > reconcileExportCatalogSync — Phase 41 > repair failures are caught and don't stop the scan (best-effort)
+[reconcile-sync] repair failed for agent 1 (missing_registered): ASDB write failed
+
+ ✓ server/agent-studio/services/export-catalog.test.ts (31 tests) 132ms
+ ✓ server/__tests__/module-nav-compliance.test.ts (38 tests) 1251ms
+   ✓ Module Nav Compliance — Structural Validation > HR nav config passes shared validation with zero errors 821ms
+stderr | server/provider-connections/provider-connections.test.ts > Encryption > encrypt → decrypt round-trip preserves plaintext
+[Secrets] WARNING: SECRETS_ENCRYPTION_KEY not set. Using dev fallback (NOT safe for production)
+
+stderr | server/provider-connections/provider-connections.test.ts > Encryption > decrypt of tampered ciphertext throws
+[Decryption] Failed to decrypt: Unsupported state or unable to authenticate data
+
+stdout | server/provider-connections/provider-connections.test.ts > Service Orchestration > full lifecycle: create → validate → activate → disable
+[ProviderConnections] Synced 1 models for conn 1
+
+stdout | server/provider-connections/provider-connections.test.ts > Service Orchestration > secret rotation: test → encrypt → store → reactivate
+[ProviderConnections] Synced 2 models for conn 1
+
+stdout | server/provider-connections/provider-connections.test.ts > Service Orchestration > getDecryptedPat returns decrypted secret for active connection
+[ProviderConnections] Synced 1 models for conn 1
+
+stdout | server/provider-connections/provider-connections.test.ts > Service Orchestration > health check keeps ACTIVE on successful probe
+[ProviderConnections] Synced 1 models for conn 1
+
+ ✓ server/provider-connections/provider-connections.test.ts (46 tests) 649ms
+ ✓ server/routers/__tests__/keyRotation.test.ts (28 tests) 33ms
+ ✓ tests/pmb/boundary.test.ts (15 tests) 754ms
+ ✓ server/workforce-assignment/__tests__/bridge.test.ts (92 tests) 88ms
+ ✓ server/governance/requireGovernedAction.test.ts (19 tests) 219ms
+ ↓ server/agents.complete.test.ts (22 tests | 22 skipped)
+ ✓ tests/workspace/workspace-invariants.test.ts (48 tests) 3947ms
+   ✓ WS-01: Every execution path resolves a WorkspaceContext > resolveWorkspaceContext and requireWorkspaceContext are exported 3736ms
+ ✓ server/ps/ps.ideation-shell.test.ts (53 tests) 52ms
+ ✓ tests/pmb/wiring.test.ts (13 tests) 36ms
+ ✓ server/ps/context-translator-client.test.ts (154 tests) 154ms
+ ✓ server/agent-studio/services/mcp/__tests__/dispatcher.test.ts (20 tests) 31ms
+ ✓ server/openrouter/model-access/execute.test.ts (12 tests) 75ms
+ ✓ server/hr/__tests__/hr-role-definitions.test.ts (41 tests) 7404ms
+   ✓ HR Role Definitions Schema > should export hrRoleDefinitions table 529ms
+   ✓ HR Role Definitions Schema > should re-export role definition tables from barrel schema 1510ms
+   ✓ HR Role Definition Permissions > should include role-def actions in HR_ACTIONS 532ms
+   ✓ HR Role Definition Router > should export hrRoleDefinitionRouter 2280ms
+   ✓ HR Role Definition Router > should be composed into HR root router 2325ms
+ ✓ server/hr/__tests__/hr-nav-validation.test.ts (83 tests | 5 skipped) 12612ms
+   ✓ HR Nav Config — Role Visibility > employee sees self-service items (show visibility mode) 5340ms
+   ✓ HR Nav Config — Rollout Readiness > HR router composes at least 14 domain sub-routers 6790ms
+stderr | server/organization-management/__tests__/om.test.ts > Authority — OM Resolver > falls back to transitional when no DB
+[Database] DATABASE_URL environment variable is not set!
+
+stderr | server/organization-management/__tests__/om.test.ts > Authority — OM Resolver > returns resolved=false when no target provided
+[Database] DATABASE_URL environment variable is not set!
+
+stderr | server/organization-management/__tests__/om.test.ts > Authority — OM Resolver > interface has all required fields
+[Database] DATABASE_URL environment variable is not set!
+
+stderr | server/organization-management/__tests__/om.test.ts > Workforce Assignment — OM Integration > accepts workspaceId parameter for OM delegation
+[Database] DATABASE_URL environment variable is not set!
+
+ ✓ server/organization-management/__tests__/om.test.ts (71 tests) 259ms
+ ✓ server/agent-studio/services/mcp/__tests__/state-machine.test.ts (29 tests) 27ms
+ ✓ tests/workspace/workspace-e2e-validation.test.ts (34 tests) 3007ms
+   ✓ E2E — RBAC (Capability-Based Allow/Deny) > workspace-guards exports requireCapability 2910ms
+ ✓ server/culture-values/__tests__/cv.test.ts (44 tests) 34ms
+ ✓ server/agent-studio/services/chat-binding.test.ts (7 tests) 24ms
+ ✓ server/agent-studio/services/mcp/__tests__/registry.test.ts (25 tests) 27ms
+ ✓ server/agent-studio/services/mcp/__tests__/lifecycle.test.ts (5 tests) 23ms
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Service Initialization > should be defined as a singleton
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Service Initialization > should have client management methods
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Service Initialization > should initialize with an HTTP server
+[JobQueue] Cleaned up 0 old jobs
+[WebSocket] Service initialized
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Client Connection Management > should track connected clients
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Client Connection Management > should provide client count
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:created events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471293_m8odyi8kk (training) enqueued
+[JobQueue] Processing next job: job_1778000471293_m8odyi8kk (training)
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:started events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471301_3v6i5owz4 (training) enqueued
+[JobQueue] Processing next job: job_1778000471301_3v6i5owz4 (training)
+[JobQueue] Job job_1778000471301_3v6i5owz4 (training) started
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:updated events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471303_wp1eeah7k (training) enqueued
+[JobQueue] Processing next job: job_1778000471303_wp1eeah7k (training)
+[JobQueue] Job job_1778000471303_wp1eeah7k updated:  50%
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:completed events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471305_21odakl24 (training) enqueued
+[JobQueue] Processing next job: job_1778000471305_21odakl24 (training)
+[JobQueue] Job job_1778000471305_21odakl24 (training) started
+[JobQueue] Job job_1778000471305_21odakl24 (training) completed
+[JobQueue] Processing next job: job_1778000471303_wp1eeah7k (training)
+[JobQueue] Cleaned up 1 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:failed events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471308_5vdhj8x4b (training) enqueued
+[JobQueue] Processing next job: job_1778000471308_5vdhj8x4b (training)
+[JobQueue] Job job_1778000471308_5vdhj8x4b (training) started
+[JobQueue] Processing next job: job_1778000471303_wp1eeah7k (training)
+[JobQueue] Cleaned up 0 old jobs
+
+stderr | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:failed events
+[JobQueue] Job job_1778000471308_5vdhj8x4b (training) failed: Test error
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job Queue Event Listening > should listen for job:cancelled events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471310_kkcuxy0je (training) enqueued
+[JobQueue] Processing next job: job_1778000471310_kkcuxy0je (training)
+[JobQueue] Job job_1778000471310_kkcuxy0je (training) cancelled
+[JobQueue] Processing next job: job_1778000471303_wp1eeah7k (training)
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Broadcasting > should broadcast queue statistics
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Broadcasting > should handle sendToClient for specific socket
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Event Handlers > should setup job queue listeners on initialization
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Real-Time Updates > should handle job progress updates
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471317_irl0d9qfu (training) enqueued
+[JobQueue] Processing next job: job_1778000471317_irl0d9qfu (training)
+[JobQueue] Job job_1778000471317_irl0d9qfu (training) started
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  0%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  10%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  20%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  30%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  40%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  50%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  60%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  70%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  80%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  90%
+[JobQueue] Job job_1778000471317_irl0d9qfu updated:  100%
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Real-Time Updates > should handle training completion events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471319_8l5fbses6 (training) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471319_8l5fbses6 (training) started
+[JobQueue] Job job_1778000471319_8l5fbses6 (training) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 1 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Real-Time Updates > should handle evaluation completion events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471327_7xbt67c7r (evaluation) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471327_7xbt67c7r (evaluation) started
+[JobQueue] Job job_1778000471327_7xbt67c7r (evaluation) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Real-Time Updates > should handle quantization completion events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471327_jzhperzfi (quantization) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471327_jzhperzfi (quantization) started
+[JobQueue] Job job_1778000471327_jzhperzfi (quantization) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 2 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job-Specific Broadcasting > should support job-specific event rooms
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Job-Specific Broadcasting > should support job-specific unsubscription
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Error Handling > should handle invalid client IDs gracefully
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Error Handling > should handle broadcasting with no connected clients
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Statistics Broadcasting > should broadcast accurate queue statistics
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471330_ad0p941hk (training) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471331_tj6ghvf2h (training) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471331_tj6ghvf2h (training) started
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Integration with Job Types > should handle training job events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471331_osqwse7iu (training) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471331_osqwse7iu (training) started
+[JobQueue] Job job_1778000471331_osqwse7iu (training) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Integration with Job Types > should handle evaluation job events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471332_7du8uqqm8 (evaluation) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471332_7du8uqqm8 (evaluation) started
+[JobQueue] Job job_1778000471332_7du8uqqm8 (evaluation) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 0 old jobs
+
+stdout | server/services/__tests__/websocket-service.test.ts > WebSocket Service > Integration with Job Types > should handle quantization job events
+[JobQueue] Cleaned up 0 old jobs
+[JobQueue] Job job_1778000471333_z929bnpwu (quantization) enqueued
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Job job_1778000471333_z929bnpwu (quantization) started
+[JobQueue] Job job_1778000471333_z929bnpwu (quantization) completed
+[JobQueue] Max concurrent jobs (2) reached
+[JobQueue] Cleaned up 2 old jobs
+
+ ✓ server/services/__tests__/websocket-service.test.ts (26 tests) 64ms
+ ✓ server/agent-studio/bindings-policy.test.ts (15 tests) 16ms
+stderr | server/ai-types/register.test.ts > registerCatalogEntry — Phase 25 > Phase 38: audit failure does NOT block the register (best-effort)
+[register] audit event 'catalog.register.created' failed for entry 999: audit DB down
+
+stderr | server/ai-types/register.test.ts > registerCatalogEntry — Phase 25 > Phase 39: event publish failure does NOT block the register (best-effort)
+[register] event 'aiTypes.catalog.registered' failed for entry 999: event bus down
+
+ ✓ server/ai-types/register.test.ts (16 tests) 29ms
+ ✓ server/ps/ps.matrix-engine.test.ts (17 tests) 43ms
+ ✓ server/ai-types/legacy-import.test.ts (19 tests) 21ms
+ ✓ server/pm-central/__tests__/pm-service.test.ts (13 tests) 29ms
+ ✓ server/agent-studio/bindings.test.ts (8 tests) 25ms
+ ✓ server/ai-types/provider-models-availability.test.ts (7 tests) 24ms
+ ✓ tests/contracts/catalog-contracts.test.ts (17 tests) 3596ms
+   ✓ Catalog Contract — DB Functions > catalog DB module exports all required CRUD operations 3577ms
+ ✓ tests/workspace/workspace-lifecycle-guards.test.ts (20 tests) 3337ms
+   ✓ Phase 1 — Workspace Guard Exports > workspace-guards module exports all required functions 3298ms
+ ✓ tests/workspace/workspace-hardening-final.test.ts (43 tests) 17442ms
+   ✓ Hardening — No Regressions > module registry still exports requireModule 4352ms
+   ✓ Hardening — No Regressions > all 5 module routers still export their router 12843ms
+ ✓ tests/governance/negative-paths.test.ts (26 tests) 24ms
+ ✓ tests/governance/governance-blocking.test.ts (18 tests) 32ms
+ ✓ tests/ai-types/policy-engines.test.ts (20 tests) 27ms
+stdout | server/providers/providers.test.ts > ProviderRegistry > should register a provider successfully
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should throw error when registering duplicate provider
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should get provider by ID
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should get all providers
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Registered provider: Test anthropic Provider (anthropic)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should get providers by type
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Registered provider: Test anthropic Provider (anthropic)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should unregister a provider
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Unregistered provider: Test openai Provider
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should get registry stats
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Registered provider: Test anthropic Provider (anthropic)
+
+stdout | server/providers/providers.test.ts > ProviderRegistry > should cleanup all providers
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Registered provider: Test anthropic Provider (anthropic)
+[ProviderRegistry] Cleaned up all providers
+
+stdout | server/providers/providers.test.ts > getProviderRegistry singleton > should reset and create new instance
+[ProviderRegistry] Cleaned up all providers
+[ProviderRegistry] Registered provider: Test openai Provider (openai)
+[ProviderRegistry] Cleaned up all providers
+
+ ✓ server/providers/providers.test.ts (18 tests) 31ms
+ ✓ server/agent-studio/services/catalog-sync-subscribers.test.ts (15 tests) 34ms
+ ✓ tests/ai-types/shared-abstractions.test.ts (36 tests) 16ms
+ ✓ server/routers/policies.test.ts (29 tests) 30ms
+stdout | server/agents/agents-e2e.test.ts
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+ ✓ server/services/__tests__/admission-control.test.ts (11 tests) 40ms
+ ✓ server/communication/__tests__/communication-service.test.ts (12 tests) 28ms
+ ✓ tests/data-analysis-capsule/structure.test.ts (30 tests) 45ms
+ ✓ tests/pm-central-capsule/structure.test.ts (37 tests) 58ms
+stdout | server/agents/agents-e2e.test.ts
+[EmbeddingEngine] Initialized with 5 models
+
+ ↓ tests/contracts/catalog.contract.test.ts (10 tests | 10 skipped)
+ ✓ server/agents.integration.test.ts (17 tests) 29ms
+ ✓ server/db/llms-governance.test.ts (9 tests) 29ms
+stdout | server/agents/agents-e2e.test.ts
+[QdrantService] Initialized with URL: http://localhost:6333
+
+stderr | server/agents/agents-e2e.test.ts
+Failed to obtain server version. Unable to check client-server compatibility. Set checkCompatibility=false to skip version check.
+
+stdout | server/agents/agents-integration.test.ts
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+ ✓ server/workspace/workspace-lifecycle.test.ts (21 tests) 18ms
+stderr | server/services/eventStreaming.test.ts > EventStreamManager > error handling > should handle subscriber callback errors
+Error in subscriber callback: Error: Callback error
+
+ ✓ server/services/eventStreaming.test.ts (18 tests) 34ms
+stdout | server/agents/agents-integration.test.ts
+[EmbeddingEngine] Initialized with 5 models
+
+ ✓ tests/code-studio-capsule/structure.test.ts (43 tests) 56ms
+ ↓ tests/contracts/runtime.contract.test.ts (5 tests | 5 skipped)
+ ✓ tests/workspace/workspace-rbac-authority.test.ts (12 tests) 3661ms
+   ✓ Phase 3 — Capability Resolver Exports > capability-resolver exports all required functions 2683ms
+   ✓ Phase 3 — Canonical Permission Gates > workspace-guards exports requireCapability 954ms
+stdout | server/agents/agents-e2e.test.ts
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+stdout | server/agents/agents-integration.test.ts
+[QdrantService] Initialized with URL: http://localhost:6333
+
+stderr | server/agents/agents-integration.test.ts
+Failed to obtain server version. Unable to check client-server compatibility. Set checkCompatibility=false to skip version check.
+
+stdout | server/agents/agents-integration.test.ts
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+ ↓ server/services/externalOrchestrator.test.ts (16 tests | 16 skipped)
+ ↓ server/services/opaPolicyEngine.test.ts (13 tests | 13 skipped)
+ ✓ tests/model-access/mock-provider.test.ts (6 tests) 342ms
+ ✓ server/agent-studio/services/provider-use-governance.test.ts (16 tests) 24ms
+ ✓ tests/agent-studio-capsule/structure.test.ts (67 tests) 79ms
+ ✓ tests/workspace/workspace-module-enforcement.test.ts (23 tests) 3876ms
+   ✓ Phase 5 — Module Registry Enforcement > isModuleEnabled is exported 3767ms
+ ✓ tests/projects-system-capsule/structure.test.ts (38 tests) 54ms
+ ✓ server/agent-studio/services/test-run-binding.test.ts (10 tests) 16ms
+ ✓ server/platform/coordinator/coordinator-wiring.test.ts (8 tests) 137ms
+ ✓ tests/workspace/workspace-activity-traceability.test.ts (14 tests) 3742ms
+   ✓ Phase 6 — Activity Log Schema > workspace_activity_log table is defined 2271ms
+   ✓ Phase 6 — logActivity Function > logActivity is exported from modules/registry 1376ms
+ ✓ server/platform/coordinator/coordinator-examples.test.ts (5 tests) 239ms
+ ✓ tests/ui/catalog-selectors/catalog-app-selectors.test.ts (12 tests) 12159ms
+   ✓ Catalog App Selectors — Component Exports > CatalogLLMSelect exports from catalog-selectors 12072ms
+ ✓ tests/workspace/capability-resolver.test.ts (8 tests) 10256ms
+   ✓ WS-02: capabilitiesToPermissions — compatibility adapter > owner capabilities produce full permissions 9653ms
+   ✓ WS-02: permissions-service exports remain stable > permissions-service exports all original functions 588ms
+ ✓ server/data-analysis/data-acquisition/__tests__/dataAcquisition.service.test.ts (17 tests) 21ms
+stdout | tests/contracts/domain-contracts.test.ts > Domain Contract — Agents > agents router has importToCatalog procedure
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+ ✓ server/automation/validation.test.ts (10 tests) 22ms
+ ✓ server/platform/ports/port-registry.test.ts (12 tests) 32ms
+stdout | tests/contracts/domain-contracts.test.ts > Domain Contract — Providers > providers router exports a router with listEnriched
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+ ✓ tests/contracts/domain-contracts.test.ts (12 tests) 13050ms
+   ✓ Domain Contract — Models > createModel writes to models table, not catalog_entries 9105ms
+   ✓ Domain Contract — Models > models router has importToCatalog — domain does NOT auto-create catalog entries 1337ms
+   ✓ Domain Contract — Providers > providers router exports a router with listEnriched 2445ms
+ ✓ tests/workspace/workspace-contract.test.ts (6 tests | 1 skipped) 1490ms
+   ✓ WS-01: WorkspaceContext helper functions > hasContextPermission returns correct boolean 1473ms
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > creates capabilities via upsert
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > creates workspace roles
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > creates role→capability mappings
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > assigns owner membership with WorkspaceOwner role
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > respects blockedCapabilities from workspace type preset
+[Seed] Created workspace "Sandbox Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 5 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+stdout | server/workspace/seed/seed.test.ts > seedWorkspace > is idempotent on re-run
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 4 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+[Seed] Created workspace "Test" (id=1)
+[Seed] Upserted 0 new capabilities (4 total)
+[Seed] Created 2 roles, 6 capability mappings
+[Seed] Assigned user 1 as WorkspaceOwner
+
+ ✓ server/workspace/seed/seed.test.ts (6 tests) 38ms
+ ✓ server/agent-studio/services/export-eligibility.test.ts (17 tests) 18ms
+stderr | server/platform/platform-flows.test.ts > Event Bus > routes critical handler failures to critical dead-letter (not silent)
+[event-bus] critical handler failed: consumer='crit-consumer' eventType='crit.boom' eventId='7b8411c1-4ef7-4290-b226-237aa23b5d24' error='crit-boom'
+
+ ✓ server/platform/platform-flows.test.ts (9 tests) 309ms
+ ✓ tests/staging-foundation/extended-preflight.test.ts (10 tests) 42ms
+ ✓ tests/hr-capsule/structure.test.ts (71 tests) 86ms
+ ↓ tests/contracts/domain.contract.test.ts (7 tests | 7 skipped)
+ ✓ tests/contracts/runtime-contracts.test.ts (7 tests) 8ms
+ ✓ server/agent-studio/services/governance-adapter.test.ts (8 tests) 41ms
+ ✓ tests/communication-capsule/structure.test.ts (27 tests) 47ms
+ ✓ server/openrouter/manifest-receipt-policy.test.ts (7 tests) 48ms
+ ✓ tests/agent-studio/migrate-provider-config-classifier.test.ts (14 tests) 23ms
+ ✓ server/llm/project-output-registration.test.ts (3 tests) 26ms
+ ✓ tests/pmb/runtime-coverage.test.ts (33 tests) 64ms
+ ✓ tests/openrouter-capsule/structure.test.ts (44 tests) 51ms
+ ✓ tests/ai-types-capsule/structure.test.ts (41 tests) 96ms
+ ✓ tests/sandbox-wf-capsule/structure.test.ts (40 tests) 45ms
+ ✓ tests/kgra-agent-capsule/structure.test.ts (38 tests) 44ms
+ ✓ server/platform/modules/platform-wiring.test.ts (9 tests) 320ms
+ ✓ server/platform/modules/platform-modules.test.ts (11 tests) 77ms
+ ✓ tests/workspace/workspace-boundary-scoping.test.ts (32 tests) 4537ms
+   ✓ Phase 2 — Server-side access enforcement > hasWorkspaceAccess is exported from server/db/workspaces 4479ms
+ ✓ tests/organization-management-capsule/structure.test.ts (36 tests) 48ms
+ ✓ tests/workspace/boundary-scoping.test.ts (26 tests) 33ms
+ ✓ tests/prm-capsule/structure.test.ts (37 tests) 74ms
+ ✓ tests/psm-capsule/structure.test.ts (39 tests) 60ms
+stderr | server/workspace/__tests__/assignment-resolver.test.ts > Workspace Assignment Resolver — Contract > resolveWorkspaceAssignments returns empty view when DB unavailable
+[Database] DATABASE_URL environment variable is not set!
+
+stderr | server/workspace/__tests__/assignment-resolver.test.ts > Workspace Assignment Resolver — Contract > getPendingRequests returns empty array when DB unavailable
+[Database] DATABASE_URL environment variable is not set!
+
+ ✓ server/workspace/__tests__/assignment-resolver.test.ts (10 tests) 2669ms
+   ✓ Workspace Assignment Resolver — Contract > exports resolveWorkspaceAssignments function 2556ms
+ ✓ tests/e2e/platform.test.ts (39 tests) 30ms
+ ✓ tests/culture-values-capsule/structure.test.ts (34 tests) 48ms
+ ✓ server/modules/kgia/tests/runtime-nodes.test.ts (11 tests) 27ms
+ ✓ tests/check-provider-key-env-boundary.test.ts (8 tests) 17ms
+ ✓ server/platform/modules/gateway-wiring.test.ts (7 tests) 39ms
+stderr | server/platform/events/event-wiring.test.ts > Event Bus — round-trip > tracks critical handler failure in criticalDeadLetter
+[event-bus] critical handler failed: consumer='consumer-1' eventType='alpha.critical' eventId='3ce89fe5-70c6-4a48-ae2a-241a59ca5626' error='boom'
+
+stderr | server/platform/events/event-wiring.test.ts > Event Bus — round-trip > delivers to sibling consumers even when one critical handler fails
+[event-bus] critical handler failed: consumer='bad-consumer' eventType='alpha.critical' eventId='0293a2dd-2f4a-46a9-ab5a-bcada1f4a23a' error='boom'
+
+ ✓ server/platform/events/event-wiring.test.ts (9 tests) 64ms
+stderr | server/secrets/secrets.test.ts > Secrets Encryption > should encrypt and decrypt correctly
+[Secrets] WARNING: SECRETS_ENCRYPTION_KEY not set. Using dev fallback (NOT safe for production)
+
+ ✓ server/secrets/secrets.test.ts (12 tests | 8 skipped) 166ms
+ ↓ server/agents/agents-integration.test.ts (16 tests | 16 skipped)
+ ↓ server/agents/agents-e2e.test.ts (9 tests | 9 skipped)
+ ✓ server/platform/handoff/handoff-wiring.test.ts (7 tests) 84ms
+ ✓ server/provider-connections/public-api.test.ts (7 tests) 22ms
+ ✓ server/ai-types/import-from-agent-studio.test.ts (10 tests) 20ms
+ ✓ server/provider-connections/binding-eligibility.test.ts (8 tests) 27ms
+ ✓ server/workspace/seed/loaders.test.ts (7 tests) 43ms
+ ✓ tests/ui/catalog-intake/intake-selectors.test.ts (10 tests) 20ms
+ ✓ server/governance/check-llm-governance-invariants.test.ts (8 tests) 16ms
+ ✓ server/agent-studio/services/readiness.test.ts (5 tests) 25ms
+ ✓ tests/module-tools/manifest-reader.test.ts (4 tests) 60ms
+ ✓ tests/shiki/slim-shiki-highlighter.test.ts (7 tests) 16ms
+ ✓ tests/module-tools/route-parser.test.ts (21 tests) 21ms
+ ↓ server/automation/permissions.test.ts (16 tests | 16 skipped)
+ ↓ server/agents/drift-detection.test.ts (12 tests | 12 skipped)
+ ✓ tests/staging-foundation/preflight.test.ts (12 tests) 24ms
+ ✓ server/agent-studio/shared/export-candidate.test.ts (8 tests) 17ms
+ ✓ server/platform/wiring/dependency-graph.test.ts (8 tests) 5830ms
+   ✓ buildDependencyGraph > emits a module node for every registered module 768ms
+   ✓ buildDependencyGraph > emits a db node for every owned database 780ms
+   ✓ buildDependencyGraph > emits event/handoff/governance nodes for declared types 1070ms
+   ✓ buildDependencyGraph > getModuleDependencies returns only outgoing edges 1946ms
+   ✓ buildDependencyGraph > getReverseDependencies returns only incoming edges 1254ms
+ ✓ server/agent-studio/publish-no-catalog-write.test.ts (4 tests) 17ms
+ ✓ server/communication/__tests__/communication-contracts.test.ts (15 tests) 30ms
+ ✓ tests/module-tools/route-source.test.ts (10 tests) 12ms
+ ↓ tests/governance/invalid-transitions.test.ts (5 tests | 5 skipped)
+ ↓ tests/ui/catalog-selectors/app-selectors.test.ts (4 tests | 4 skipped)
+ ✓ server/modules/registry.test.ts (6 tests) 25ms
+ ✓ server/data-analysis/graphrag/adapters/sample-datasets-adapter.test.ts (8 tests) 37ms
+ ✓ server/platform/modules/data-analysis-data-acquisition.test.ts (7 tests) 35ms
+ ✓ server/platform/wiring/wiring-inventory.test.ts (7 tests) 3357ms
+   ✓ buildApplicationWiringInventory > includes every registered module 610ms
+   ✓ buildApplicationWiringInventory > populates every documented wiring area for every module 501ms
+   ✓ buildApplicationWiringInventory > marks modules with no UI routes as not-applicable for client-route 700ms
+   ✓ buildApplicationWiringInventory > treats modules without a database as not-applicable for db 358ms
+   ✓ buildApplicationWiringInventory > optional event/handoff areas don't penalise non-participating modules 371ms
+   ✓ buildApplicationWiringInventory > emits a manifest blocker when serverManifestExists=false 314ms
+   ✓ buildApplicationWiringInventory > merges runtime gateway facts when supplied 498ms
+ ✓ server/platform/wiring/digital-hq-wiring.test.ts (7 tests) 6796ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > summary shape matches what the router returns 1929ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > matrix returns at least one module row 474ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > graph returns nodes/edges/cycles arrays 871ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > missing endpoint returns the four bucket arrays 1089ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > readiness rollup is the same shape the router returns 945ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > inventory builds without DB access (no facts supplied) 433ms
+   ✓ AWI surfaces backing hq.applicationWiring.* > supplying facts changes the gateway-area scoring deterministically 1050ms
+ ✓ server/data-analysis/__tests__/data-analysis-manifest.test.ts (8 tests) 22ms
+ ↓ tests/governance/policy-blocking.test.ts (4 tests | 4 skipped)
+ ✓ server/pm-central/__tests__/pm-validation.test.ts (18 tests) 28ms
+ ✓ server/agent-studio/services/provider-config-guard.test.ts (7 tests) 25ms
+ ✓ server/data-analysis/data-acquisition/__tests__/dataAcquisition.worker.test.ts (7 tests) 1229ms
+   ✓ Data Acquisition worker contract > getDataAcquisitionWorkerStatus() returns a normalized status object even when unreachable 1215ms
+ ✓ server/platform/wiring/readiness.test.ts (8 tests) 14ms
+ ✓ server/data-analysis/__tests__/graphrag-ownership.test.ts (8 tests) 65ms
+ ↓ tests/ui/catalog-intake/intake-selector.test.ts (4 tests | 4 skipped)
+ ↓ tests/governance/audit-blocking.test.ts (4 tests | 4 skipped)
+ ✓ server/modules/pmt/router.test.ts (5 tests) 1192ms
+   ✓ PMT Engine > schema has correct table names 1171ms
+ ✓ tests/check-provider-credential-resolver-boundary.test.ts (3 tests) 10ms
+ ↓ tests/ui/catalog-selectors/bot-wizard-selector.test.ts (3 tests | 3 skipped)
+ ✓ server/communication/__tests__/communication-manifest.test.ts (10 tests) 16ms
+ ✓ tests/module-tools/boundary-rules.test.ts (11 tests) 20ms
+ ✓ tests/staging-foundation/generate-dev-secrets.test.ts (6 tests) 19ms
+ ✓ server/modules/collaboration/router.test.ts (6 tests) 1030ms
+   ✓ Collaboration Engine > schema tables are defined 1001ms
+ ✓ server/data-analysis/data-acquisition/__tests__/dataAcquisition.public-api.test.ts (22 tests) 26ms
+ ✓ tests/module-tools/route-inventory.test.ts (5 tests) 16ms
+ ✓ server/code-studio/template-import.test.ts (5 tests) 27ms
+ ✓ server/modules/agents/router.test.ts (5 tests) 841ms
+   ✓ Agent Orchestration Engine > schema tables are defined 818ms
+ ↓ server/automation/execution.test.ts (5 tests | 5 skipped)
+ ✓ server/communication/__tests__/communication-validation.test.ts (13 tests) 24ms
+ ✓ server/platform/wiring/kgra-agent-client-route.test.ts (18 tests) 23ms
+ ✓ server/modules/knowledge/router.test.ts (5 tests) 739ms
+   ✓ Knowledge Engine > schema tables are defined 724ms
+ ✓ server/platform/wiring/projects-system-client-route.test.ts (7 tests) 18ms
+ ✓ tests/module-tools/route-composer.test.ts (6 tests) 17ms
+ ✓ server/data-analysis/__tests__/graphrag-worker-status.test.ts (6 tests) 218ms
+ ✓ server/platform/wiring/code-studio-client-route.test.ts (6 tests) 14ms
+stdout | server/platform/modules/gateway-actions-wired.test.ts
+[PRMDB] Connecting to: postgresql://localhost:5432/prmdb
+[PRMDB] Drizzle instance created
+
+ ✓ server/governance/legacy-import-to-catalog-deprecation.test.ts (4 tests) 14ms
+stderr | server/platform/modules/gateway-actions-wired.test.ts
+[PRMDB Seed] Error: DrizzleQueryError: Failed query: 
+      CREATE TABLE IF NOT EXISTS prm_cases (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        severity VARCHAR(30),
+        priority VARCHAR(30),
+        status VARCHAR(30) NOT NULL DEFAULT 'draft',
+        source_type VARCHAR(50),
+        owner_user_id INTEGER,
+        reporter_user_id INTEGER,
+        confidence NUMERIC(5,2),
+        impact_statement TEXT,
+        scope TEXT,
+        closure_reason TEXT,
+        reopen_reason TEXT,
+        ext_project_id INTEGER,
+        ext_pm_work_id INTEGER,
+        ext_workspace_id INTEGER,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL,
+        closed_at TIMESTAMP,
+        reopened_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS prm_cases_status_idx ON prm_cases(status);
+      CREATE INDEX IF NOT EXISTS prm_cases_severity_idx ON prm_cases(severity);
+      CREATE INDEX IF NOT EXISTS prm_cases_owner_idx ON prm_cases(owner_user_id);
+
+      CREATE TABLE IF NOT EXISTS prm_case_events (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        from_status VARCHAR(30),
+        to_status VARCHAR(30),
+        actor_user_id INTEGER,
+        reason TEXT,
+        metadata JSON,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_case_events_case_idx ON prm_case_events(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_method_templates (
+        id SERIAL PRIMARY KEY,
+        method_type VARCHAR(50) NOT NULL,
+        name VARCHAR(255),
+        description TEXT,
+        template_data JSON,
+        category VARCHAR(50),
+        is_system BOOLEAN DEFAULT true,
+        published BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_method_templates_type_idx ON prm_method_templates(method_type);
+
+      CREATE TABLE IF NOT EXISTS prm_method_runs (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        template_id INTEGER,
+        method_type VARCHAR(50) NOT NULL,
+        workspace_data JSON,
+        narrative_summary TEXT,
+        status VARCHAR(30) DEFAULT 'in_progress',
+        started_by INTEGER,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL,
+        completed_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS prm_method_runs_case_idx ON prm_method_runs(case_id);
+      CREATE INDEX IF NOT EXISTS prm_method_runs_type_idx ON prm_method_runs(method_type);
+
+      CREATE TABLE IF NOT EXISTS prm_decisions (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        chosen_path TEXT,
+        rationale TEXT NOT NULL,
+        alternatives JSON,
+        constraints JSON,
+        approved_by INTEGER,
+        approved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_decisions_case_idx ON prm_decisions(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_actions (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        action_type VARCHAR(30) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        owner_user_id INTEGER,
+        due_date TIMESTAMP,
+        status VARCHAR(30) DEFAULT 'pending',
+        dependency_note TEXT,
+        effectiveness_result TEXT,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_actions_case_idx ON prm_actions(case_id);
+      CREATE INDEX IF NOT EXISTS prm_actions_status_idx ON prm_actions(status);
+
+      CREATE TABLE IF NOT EXISTS prm_evidence (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        evidence_type VARCHAR(30),
+        title VARCHAR(255),
+        file_url TEXT,
+        external_url TEXT,
+        notes TEXT,
+        is_validated BOOLEAN DEFAULT false,
+        validated_by INTEGER,
+        validated_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_evidence_case_idx ON prm_evidence(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_verifications (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        test_condition TEXT NOT NULL,
+        expected_result TEXT NOT NULL,
+        actual_result TEXT,
+        passed BOOLEAN,
+        approver_user_id INTEGER,
+        signed_off_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_verifications_case_idx ON prm_verifications(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_prevention_plans (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        control_change TEXT,
+        sop_update TEXT,
+        training_need TEXT,
+        monitoring_rule TEXT,
+        status VARCHAR(30) DEFAULT 'draft',
+        owner_user_id INTEGER,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_prevention_plans_case_idx ON prm_prevention_plans(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_lessons (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER,
+        title VARCHAR(255) NOT NULL,
+        what_happened TEXT,
+        why_it_mattered TEXT,
+        what_changed TEXT,
+        reuse_notes TEXT,
+        published BOOLEAN DEFAULT false,
+        published_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_lessons_case_idx ON prm_lessons(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_playbooks (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        domain VARCHAR(50),
+        method_type VARCHAR(50),
+        template_data JSON,
+        source_lesson_id INTEGER,
+        published BOOLEAN DEFAULT false,
+        published_at TIMESTAMP,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_playbooks_domain_idx ON prm_playbooks(domain);
+
+      CREATE TABLE IF NOT EXISTS prm_catalog_items (
+        id SERIAL PRIMARY KEY,
+        item_type VARCHAR(30),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        content_data JSON,
+        source_id INTEGER,
+        source_type VARCHAR(30),
+        publication_state VARCHAR(30) DEFAULT 'draft',
+        reviewed_by INTEGER,
+        published_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_catalog_items_type_idx ON prm_catalog_items(item_type);
+      CREATE INDEX IF NOT EXISTS prm_catalog_items_state_idx ON prm_catalog_items(publication_state);
+
+      CREATE TABLE IF NOT EXISTS prm_training_assets (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        module_number INTEGER,
+        content_data JSON,
+        asset_type VARCHAR(30),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS prm_maturity_runs (
+        id SERIAL PRIMARY KEY,
+        run_date TIMESTAMP DEFAULT now() NOT NULL,
+        assessor_user_id INTEGER,
+        dimension_scores JSON,
+        total_score INTEGER,
+        maturity_level INTEGER,
+        gap_notes TEXT,
+        next_actions TEXT,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS prm_kpi_snapshots (
+        id SERIAL PRIMARY KEY,
+        snapshot_date TIMESTAMP DEFAULT now() NOT NULL,
+        open_cases INTEGER,
+        overdue_actions INTEGER,
+        mean_time_to_resolution NUMERIC,
+        recurrence_rate NUMERIC,
+        verification_rate NUMERIC,
+        method_usage JSON,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS prm_reporting_jobs (
+        id SERIAL PRIMARY KEY,
+        job_type VARCHAR(50),
+        parameters JSON,
+        result_data JSON,
+        status VARCHAR(30) DEFAULT 'pending',
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_reporting_jobs_status_idx ON prm_reporting_jobs(status);
+
+      CREATE TABLE IF NOT EXISTS prm_external_refs (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL,
+        target_module VARCHAR(30) NOT NULL,
+        target_id INTEGER NOT NULL,
+        ref_type VARCHAR(30),
+        label VARCHAR(255),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_external_refs_case_idx ON prm_external_refs(case_id);
+      CREATE INDEX IF NOT EXISTS prm_external_refs_target_idx ON prm_external_refs(target_module, target_id);
+
+      CREATE TABLE IF NOT EXISTS prm_sync_events (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER,
+        direction VARCHAR(10),
+        target_module VARCHAR(30),
+        event_type VARCHAR(50),
+        payload JSON,
+        status VARCHAR(30) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_sync_events_case_idx ON prm_sync_events(case_id);
+
+      CREATE TABLE IF NOT EXISTS prm_publication_states (
+        id SERIAL PRIMARY KEY,
+        entity_type VARCHAR(30),
+        entity_id INTEGER,
+        state VARCHAR(30),
+        reviewer_user_id INTEGER,
+        review_notes TEXT,
+        state_changed_at TIMESTAMP DEFAULT now() NOT NULL,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS prm_pub_states_entity_idx ON prm_publication_states(entity_type, entity_id);
+
+      CREATE TABLE IF NOT EXISTS prm_catalog_imports (
+        id SERIAL PRIMARY KEY,
+        catalog_entry_id INTEGER NOT NULL,
+        entry_type VARCHAR(20) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT '',
+        category VARCHAR(50) DEFAULT '',
+        tags JSON DEFAULT '[]',
+        config JSON DEFAULT '{}',
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_prm_catalog_imports_entry ON prm_catalog_imports(catalog_entry_id);
+    
+params: 
+    at NodePgPreparedQuery.queryWithCache (file:///root/MyNewAp1Claude/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_mysql2@3.15.1_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at seedPrmDb (/root/MyNewAp1Claude/server/prm/seed.ts:22:5)
+    ... 4 lines matching cause stack trace ...
+    at runFiles (file:///root/MyNewAp1Claude/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///root/MyNewAp1Claude/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///root/MyNewAp1Claude/node_modules/.pnpm/vitest@2.1.9_@types+node@24.7.0_jsdom@25.0.1_lightningcss@1.30.1/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11 {
+  query: '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_cases (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        description TEXT,\n' +
+    '        severity VARCHAR(30),\n' +
+    '        priority VARCHAR(30),\n' +
+    "        status VARCHAR(30) NOT NULL DEFAULT 'draft',\n" +
+    '        source_type VARCHAR(50),\n' +
+    '        owner_user_id INTEGER,\n' +
+    '        reporter_user_id INTEGER,\n' +
+    '        confidence NUMERIC(5,2),\n' +
+    '        impact_statement TEXT,\n' +
+    '        scope TEXT,\n' +
+    '        closure_reason TEXT,\n' +
+    '        reopen_reason TEXT,\n' +
+    '        ext_project_id INTEGER,\n' +
+    '        ext_pm_work_id INTEGER,\n' +
+    '        ext_workspace_id INTEGER,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        closed_at TIMESTAMP,\n' +
+    '        reopened_at TIMESTAMP\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_cases_status_idx ON prm_cases(status);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_cases_severity_idx ON prm_cases(severity);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_cases_owner_idx ON prm_cases(owner_user_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_case_events (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        event_type VARCHAR(50) NOT NULL,\n' +
+    '        from_status VARCHAR(30),\n' +
+    '        to_status VARCHAR(30),\n' +
+    '        actor_user_id INTEGER,\n' +
+    '        reason TEXT,\n' +
+    '        metadata JSON,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_case_events_case_idx ON prm_case_events(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_method_templates (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        method_type VARCHAR(50) NOT NULL,\n' +
+    '        name VARCHAR(255),\n' +
+    '        description TEXT,\n' +
+    '        template_data JSON,\n' +
+    '        category VARCHAR(50),\n' +
+    '        is_system BOOLEAN DEFAULT true,\n' +
+    '        published BOOLEAN DEFAULT false,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_method_templates_type_idx ON prm_method_templates(method_type);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_method_runs (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        template_id INTEGER,\n' +
+    '        method_type VARCHAR(50) NOT NULL,\n' +
+    '        workspace_data JSON,\n' +
+    '        narrative_summary TEXT,\n' +
+    "        status VARCHAR(30) DEFAULT 'in_progress',\n" +
+    '        started_by INTEGER,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        completed_at TIMESTAMP\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_method_runs_case_idx ON prm_method_runs(case_id);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_method_runs_type_idx ON prm_method_runs(method_type);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_decisions (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        chosen_path TEXT,\n' +
+    '        rationale TEXT NOT NULL,\n' +
+    '        alternatives JSON,\n' +
+    '        constraints JSON,\n' +
+    '        approved_by INTEGER,\n' +
+    '        approved_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_decisions_case_idx ON prm_decisions(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_actions (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        action_type VARCHAR(30) NOT NULL,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        description TEXT,\n' +
+    '        owner_user_id INTEGER,\n' +
+    '        due_date TIMESTAMP,\n' +
+    "        status VARCHAR(30) DEFAULT 'pending',\n" +
+    '        dependency_note TEXT,\n' +
+    '        effectiveness_result TEXT,\n' +
+    '        completed_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_actions_case_idx ON prm_actions(case_id);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_actions_status_idx ON prm_actions(status);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_evidence (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        evidence_type VARCHAR(30),\n' +
+    '        title VARCHAR(255),\n' +
+    '        file_url TEXT,\n' +
+    '        external_url TEXT,\n' +
+    '        notes TEXT,\n' +
+    '        is_validated BOOLEAN DEFAULT false,\n' +
+    '        validated_by INTEGER,\n' +
+    '        validated_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_evidence_case_idx ON prm_evidence(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_verifications (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        test_condition TEXT NOT NULL,\n' +
+    '        expected_result TEXT NOT NULL,\n' +
+    '        actual_result TEXT,\n' +
+    '        passed BOOLEAN,\n' +
+    '        approver_user_id INTEGER,\n' +
+    '        signed_off_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_verifications_case_idx ON prm_verifications(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_prevention_plans (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        control_change TEXT,\n' +
+    '        sop_update TEXT,\n' +
+    '        training_need TEXT,\n' +
+    '        monitoring_rule TEXT,\n' +
+    "        status VARCHAR(30) DEFAULT 'draft',\n" +
+    '        owner_user_id INTEGER,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_prevention_plans_case_idx ON prm_prevention_plans(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_lessons (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        what_happened TEXT,\n' +
+    '        why_it_mattered TEXT,\n' +
+    '        what_changed TEXT,\n' +
+    '        reuse_notes TEXT,\n' +
+    '        published BOOLEAN DEFAULT false,\n' +
+    '        published_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_lessons_case_idx ON prm_lessons(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_playbooks (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        description TEXT,\n' +
+    '        domain VARCHAR(50),\n' +
+    '        method_type VARCHAR(50),\n' +
+    '        template_data JSON,\n' +
+    '        source_lesson_id INTEGER,\n' +
+    '        published BOOLEAN DEFAULT false,\n' +
+    '        published_at TIMESTAMP,\n' +
+    '        created_by INTEGER,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_playbooks_domain_idx ON prm_playbooks(domain);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_catalog_items (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        item_type VARCHAR(30),\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        description TEXT,\n' +
+    '        content_data JSON,\n' +
+    '        source_id INTEGER,\n' +
+    '        source_type VARCHAR(30),\n' +
+    "        publication_state VARCHAR(30) DEFAULT 'draft',\n" +
+    '        reviewed_by INTEGER,\n' +
+    '        published_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_catalog_items_type_idx ON prm_catalog_items(item_type);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_catalog_items_state_idx ON prm_catalog_items(publication_state);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_training_assets (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        title VARCHAR(255) NOT NULL,\n' +
+    '        module_number INTEGER,\n' +
+    '        content_data JSON,\n' +
+    '        asset_type VARCHAR(30),\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        updated_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_maturity_runs (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        run_date TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        assessor_user_id INTEGER,\n' +
+    '        dimension_scores JSON,\n' +
+    '        total_score INTEGER,\n' +
+    '        maturity_level INTEGER,\n' +
+    '        gap_notes TEXT,\n' +
+    '        next_actions TEXT,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_kpi_snapshots (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        snapshot_date TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        open_cases INTEGER,\n' +
+    '        overdue_actions INTEGER,\n' +
+    '        mean_time_to_resolution NUMERIC,\n' +
+    '        recurrence_rate NUMERIC,\n' +
+    '        verification_rate NUMERIC,\n' +
+    '        method_usage JSON,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_reporting_jobs (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        job_type VARCHAR(50),\n' +
+    '        parameters JSON,\n' +
+    '        result_data JSON,\n' +
+    "        status VARCHAR(30) DEFAULT 'pending',\n" +
+    '        started_at TIMESTAMP,\n' +
+    '        completed_at TIMESTAMP,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_reporting_jobs_status_idx ON prm_reporting_jobs(status);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_external_refs (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER NOT NULL,\n' +
+    '        target_module VARCHAR(30) NOT NULL,\n' +
+    '        target_id INTEGER NOT NULL,\n' +
+    '        ref_type VARCHAR(30),\n' +
+    '        label VARCHAR(255),\n' +
+    '        notes TEXT,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_external_refs_case_idx ON prm_external_refs(case_id);\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_external_refs_target_idx ON prm_external_refs(target_module, target_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_sync_events (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        case_id INTEGER,\n' +
+    '        direction VARCHAR(10),\n' +
+    '        target_module VARCHAR(30),\n' +
+    '        event_type VARCHAR(50),\n' +
+    '        payload JSON,\n' +
+    "        status VARCHAR(30) DEFAULT 'pending',\n" +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_sync_events_case_idx ON prm_sync_events(case_id);\n' +
+    '\n' +
+    '      CREATE TABLE IF NOT EXISTS prm_publication_states (\n' +
+    '        id SERIAL PRIMARY KEY,\n' +
+    '        entity_type VARCHAR(30),\n' +
+    '        entity_id INTEGER,\n' +
+    '        state VARCHAR(30),\n' +
+    '        reviewer_user_id INTEGER,\n' +
+    '        review_notes TEXT,\n' +
+    '        state_changed_at TIMESTAMP DEFAULT now() NOT NULL,\n' +
+    '        created_at TIMESTAMP DEFAULT now() NOT NULL\n' +
+    '      );\n' +
+    '      CREATE INDEX IF NOT EXISTS prm_pub_states_entity_idx ON prm_publication_states(entity_type,'... 579 more characters,
+  params: [],
+  cause: AggregateError: 
+      at /root/MyNewAp1Claude/node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at file:///root/MyNewAp1Claude/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_mysql2@3.15.1_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+      at NodePgPreparedQuery.queryWithCache (file:///root/MyNewAp1Claude/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_mysql2@3.15.1_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12)
+      at seedPrmDb (/root/MyNewAp1Claude/server/prm/seed.ts:22:5)
+      at Object.boot (/root/MyNewAp1Claude/server/prm/manifest.ts:121:7)
+      at /root/MyNewAp1Claude/server/platform/modules/gateway-actions-wired.test.ts:59:9
+      at callSuiteHook (file:///root/MyNewAp1Claude/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:964:22)
+      at runSuite (file:///root/MyNewAp1Claude/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1175:29)
+      at runFiles (file:///root/MyNewAp1Claude/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5) {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+
+stdout | server/platform/modules/gateway-actions-wired.test.ts
+[WfDB] Connecting to: postgresql://localhost:5432/wfdb
+[WfDB] Drizzle instance created
+
+stdout | server/platform/modules/gateway-actions-wired.test.ts
+[RAGDB] Connecting to: postgresql://localhost:5432/ragdb
+[RAGDB] Drizzle instance created
+
+stderr | server/platform/modules/gateway-actions-wired.test.ts
+[RAGDB Seed] Failed: Failed query: 
+      CREATE TABLE IF NOT EXISTS kgra_entities (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        short_name VARCHAR(500),
+        entity_type VARCHAR(50) NOT NULL,
+        mentions INTEGER NOT NULL DEFAULT 1,
+        directory VARCHAR(500),
+        source_doc_id INTEGER,
+        build_id VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_entities_name ON kgra_entities(name);
+      CREATE INDEX IF NOT EXISTS idx_kgra_entities_type ON kgra_entities(entity_type);
+      CREATE INDEX IF NOT EXISTS idx_kgra_entities_build ON kgra_entities(build_id);
+    
+params: 
+
+stderr | server/platform/modules/gateway-actions-wired.test.ts
+[Database] DATABASE_URL environment variable is not set!
+
+stdout | server/platform/modules/gateway-actions-wired.test.ts
+[AI Types] Module ports wired successfully
+
+ ✓ server/platform/modules/gateway-actions-wired.test.ts (22 tests) 948ms
+ ↓ tests/ui/catalog-selectors/chat-selector.test.ts (2 tests | 2 skipped)
+ ✓ server/modules/reporting/router.test.ts (5 tests) 6881ms
+   ✓ Reporting Engine > reporting is read-only — no governed procedures 6866ms
+ ✓ server/modules/kgia/tests/query-repair.test.ts (10 tests) 18ms
+ ↓ server/automation.workflow-save.test.ts (3 tests | 3 skipped)
+ ✓ server/platform/wiring/pm-central-client-route.test.ts (5 tests) 20ms
+ ↓ server/automation.workflow-fetch.test.ts (4 tests | 4 skipped)
+ ✓ server/data-analysis/data-acquisition/__tests__/dataAcquisition.router.test.ts (3 tests) 12ms
+ ✓ server/data-analysis/__tests__/graphrag-events.test.ts (5 tests) 17ms
+ ✓ server/data-analysis/data-acquisition/__tests__/dataAcquisition.events.test.ts (6 tests) 22ms
+ ✓ server/platform/wiring/data-analysis-client-route.test.ts (4 tests) 11ms
+ ✓ server/platform/wiring/psm-client-route.test.ts (9 tests) 17ms
+ ✓ server/platform/wiring/hr-client-route.test.ts (10 tests) 18ms
+ ✓ server/platform/wiring/wiring-matrix.test.ts (6 tests) 8584ms
+   ✓ buildWiringMatrix > returns the documented columns 1082ms
+   ✓ buildWiringMatrix > returns one row per registered module 967ms
+   ✓ buildWiringMatrix > summary counts add up to moduleCount when summed by readinessStatus 936ms
+   ✓ buildWiringMatrix > missing-required count matches the explicit filter 1185ms
+   ✓ buildWiringMatrix > filters return area entries (not module-level) 1368ms
+   ✓ buildWiringMatrix > summarize is pure: same input → same output 3042ms
+ ✓ server/platform/wiring/agent-studio-client-route.test.ts (15 tests) 25ms
+ ✓ server/platform/wiring/openrouter-client-route.test.ts (14 tests) 27ms
+ ✓ server/ai-types/catalog-schema.test.ts (6 tests) 13ms
+ ✓ server/platform/wiring/sandbox-wf-client-route.test.ts (16 tests) 23ms
+ ✓ server/platform/wiring/prm-client-route.test.ts (8 tests) 15ms
+ ✓ server/platform/wiring/culture-values-client-route.test.ts (12 tests) 22ms
+ ✓ server/platform/wiring/organization-management-client-route.test.ts (11 tests) 32ms
+ ✓ server/platform/wiring/ai-types-client-route.test.ts (13 tests) 27ms
+ ✓ server/data-analysis/__tests__/graphrag-public-api.test.ts (10 tests) 16ms
+ ✓ server/communication/__tests__/communication-repository.test.ts (20 tests) 20ms
+ ✓ server/platform/wiring/communication-client-route.test.ts (3 tests) 10ms
+stdout | server/auth.logout.test.ts
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+ ✓ server/pm-central/__tests__/pm-repository.test.ts (35 tests) 24ms
+stdout | server/chat/chat.test.ts
+[ResourceManager] Initialized with hardware profile: { hasGPU: false, gpuType: 'none', gpuVRAM: undefined, totalRAM: 6.9 }
+
+stdout | server/auth.logout.test.ts
+[EmbeddingEngine] Initialized with 5 models
+
+stdout | server/chat/chat.test.ts
+[EmbeddingEngine] Initialized with 5 models
+
+ ✓ server/governance/error-presentation.test.ts (3 tests) 19ms
+stdout | server/auth.logout.test.ts
+[QdrantService] Initialized with URL: http://localhost:6333
+
+stderr | server/auth.logout.test.ts
+Failed to obtain server version. Unable to check client-server compatibility. Set checkCompatibility=false to skip version check.
+
+stdout | server/auth.logout.test.ts
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+stdout | server/chat/chat.test.ts
+[QdrantService] Initialized with URL: http://localhost:6333
+
+stderr | server/chat/chat.test.ts
+Failed to obtain server version. Unable to check client-server compatibility. Set checkCompatibility=false to skip version check.
+
+ ✓ server/communication/__tests__/communication-public-api.test.ts (4 tests) 9ms
+stdout | server/chat/chat.test.ts
+[ToolRegistry] Registered tool: calculator
+[ToolRegistry] Registered tool: current_time
+[ToolRegistry] Registered tool: text_analysis
+[ToolRegistry] Registered tool: json_parser
+[ToolRegistry] Registered tool: url_parser
+[ToolRegistry] Initialized with 5 built-in tools
+
+ ✓ server/communication/__tests__/communication-events.test.ts (3 tests) 10ms
+ ✓ server/pm-central/__tests__/pm-public-api.test.ts (4 tests) 10ms
+ ✓ server/communication/__tests__/communication-router.test.ts (2 tests) 27ms
+ ✓ server/pm-central/__tests__/pm-router.test.ts (1 test) 14ms
+ ✓ server/pm-central/__tests__/pm-events.test.ts (3 tests) 13ms
+ ↓ client/src/modules/code-studio/pages/CodeStudioTemplatesPage.test.tsx (2 tests | 2 skipped)
+ ↓ client/src/modules/code-studio/pages/CodeStudioJobsPage.test.tsx (2 tests | 2 skipped)
+ ↓ client/src/modules/code-studio/components/CodeStudioSidebar.test.tsx (1 test | 1 skipped)
+ ✓ client/src/components/ui/scrollable-tabs-list.test.tsx (8 tests) 267ms
+ ✓ server/auth.logout.test.ts (1 test) 14ms
+stdout | server/chat/chat.test.ts > chatRouter (mounted on appRouter) > testProvider > should throw error for non-existent provider
+[Audit] GATE_CHECK system:0 → success
+
+stderr | server/chat/chat.test.ts > chatRouter (mounted on appRouter) > testProvider > should throw error for non-existent provider
+[Database] DATABASE_URL environment variable is not set!
+
+ ✓ server/chat/chat.test.ts (2 tests) 91ms
+ ✓ client/src/modules/ps/components/ideation/PSIdeationShell.test.tsx (38 tests) 2004ms
+   ✓ Right sidebar toggle removal > PanelRightOpen is not imported in the shell 1653ms
+
+ Test Files  178 passed | 23 skipped (201)
+      Tests  3181 passed | 183 skipped (3364)
+   Start at  17:00:48
+   Duration  191.73s (transform 123.20s, setup 197.95s, collect 620.37s, tests 155.92s, environment 22.77s, prepare 128.61s)
+
+---exit=0
