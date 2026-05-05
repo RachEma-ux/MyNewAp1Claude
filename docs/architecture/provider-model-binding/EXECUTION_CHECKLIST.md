@@ -558,13 +558,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 42 — Boundary tests
 
-- [ ] Test Agent Studio does not store provider keys.
-- [ ] Test Agent Studio does not write catalog_entries.
-- [ ] Test AI Types does not import Agent Studio internals.
-- [ ] Test AI Types does not query ASDB.
-- [ ] Test Model Access does not write/read runtime provider keys from process.env.
-- [ ] Test Provider Connections public API returns no secrets.
-- [ ] Test new frontend flows do not call other module backend routers directly.
+- [x] Test Agent Studio does not store provider keys. *(`tests/pmb/boundary.test.ts` invariant 1: scans `drizzle/tables/agent-studio.ts` for forbidden column literals (`api_key`, `password`, `client_secret`, `bearer_token`, `refresh_token`); scans `server/agent-studio/repository.ts` drizzle write payloads for secret-shaped field names. Runtime SDK uses (D2 `withProviderCredential`) are intentionally excluded — the invariant is about *storage*.)*
+- [x] Test Agent Studio does not write catalog_entries. *(invariant 2: scans every AS source file for imports of `createCatalogEntry`/`updateCatalogEntry` from `ai-types/db`, imports of the `catalogEntries` drizzle table, and raw `INSERT INTO catalog_entries` / `UPDATE catalog_entries` SQL. Complements the existing runtime `publish-no-catalog-write.test.ts`.)*
+- [x] Test AI Types does not import Agent Studio internals. *(invariant 3: scans `server/ai-types/` imports — only `agent-studio/shared/*` (typed contracts) is allowed; repository, db, services, internal manifest are forbidden.)*
+- [x] Test AI Types does not query ASDB. *(invariant 4: scans `server/ai-types/` for `getAsDb` imports, references to `agent-studio/db/connection`, and raw SQL on `ags_*` tables.)*
+- [x] Test Model Access does not write/read runtime provider keys from process.env. *(invariant 5: scans `server/openrouter/model-access/` for `process.env.<X>_API_KEY` reads (excluding `BUILT_IN_FORGE_API_KEY` + `OMNIRAG_API_KEY` non-provider keys). Complements `scripts/check-provider-key-env-boundary.ts`.)*
+- [x] Test Provider Connections public API returns no secrets. *(invariant 6: extracts `ProviderConnectionRef` and every other exported interface from `server/provider-connections/public-api.ts` (with JSDoc stripped) and asserts no field name matches `apiKey`/`secret`/`credentials`/`bearerToken`/`clientSecret`/`password`.)*
+- [x] Test new frontend flows do not call other module backend routers directly. *(invariant 7: asserts `package.json` wires `check:cross-module-links` into the validation pipeline and the script file exists. The script itself is the per-import enforcement; this test pins the wiring so it can't be silently dropped.)*
 
 ### Phase 43 — Wiring tests
 
