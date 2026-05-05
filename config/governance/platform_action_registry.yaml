@@ -1677,6 +1677,19 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # Direction B follow-up — bulk drift scan + best-effort repair of the
+  # AS catalog sync log. Wraps `agentStudio.exportCatalog.reconcileSync`
+  # (Phase 41 gateway action, medium risk, receipt-required). Risk R2 here
+  # because the dryRun=true path is read-only and the apply path only
+  # writes idempotent synthetic rows on the AS sync log.
+  catalogImport.reconcileAgentStudioSync:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # DISCOVERY OPS
   # ═══════════════════════════════════════════════════════════════════════════
