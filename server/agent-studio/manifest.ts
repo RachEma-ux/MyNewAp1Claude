@@ -100,6 +100,40 @@ export const agentStudioManifest: ModuleManifest = {
       risk: "low",
       receiptRequired: false,
     },
+    // Plan v3 Phase 30 — Agent Studio Export Catalog backend.
+    {
+      key: "agentStudio.exportCatalog.listCandidates",
+      description: "List Agent Studio export candidates (no credentials)",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.exportCatalog.getCandidate",
+      description: "Get a single Agent Studio export candidate",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.exportCatalog.exportCandidate",
+      description:
+        "Export a candidate via aiTypes.catalog.register (writes catalog_entries)",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "agentStudio.exportCatalog.markImported",
+      description:
+        "Confirm a successful import for a candidate (advisory marker)",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.exportCatalog.reconcileImports",
+      description:
+        "Admin override: reconcile a legacy_imported_unresolved catalog row to a specific source version",
+      risk: "high",
+      receiptRequired: true,
+    },
   ],
 
   routes: [{ path: "/agent-studio", label: "Agent Studio" }],

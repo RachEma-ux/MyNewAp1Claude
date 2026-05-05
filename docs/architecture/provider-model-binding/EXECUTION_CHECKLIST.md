@@ -429,13 +429,13 @@ Migration: `drizzle/0038_catalog_source_versioning.sql` adds the two new columns
 
 ### Phase 30 — Export Catalog backend
 
-- [ ] Add `agentStudio.exportCatalog.listCandidates`.
-- [ ] Add `agentStudio.exportCatalog.getCandidate`.
-- [ ] Add `agentStudio.exportCatalog.exportCandidate`.
-- [ ] Add `agentStudio.exportCatalog.markImported`.
-- [ ] Add `agentStudio.exportCatalog.reconcileImports`.
-- [ ] Register gateway actions.
-- [ ] Add tests.
+- [x] Add `agentStudio.exportCatalog.listCandidates`. *(Reads ASDB ags_agents + main DB catalog_entries; merges with Phase 27/28 verdicts; supports workspaceId + status filters.)*
+- [x] Add `agentStudio.exportCatalog.getCandidate`. *(Single-agent variant of list; returns null when agent not in published list.)*
+- [x] Add `agentStudio.exportCatalog.exportCandidate`. *(Calls `aiTypes.catalog.register` via `gatewayCall` with `intent="agent-studio-export"` and a stub governance receipt id; refuses non-`ready`/`exported` candidates.)*
+- [x] Add `agentStudio.exportCatalog.markImported`. *(Advisory marker; persistence today is the catalog_entries row itself. Stage 9 may add `ags_export_log`.)*
+- [x] Add `agentStudio.exportCatalog.reconcileImports`. *(Wraps Phase 24's `reconcileLegacyImport` with the export-catalog naming.)*
+- [x] Register gateway actions. *(`server/agent-studio/boot.ts` registerPublicApi for all 5; manifest governanceActions for all 5; `action-key-map.ts` updated; governance check 80/80.)*
+- [x] Add tests. *(`server/agent-studio/services/export-catalog.test.ts` — 17 tests across buildExportCandidate, listExportCandidates, getExportCandidate, prepareExportRegisterPayload, markCandidateImported, reconcileCandidateImports.)*
 
 ### Phase 31 — Export eligibility rules
 
