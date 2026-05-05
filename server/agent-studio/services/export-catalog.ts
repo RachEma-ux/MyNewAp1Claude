@@ -199,19 +199,22 @@ export interface ExportCandidateResult {
 
 /**
  * Plan v3 Phase 30 — calls `aiTypes.catalog.register` for the candidate.
- * Refuses to operate on candidates whose export status is not "ready"
- * (anything else is a deeper problem the caller must fix first).
+ * Phase 31 — runs the full 9-gate eligibility check before returning the
+ * register payload. The handler refuses to operate on any candidate whose
+ * eligibility verdict is not `eligible=true`.
  *
  * The actual `aiTypes.catalog.register` invocation happens at the gateway
  * layer in `boot.ts` — this function returns the prepared register payload
- * + governance verdict so the boot layer can call the gateway with the
- * right intent string and receipt enforcement.
+ * + governance verdict + eligibility verdict so the boot layer can call
+ * the gateway with the right intent string and receipt enforcement.
  */
 export async function prepareExportRegisterPayload(
   input: ExportCandidateInput,
   lookups: ExportCatalogLookups,
+  eligibilityOpts?: import("./export-eligibility").EvaluateExportEligibilityOptions,
 ): Promise<{
   candidate: AgentStudioExportCandidate;
+  eligibility: import("./export-eligibility").ExportEligibilityVerdict;
   registerPayload: {
     entryType: string;
     sourceType: string;
@@ -230,14 +233,22 @@ export async function prepareExportRegisterPayload(
       `export-catalog: agent ${input.agentId} is not a published candidate`,
     );
   }
-  if (candidate.exportStatus !== "ready" && candidate.exportStatus !== "exported") {
+
+  const { evaluateExportEligibility } = await import("./export-eligibility");
+  const eligibility = await evaluateExportEligibility(candidate, eligibilityOpts);
+  if (!eligibility.eligible) {
+    const failedGates = eligibility.gates
+      .filter((g) => !g.pass)
+      .map((g) => `${g.gate}: ${g.reason}`)
+      .join("; ");
     throw new Error(
-      `export-catalog: agent ${input.agentId} not eligible (status=${candidate.exportStatus}; blockers=${candidate.governance.blockerRules.join(",")})`,
+      `export-catalog: agent ${input.agentId} not eligible — ${failedGates}`,
     );
   }
 
   return {
     candidate,
+    eligibility,
     registerPayload: {
       entryType: "agent",
       sourceType: "agent",
