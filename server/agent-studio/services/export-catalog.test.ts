@@ -274,6 +274,46 @@ describe("prepareExportRegisterPayload — Phase 30", () => {
     expect(JSON.stringify(r.registerPayload.fields)).not.toContain("apiKey");
   });
 
+  it("Phase 37: initial status=draft and reviewState=needs_review", async () => {
+    const r = await prepareExportRegisterPayload(
+      { agentId: 1, registeredBy: 42 },
+      makeLookups({ agents: [happyAgent] }),
+      { readinessScoreThreshold: 0 },
+    );
+    expect(r.registerPayload.fields.status).toBe("draft");
+    expect(r.registerPayload.fields.reviewState).toBe("needs_review");
+    expect(r.registerPayload.fields.origin).toBe("agent_studio");
+  });
+
+  it("Phase 37: activeSourceVersionId is top-level (matches Phase 23 column)", async () => {
+    const r = await prepareExportRegisterPayload(
+      { agentId: 1, registeredBy: 42 },
+      makeLookups({ agents: [happyAgent] }),
+      { readinessScoreThreshold: 0 },
+    );
+    expect(r.registerPayload.fields.activeSourceVersionId).toBe(555);
+  });
+
+  it("Phase 37: stores export DTO + eligibility gates in config (no secrets)", async () => {
+    const r = await prepareExportRegisterPayload(
+      { agentId: 1, registeredBy: 42 },
+      makeLookups({ agents: [happyAgent] }),
+      { readinessScoreThreshold: 0 },
+    );
+    const cfg = r.registerPayload.fields.config as any;
+    expect(cfg.exportDto).toBeDefined();
+    expect(cfg.exportDto.sourceModule).toBe("agentStudio");
+    expect(cfg.exportDto.sourceRefId).toBe(1);
+    expect(cfg.exportDto.governance.status).toBe("cleared");
+    expect(Array.isArray(cfg.eligibilityGates)).toBe(true);
+    expect(cfg.eligibilityGates.length).toBe(9);
+    // No forbidden keys leaked
+    const flat = JSON.stringify(cfg).toLowerCase();
+    expect(flat).not.toContain("apikey");
+    expect(flat).not.toContain("providerconfig");
+    expect(flat).not.toContain("systeminstructions");
+  });
+
   it("Phase 31: blocks re-export of already-imported candidates", async () => {
     await expect(
       prepareExportRegisterPayload(
