@@ -1,0 +1,10 @@
+
+> mynewap1claude@1.0.0 check:cross-module-links /root/MyNewAp1Claude
+> tsx scripts/check-cross-module-links.ts
+
+Cross-Module Links
+==================
+
+Failures: 0
+Baseline warnings: 0
+OK — no migrated-module link violations.

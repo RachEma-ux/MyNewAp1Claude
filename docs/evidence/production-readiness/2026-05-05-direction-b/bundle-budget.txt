@@ -1,0 +1,29 @@
+
+> mynewap1claude@1.0.0 check:bundle-budget /root/MyNewAp1Claude
+> tsx scripts/check-bundle-budget.ts
+
+[bundle-budget] Build summary:
+  Total chunks:        516
+  Application chunks:  487
+  Language chunks:     29
+
+Top 10 application chunks:
+  index-DhgXG3r5.js                                  940.7 KB
+  WorkspaceExecutionShell-BBedkB6e.js                680.9 KB
+  WikiArticle-B0KnVlyo.js                            472.2 KB
+  BarChart-Cz-YxVH8.js                               368.5 KB
+  PSIdeationDetailPage-DD_7j91b.js                   212.6 KB
+  PSControlPanelShell-BwBcS1y9.js                    164.9 KB
+  WizardPage-BwvyKUTL.js                             151.6 KB
+  style-0iDIBnn-.js                                  133.4 KB
+  CatalogManagePage-DByGxrvs.js                      127.7 KB
+  CandidatePage-D56vQgAe.js                          122.1 KB
+
+Top 5 language chunks (lazy-loaded by Shiki):
+  cpp-BRuaLJcg.js                                    622.6 KB
+  typescript-BPQ3VLAy.js                             176.8 KB
+  jsx-g9-lgVsj.js                                    173.6 KB
+  tsx-COt5Ahok.js                                    171.4 KB
+  javascript-wDzz0qaB.js                             170.7 KB
+
+[bundle-budget] PASS — every chunk is within budget.

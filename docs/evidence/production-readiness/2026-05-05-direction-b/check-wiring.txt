@@ -1,0 +1,194 @@
+
+> mynewap1claude@1.0.0 check:wiring /root/MyNewAp1Claude
+> tsx scripts/check-module-wiring.ts && tsx scripts/check-gateway-wiring.ts && tsx scripts/check-event-wiring.ts && tsx scripts/check-handoff-wiring.ts && tsx scripts/check-frontend-module-wiring.ts && tsx scripts/check-runtime-wiring.ts && tsx scripts/check-coordinator-wiring.ts
+
+=== check:wiring (module level) ===
+
+# Module Wiring Report
+
+Generated: 2026-05-05T19:38:58.665Z
+
+## Totals
+
+- Modules tracked: **16**
+- Fully wired: **16**
+- Declared-only: **0**
+- Blockers: **0**
+- Follow-ups: **0**
+
+## Per-module status
+
+| Module | Manifest | Router | Runtime | DB | PublicAPI | Events | Handoffs | Routes | Gov | HQ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| prm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| psm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| codeStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| agentStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| sandboxWf | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| rag | ✓ | ✗ | WIRED | WIRED | WIRED | WIRED | n/a | n/a | WIRED | WIRED |
+| openRouter | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| ps | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| hr | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| organizationManagement | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| cultureValues | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| aiTypes | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| kgraAgent | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| communication | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| pmCentral | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| dataAnalysis | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+
+## Findings
+
+No findings. Every declared lane has a runtime registration.
+
+
+Report snapshot written to /root/MyNewAp1Claude/docs/architecture/modularity/MODULE_WIRING_REPORT.md
+
+OK — module wiring within tolerance.
+=== check:gateway-wiring ===
+
+Discovered 103 registerPublicApi() call(s).
+  agentStudio.agentStudio.agent.publish [receipt]  (server/agent-studio/boot.ts:107)
+  agentStudio.agentStudio.run.execute [receipt]  (server/agent-studio/boot.ts:130)
+  agentStudio.agentStudio.providerBindings.list  (server/agent-studio/boot.ts:164)
+  agentStudio.agentStudio.providerBindings.create  (server/agent-studio/boot.ts:181)
+  agentStudio.agentStudio.providerBindings.update  (server/agent-studio/boot.ts:200)
+  agentStudio.agentStudio.providerBindings.remove  (server/agent-studio/boot.ts:219)
+  agentStudio.agentStudio.providerBindings.validate  (server/agent-studio/boot.ts:237)
+  agentStudio.agentStudio.providerBindings.resolveForRun  (server/agent-studio/boot.ts:255)
+  agentStudio.agentStudio.exportCatalog.listCandidates  (server/agent-studio/boot.ts:273)
+  agentStudio.agentStudio.exportCatalog.getCandidate  (server/agent-studio/boot.ts:294)
+  agentStudio.agentStudio.exportCatalog.exportCandidate [receipt]  (server/agent-studio/boot.ts:316)
+  agentStudio.agentStudio.exportCatalog.markImported  (server/agent-studio/boot.ts:364)
+  agentStudio.agentStudio.exportCatalog.reconcileImports [receipt]  (server/agent-studio/boot.ts:387)
+  agentStudio.agentStudio.exportCatalog.reconcileSync [receipt]  (server/agent-studio/boot.ts:429)
+  aiTypes.aiTypes.catalog.publish [receipt]  (server/ai-types/manifest.ts:76)
+  aiTypes.aiTypes.providerModels.listAvailable  (server/ai-types/manifest.ts:113)
+  aiTypes.aiTypes.catalog.register [receipt]  (server/ai-types/manifest.ts:140)
+  codeStudio.codeStudio.template.publish [receipt]  (server/code-studio/manifest.ts:69)
+  codeStudio.codeStudio.run.execute [receipt]  (server/code-studio/manifest.ts:84)
+  communication.communication.conversation.create  (server/communication/manifest.ts:138)
+  communication.communication.conversations.list  (server/communication/manifest.ts:175)
+  communication.communication.conversations.get  (server/communication/manifest.ts:195)
+  communication.communication.message.add  (server/communication/manifest.ts:209)
+  communication.communication.messages.list  (server/communication/manifest.ts:241)
+  communication.communication.chat.send  (server/communication/manifest.ts:259)
+  communication.communication.meeting.create  (server/communication/manifest.ts:302)
+  communication.communication.meetings.list  (server/communication/manifest.ts:345)
+  communication.communication.notification.create  (server/communication/manifest.ts:364)
+  communication.communication.notifications.list  (server/communication/manifest.ts:403)
+  communication.communication.conversation.delete [receipt]  (server/communication/manifest.ts:429)
+  communication.communication.message.delete [receipt]  (server/communication/manifest.ts:448)
+  communication.communication.meeting.cancel [receipt]  (server/communication/manifest.ts:467)
+  communication.communication.export [receipt]  (server/communication/manifest.ts:490)
+  communication.communication.health  (server/communication/manifest.ts:527)
+  cultureValues.cv.value.publish [receipt]  (server/culture-values/manifest.ts:50)
+  dataAnalysis.dataAnalysis.graphRag.workerStatus  (server/data-analysis/manifest.ts:244)
+  dataAnalysis.dataAnalysis.graphRag.listSources  (server/data-analysis/manifest.ts:255)
+  dataAnalysis.dataAnalysis.graphRag.listSyncRuns  (server/data-analysis/manifest.ts:264)
+  dataAnalysis.dataAnalysis.graphRag.listIndexRuns  (server/data-analysis/manifest.ts:274)
+  dataAnalysis.dataAnalysis.graphRag.listQueryRuns  (server/data-analysis/manifest.ts:284)
+  dataAnalysis.dataAnalysis.graphRag.registerSource  (server/data-analysis/manifest.ts:294)
+  dataAnalysis.dataAnalysis.graphRag.syncSource  (server/data-analysis/manifest.ts:325)
+  dataAnalysis.dataAnalysis.graphRag.buildIndex [receipt]  (server/data-analysis/manifest.ts:345)
+  dataAnalysis.dataAnalysis.graphRag.query  (server/data-analysis/manifest.ts:368)
+  dataAnalysis.dataAnalysis.dataAcquisition.workerStatus  (server/data-analysis/manifest.ts:412)
+  dataAnalysis.dataAnalysis.dataAcquisition.summary  (server/data-analysis/manifest.ts:423)
+  dataAnalysis.dataAnalysis.dataAcquisition.updateSource  (server/data-analysis/manifest.ts:432)
+  dataAnalysis.dataAnalysis.dataAcquisition.disableSource  (server/data-analysis/manifest.ts:447)
+  dataAnalysis.dataAnalysis.dataAcquisition.exportCanonicalRecord [receipt]  (server/data-analysis/manifest.ts:462)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.runOutputPipeline [receipt]  (server/data-analysis/manifest.ts:489)
+  dataAnalysis.dataAnalysis.dataAcquisition.registerSource  (server/data-analysis/manifest.ts:504)
+  dataAnalysis.dataAnalysis.dataAcquisition.runAcquisition  (server/data-analysis/manifest.ts:519)
+  dataAnalysis.dataAnalysis.dataAcquisition.discoverItems  (server/data-analysis/manifest.ts:534)
+  dataAnalysis.dataAnalysis.dataAcquisition.classifyItem  (server/data-analysis/manifest.ts:559)
+  dataAnalysis.dataAnalysis.dataAcquisition.routeItem  (server/data-analysis/manifest.ts:574)
+  dataAnalysis.dataAnalysis.dataAcquisition.runProcessing [receipt]  (server/data-analysis/manifest.ts:589)
+  dataAnalysis.dataAnalysis.dataAcquisition.runOutputPipeline [receipt]  (server/data-analysis/manifest.ts:605)
+  dataAnalysis.dataAnalysis.dataAcquisition.getCanonicalRecord  (server/data-analysis/manifest.ts:621)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.classify  (server/data-analysis/manifest.ts:631)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.routeParser  (server/data-analysis/manifest.ts:646)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.runParser [receipt]  (server/data-analysis/manifest.ts:661)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.validate  (server/data-analysis/manifest.ts:676)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.getCanonical  (server/data-analysis/manifest.ts:691)
+  hr.hr.employee.create [receipt]  (server/hr/manifest.ts:51)
+  kgraAgent.kgra.run.execute  (server/kgra-agent/manifest.ts:48)
+  openRouter.openRouter.config.update [receipt]  (server/openrouter/manifest.ts:86)
+  openRouter.openRouter.modelAccess.execute  (server/openrouter/manifest.ts:142)
+  openRouter.openRouter.modelAccess.stream  (server/openrouter/manifest.ts:159)
+  openRouter.openRouter.modelAccess.validateBinding  (server/openrouter/manifest.ts:199)
+  organizationManagement.om.entity.create [receipt]  (server/organization-management/manifest.ts:48)
+  organizationManagement.om.position.assign [receipt]  (server/organization-management/manifest.ts:88)
+  pmCentral.pmCentral.health  (server/pm-central/manifest.ts:180)
+  pmCentral.pmCentral.summary  (server/pm-central/manifest.ts:189)
+  pmCentral.pmCentral.project.create  (server/pm-central/manifest.ts:203)
+  pmCentral.pmCentral.project.get  (server/pm-central/manifest.ts:234)
+  pmCentral.pmCentral.project.list  (server/pm-central/manifest.ts:245)
+  pmCentral.pmCentral.project.status.update [receipt]  (server/pm-central/manifest.ts:265)
+  pmCentral.pmCentral.task.create  (server/pm-central/manifest.ts:297)
+  pmCentral.pmCentral.task.status.update  (server/pm-central/manifest.ts:329)
+  pmCentral.pmCentral.project.update  (server/pm-central/manifest.ts:360)
+  pmCentral.pmCentral.project.archive [receipt]  (server/pm-central/manifest.ts:390)
+  pmCentral.pmCentral.plan.approve [receipt]  (server/pm-central/manifest.ts:412)
+  pmCentral.pmCentral.task.assign  (server/pm-central/manifest.ts:434)
+  pmCentral.pmCentral.risk.create  (server/pm-central/manifest.ts:461)
+  pmCentral.pmCentral.issue.create  (server/pm-central/manifest.ts:494)
+  pmCentral.pmCentral.decision.record  (server/pm-central/manifest.ts:525)
+  pmCentral.pmCentral.handoff.receiveFromPS  (server/pm-central/manifest.ts:556)
+  pmCentral.pmCentral.handoff.accept  (server/pm-central/manifest.ts:567)
+  pmCentral.pmCentral.handoff.reject  (server/pm-central/manifest.ts:589)
+  pmCentral.pmCentral.handoff.convert [receipt]  (server/pm-central/manifest.ts:616)
+  prm.prm.methods.listTemplates  (server/prm/manifest.ts:64)
+  prm.prm.method.publish [receipt]  (server/prm/manifest.ts:80)
+  prm.prm.method.deprecate [receipt]  (server/prm/manifest.ts:100)
+  providerConnections.providerConnections.listActiveForProvider  (server/provider-connections/manifest.ts:134)
+  providerConnections.providerConnections.getConnectionStatus  (server/provider-connections/manifest.ts:153)
+  providerConnections.providerConnections.validateConnection  (server/provider-connections/manifest.ts:169)
+  providerConnections.providerConnections.getBindingEligibility  (server/provider-connections/manifest.ts:186)
+  ps.ps.ideation.publish [receipt]  (server/ps/manifest.ts:61)
+  ps.ps.handoff.pmCentral [receipt]  (server/ps/manifest.ts:79)
+  psm.psm.method.publish [receipt]  (server/psm/manifest.ts:52)
+  rag.rag.index.run  (server/rag/manifest.ts:54)
+  sandboxWf.sandboxWf.execute [receipt]  (server/sandbox-wf/manifest.ts:66)
+  sandboxWf.sandboxWf.workflow.publish [receipt]  (server/sandbox-wf/manifest.ts:85)
+
+0 finding(s):
+
+OK — gateway wiring within tolerance.
+=== check:event-wiring ===
+
+0 finding(s):
+
+OK — event wiring within tolerance.
+=== check:handoff-wiring ===
+
+Discovered 8 registerHandoffAcceptor() call(s).
+  agentStudio::agentStudio.run.requested
+  codeStudio::codeStudio.run.requested
+  communication::communication.conversation.open
+  communication::communication.meeting.schedule
+  communication::communication.notification.create
+  pmCentral::pmCentral.project.receiveFromPS
+  pmCentral::pmCentral.project.convertFromPS
+  sandboxWf::sandboxWf.execute.requested
+
+0 finding(s):
+
+OK — handoff wiring within tolerance.
+=== check:frontend-wiring ===
+
+0 finding(s):
+
+OK — frontend wiring within tolerance.
+=== check:runtime-wiring ===
+
+Modules tracked: 16 (KNOWN_MODULES=16).
+
+0 finding(s):
+
+OK — runtime wiring within tolerance.
+=== check:coordinator-wiring ===
+
+0 finding(s):
+
+OK — coordinator wiring within tolerance.

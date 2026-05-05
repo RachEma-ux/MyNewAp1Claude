@@ -1,0 +1,593 @@
+
+> mynewap1claude@1.0.0 build /root/MyNewAp1Claude
+> rm -rf dist client/dist .vite && vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && cp -r schemas dist/
+
+vite v7.1.9 building for production...
+transforming...
+✓ 4018 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                                           3.23 kB │ gzip:   1.40 kB
+../dist/public/assets/KaTeX_Size3-Regular-CTq5MqoE.woff             4.42 kB
+../dist/public/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2            4.93 kB
+../dist/public/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2            5.21 kB
+../dist/public/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2            5.47 kB
+../dist/public/assets/KaTeX_Size4-Regular-BF-4gkZK.woff             5.98 kB
+../dist/public/assets/KaTeX_Size2-Regular-oD1tc_U0.woff             6.19 kB
+../dist/public/assets/KaTeX_Size1-Regular-C195tn64.woff             6.50 kB
+../dist/public/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2      6.91 kB
+../dist/public/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2         6.91 kB
+../dist/public/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf              7.59 kB
+../dist/public/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff       7.66 kB
+../dist/public/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff          7.72 kB
+../dist/public/assets/KaTeX_Script-Regular-D3wIWfF6.woff2           9.64 kB
+../dist/public/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2       10.34 kB
+../dist/public/assets/KaTeX_Size4-Regular-DWFBv043.ttf             10.36 kB
+../dist/public/assets/KaTeX_Script-Regular-D5yQViql.woff           10.59 kB
+../dist/public/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2         11.32 kB
+../dist/public/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2            11.35 kB
+../dist/public/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf             11.51 kB
+../dist/public/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2        12.03 kB
+../dist/public/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2          12.22 kB
+../dist/public/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf             12.23 kB
+../dist/public/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff        12.32 kB
+../dist/public/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf       12.34 kB
+../dist/public/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf          12.37 kB
+../dist/public/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff          13.21 kB
+../dist/public/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff             13.30 kB
+../dist/public/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2      13.57 kB
+../dist/public/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff         14.11 kB
+../dist/public/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff           14.41 kB
+../dist/public/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff       16.03 kB
+../dist/public/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2         16.40 kB
+../dist/public/assets/KaTeX_Math-Italic-t53AETM-.woff2             16.44 kB
+../dist/public/assets/KaTeX_Script-Regular-C5JkGWo-.ttf            16.65 kB
+../dist/public/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2         16.78 kB
+../dist/public/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2             16.99 kB
+../dist/public/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff          18.67 kB
+../dist/public/assets/KaTeX_Math-Italic-DA0__PXp.woff              18.75 kB
+../dist/public/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff          19.41 kB
+../dist/public/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf         19.44 kB
+../dist/public/assets/KaTeX_Fraktur-Regular-CB_wures.ttf           19.57 kB
+../dist/public/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf              19.58 kB
+../dist/public/assets/KaTeX_Main-Italic-BMLOBm91.woff              19.68 kB
+../dist/public/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf          22.36 kB
+../dist/public/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf            24.50 kB
+../dist/public/assets/KaTeX_Main-Bold-Cx986IdX.woff2               25.32 kB
+../dist/public/assets/KaTeX_Main-Regular-B22Nviop.woff2            26.27 kB
+../dist/public/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf        27.56 kB
+../dist/public/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2             28.08 kB
+../dist/public/assets/KaTeX_Main-Bold-Jm3AIy58.woff                29.91 kB
+../dist/public/assets/KaTeX_Main-Regular-Dr94JaBh.woff             30.77 kB
+../dist/public/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf           31.20 kB
+../dist/public/assets/KaTeX_Math-Italic-flOr_0UB.ttf               31.31 kB
+../dist/public/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf           32.97 kB
+../dist/public/assets/KaTeX_AMS-Regular-DMm9YOAa.woff              33.52 kB
+../dist/public/assets/KaTeX_Main-Italic-3WenGoN9.ttf               33.58 kB
+../dist/public/assets/KaTeX_Main-Bold-waoOVXN0.ttf                 51.34 kB
+../dist/public/assets/KaTeX_Main-Regular-ypZvNtVU.ttf              53.58 kB
+../dist/public/assets/KaTeX_AMS-Regular-DRggAlZN.ttf               63.63 kB
+../dist/public/assets/style-B5DZHykP.css                            7.32 kB │ gzip:   1.61 kB
+../dist/public/assets/WikiArticle-CyAuISp2.css                     29.19 kB │ gzip:   8.04 kB
+../dist/public/assets/index-DXWjr_om.css                          213.61 kB │ gzip:  30.75 kB
+../dist/public/assets/index-BdQq_4o_.js                             0.06 kB │ gzip:   0.08 kB
+../dist/public/assets/use-toast-C3HsPbFp.js                         0.19 kB │ gzip:   0.16 kB
+../dist/public/assets/index-DQjXNMZA.js                             0.23 kB │ gzip:   0.18 kB
+../dist/public/assets/chevron-left-Zzm0P7HM.js                      0.30 kB │ gzip:   0.25 kB
+../dist/public/assets/circle-Cucw8jv4.js                            0.30 kB │ gzip:   0.24 kB
+../dist/public/assets/play-KAcLFKia.js                              0.30 kB │ gzip:   0.25 kB
+../dist/public/assets/square-qGiYe_LZ.js                            0.32 kB │ gzip:   0.26 kB
+../dist/public/assets/filter-B0NJOBuG.js                            0.33 kB │ gzip:   0.27 kB
+../dist/public/assets/arrow-right-dgtwVqbx.js                       0.33 kB │ gzip:   0.27 kB
+../dist/public/assets/arrow-left-CJwl0qrV.js                        0.33 kB │ gzip:   0.27 kB
+../dist/public/assets/search-DnnRaQ2g.js                            0.34 kB │ gzip:   0.27 kB
+../dist/public/assets/ban-B6Sjx1A8.js                               0.34 kB │ gzip:   0.27 kB
+../dist/public/assets/gauge-Bnh59xOJ.js                             0.35 kB │ gzip:   0.27 kB
+../dist/public/assets/circle-dot-D1Q1HKJd.js                        0.35 kB │ gzip:   0.26 kB
+../dist/public/assets/code-DDs63q5V.js                              0.35 kB │ gzip:   0.27 kB
+../dist/public/assets/circle-check-big-BjdKVA75.js                  0.36 kB │ gzip:   0.28 kB
+../dist/public/assets/circle-play-Dem_vKfg.js                       0.36 kB │ gzip:   0.28 kB
+../dist/public/assets/smartphone-BnGM1f_P.js                        0.37 kB │ gzip:   0.29 kB
+../dist/public/assets/trending-up-DEK6JmwK.js                       0.37 kB │ gzip:   0.28 kB
+../dist/public/assets/info-B7hm-hA3.js                              0.37 kB │ gzip:   0.28 kB
+../dist/public/assets/circle-x-BcCM2lzy.js                          0.38 kB │ gzip:   0.28 kB
+../dist/public/assets/circle-plus-DcBQ_EHD.js                       0.38 kB │ gzip:   0.28 kB
+../dist/public/assets/trending-down-DYXmATFD.js                     0.38 kB │ gzip:   0.28 kB
+../dist/public/assets/pause-BclQ3P-I.js                             0.38 kB │ gzip:   0.27 kB
+../dist/public/assets/mail-BxtTCF6B.js                              0.38 kB │ gzip:   0.30 kB
+../dist/public/assets/circle-arrow-up-CCl4hpt-.js                   0.39 kB │ gzip:   0.29 kB
+../dist/public/assets/file-Ppv6tvbF.js                              0.39 kB │ gzip:   0.28 kB
+../dist/public/assets/square-check-big-C33aeHxc.js                  0.39 kB │ gzip:   0.30 kB
+../dist/public/assets/ellipsis-CwpITZcW.js                          0.40 kB │ gzip:   0.27 kB
+../dist/public/assets/merge-D3qVkY-s.js                             0.40 kB │ gzip:   0.30 kB
+../dist/public/assets/library-4BNayCe9.js                           0.40 kB │ gzip:   0.29 kB
+../dist/public/assets/ellipsis-vertical-CAZDMaHa.js                 0.40 kB │ gzip:   0.28 kB
+../dist/public/assets/pen-CAWh2Ff_.js                               0.40 kB │ gzip:   0.31 kB
+../dist/public/assets/copy-CcyB1Zzi.js                              0.41 kB │ gzip:   0.31 kB
+../dist/public/assets/SectionLabel-C1L3biKS.js                      0.41 kB │ gzip:   0.32 kB
+../dist/public/assets/history-Bnueamtp.js                           0.41 kB │ gzip:   0.30 kB
+../dist/public/assets/timer-tQkNb_tA.js                             0.41 kB │ gzip:   0.29 kB
+../dist/public/assets/circle-help-CyFk1MWP.js                       0.41 kB │ gzip:   0.30 kB
+../dist/public/assets/link-2-BUvsNGX_.js                            0.41 kB │ gzip:   0.31 kB
+../dist/public/assets/globe-CRv4jMn1.js                             0.41 kB │ gzip:   0.29 kB
+../dist/public/assets/circle-pause-CAuZrd1n.js                      0.41 kB │ gzip:   0.29 kB
+../dist/public/assets/test-tube-CPlvywRE.js                         0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/external-link-Bc8YVE7L.js                     0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/compass-D3t8dY-8.js                           0.42 kB │ gzip:   0.31 kB
+../dist/public/assets/settings-2-fA0ayFK7.js                        0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/archive-Cn1zGxBD.js                           0.42 kB │ gzip:   0.31 kB
+../dist/public/assets/route-_X5N-pjK.js                             0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/eye-C8OZpsK5.js                               0.43 kB │ gzip:   0.31 kB
+../dist/public/assets/link-D82V3zoL.js                              0.43 kB │ gzip:   0.30 kB
+../dist/public/assets/upload-BwWYODY7.js                            0.43 kB │ gzip:   0.32 kB
+../dist/public/assets/monitor-Zijg5gch.js                           0.43 kB │ gzip:   0.31 kB
+../dist/public/assets/key-Bs25A88j.js                               0.43 kB │ gzip:   0.32 kB
+../dist/public/assets/repeat-C4gszx0J.js                            0.44 kB │ gzip:   0.31 kB
+../dist/public/assets/pen-line-Ca3GWRU9.js                          0.45 kB │ gzip:   0.33 kB
+../dist/public/assets/list-checks-vJtpfew1.js                       0.45 kB │ gzip:   0.30 kB
+../dist/public/assets/git-compare-DM1ZKbwn.js                       0.45 kB │ gzip:   0.31 kB
+../dist/public/assets/layout-template-B3892CM-.js                   0.45 kB │ gzip:   0.30 kB
+../dist/public/assets/inbox-DtybdS3E.js                             0.46 kB │ gzip:   0.33 kB
+../dist/public/assets/grid-3x3-COn4DYfz.js                          0.46 kB │ gzip:   0.31 kB
+../dist/public/assets/hash-BqFiBqjc.js                              0.47 kB │ gzip:   0.30 kB
+../dist/public/assets/file-up-D3i8IaF6.js                           0.47 kB │ gzip:   0.32 kB
+../dist/public/assets/thumbs-up-D9Nm1U_n.js                         0.47 kB │ gzip:   0.34 kB
+../dist/public/assets/milestone-BBsBEkK-.js                         0.47 kB │ gzip:   0.32 kB
+../dist/public/assets/clipboard-check-DvVVImCR.js                   0.47 kB │ gzip:   0.33 kB
+../dist/public/assets/flask-conical-DJekVNdm.js                     0.48 kB │ gzip:   0.34 kB
+../dist/public/assets/square-pen-xmbSkq1g.js                        0.49 kB │ gzip:   0.34 kB
+../dist/public/assets/file-code-jmhmB0-f.js                         0.49 kB │ gzip:   0.32 kB
+../dist/public/assets/heart-pulse-pyysE0pL.js                       0.49 kB │ gzip:   0.35 kB
+../dist/public/assets/refresh-cw-B0Xnzt2l.js                        0.49 kB │ gzip:   0.33 kB
+../dist/public/assets/tag-BVkMl8BH.js                               0.50 kB │ gzip:   0.35 kB
+../dist/public/assets/save-MXYrW3YC.js                              0.50 kB │ gzip:   0.33 kB
+../dist/public/assets/graduation-cap-CuBYN-lj.js                    0.50 kB │ gzip:   0.35 kB
+../dist/public/assets/server-B94U5fiJ.js                            0.51 kB │ gzip:   0.32 kB
+../dist/public/assets/layout-grid-ZxkFUG7H.js                       0.51 kB │ gzip:   0.30 kB
+../dist/public/assets/webhook-CQqfwdRM.js                           0.52 kB │ gzip:   0.37 kB
+../dist/public/assets/shield-alert-BInjCZZl.js                      0.52 kB │ gzip:   0.36 kB
+../dist/public/assets/key-round-BPz1_bre.js                         0.52 kB │ gzip:   0.36 kB
+../dist/public/assets/monitor-play-DBV5WQtm.js                      0.52 kB │ gzip:   0.35 kB
+../dist/public/assets/shield-x-BnEs-oVT.js                          0.53 kB │ gzip:   0.36 kB
+../dist/public/assets/snowflake-DdjpV7UQ.js                         0.53 kB │ gzip:   0.34 kB
+../dist/public/assets/file-pen-DoS_Ba_F.js                          0.54 kB │ gzip:   0.36 kB
+../dist/public/assets/hammer-Dyrv4qlB.js                            0.54 kB │ gzip:   0.37 kB
+../dist/public/assets/network-BKHpcOC0.js                           0.55 kB │ gzip:   0.34 kB
+../dist/public/assets/textarea-CTrKInq6.js                          0.56 kB │ gzip:   0.39 kB
+../dist/public/assets/hard-drive-BGK7OKit.js                        0.56 kB │ gzip:   0.36 kB
+../dist/public/assets/input-Dt9B56lF.js                             0.56 kB │ gzip:   0.39 kB
+../dist/public/assets/useCatalogAvailable-Bfd4roro.js               0.59 kB │ gzip:   0.38 kB
+../dist/public/assets/eye-off-DYenynmC.js                           0.60 kB │ gzip:   0.38 kB
+../dist/public/assets/handshake-B-lgkg3-.js                         0.62 kB │ gzip:   0.39 kB
+../dist/public/assets/cpu-FEP-0JnE.js                               0.67 kB │ gzip:   0.36 kB
+../dist/public/assets/memory-stick-DPE6Xzhy.js                      0.70 kB │ gzip:   0.38 kB
+../dist/public/assets/power-vUbQy2p2.js                             0.74 kB │ gzip:   0.36 kB
+../dist/public/assets/label-Dv_ZM3ev.js                             0.74 kB │ gzip:   0.49 kB
+../dist/public/assets/panel-left-open-BUzR7-Jp.js                   0.75 kB │ gzip:   0.34 kB
+../dist/public/assets/panel-right-open-DXVUrfQE.js                  0.75 kB │ gzip:   0.34 kB
+../dist/public/assets/LoadingState-gGgk-MjD.js                      0.80 kB │ gzip:   0.41 kB
+../dist/public/assets/bug-ChosaLPx.js                               0.84 kB │ gzip:   0.47 kB
+../dist/public/assets/zoom-out-CmEKbiax.js                          0.84 kB │ gzip:   0.33 kB
+../dist/public/assets/separator-CUrLuMhp.js                         0.87 kB │ gzip:   0.48 kB
+../dist/public/assets/cog-BuE1zVcO.js                               0.88 kB │ gzip:   0.45 kB
+../dist/public/assets/AgentStatusBadge-6m2cG8aG.js                  0.93 kB │ gzip:   0.48 kB
+../dist/public/assets/tags-8gRNwD7A.js                              0.98 kB │ gzip:   0.47 kB
+../dist/public/assets/mod-BuWI3nY_.js                               1.17 kB │ gzip:   0.49 kB
+../dist/public/assets/AgentBadge-vttCfJdW.js                        1.23 kB │ gzip:   0.57 kB
+../dist/public/assets/mod-BNXMgr6M.js                               1.26 kB │ gzip:   0.53 kB
+../dist/public/assets/ASCandidatePage-CxgV05zp.js                   1.33 kB │ gzip:   0.69 kB
+../dist/public/assets/alert-nQx2QFHo.js                             1.38 kB │ gzip:   0.61 kB
+../dist/public/assets/EmptyState-DDbAnCbR.js                        1.46 kB │ gzip:   0.47 kB
+../dist/public/assets/EmptyState-BePY0Wfp.js                        1.47 kB │ gzip:   0.54 kB
+../dist/public/assets/KGRAAgentPage-Bi_rHT6F.js                     1.52 kB │ gzip:   0.79 kB
+../dist/public/assets/ini-BEwlwnbL.js                               1.53 kB │ gzip:   0.50 kB
+../dist/public/assets/AirflowPage-DDWsRm9V.js                       1.54 kB │ gzip:   0.51 kB
+../dist/public/assets/AirbytePage-1AX5KNyT.js                       1.55 kB │ gzip:   0.51 kB
+../dist/public/assets/FlowChartPage-1x2RqiEK.js                     1.55 kB │ gzip:   0.51 kB
+../dist/public/assets/mod-BU-WCciH.js                               1.56 kB │ gzip:   0.62 kB
+../dist/public/assets/StatusPill-DUfAKmI7.js                        1.58 kB │ gzip:   0.74 kB
+../dist/public/assets/PageHeader-DUJiBU9A.js                        1.66 kB │ gzip:   0.50 kB
+../dist/public/assets/docker-BcOcwvcX.js                            1.74 kB │ gzip:   0.60 kB
+../dist/public/assets/step-progress-Ds1Gismj.js                     1.80 kB │ gzip:   0.60 kB
+../dist/public/assets/ThreadsPanel-DxNuicRu.js                      1.81 kB │ gzip:   0.52 kB
+../dist/public/assets/OMTopLevelPage-5ATWSkFI.js                    1.82 kB │ gzip:   0.61 kB
+../dist/public/assets/useConfirmDialog-CSGwPCKE.js                  1.88 kB │ gzip:   0.61 kB
+../dist/public/assets/ParticipantsPanel-DQsKyJz-.js                 1.89 kB │ gzip:   0.55 kB
+../dist/public/assets/Breadcrumb-hnJLKt7M.js                        1.96 kB │ gzip:   0.52 kB
+../dist/public/assets/table-BsOdMOZU.js                             2.00 kB │ gzip:   0.58 kB
+../dist/public/assets/mod-DsKJT0ER.js                               2.04 kB │ gzip:   0.85 kB
+../dist/public/assets/HRReportsPage-BQ6Sciry.js                     2.06 kB │ gzip:   0.57 kB
+../dist/public/assets/ParticipantsPanel-IvSCBDPY.js                 2.08 kB │ gzip:   0.53 kB
+../dist/public/assets/PageShell-C593rsen.js                         2.13 kB │ gzip:   0.62 kB
+../dist/public/assets/progress-fkdRd9M_.js                          2.16 kB │ gzip:   1.03 kB
+../dist/public/assets/PRMSeverityBadge-BzvEJT31.js                  2.20 kB │ gzip:   0.74 kB
+../dist/public/assets/mod-nzrUGpW5.js                               2.29 kB │ gzip:   0.80 kB
+../dist/public/assets/formatDistanceToNow-Bfdiy1JH.js               2.30 kB │ gzip:   0.93 kB
+../dist/public/assets/mod-47hMfYfB.js                               2.35 kB │ gzip:   0.79 kB
+../dist/public/assets/diff-D97Zzqfu.js                              2.57 kB │ gzip:   0.69 kB
+../dist/public/assets/PMProjectList-DrdDu_Kd.js                     2.58 kB │ gzip:   0.71 kB
+../dist/public/assets/CVTopLevelPage-DUmI-Ley.js                    2.72 kB │ gzip:   0.85 kB
+../dist/public/assets/switch-CLMLNw4L.js                            2.81 kB │ gzip:   1.37 kB
+../dist/public/assets/json-Cp-IABpG.js                              2.82 kB │ gzip:   0.78 kB
+../dist/public/assets/mod-Ynu1rXEZ.js                               3.04 kB │ gzip:   1.17 kB
+../dist/public/assets/PMMilestonesPage-BLw510WU.js                  3.07 kB │ gzip:   0.84 kB
+../dist/public/assets/PMDecisionsPage-BY8wvExP.js                   3.13 kB │ gzip:   0.84 kB
+../dist/public/assets/DeliverablesPanel-gRajMpGf.js                 3.26 kB │ gzip:   0.82 kB
+../dist/public/assets/PRMMethodsLibraryPage-ZixqXE-c.js             3.28 kB │ gzip:   0.92 kB
+../dist/public/assets/PMRisksPage-CUe6KmUx.js                       3.33 kB │ gzip:   0.86 kB
+../dist/public/assets/PMIssuesPage-CMWMvnlo.js                      3.38 kB │ gzip:   0.87 kB
+../dist/public/assets/TaskBoardPanel-DOcLhTPA.js                    3.59 kB │ gzip:   0.96 kB
+../dist/public/assets/PMTasksPage-DVBPFyOq.js                       3.59 kB │ gzip:   0.88 kB
+../dist/public/assets/DocsPanel-ClFFDWSn.js                         3.59 kB │ gzip:   0.83 kB
+../dist/public/assets/sheet-CCX6N7E9.js                             3.61 kB │ gzip:   0.96 kB
+../dist/public/assets/CodeStudioAgentsPage-XGDmKrsm.js              3.62 kB │ gzip:   0.78 kB
+../dist/public/assets/AgentControlPanelPage-TMMN8fIL.js             3.63 kB │ gzip:   1.10 kB
+../dist/public/assets/PMProjectsPage-14jgNUNc.js                    3.67 kB │ gzip:   0.90 kB
+../dist/public/assets/PRMCatalogPage-VAWyc8bx.js                    3.73 kB │ gzip:   0.91 kB
+../dist/public/assets/tabs-BsPxNdYs.js                              3.90 kB │ gzip:   1.58 kB
+../dist/public/assets/ProjectChangesPanel-DkFbacRa.js               3.91 kB │ gzip:   0.90 kB
+../dist/public/assets/OpenRouterActivityPage-Dn6AxttY.js            3.96 kB │ gzip:   0.81 kB
+../dist/public/assets/HRSkillsPage-P4ZuwhY7.js                      3.98 kB │ gzip:   0.77 kB
+../dist/public/assets/PRMPlaybooksPage-lGyD4pHg.js                  3.98 kB │ gzip:   1.02 kB
+../dist/public/assets/MilestonesPanel-BSPZXfrP.js                   4.08 kB │ gzip:   0.95 kB
+../dist/public/assets/OpenRouterGuardrailsPage-B1tqGOC8.js          4.12 kB │ gzip:   1.20 kB
+../dist/public/assets/DecisionsPanel-VTcQSPLq.js                    4.20 kB │ gzip:   0.89 kB
+../dist/public/assets/AppBlockerAlert-Bw_ya1Sw.js                   4.23 kB │ gzip:   0.83 kB
+../dist/public/assets/MeetingsPanel-BFdq55CN.js                     4.26 kB │ gzip:   0.89 kB
+../dist/public/assets/SoftwarePage-R0Xf-ELr.js                      4.27 kB │ gzip:   0.77 kB
+../dist/public/assets/AutomationSettings-BXjRSkCU.js                4.37 kB │ gzip:   0.81 kB
+../dist/public/assets/useCatalogEntries-DKetv6DV.js                 4.42 kB │ gzip:   1.31 kB
+../dist/public/assets/checkbox-Dtt7dN-W.js                          4.44 kB │ gzip:   1.88 kB
+../dist/public/assets/CatalogAgentSelect-D3jZFHCO.js                4.49 kB │ gzip:   1.15 kB
+../dist/public/assets/WSCatalogPage-BrKZA8z7.js                     4.58 kB │ gzip:   1.15 kB
+../dist/public/assets/BaselinesPanel-_WQ3pdz9.js                    4.64 kB │ gzip:   0.98 kB
+../dist/public/assets/CommunicationConversationsPage-DCqswI2c.js    4.66 kB │ gzip:   1.01 kB
+../dist/public/assets/radio-group-Cvl3KLrz.js                       4.69 kB │ gzip:   2.01 kB
+../dist/public/assets/dialog-_VIkyp_Q.js                            4.69 kB │ gzip:   1.33 kB
+../dist/public/assets/WorklogPanel-B3siIYhJ.js                      4.74 kB │ gzip:   0.77 kB
+../dist/public/assets/StatusUpdatesPanel-l58TIUMA.js                4.78 kB │ gzip:   0.98 kB
+../dist/public/assets/PolicyPanel-CObwAobR.js                       4.87 kB │ gzip:   0.97 kB
+../dist/public/assets/CatalogSelect-Dw-xqCHL.js                     5.04 kB │ gzip:   1.37 kB
+../dist/public/assets/IterationsPanel-DThIniFg.js                   5.05 kB │ gzip:   1.11 kB
+../dist/public/assets/index-CvCFMrCj.js                             5.10 kB │ gzip:   1.96 kB
+../dist/public/assets/PMSettingsPage-D9sChMsh.js                    5.13 kB │ gzip:   0.82 kB
+../dist/public/assets/mod-BHPCMw9W.js                               5.24 kB │ gzip:   1.43 kB
+../dist/public/assets/WSSandboxPage-BSKj20Yd.js                     5.26 kB │ gzip:   1.43 kB
+../dist/public/assets/ConversationList-Cjmyfi7A.js                  5.29 kB │ gzip:   1.06 kB
+../dist/public/assets/PMHandoffsPage-D7QWYjq7.js                    5.34 kB │ gzip:   1.21 kB
+../dist/public/assets/EvidencePanel-D_hyOStA.js                     5.36 kB │ gzip:   0.97 kB
+../dist/public/assets/xml-sdJ4AIDG.js                               5.38 kB │ gzip:   1.21 kB
+../dist/public/assets/HRPositionsPage-SJUjMqn9.js                   5.44 kB │ gzip:   0.99 kB
+../dist/public/assets/IssuesPanel-Dt3hkI_D.js                       5.48 kB │ gzip:   1.05 kB
+../dist/public/assets/CommunicationNotificationsPage-K5PVX2TK.js    5.49 kB │ gzip:   1.10 kB
+../dist/public/assets/ActionItemsPanel-BmoTuO3i.js                  5.52 kB │ gzip:   1.04 kB
+../dist/public/assets/CodeStudioSessionsPage-CsK6ii37.js            5.65 kB │ gzip:   1.26 kB
+../dist/public/assets/CodeStudioApprovalsPage-DRYq4J7O.js           5.69 kB │ gzip:   1.17 kB
+../dist/public/assets/ApprovalsPanel-CKftBDrm.js                    5.76 kB │ gzip:   1.12 kB
+../dist/public/assets/alert-dialog-C5H2xue6.js                      6.07 kB │ gzip:   1.82 kB
+../dist/public/assets/PSMLibraryPage-B9zpJQrH.js                    6.19 kB │ gzip:   1.47 kB
+../dist/public/assets/HRAuditLogsPage-CboGhlOM.js                   6.35 kB │ gzip:   1.46 kB
+../dist/public/assets/mod-BcknfRF1.js                               6.38 kB │ gzip:   1.69 kB
+../dist/public/assets/toml-vGWfd6FD.js                              6.43 kB │ gzip:   1.28 kB
+../dist/public/assets/CodeStudioReposPage-CeMalgNB.js               6.46 kB │ gzip:   1.29 kB
+../dist/public/assets/PMShellPanel-Rl3dxIEq.js                      6.48 kB │ gzip:   1.20 kB
+../dist/public/assets/ProjectRisksPanel-0Pj_z_HY.js                 6.58 kB │ gzip:   1.21 kB
+../dist/public/assets/ModuleWizardShell-Ct7iLE9E.js                 6.60 kB │ gzip:   1.31 kB
+../dist/public/assets/BudgetPanel-FgTFfWEf.js                       6.85 kB │ gzip:   1.06 kB
+../dist/public/assets/CommunicationChatPage-Du00HWfL.js             6.85 kB │ gzip:   1.42 kB
+../dist/public/assets/ResourcesPanel-BG4k2fT7.js                    6.90 kB │ gzip:   1.20 kB
+../dist/public/assets/PRMControlPanelPage-CTwdChjt.js               6.92 kB │ gzip:   1.10 kB
+../dist/public/assets/TemplatesPage-DmYeuBve.js                     6.97 kB │ gzip:   1.59 kB
+../dist/public/assets/CollaborationPage-CApw4pac.js                 7.02 kB │ gzip:   0.91 kB
+../dist/public/assets/TimelinePanel-CSi5pPdL.js                     7.02 kB │ gzip:   1.08 kB
+../dist/public/assets/ModelsShellPage-BD0GOF-u.js                   7.02 kB │ gzip:   1.93 kB
+../dist/public/assets/WCPWorkflowsList-BybnR8NR.js                  7.20 kB │ gzip:   1.74 kB
+../dist/public/assets/PSAICatalogPage-DD083_Ht.js                   7.21 kB │ gzip:   1.56 kB
+../dist/public/assets/MyFollowupsPanel-OXYgZfhZ.js                  7.21 kB │ gzip:   1.32 kB
+../dist/public/assets/CodeStudioPoliciesPage-IZavrDPc.js            7.30 kB │ gzip:   1.47 kB
+../dist/public/assets/BotsShellPage-QLXXtU6q.js                     7.48 kB │ gzip:   2.25 kB
+../dist/public/assets/ProvidersShellPage-BEkuGjCG.js                7.50 kB │ gzip:   2.00 kB
+../dist/public/assets/HRJobArchitecturePage-B1hRFdue.js             7.53 kB │ gzip:   1.15 kB
+../dist/public/assets/PRMCaseListPage-5QY6Ne-J.js                   7.62 kB │ gzip:   1.72 kB
+../dist/public/assets/en-US-DzAkKII6.js                             7.64 kB │ gzip:   2.69 kB
+../dist/public/assets/AgentsShellPage-CoPiKedE.js                   7.75 kB │ gzip:   2.21 kB
+../dist/public/assets/ProjectReportsPanel-C924whjx.js               7.75 kB │ gzip:   1.05 kB
+../dist/public/assets/mod-C5x0OUsC.js                               7.80 kB │ gzip:   1.97 kB
+../dist/public/assets/GateCenterPanel-DLQkZHHy.js                   7.82 kB │ gzip:   1.62 kB
+../dist/public/assets/HRWorkPermitsPage-DmB9vv4v.js                 7.86 kB │ gzip:   1.39 kB
+../dist/public/assets/HROvertimePage-1GIbg2WC.js                    7.95 kB │ gzip:   1.30 kB
+../dist/public/assets/ScopeWbsPanel-DEcidMF8.js                     8.11 kB │ gzip:   1.26 kB
+../dist/public/assets/WikiEditor-C9I05uJy.js                        8.16 kB │ gzip:   1.85 kB
+../dist/public/assets/HRAccessControlsPage-Bg_KuaZt.js              8.20 kB │ gzip:   1.46 kB
+../dist/public/assets/PSMCasesPage-DpMJRfEr.js                      8.29 kB │ gzip:   1.86 kB
+../dist/public/assets/PlansPanel-BEVclYPv.js                        8.33 kB │ gzip:   1.60 kB
+../dist/public/assets/AITypesShell-uIIpYbwX.js                      8.36 kB │ gzip:   2.10 kB
+../dist/public/assets/HROrganizationPage-BP54skyz.js                8.37 kB │ gzip:   1.37 kB
+../dist/public/assets/string-cKWu9XK9.js                            8.38 kB │ gzip:   3.55 kB
+../dist/public/assets/AITypesRelationshipsPage-rtITOjxj.js          8.46 kB │ gzip:   1.42 kB
+../dist/public/assets/PRMNewCasePage-DjJ9SNgB.js                    8.47 kB │ gzip:   1.49 kB
+../dist/public/assets/HRRiskManagementPage-DGK0D6Yd.js              8.55 kB │ gzip:   1.49 kB
+../dist/public/assets/LLMShellPage-BJZCPi51.js                      8.57 kB │ gzip:   2.43 kB
+../dist/public/assets/OpenRouterHealthPage-HYfjxyS9.js              8.60 kB │ gzip:   1.73 kB
+../dist/public/assets/AgentChat-CRJIinEG.js                         8.61 kB │ gzip:   1.93 kB
+../dist/public/assets/CommunicationVideoMeetingPage-CJvgfqKZ.js     8.64 kB │ gzip:   1.54 kB
+../dist/public/assets/HRStaffingPage-BjWTPgYd.js                    8.65 kB │ gzip:   1.39 kB
+../dist/public/assets/ShellClonePage-CHvfz0Q7.js                    8.70 kB │ gzip:   1.74 kB
+../dist/public/assets/kotlin-BdnUsdx6.js                            8.79 kB │ gzip:   2.13 kB
+../dist/public/assets/catalog-taxonomy-DS-8yOqv.js                  8.84 kB │ gzip:   3.08 kB
+../dist/public/assets/HRIncidentsPage-kH8MbpT8.js                   9.14 kB │ gzip:   1.50 kB
+../dist/public/assets/AgentMemoryPage-CT2oAPnz.js                   9.15 kB │ gzip:   1.96 kB
+../dist/public/assets/slider-Chb5Ba7L.js                            9.29 kB │ gzip:   3.62 kB
+../dist/public/assets/WikiPage-78bWhEpg.js                          9.29 kB │ gzip:   1.64 kB
+../dist/public/assets/FreezeHoldsPanel-pBRlnfmb.js                  9.55 kB │ gzip:   1.58 kB
+../dist/public/assets/PMCentralDashboardPage-IIi63pAm.js            9.55 kB │ gzip:   1.53 kB
+../dist/public/assets/CommunicationDashboardPage-CbtYBFMO.js        9.72 kB │ gzip:   1.48 kB
+../dist/public/assets/AgentPromptsPage-DzzKqJXO.js                  9.75 kB │ gzip:   1.69 kB
+../dist/public/assets/PSMSelectorPage-BwM5jp1y.js                   9.76 kB │ gzip:   2.15 kB
+../dist/public/assets/AITypesGovernancePage-ChHs3e7q.js             9.77 kB │ gzip:   1.65 kB
+../dist/public/assets/KGIAGovernancePage-KLlgCsWm.js                9.79 kB │ gzip:   1.41 kB
+../dist/public/assets/PRMDashboardPage-CRNmarJA.js                  9.82 kB │ gzip:   1.49 kB
+../dist/public/assets/HRSurveysPage-BLhzH6yI.js                     9.83 kB │ gzip:   1.62 kB
+../dist/public/assets/WSControlPanelPage-c8yeZRU8.js                9.85 kB │ gzip:   2.02 kB
+../dist/public/assets/CatalogAgentChat-D_Dp0IWw.js                  9.86 kB │ gzip:   2.32 kB
+../dist/public/assets/WSListPage-BkHGiNxZ.js                        9.90 kB │ gzip:   2.05 kB
+../dist/public/assets/CharterPanel-Cqmcrn2A.js                      9.90 kB │ gzip:   1.38 kB
+../dist/public/assets/ProjectAgentRunsPanel-DwDCAckr.js             9.91 kB │ gzip:   1.84 kB
+../dist/public/assets/WCPExecutions-DnNl2J5J.js                     9.91 kB │ gzip:   1.72 kB
+../dist/public/assets/mod-BS1YA5dJ.js                              10.04 kB │ gzip:   2.32 kB
+../dist/public/assets/AgentBehaviorPage-BUf41Dpn.js                10.05 kB │ gzip:   1.91 kB
+../dist/public/assets/OpenRouterRoutingPage-DRTR3P8g.js            10.10 kB │ gzip:   1.79 kB
+../dist/public/assets/PSMAdminPage-zc1UkGk6.js                     10.14 kB │ gzip:   1.67 kB
+../dist/public/assets/CodeStudioDashboardPage-Ck7JYb-j.js          10.16 kB │ gzip:   1.23 kB
+../dist/public/assets/AITypesOverviewPage-zdlNfOQY.js              10.25 kB │ gzip:   1.78 kB
+../dist/public/assets/Home-Di0s2vOQ.js                             10.26 kB │ gzip:   2.02 kB
+../dist/public/assets/DeploymentStatus-BPbufHk8.js                 10.41 kB │ gzip:   1.60 kB
+../dist/public/assets/ScorecardPanel-DWPgtAlX.js                   10.41 kB │ gzip:   1.80 kB
+../dist/public/assets/HRPoliciesPage-But3Ca3O.js                   10.41 kB │ gzip:   1.64 kB
+../dist/public/assets/HRBenefitsPage-DpLidEQg.js                   10.47 kB │ gzip:   1.65 kB
+../dist/public/assets/mod-DSFj0Nzz.js                              10.49 kB │ gzip:   2.36 kB
+../dist/public/assets/yaml-Buea-lGh.js                             10.51 kB │ gzip:   2.26 kB
+../dist/public/assets/AgentTemplates-Ctkj7mgC.js                   10.56 kB │ gzip:   3.09 kB
+../dist/public/assets/AgentList-D1HUnZNk.js                        10.77 kB │ gzip:   2.40 kB
+../dist/public/assets/HRLettersCertificatesPage-CgnAkS3E.js        10.79 kB │ gzip:   1.63 kB
+../dist/public/assets/PSMDashboardPage-BGgB-wJs.js                 11.02 kB │ gzip:   1.75 kB
+../dist/public/assets/SimpleShellPage-BZ9iMXW6.js                  11.07 kB │ gzip:   2.75 kB
+../dist/public/assets/github-light-DAi9KRSo.js                     11.18 kB │ gzip:   2.52 kB
+../dist/public/assets/OpenRouterUsagePage-CWuDJ1C7.js              11.21 kB │ gzip:   1.55 kB
+../dist/public/assets/WSDashboardPage-CPnATlRo.js                  11.25 kB │ gzip:   1.52 kB
+../dist/public/assets/DirectoryDropdown-C_VQmshj.js                11.39 kB │ gzip:   3.23 kB
+../dist/public/assets/github-dark-DHJKELXO.js                      11.41 kB │ gzip:   2.56 kB
+../dist/public/assets/AITypesValidationPage-CEB7EL-0.js            11.44 kB │ gzip:   1.77 kB
+../dist/public/assets/HRHomePage-B9wIViO_.js                       11.50 kB │ gzip:   2.25 kB
+../dist/public/assets/ToolsManagementPage-8lx-sAxX.js              11.59 kB │ gzip:   2.52 kB
+../dist/public/assets/InboxPage-BYWgg7VQ.js                        11.73 kB │ gzip:   1.75 kB
+../dist/public/assets/RisksPanel-DwjYcv1n.js                       11.74 kB │ gzip:   1.94 kB
+../dist/public/assets/ShellNewPage-CmXdrFL6.js                     11.75 kB │ gzip:   2.03 kB
+../dist/public/assets/HRRoleDefinitionsPage-BxPfOrr5.js            11.80 kB │ gzip:   1.83 kB
+../dist/public/assets/PSCatalogPage-DL_5AtXI.js                    11.86 kB │ gzip:   1.70 kB
+../dist/public/assets/PSMRunPage-DhbnnMrM.js                       11.91 kB │ gzip:   2.30 kB
+../dist/public/assets/HRRoleDefinitionReviewPage-BYkgeIUo.js       11.92 kB │ gzip:   1.86 kB
+../dist/public/assets/Automation-thtj1I_z.js                       12.04 kB │ gzip:   2.73 kB
+../dist/public/assets/OpenRouterModelsPage-CwdUekU3.js             12.07 kB │ gzip:   1.81 kB
+../dist/public/assets/HRRoleDefinitionComparePage-BlCG9mG4.js      12.18 kB │ gzip:   1.69 kB
+../dist/public/assets/format-CLMFs22B.js                           12.18 kB │ gzip:   3.24 kB
+../dist/public/assets/AgentIdentityPage-CrgGkUBQ.js                12.18 kB │ gzip:   2.23 kB
+../dist/public/assets/HREngagementPage-D4Ra3quq.js                 12.24 kB │ gzip:   1.70 kB
+../dist/public/assets/HRTimesheetPage-DFqee2sE.js                  12.29 kB │ gzip:   1.69 kB
+../dist/public/assets/AgentHooksPage-7n4xHgcG.js                   12.37 kB │ gzip:   2.65 kB
+../dist/public/assets/index-DbCL8CB4.js                            12.39 kB │ gzip:   4.50 kB
+../dist/public/assets/KGIAShellPage-gP71ejuK.js                    12.41 kB │ gzip:   2.77 kB
+../dist/public/assets/OverviewPanel-B-1Qc1Nn.js                    12.49 kB │ gzip:   1.67 kB
+../dist/public/assets/Settings-B2kz66J4.js                         12.53 kB │ gzip:   2.44 kB
+../dist/public/assets/VectorDBManagement-CN6HJMAx.js               12.53 kB │ gzip:   2.21 kB
+../dist/public/assets/AgentVersionsPage-5Gs_WCvX.js                12.59 kB │ gzip:   2.49 kB
+../dist/public/assets/PMCentralShellPage-oKAYTPIe.js               12.68 kB │ gzip:   3.13 kB
+../dist/public/assets/OpenRouterConnectPage-hAt0Xnpo.js            12.76 kB │ gzip:   2.18 kB
+../dist/public/assets/HRShiftPlanningPage-CKhGs3Pl.js              12.91 kB │ gzip:   1.94 kB
+../dist/public/assets/DiffViewer-CGOHA5X6.js                       12.99 kB │ gzip:   2.74 kB
+../dist/public/assets/HRLeavePage-Cpzw8-1L.js                      13.17 kB │ gzip:   1.92 kB
+../dist/public/assets/ReportsPanel-BSL7mbR1.js                     13.19 kB │ gzip:   1.93 kB
+../dist/public/assets/ExecutionPanel-B9wSCopa.js                   13.24 kB │ gzip:   1.88 kB
+../dist/public/assets/scroll-area-B41RENEW.js                      13.29 kB │ gzip:   4.10 kB
+../dist/public/assets/PSMMethodDetailPage-Bv_S4KmF.js              13.40 kB │ gzip:   1.96 kB
+../dist/public/assets/LocalInference-BRohDOAr.js                   13.50 kB │ gzip:   2.28 kB
+../dist/public/assets/PSMAnalyticsPage-Dd9Wfnpl.js                 13.54 kB │ gzip:   1.71 kB
+../dist/public/assets/DownloadAnalytics-CbCIqne2.js                13.56 kB │ gzip:   1.78 kB
+../dist/public/assets/AITypesTaxonomyPage-D-PjrUwM.js              13.69 kB │ gzip:   2.28 kB
+../dist/public/assets/KGIASourcesPage-CewScoNx.js                  13.80 kB │ gzip:   2.24 kB
+../dist/public/assets/AgentBindingPage-DEwdjKBH.js                 13.82 kB │ gzip:   2.89 kB
+../dist/public/assets/AgentWorkflowsPage-BifBoSLW.js               14.10 kB │ gzip:   2.81 kB
+../dist/public/assets/WCPWorkflowBuilder-BezG9Tw8.js               14.19 kB │ gzip:   3.28 kB
+../dist/public/assets/OpenRouterShell-CWxVt4PE.js                  14.20 kB │ gzip:   2.93 kB
+../dist/public/assets/EmbeddingsManagement-Dh-2b_9y.js             14.29 kB │ gzip:   2.23 kB
+../dist/public/assets/AutoRemediationPage-DmK2eWZ5.js              14.34 kB │ gzip:   2.37 kB
+../dist/public/assets/PSIdeationPage-C0VaXPmx.js                   14.36 kB │ gzip:   2.90 kB
+../dist/public/assets/LLMControlPlane-BUuCvae0.js                  14.37 kB │ gzip:   2.51 kB
+../dist/public/assets/ProviderControlPanelPage-BSIdlunQ.js         14.38 kB │ gzip:   2.58 kB
+../dist/public/assets/PRMAICatalogPage-D57P4Me9.js                 14.40 kB │ gzip:   2.60 kB
+../dist/public/assets/PSMAICatalogPage-BXl-GWNv.js                 14.40 kB │ gzip:   2.60 kB
+../dist/public/assets/PSIdeationConvertPage-ChSnHaal.js            14.44 kB │ gzip:   2.02 kB
+../dist/public/assets/ComplianceExportPage-D9Hnofbd.js             14.62 kB │ gzip:   2.40 kB
+../dist/public/assets/ChangesPanel-KsB1alXy.js                     14.86 kB │ gzip:   2.44 kB
+../dist/public/assets/AgentEditor-CXQoVwQM.js                      14.96 kB │ gzip:   2.97 kB
+../dist/public/assets/rust-B1yitclQ.js                             15.07 kB │ gzip:   2.70 kB
+../dist/public/assets/AgentKnowledgePage-J1E2bsV6.js               15.07 kB │ gzip:   2.49 kB
+../dist/public/assets/CodeStudioControlPanelPage-DmLBUE_S.js       15.08 kB │ gzip:   2.33 kB
+../dist/public/assets/LLMCataloguePage-BKN_N7mV.js                 15.16 kB │ gzip:   3.21 kB
+../dist/public/assets/HRSectionLandingPage-DaMHjQtj.js             15.25 kB │ gzip:   2.22 kB
+../dist/public/assets/WCPExecutionDetails-BcnOoIvX.js              15.40 kB │ gzip:   2.29 kB
+../dist/public/assets/HRDirectoryPage-BbkiDCIq.js                  15.40 kB │ gzip:   2.23 kB
+../dist/public/assets/AgentMcpManagerPage-wh3PooWa.js              15.46 kB │ gzip:   3.10 kB
+../dist/public/assets/ProvidersComingSoonPage-BJPlq6PD.js          15.54 kB │ gzip:   2.42 kB
+../dist/public/assets/HRGoalsPage-CHYiOJdE.js                      15.62 kB │ gzip:   2.13 kB
+../dist/public/assets/HRGrievancesPage-BuKXXSoo.js                 15.87 kB │ gzip:   2.12 kB
+../dist/public/assets/PMProjectDetailPage-Dc6MXwt6.js              15.88 kB │ gzip:   1.80 kB
+../dist/public/assets/ProtocolsPage-C6Z8jXcd.js                    15.99 kB │ gzip:   2.85 kB
+../dist/public/assets/HRCompensationPage-GDJGGPjI.js               16.02 kB │ gzip:   2.09 kB
+../dist/public/assets/AgentStudioNewPage-BOCDlSl4.js               16.06 kB │ gzip:   2.45 kB
+../dist/public/assets/HRComplianceMgmtPage-CzOXVRfr.js             16.19 kB │ gzip:   2.11 kB
+../dist/public/assets/Analytics-D3icTnGI.js                        16.33 kB │ gzip:   2.08 kB
+../dist/public/assets/DoubleShellPage-SS7OMTEK.js                  16.34 kB │ gzip:   3.48 kB
+../dist/public/assets/AutomationExecutionDetails-DTUPM7hY.js       16.44 kB │ gzip:   2.64 kB
+../dist/public/assets/MaestroChatWindow-ClQGMtir.js                16.48 kB │ gzip:   3.65 kB
+../dist/public/assets/HRTalentPage-DeWrqW_2.js                     16.65 kB │ gzip:   2.20 kB
+../dist/public/assets/Documents-0Ay3WaXw.js                        16.90 kB │ gzip:   3.64 kB
+../dist/public/assets/PSMCaseDetailPage-CYqxu8az.js                17.13 kB │ gzip:   2.54 kB
+../dist/public/assets/PromotionRequestsPage-BUyopop-.js            17.21 kB │ gzip:   2.56 kB
+../dist/public/assets/HRCertificationsPage-D19Qniur.js             17.38 kB │ gzip:   2.06 kB
+../dist/public/assets/KGIAOversightPage-JK-FbhKl.js                17.44 kB │ gzip:   2.26 kB
+../dist/public/assets/AgentSimulationPage-mgKPZxu1.js              17.54 kB │ gzip:   3.23 kB
+../dist/public/assets/AgentRunDetailPanel-Biq-2GTC.js              17.72 kB │ gzip:   2.77 kB
+../dist/public/assets/SecretsPage-B2PcTQFT.js                      17.73 kB │ gzip:   2.95 kB
+../dist/public/assets/AgentChatPage-CBFv7gnd.js                    17.83 kB │ gzip:   3.55 kB
+../dist/public/assets/ProviderAnalytics-B8YciP33.js                17.87 kB │ gzip:   2.38 kB
+../dist/public/assets/AgentTestingPage-BweRMQjU.js                 17.93 kB │ gzip:   2.86 kB
+../dist/public/assets/ProviderConnectionsPage-DlN9EBQq.js          17.94 kB │ gzip:   2.94 kB
+../dist/public/assets/graphql-ChdNCCLP.js                          18.00 kB │ gzip:   2.52 kB
+../dist/public/assets/KGIABenchmarksPage-DylL59O9.js               18.37 kB │ gzip:   2.72 kB
+../dist/public/assets/OllamaSetup-BwftZvlf.js                      18.44 kB │ gzip:   3.27 kB
+../dist/public/assets/PolicyManagement-Bsc7PdB7.js                 18.52 kB │ gzip:   3.94 kB
+../dist/public/assets/UIShowcasePage-DINEDCU9.js                   18.55 kB │ gzip:   3.14 kB
+../dist/public/assets/pm-method-packs-C1JD02p9.js                  18.57 kB │ gzip:   4.31 kB
+../dist/public/assets/AgentDetailPage-YP7XFXfs.js                  18.58 kB │ gzip:   2.81 kB
+../dist/public/assets/OpenRouterPlaygroundPage-BrhmSgk3.js         18.61 kB │ gzip:   2.60 kB
+../dist/public/assets/OpenRouterHomePage-D2KVSe4A.js               18.89 kB │ gzip:   2.63 kB
+../dist/public/assets/LLMDashboard-BZKNgEUl.js                     18.95 kB │ gzip:   2.54 kB
+../dist/public/assets/AgentMarketplacePage-DXfhAAOk.js             19.30 kB │ gzip:   3.44 kB
+../dist/public/assets/AgentSubagentsPage-IoHCMstU.js               19.43 kB │ gzip:   3.28 kB
+../dist/public/assets/BotListPage-DkqALREm.js                      19.44 kB │ gzip:   3.83 kB
+../dist/public/assets/AutomationExecutions-q1GHIFhL.js             19.75 kB │ gzip:   3.00 kB
+../dist/public/assets/HRSettingsPage-9iQL3QdN.js                   20.02 kB │ gzip:   3.53 kB
+../dist/public/assets/AITypesControlPanelPage-D2T2WESx.js          20.07 kB │ gzip:   2.30 kB
+../dist/public/assets/DashboardPanel-ch8M9979.js                   20.37 kB │ gzip:   2.67 kB
+../dist/public/assets/ModelListPage-xDxiQbT0.js                    20.61 kB │ gzip:   3.88 kB
+../dist/public/assets/ErrorAnalysisDashboard-a3vmgGDH.js           20.81 kB │ gzip:   2.71 kB
+../dist/public/assets/ConnectProviderModal-C_CqsUjg.js             20.83 kB │ gzip:   4.20 kB
+../dist/public/assets/AgentOverviewPage-D9o5fYLt.js                20.93 kB │ gzip:   2.85 kB
+../dist/public/assets/HRAnalyticsDashboardPage-CYy0VfIT.js         21.05 kB │ gzip:   2.58 kB
+../dist/public/assets/AgentGovernancePage-B2x5PbMS.js              21.43 kB │ gzip:   3.67 kB
+../dist/public/assets/LLMPromotions-C1d5eMQp.js                    21.50 kB │ gzip:   3.45 kB
+../dist/public/assets/HRTrainingPage-CoHpprYE.js                   21.71 kB │ gzip:   2.45 kB
+../dist/public/assets/HROffboardingPage-C7-FnFhL.js                21.82 kB │ gzip:   2.96 kB
+../dist/public/assets/pm-methods-catalog-ChuE8GTo.js               22.20 kB │ gzip:   6.67 kB
+../dist/public/assets/CodeStudioAICatalogPage-Cu6cPFR-.js          22.22 kB │ gzip:   3.79 kB
+../dist/public/assets/HROnboardingPage-KmcgY1Nb.js                 22.22 kB │ gzip:   2.93 kB
+../dist/public/assets/AITypesPage-Du1gpn6W.js                      22.30 kB │ gzip:   3.31 kB
+../dist/public/assets/mod-Cvpl0i-3.js                              22.31 kB │ gzip:   4.93 kB
+../dist/public/assets/ProviderListPage--KU8V0Jh.js                 22.86 kB │ gzip:   4.41 kB
+../dist/public/assets/ResourceMonitor-BYWNu6-S.js                  23.09 kB │ gzip:   2.82 kB
+../dist/public/assets/HRRecruitmentPage-BrP3Ebw-.js                23.14 kB │ gzip:   2.70 kB
+../dist/public/assets/Models-DhCp6eGK.js                           23.21 kB │ gzip:   3.93 kB
+../dist/public/assets/sql-BLtJtn59.js                              23.41 kB │ gzip:   7.42 kB
+../dist/public/assets/ComingSoonListPage-qs6H6wmy.js               23.63 kB │ gzip:   3.02 kB
+../dist/public/assets/AgentEnginePanel-McMJCyBC.js                 23.75 kB │ gzip:   3.37 kB
+../dist/public/assets/RunConsolePage--GGZI1Dv.js                   24.05 kB │ gzip:   4.07 kB
+../dist/public/assets/AgentPublishPage-CYiZgyZa.js                 24.05 kB │ gzip:   4.07 kB
+../dist/public/assets/select-_AgXLNMz.js                           24.32 kB │ gzip:   7.73 kB
+../dist/public/assets/AgentStudioHomePage-DhcNAq8k.js              24.67 kB │ gzip:   4.04 kB
+../dist/public/assets/KGIAWorkbenchPage-DBevRFox.js                25.06 kB │ gzip:   5.01 kB
+../dist/public/assets/HomeTemplatePage-Bca2zkiE.js                 25.12 kB │ gzip:   4.95 kB
+../dist/public/assets/CodeEditor-SOyujqHf.js                       25.23 kB │ gzip:   7.00 kB
+../dist/public/assets/mod-bJSnTrfC.js                              25.97 kB │ gzip:   3.84 kB
+../dist/public/assets/AgentRuntimePage-BjtOkmEk.js                 26.67 kB │ gzip:   4.67 kB
+../dist/public/assets/AgentMcpPage-DXqFGQgz.js                     27.10 kB │ gzip:   5.05 kB
+../dist/public/assets/CodeStudioTemplatesPage-Clq37VH-.js          27.12 kB │ gzip:   3.98 kB
+../dist/public/assets/scss-OYdSNvt2.js                             27.20 kB │ gzip:   4.20 kB
+../dist/public/assets/java-CylS5w8V.js                             27.22 kB │ gzip:   4.27 kB
+../dist/public/assets/HRPerformanceReviewsPage-BQN7FPt1.js         27.33 kB │ gzip:   2.98 kB
+../dist/public/assets/mod-CgD-Zva_.js                              27.38 kB │ gzip:   5.84 kB
+../dist/public/assets/PSListPage-CvJmYflx.js                       27.58 kB │ gzip:   3.94 kB
+../dist/public/assets/LLMListPage-DYiwKLd2.js                      27.80 kB │ gzip:   5.58 kB
+../dist/public/assets/DriftDetectionPage-Dz5lMDmL.js               27.81 kB │ gzip:   6.70 kB
+../dist/public/assets/HRRoleDefinitionEditPage-DEw64yMk.js         27.84 kB │ gzip:   3.64 kB
+../dist/public/assets/AgentEditorPage-oFswzbCb.js                  27.91 kB │ gzip:   3.61 kB
+../dist/public/assets/ModelBrowser-3MnneQue.js                     28.05 kB │ gzip:   4.64 kB
+../dist/public/assets/ProviderWizardPage-Brzy9rYh.js               29.91 kB │ gzip:   4.55 kB
+../dist/public/assets/DocumentsDashboard-BujB-yl0.js               29.96 kB │ gzip:   4.23 kB
+../dist/public/assets/CodeStudioJobsPage-CHvUm6uc.js               30.08 kB │ gzip:   4.82 kB
+../dist/public/assets/AICatalogPage-DVrDQr5P.js                    30.27 kB │ gzip:   6.42 kB
+../dist/public/assets/AgentSkillCatalogPage-xEcvYNRs.js            30.45 kB │ gzip:   4.64 kB
+../dist/public/assets/LLMDetailPage-9QKqQO9e.js                    31.88 kB │ gzip:   4.31 kB
+../dist/public/assets/DataAcquisitionPage-ZJJx81cH.js              31.99 kB │ gzip:   4.06 kB
+../dist/public/assets/HardwareProfile-DZgBUJWZ.js                  32.04 kB │ gzip:   3.44 kB
+../dist/public/assets/AgentToolCatalogPage-yvpZDdDw.js             32.46 kB │ gzip:   4.81 kB
+../dist/public/assets/HRRoleDefinitionDetailPage-HqjsbhDC.js       32.74 kB │ gzip:   3.66 kB
+../dist/public/assets/OpenCodeChatPage-otNDrbU0.js                 33.69 kB │ gzip:   5.98 kB
+../dist/public/assets/AgentToolsPage-DPH-EzAm.js                   33.72 kB │ gzip:   4.59 kB
+../dist/public/assets/DeployPage-DFLq9frv.js                       33.79 kB │ gzip:   4.92 kB
+../dist/public/assets/PRMCaseWorkspacePage-CsQMRI8p.js             36.37 kB │ gzip:   4.91 kB
+../dist/public/assets/AgentRunsPage-B49WTEQq.js                    37.22 kB │ gzip:   6.08 kB
+../dist/public/assets/ProviderDetail-C2RSzN9M.js                   37.68 kB │ gzip:   5.51 kB
+../dist/public/assets/js-yaml-CO_3xtvD.js                          40.04 kB │ gzip:  13.52 kB
+../dist/public/assets/GovernanceScorecard-XHo_dl-r.js              40.35 kB │ gzip:   5.20 kB
+../dist/public/assets/LLMTrainingDashboard-giLFikE9.js             41.43 kB │ gzip:   4.34 kB
+../dist/public/assets/OpenCodeHomePage-DZzKbSuf.js                 41.54 kB │ gzip:   8.06 kB
+../dist/public/assets/bash-SHvotRv0.js                             41.69 kB │ gzip:   6.18 kB
+../dist/public/assets/TemplatesPanel-zcMJ-3Fd.js                   42.87 kB │ gzip:   7.00 kB
+../dist/public/assets/TriggersStore-DqW7-ldS.js                    43.77 kB │ gzip:   6.51 kB
+../dist/public/assets/AgentDashboardPage-DezeEoRn.js               43.88 kB │ gzip:   9.00 kB
+../dist/public/assets/MethodesPage-Uidv3iJG.js                     45.04 kB │ gzip:   5.89 kB
+../dist/public/assets/ModelsComingSoonPage-CgOQq1NT.js             45.17 kB │ gzip:   5.90 kB
+../dist/public/assets/LLMWizard-Dd7vyL5W.js                        45.66 kB │ gzip:   6.90 kB
+../dist/public/assets/BotsComingSoonPage-CzHpymbF.js               45.95 kB │ gzip:   6.37 kB
+../dist/public/assets/go-Dn2_MT6a.js                               46.78 kB │ gzip:   5.19 kB
+../dist/public/assets/css-DPfMkruS.js                              49.02 kB │ gzip:  11.85 kB
+../dist/public/assets/CodeStudioJobDetailPage-05hhiaMq.js          52.01 kB │ gzip:   6.91 kB
+../dist/public/assets/NewProviderPage-Cbzak3PS.js                  52.21 kB │ gzip:   7.72 kB
+../dist/public/assets/CVSettingsPage-sMSPyO6-.js                   52.78 kB │ gzip:   6.52 kB
+../dist/public/assets/ProjectPage-yu3sWr-R.js                      53.18 kB │ gzip:   8.72 kB
+../dist/public/assets/IdeaBuilderWizard-ByCC8xJo.js                53.64 kB │ gzip:   7.64 kB
+../dist/public/assets/schemas-DGrYQ6U4.js                          53.78 kB │ gzip:  14.32 kB
+../dist/public/assets/AgentStudioShell-DdBNEQGW.js                 56.35 kB │ gzip:   9.86 kB
+../dist/public/assets/LLMProviderConfigWizard-C_GuXdm2.js          57.19 kB │ gzip:   8.34 kB
+../dist/public/assets/html-GMplVEZG.js                             57.25 kB │ gzip:  11.75 kB
+../dist/public/assets/AutomationBuilder-Ck0uvXC-.js                57.26 kB │ gzip:  11.33 kB
+../dist/public/assets/CodeStudioHowToPage-Bf7CGn0D.js              58.77 kB │ gzip:  11.38 kB
+../dist/public/assets/markdown-Cvjx9yec.js                         59.34 kB │ gzip:   5.63 kB
+../dist/public/assets/engine-javascript-D0vevdJg.js                59.96 kB │ gzip:  20.93 kB
+../dist/public/assets/AgentsPage-tIIANG7g.js                       61.36 kB │ gzip:  10.21 kB
+../dist/public/assets/SandboxWFPage-CMYtdcLg.js                    66.86 kB │ gzip:   9.18 kB
+../dist/public/assets/ruby-DQmAk7WH.js                             69.10 kB │ gzip:   9.69 kB
+../dist/public/assets/python-B6aJPvgy.js                           69.95 kB │ gzip:   9.16 kB
+../dist/public/assets/Providers-IM8abkhM.js                        71.76 kB │ gzip:  10.66 kB
+../dist/public/assets/c-BIGW1oBm.js                                72.11 kB │ gzip:  10.48 kB
+../dist/public/assets/DocumentUpload-DWsaqLNv.js                   74.69 kB │ gzip:  19.26 kB
+../dist/public/assets/DataWarehousePage-Cfinu0aZ.js                79.34 kB │ gzip:   8.58 kB
+../dist/public/assets/PSWizardShell-CgVbc20o.js                    82.26 kB │ gzip:  10.78 kB
+../dist/public/assets/ActionsStore-BsdBves1.js                     83.24 kB │ gzip:  10.83 kB
+../dist/public/assets/csharp-CX12Zw3r.js                           85.62 kB │ gzip:  10.24 kB
+../dist/public/assets/swift-Dg5xB15N.js                            86.61 kB │ gzip:  14.68 kB
+../dist/public/assets/PMCentralPage-BJj37YAT.js                    86.63 kB │ gzip:  11.98 kB
+../dist/public/assets/DigitalHQPage-VgbjLwYG.js                    93.92 kB │ gzip:   8.82 kB
+../dist/public/assets/core-DzJuOd1u.js                             94.79 kB │ gzip:  29.64 kB
+../dist/public/assets/WorkConsoleShellPage-gJn2Lezb.js             98.20 kB │ gzip:  12.81 kB
+../dist/public/assets/OMTemplatesPage-DZ9npoJh.js                  99.20 kB │ gzip:  10.50 kB
+../dist/public/assets/HardwarePage-CdUrPvCy.js                    105.12 kB │ gzip:   9.10 kB
+../dist/public/assets/WSWizardPage-C4mndb4z.js                    106.39 kB │ gzip:  14.28 kB
+../dist/public/assets/GraphRAGPage-BQaOJzWu.js                    108.18 kB │ gzip:  11.48 kB
+../dist/public/assets/CodeStudioOpenCodeSettingsPage-BuwuUqE2.js  110.75 kB │ gzip:  11.40 kB
+../dist/public/assets/WFCreationShell-BODbfPQL.js                 110.91 kB │ gzip:  16.11 kB
+../dist/public/assets/php-CDn_0X-4.js                             111.00 kB │ gzip:  28.46 kB
+../dist/public/assets/GovernanceCenterPage-CFs4RJoA.js            118.59 kB │ gzip:  11.74 kB
+../dist/public/assets/LLMCreationWizard-SsMH-tjT.js               121.03 kB │ gzip:  16.16 kB
+../dist/public/assets/DiscoveryOpsPanel-DUn32Ymx.js               123.39 kB │ gzip:  18.66 kB
+../dist/public/assets/CandidatePage-D56vQgAe.js                   125.04 kB │ gzip:  17.62 kB
+../dist/public/assets/CatalogManagePage-DByGxrvs.js               130.77 kB │ gzip:  19.82 kB
+../dist/public/assets/style-0iDIBnn-.js                           136.63 kB │ gzip:  44.17 kB
+../dist/public/assets/WizardPage-BwvyKUTL.js                      155.21 kB │ gzip:  18.54 kB
+../dist/public/assets/PSControlPanelShell-BwBcS1y9.js             168.87 kB │ gzip:  18.23 kB
+../dist/public/assets/javascript-wDzz0qaB.js                      174.83 kB │ gzip:  16.60 kB
+../dist/public/assets/tsx-COt5Ahok.js                             175.54 kB │ gzip:  16.59 kB
+../dist/public/assets/jsx-g9-lgVsj.js                             177.79 kB │ gzip:  16.72 kB
+../dist/public/assets/typescript-BPQ3VLAy.js                      181.08 kB │ gzip:  16.11 kB
+../dist/public/assets/PSIdeationDetailPage-DD_7j91b.js            217.67 kB │ gzip:  27.19 kB
+../dist/public/assets/BarChart-Cz-YxVH8.js                        377.35 kB │ gzip: 102.77 kB
+../dist/public/assets/WikiArticle-B0KnVlyo.js                     483.51 kB │ gzip: 141.31 kB
+../dist/public/assets/cpp-BRuaLJcg.js                             637.55 kB │ gzip:  47.29 kB
+../dist/public/assets/WorkspaceExecutionShell-BBedkB6e.js         697.20 kB │ gzip:  75.63 kB
+../dist/public/assets/index-DhgXG3r5.js                           963.29 kB │ gzip: 252.09 kB
+✓ built in 3m 9s
+
+  dist/index.js  5.0mb ⚠️
+
+⚡ Done in 447ms
