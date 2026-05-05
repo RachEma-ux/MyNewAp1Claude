@@ -1342,3 +1342,81 @@ export const agsCatalogSyncLog = pgTable(
 
 export type AgsCatalogSyncLog = typeof agsCatalogSyncLog.$inferSelect;
 export type InsertAgsCatalogSyncLog = typeof agsCatalogSyncLog.$inferInsert;
+
+// ── CAG (Capability Pack) — RAC Phase 1A ─────────────────────────────────
+//
+// Per RAC_EXECUTION_PLAN.md Phase 1A. Two tables:
+//   - agsCagCapabilityPacks: versioned packs per draft, mutable status.
+//   - agsCagPackEvents: append-only event log.
+
+export const agsCagCapabilityPacks = pgTable(
+  "ags_cag_capability_packs",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    agentId: integer("agent_id").notNull(),
+    agentDraftId: integer("agent_draft_id").notNull(),
+    catalogEntryId: integer("catalog_entry_id"),
+    packType: varchar("pack_type", { length: 50 }).notNull().default("capability_v1"),
+    packVersion: integer("pack_version").notNull().default(1),
+    /** 'fresh' | 'stale' | 'archived' | 'invalid' */
+    status: varchar("status", { length: 32 }).notNull().default("fresh"),
+    contentJson: jsonb("content_json").$type<Record<string, unknown>>().notNull(),
+    compressedPrompt: text("compressed_prompt"),
+    tokenEstimate: integer("token_estimate"),
+    sourceManifestJson: jsonb("source_manifest_json").$type<Record<string, unknown>>().notNull(),
+    sourceHashesJson: jsonb("source_hashes_json").$type<Record<string, string>>().notNull(),
+    injectionPolicyJson: jsonb("injection_policy_json").$type<Record<string, unknown> | null>(),
+    riskSummaryJson: jsonb("risk_summary_json").$type<Record<string, unknown> | null>(),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at"),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (t) => ({
+    draftVersionIdx: uniqueIndex("uniq_ags_cag_pack_draft_version").on(
+      t.agentDraftId,
+      t.packVersion,
+    ),
+    statusIdx: index("idx_ags_cag_pack_status").on(t.status),
+    wsAgentIdx: index("idx_ags_cag_pack_ws_agent").on(t.workspaceId, t.agentId),
+  }),
+);
+
+export type AgsCagCapabilityPack = typeof agsCagCapabilityPacks.$inferSelect;
+export type InsertAgsCagCapabilityPack = typeof agsCagCapabilityPacks.$inferInsert;
+
+export const agsCagPackEvents = pgTable(
+  "ags_cag_pack_events",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    agentDraftId: integer("agent_draft_id").notNull(),
+    packId: integer("pack_id"),
+    /** 'pack_created' | 'pack_marked_stale' | 'pack_archived' | 'pack_used' | 'pack_validation_failed' | ... */
+    eventType: varchar("event_type", { length: 50 }).notNull(),
+    /** 'info' | 'warn' | 'error' */
+    eventSeverity: varchar("event_severity", { length: 20 }).notNull().default("info"),
+    reason: varchar("reason", { length: 255 }),
+    oldHash: varchar("old_hash", { length: 128 }),
+    newHash: varchar("new_hash", { length: 128 }),
+    runtimeRunId: integer("runtime_run_id"),
+    actorType: varchar("actor_type", { length: 20 }),
+    sourceType: varchar("source_type", { length: 50 }),
+    packVersion: integer("pack_version"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+  },
+  (t) => ({
+    draftCreatedIdx: index("idx_ags_cag_events_draft_created").on(
+      t.agentDraftId,
+      t.createdAt,
+    ),
+    packIdx: index("idx_ags_cag_events_pack").on(t.packId),
+  }),
+);
+
+export type AgsCagPackEvent = typeof agsCagPackEvents.$inferSelect;
+export type InsertAgsCagPackEvent = typeof agsCagPackEvents.$inferInsert;
