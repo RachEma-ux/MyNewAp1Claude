@@ -41,6 +41,13 @@ import {
   evaluateMcpPreInvoke,
   evaluateMcpPostInvoke,
 } from "../governance-adapter";
+import { readRiskClass } from "../cag";
+import {
+  getToolSandbox,
+  DEFAULT_SANDBOX_POLICY,
+  SandboxUnavailableError,
+  type ToolSandboxResult,
+} from "../sandbox";
 import type {
   DispatchMcpToolCallInput,
   DispatchMcpToolCallResult,
@@ -449,16 +456,57 @@ export async function dispatchMcpToolCall(
   }
 
   // ── 7. Invoke the tool ──
+  // RAC P9 — D-SBX-3 gate: tools classified as code_execution MUST
+  // run inside the ToolSandbox (D-SBX-IMPL-1: node:vm). All other
+  // risk classes invoke the MCP transport directly. The dispatcher
+  // reads riskClass via the CAG classifier (D-TOOL-5: single source
+  // of truth across CAG, dispatcher, and export readiness).
+  const riskClass = readRiskClass(tool as Parameters<typeof readRiskClass>[0]);
   let result: unknown;
-  let invokeError: { message: string; original: unknown } | null = null;
+  let invokeError: { message: string; original: unknown; sandboxCode?: string } | null = null;
   const invokeStartMs = Date.now();
-  try {
-    result = await conn.callTool(parsed.remoteToolName!, input.args ?? {});
-  } catch (e) {
-    invokeError = {
-      message: e instanceof Error ? e.message : String(e),
-      original: e,
-    };
+  if (riskClass === "code_execution") {
+    try {
+      const sandbox = getToolSandbox();
+      const sandboxResult: ToolSandboxResult = await sandbox.execute({
+        toolName: input.toolName,
+        args: input.args ?? {},
+        policy: DEFAULT_SANDBOX_POLICY,
+        ctx: {
+          // Dispatcher input doesn't carry a workspaceId; the sandbox
+          // ctx is correlation-only (D-SBX-IMPL-2 §3) so 0 is a sentinel.
+          workspaceId: 0,
+          actorId: input.caller?.userId ?? 0,
+          correlationId: String(input.runtimeRunId ?? input.agentDraftId),
+        },
+      });
+      if (sandboxResult.ok) {
+        result = sandboxResult.output;
+      } else {
+        invokeError = {
+          message: sandboxResult.error?.message ?? "sandbox returned ok=false without an error code",
+          original: sandboxResult.error,
+          sandboxCode: sandboxResult.error?.code,
+        };
+      }
+    } catch (e) {
+      // SandboxUnavailableError + any unhandled throws funnel here.
+      const code = e instanceof SandboxUnavailableError ? "SBX_UNAVAILABLE" : undefined;
+      invokeError = {
+        message: e instanceof Error ? e.message : String(e),
+        original: e,
+        sandboxCode: code,
+      };
+    }
+  } else {
+    try {
+      result = await conn.callTool(parsed.remoteToolName!, input.args ?? {});
+    } catch (e) {
+      invokeError = {
+        message: e instanceof Error ? e.message : String(e),
+        original: e,
+      };
+    }
   }
   const invokeDurationMs = Date.now() - invokeStartMs;
 
