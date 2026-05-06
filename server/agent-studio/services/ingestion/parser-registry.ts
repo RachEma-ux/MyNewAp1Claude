@@ -18,6 +18,7 @@ import { htmlSnapshotParser } from "./parsers/html-snapshot-parser";
 import { jsonParser } from "./parsers/json-parser";
 import { basicPdfTextParser } from "./parsers/basic-pdf-parser";
 import { basicCodeFileParser } from "./parsers/basic-code-parser";
+import { csvParser } from "./parsers/csv-parser";
 import { UnsupportedContentTypeError, type Parser } from "./types";
 
 const parsers = new Map<string, Parser>();
@@ -66,6 +67,7 @@ export function registerDefaultParsers(): void {
   registerParser(jsonParser);
   registerParser(basicPdfTextParser);
   registerParser(basicCodeFileParser);
+  registerParser(csvParser);
   defaultsRegistered = true;
 }
 

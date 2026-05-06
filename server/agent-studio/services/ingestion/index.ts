@@ -104,3 +104,4 @@ export { htmlSnapshotParser } from "./parsers/html-snapshot-parser";
 export { jsonParser } from "./parsers/json-parser";
 export { basicPdfTextParser } from "./parsers/basic-pdf-parser";
 export { basicCodeFileParser } from "./parsers/basic-code-parser";
+export { csvParser } from "./parsers/csv-parser";
