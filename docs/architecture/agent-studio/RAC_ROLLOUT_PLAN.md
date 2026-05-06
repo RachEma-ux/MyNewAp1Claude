@@ -156,7 +156,7 @@ Comment out the `writeTrace` + `writeContextBlocks` calls in `chat-stream.ts` en
 ## 7. What is explicitly out of scope for P12
 
 - Any new code or schema changes. P12 is docs-only.
-- Multi-region deployment guidance. We are still single-region; cross-region replication is a Stage 9 concern.
+- Multi-region deployment guidance. We are still single-region; the forward-looking shape + trigger conditions + swap surface are locked in `docs/architecture/agent-studio-multi-region.md` (D2 closure).
 - Cost/billing modelling for embedding traffic. The resource estimate (this PR's sibling doc) records the actuals; the cost model itself is a finance concern outside Agent Studio.
 - Chargeback for sandbox CPU time. The default node:vm impl runs in-process; future external-sandbox impls will need a metering story.
 

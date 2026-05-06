@@ -78,8 +78,8 @@ Phase 1 — CLAUDE.md and missing ADRs. Updated in this commit.
 
 ## Deferred Scope
 
-- pgvector migration — documented as future, not blocking.
-- Multi-region deployment guidance — single-region remains the operational baseline.
+- pgvector migration — documented as future, not blocking. Optional-engine activation closed at D1 (`docs/architecture/agent-studio-pgvector-future-migration.md` §11).
+- Multi-region deployment — single-region remains the operational baseline. Forward-looking ADR locks the deferral + trigger conditions + swap surface (`docs/architecture/agent-studio-multi-region.md`).
 
 ---
 

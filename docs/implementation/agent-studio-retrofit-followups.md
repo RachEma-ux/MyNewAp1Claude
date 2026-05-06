@@ -113,10 +113,15 @@ Implementation:
 
 **Tests** (16 new in `tests/agent-studio/pgvector-adapter.test.ts`): engine-up happy path with score normalization (`distance 0.0 → score 1.0`, `0.5 → 0.75`, `1.6 → 0.2`), SQL shape verification (`<=>` operator + `ORDER BY` + `LIMIT`), workspace-default fallback when source binding is null, extension-absent + column-absent both surface as `pgvector_extension_not_installed`, dim-mismatch refusal at search-time + at validateIndex-time, `EmbeddingDimMismatchError` thrown when query embedding dim ≠ 1536, source-missing + provider-unresolved + asdb-unavailable warnings, health-cache TTL coalescing within window + recovery after extension-installed flip. All tests use **deterministic fake data** via injected `getDb` + `embedQuery` + `getSource` + `now` — no live pgvector or ASDB required. Existing `rac-ingestion.test.ts` assertions updated to match the new engine-state reason taxonomy. Full agent-studio suite green at 482/482.
 
-### D2 — Multi-region deployment
+### D2 — Multi-region deployment ✅
 
-- **Status:** Single-region remains the operational baseline.
-- **Trigger:** When operations team formally requests it. The retrofit's row keys (workspaceId-scoped) are already amenable to per-region sharding.
+**Status:** CLOSED via doc-only ADR. Merged 2026-05-06.
+
+The original deferral spec was a single-line trigger ("when operations team formally requests it") with no anchor doc. D2 closure authors `docs/architecture/agent-studio-multi-region.md` — a forward-looking ADR mirroring the pgvector ADR's *original* shape: locks the deferral, enumerates four trigger conditions (§3.1 data residency / §3.2 user-latency / §3.3 failover/DR / §3.4 ops request), describes the swap surface (schema, region resolver, engine bindings, routing layer, read replicas, what stays single-region), documents a per-workspace migration plan with back-out, and explicitly lists what the ADR does NOT authorize.
+
+**No code shipped.** Single-region remains the intentional operational baseline. None of the four trigger conditions has fired in the retrofit. When a trigger fires, the ADR is amended (mirroring the pgvector D1 amendment pattern that added §11 with `D-PARSE-PGVECTOR-1..4`) and a separate planning + execution arc lands the implementation.
+
+**Why doc-only:** unlike D1 (where trigger §3.4 of the pgvector ADR fired in-codebase — no working vector retrieval shipped), D2 has no equivalent in-codebase signal. Single-region is intentional, not a gap. Building scaffolding without a real trigger ships speculation as code; the right output is the ADR that should already have existed.
 
 ### D3 — In-process synthesizers (legacy carryover) ✅
 
