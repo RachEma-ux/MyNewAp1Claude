@@ -51,6 +51,7 @@ import { getRunTree, invokeSubagent } from "../services/subagent-runner";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import { providerBindingsRouter } from "./provider-bindings-router";
 import { cagRouter } from "./cag-router";
+import { racSourcesRouter } from "./rac-sources-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2115,4 +2116,6 @@ export const agentStudioRouter = router({
   providerBindings: providerBindingsRouter,
   // RAC Phase 1D: Capability Pack preview/refresh APIs
   cag: cagRouter,
+  // RAC Phase 2: Source registry CRUD (profiles / sources / policies / ws-embedding-default)
+  racSources: racSourcesRouter,
 });

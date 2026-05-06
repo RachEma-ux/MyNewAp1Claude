@@ -18,6 +18,7 @@ import {
   varchar,
   integer,
   boolean,
+  real,
   timestamp,
   jsonb,
   index,
@@ -1420,3 +1421,119 @@ export const agsCagPackEvents = pgTable(
 
 export type AgsCagPackEvent = typeof agsCagPackEvents.$inferSelect;
 export type InsertAgsCagPackEvent = typeof agsCagPackEvents.$inferInsert;
+
+// ── RAC Phase 2 — Source Registry ──────────────────────────────────────────
+
+export const agsRacProfiles = pgTable(
+  "ags_rac_profiles",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    agentId: integer("agent_id").notNull(),
+    agentDraftId: integer("agent_draft_id").notNull(),
+    profileKey: varchar("profile_key", { length: 64 }).notNull().default("default"),
+    enabled: boolean("enabled").notNull().default(true),
+    /** Per-profile retrieval timeout override (D-RET-6). NULL → 3000ms default. */
+    timeoutMs: integer("timeout_ms"),
+    notes: text("notes"),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftKeyUniq: uniqueIndex("uniq_ags_rac_profile_draft_key").on(
+      t.agentDraftId,
+      t.profileKey,
+    ),
+    wsAgentIdx: index("idx_ags_rac_profile_ws_agent").on(t.workspaceId, t.agentId),
+  }),
+);
+
+export type AgsRacProfile = typeof agsRacProfiles.$inferSelect;
+export type InsertAgsRacProfile = typeof agsRacProfiles.$inferInsert;
+
+export const agsRacSources = pgTable(
+  "ags_rac_sources",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    profileId: integer("profile_id").notNull(),
+    /** D-RET-1 enum: cag_pack | memory | document_collection | vector_index | graph_index | workspace_context | project_context | tool_result_context | manual_context | external_connector */
+    sourceType: varchar("source_type", { length: 32 }).notNull(),
+    /** 'agentStudio' | 'dataAnalysis' | 'projectsSystem' | 'external' */
+    ownerModule: varchar("owner_module", { length: 32 }).notNull(),
+    /** ID of the owning module's record (e.g. document collection id, project id, graphrag source id). */
+    externalRefId: varchar("external_ref_id", { length: 255 }),
+    displayName: varchar("display_name", { length: 255 }),
+    enabled: boolean("enabled").notNull().default(true),
+    priority: integer("priority").notNull().default(50),
+    // ── D-EMB-1: embedding binding (NULL → workspace default per D-EMB-4) ──
+    embeddingProviderConnectionId: integer("embedding_provider_connection_id"),
+    embeddingModelRef: varchar("embedding_model_ref", { length: 255 }),
+    embeddingModelDim: integer("embedding_model_dim"),
+    embeddingModelVersion: varchar("embedding_model_version", { length: 64 }),
+    embeddingModelPinnedAt: timestamp("embedding_model_pinned_at"),
+    // ── D-RET-2: chunk override (NULL → defaults) ─────────────────────────
+    chunkSizeOverride: integer("chunk_size_override"),
+    chunkOverlapOverride: integer("chunk_overlap_override"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    profileIdx: index("idx_ags_rac_sources_profile").on(t.profileId),
+    wsTypeIdx: index("idx_ags_rac_sources_ws_type").on(t.workspaceId, t.sourceType),
+    priorityIdx: index("idx_ags_rac_sources_priority").on(t.profileId, t.priority),
+  }),
+);
+
+export type AgsRacSource = typeof agsRacSources.$inferSelect;
+export type InsertAgsRacSource = typeof agsRacSources.$inferInsert;
+
+export const agsRacPolicies = pgTable(
+  "ags_rac_policies",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    profileId: integer("profile_id").notNull(),
+    // ── D-RET-5: NULL = "use canonical default" ───────────────────────────
+    minScore: real("min_score"),
+    maxChunks: integer("max_chunks"),
+    dedupeBy: varchar("dedupe_by", { length: 32 }),
+    freshnessMaxAgeDays: integer("freshness_max_age_days"),
+    citationRequired: boolean("citation_required"),
+    sourcePermissionFilter: varchar("source_permission_filter", { length: 64 }),
+    /** 'warn' | 'block' | 'none' */
+    piiPolicy: varchar("pii_policy", { length: 16 }),
+    licensePolicy: varchar("license_policy", { length: 16 }),
+    timeoutMs: integer("timeout_ms"),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    profileUniq: uniqueIndex("uniq_ags_rac_policy_profile").on(t.profileId),
+  }),
+);
+
+export type AgsRacPolicy = typeof agsRacPolicies.$inferSelect;
+export type InsertAgsRacPolicy = typeof agsRacPolicies.$inferInsert;
+
+export const agsRacWorkspaceEmbeddingDefault = pgTable(
+  "ags_rac_workspace_embedding_default",
+  {
+    workspaceId: integer("workspace_id").primaryKey(),
+    embeddingProviderConnectionId: integer("embedding_provider_connection_id").notNull(),
+    embeddingModelRef: varchar("embedding_model_ref", { length: 255 }).notNull(),
+    embeddingModelDim: integer("embedding_model_dim").notNull(),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+);
+
+export type AgsRacWorkspaceEmbeddingDefault =
+  typeof agsRacWorkspaceEmbeddingDefault.$inferSelect;
+export type InsertAgsRacWorkspaceEmbeddingDefault =
+  typeof agsRacWorkspaceEmbeddingDefault.$inferInsert;
