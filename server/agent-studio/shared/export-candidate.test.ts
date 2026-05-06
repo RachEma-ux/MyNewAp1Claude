@@ -36,6 +36,19 @@ const fixture: AgentStudioExportCandidate = {
     receiptId: null,
     blockerRules: [],
   },
+  racReadiness: {
+    status: "ready",
+    reasons: [],
+    toolRisk: {
+      hasReadOnly: true,
+      hasRisky: false,
+      hasCodeExecution: false,
+      hasQuarantined: false,
+      classes: ["read_only"],
+    },
+    sandboxHealth: { ok: true, impl: "node-vm" },
+    computedAt: "2026-05-04T00:00:00.000Z",
+  },
   binding: {
     status: "binding_v1",
     providerConnectionId: 100,
@@ -66,6 +79,7 @@ describe("AgentStudioExportCandidate — Phase 29 contract", () => {
         "lifecycleState",
         "readiness",
         "governance",
+        "racReadiness",
         "binding",
         "capabilities",
         "sourceModule",
@@ -101,6 +115,16 @@ describe("AgentStudioExportCandidate — Phase 29 contract", () => {
       "providerCatalogEntryId",
       "providerConnectionId",
       "status",
+    ]);
+  });
+
+  it("nested racReadiness covers RAC P10 D-TOOL-4 fields", () => {
+    expect(Object.keys(fixture.racReadiness).sort()).toEqual([
+      "computedAt",
+      "reasons",
+      "sandboxHealth",
+      "status",
+      "toolRisk",
     ]);
   });
 

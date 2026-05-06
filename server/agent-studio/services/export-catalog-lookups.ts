@@ -11,10 +11,14 @@ import type {
   ExportCatalogLookups,
   ReconcileSyncDriftLookups,
 } from "./export-catalog";
+import type { ToolRiskClass } from "./cag/types";
 
 export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
   const { getAsDb } = await import("../db/connection");
   const { getDb } = await import("../../db/connection");
+  const repo = await import("../repository");
+  const { readRiskClass } = await import("./cag/risk-classifier");
+  const { probeSandboxForExport } = await import("./rac-readiness");
 
   return {
     async listPublishedAgents(filter) {
@@ -118,6 +122,54 @@ export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
         legacyImportState: r.legacyImportState ?? null,
         activeSourceVersionId: r.activeSourceVersionId ?? null,
       };
+    },
+
+    /**
+     * RAC P10 — resolve every tool the agent's current draft binds, and
+     * read each tool's risk class through the CAG classifier (D-TOOL-5
+     * single source of truth). Tools without a manifest-declared
+     * `riskClass` fall back to the built-in table; any other unclassified
+     * tool resolves to `quarantined` per D-TOOL-1 default-deny.
+     *
+     * Best-effort: if the draft can't be resolved the lookup returns an
+     * empty list, which the matrix interprets as "ready". That preserves
+     * existing dev-DB exports during the rollout window — the gate
+     * tightens automatically once tool manifests carry `riskClass`.
+     */
+    async listAgentToolRiskClasses(agentId) {
+      try {
+        const draft = await repo.getCurrentDraft(agentId);
+        if (!draft) return [];
+        const bindings = await repo.listToolBindings(draft.id);
+        const classes = new Set<ToolRiskClass>();
+        for (const b of bindings) {
+          // The binding row carries `toolName`; the registry classifier
+          // reads from the tool manifest. We synthesize a minimal McpTool
+          // so the classifier's contract is unchanged.
+          const cls = readRiskClass({
+            name: (b as { toolName?: string }).toolName ?? "",
+          });
+          classes.add(cls);
+        }
+        return [...classes];
+      } catch (err) {
+        // Production path is best-effort; downstream readiness defaults
+        // to "ready" when the list is empty. Log and continue.
+        console.warn(
+          `[export-catalog] listAgentToolRiskClasses failed for agent ${agentId}:`,
+          err instanceof Error ? err.message : err,
+        );
+        return [];
+      }
+    },
+
+    /**
+     * RAC P10 — sandbox health snapshot. Returns `null` when no impl is
+     * registered (the registry sentinel; D-SBX-2 hard-blocks
+     * `code_execution` agents in that case).
+     */
+    async getSandboxHealth() {
+      return probeSandboxForExport();
     },
   };
 }

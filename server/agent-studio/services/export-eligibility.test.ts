@@ -34,6 +34,19 @@ function eligibleFixture(): AgentStudioExportCandidate {
       receiptId: null,
       blockerRules: [],
     },
+    racReadiness: {
+      status: "ready",
+      reasons: [],
+      toolRisk: {
+        hasReadOnly: true,
+        hasRisky: false,
+        hasCodeExecution: false,
+        hasQuarantined: false,
+        classes: ["read_only"],
+      },
+      sandboxHealth: { ok: true, impl: "node-vm" },
+      computedAt: "2026-05-04T00:00:00.000Z",
+    },
     binding: {
       status: "binding_v1",
       providerConnectionId: 100,
@@ -53,7 +66,7 @@ describe("evaluateExportEligibility — Phase 31 gates", () => {
     const r = await evaluateExportEligibility(eligibleFixture());
     expect(r.eligible).toBe(true);
     expect(r.firstFailure).toBeNull();
-    expect(r.gates.length).toBe(9);
+    expect(r.gates.length).toBe(10);
     for (const g of r.gates) expect(g.pass).toBe(true);
   });
 
@@ -177,7 +190,51 @@ describe("evaluateExportEligibility — Phase 31 gates", () => {
     expect(r.eligible).toBe(false);
     expect(r.gates[0].pass).toBe(false);
     expect(r.gates[1].pass).toBe(false);
-    expect(r.gates.length).toBe(9);
+    expect(r.gates.length).toBe(10);
+  });
+
+  it("rac_readiness fails when racStatus=blocked", async () => {
+    const c = eligibleFixture();
+    c.racReadiness = {
+      status: "blocked",
+      reasons: ["sandbox_required"],
+      toolRisk: {
+        hasReadOnly: false,
+        hasRisky: false,
+        hasCodeExecution: true,
+        hasQuarantined: false,
+        classes: ["code_execution"],
+      },
+      sandboxHealth: null,
+      computedAt: "2026-05-06T00:00:00.000Z",
+    };
+    const r = await evaluateExportEligibility(c);
+    expect(r.firstFailure).toBe("rac_readiness");
+    const gate = r.gates.find((g) => g.gate === "rac_readiness")!;
+    expect(gate.pass).toBe(false);
+    expect(gate.reason).toMatch(/sandbox_required/);
+  });
+
+  it("rac_readiness passes when racStatus=degraded (warning only)", async () => {
+    const c = eligibleFixture();
+    c.racReadiness = {
+      status: "degraded",
+      reasons: ["write_requires_approval"],
+      toolRisk: {
+        hasReadOnly: false,
+        hasRisky: true,
+        hasCodeExecution: false,
+        hasQuarantined: false,
+        classes: ["write"],
+      },
+      sandboxHealth: { ok: true, impl: "node-vm" },
+      computedAt: "2026-05-06T00:00:00.000Z",
+    };
+    const r = await evaluateExportEligibility(c);
+    expect(r.eligible).toBe(true);
+    const gate = r.gates.find((g) => g.gate === "rac_readiness")!;
+    expect(gate.pass).toBe(true);
+    expect(gate.reason).toMatch(/degraded/);
   });
 
   it("firstFailure picks the FIRST failing gate in declared order", async () => {
