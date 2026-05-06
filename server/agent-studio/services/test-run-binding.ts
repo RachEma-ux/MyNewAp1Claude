@@ -43,6 +43,12 @@ import {
   evaluateProviderUsePolicy,
   type ProviderUsePolicyReason,
 } from "./provider-use-governance";
+import * as repo from "../repository";
+import { resolveCagPack } from "./cag";
+import {
+  composeSystemPrompt,
+  type ComposerMode,
+} from "./runtime/system-prompt-composer";
 
 /**
  * Reason a test-run could not produce output. Either a binding-policy
@@ -153,9 +159,49 @@ export async function runTestWithBinding(
     };
   }
 
+  // RAC P1C — when caller doesn't supply a systemPrompt, build one
+  // through the single composer (D-PRM-1). Caller-supplied prompts are
+  // passed through unchanged so test fixtures keep working.
+  let resolvedSystemPrompt = input.systemPrompt;
+  if (!resolvedSystemPrompt) {
+    const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
+    const draftRow = await repo.getDraftById(input.draftId).catch(() => null);
+    if (draftRow) {
+      try {
+        const resolvedCag = await resolveCagPack({
+          workspaceId: input.workspaceId,
+          agentId: (draftRow as any).agentId ?? draftRow.id,
+          agentDraftId: draftRow.id,
+          actorId: input.actorId,
+          mode: cagMode,
+        });
+        const composed = composeSystemPrompt({
+          mode: cagMode,
+          draft: {
+            name: (draftRow as any).name ?? null,
+            role: (draftRow as any).role ?? null,
+            scope: (draftRow as any).scope ?? null,
+            mission: (draftRow as any).mission ?? null,
+            systemInstructions: (draftRow as any).systemInstructions ?? null,
+            roleInstructions: (draftRow as any).roleInstructions ?? null,
+            policyInstructions: (draftRow as any).policyInstructions ?? null,
+            successCriteria: (draftRow as any).successCriteria ?? null,
+            escalationRules: (draftRow as any).escalationRules ?? null,
+          },
+          capabilityPack: resolvedCag.section,
+          retrievalEvidence: null,
+        });
+        resolvedSystemPrompt = composed.text;
+      } catch {
+        // Best-effort: fall through to no system prompt; the caller
+        // sees the same behavior as before when CAG resolution fails.
+      }
+    }
+  }
+
   const messages: ModelAccessMessage[] = [];
-  if (input.systemPrompt && input.systemPrompt.length > 0) {
-    messages.push({ role: "system", content: input.systemPrompt });
+  if (resolvedSystemPrompt && resolvedSystemPrompt.length > 0) {
+    messages.push({ role: "system", content: resolvedSystemPrompt });
   }
   messages.push({ role: "user", content: input.prompt });
 

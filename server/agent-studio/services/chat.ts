@@ -48,6 +48,12 @@ import type {
   ModelAccessToolCall,
 } from "../../openrouter/model-access/types";
 import { evaluateProviderUsePolicy } from "./provider-use-governance";
+import { resolveCagPack } from "./cag";
+import {
+  composeSystemPrompt,
+  CagRequiredError,
+  type ComposerMode,
+} from "./runtime/system-prompt-composer";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -646,12 +652,47 @@ export async function sendChatMessage(
     content: input.userMessage,
   });
 
-  // Build the system prompt up-front — needed by both the binding path
-  // (Phase 17) and the legacy path.
-  const systemPromptForBinding =
-    [draft.systemInstructions, draft.roleInstructions]
-      .filter((s): s is string => typeof s === "string" && s.length > 0)
-      .join("\n\n") || "You are a helpful assistant.";
+  // RAC P1C — single composer (D-PRM-1). Replaces the legacy
+  // [systemInstructions + roleInstructions] concat. Mode=disabled
+  // preserves byte-equivalent output (golden-tested).
+  const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
+  let cagSection = null;
+  let cagWarnings: string[] = [];
+  try {
+    const resolved = await resolveCagPack({
+      workspaceId: options.workspaceId ?? 1,
+      agentId: (draft as any).agentId ?? draft.id,
+      agentDraftId: draft.id,
+      actorId: options.actorId ?? 1,
+      mode: cagMode,
+    });
+    cagSection = resolved.section;
+    cagWarnings = resolved.warnings;
+  } catch (err) {
+    if (err instanceof CagRequiredError) {
+      throw err; // caller maps to chat error response
+    }
+    throw err;
+  }
+  const composedForBinding = composeSystemPrompt({
+    mode: cagMode,
+    draft: {
+      name: (draft as any).name ?? null,
+      role: (draft as any).role ?? null,
+      scope: (draft as any).scope ?? null,
+      mission: (draft as any).mission ?? null,
+      systemInstructions: draft.systemInstructions ?? null,
+      roleInstructions: draft.roleInstructions ?? null,
+      policyInstructions: (draft as any).policyInstructions ?? null,
+      successCriteria: (draft as any).successCriteria ?? null,
+      escalationRules: (draft as any).escalationRules ?? null,
+    },
+    capabilityPack: cagSection,
+    retrievalEvidence: null,
+  });
+  for (const w of cagWarnings) console.info(`[chat/cag] ${w}`);
+  for (const w of composedForBinding.warnings) console.info(`[chat/composer] ${w}`);
+  const systemPromptForBinding = composedForBinding.text;
 
   // Plan v3 Phase 17/18: prefer the binding-driven Model Access path
   // whenever a binding_v1 row exists for this draft AND it points at
