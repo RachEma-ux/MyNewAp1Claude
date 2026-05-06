@@ -124,7 +124,29 @@ export async function runIngestion(
       }
       throw e;
     }
-    const parsed = await parser.parse(artifact);
+    let parsed;
+    try {
+      parsed = await parser.parse(artifact);
+    } catch (e) {
+      // D-PARSE-OCR-3: parsers may refuse at parse-time when their
+      // engine is unhealthy; surface that as `unsupported_type` so it
+      // matches the missing-parser path operators already understand.
+      if (e instanceof UnsupportedContentTypeError) {
+        await completeJob({
+          jobId,
+          status: "unsupported_type",
+          ...counters,
+          failureReason: e.message,
+        });
+        return {
+          jobId,
+          status: "unsupported_type",
+          ...counters,
+          failureReason: e.message,
+        };
+      }
+      throw e;
+    }
 
     // ── Layer 3: Normalizer.normalize ──
     const normalizer =

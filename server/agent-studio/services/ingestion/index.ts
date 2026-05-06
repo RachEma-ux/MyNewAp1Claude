@@ -106,3 +106,5 @@ export { basicPdfTextParser } from "./parsers/basic-pdf-parser";
 export { basicCodeFileParser } from "./parsers/basic-code-parser";
 export { csvParser } from "./parsers/csv-parser";
 export { xlsxParser } from "./parsers/xlsx-parser";
+export { ocrParser, createOcrParser } from "./parsers/ocr-parser";
+export type { OcrParserDeps } from "./parsers/ocr-parser";

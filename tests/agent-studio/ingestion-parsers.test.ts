@@ -183,7 +183,7 @@ describe("parser registry", () => {
     resetParsersToDefaults();
   });
 
-  it("registers all 6 default parsers", () => {
+  it("registers all 9 default parsers (text/markdown/html/json/pdf/code/csv/xlsx/ocr)", () => {
     registerDefaultParsers();
     expect(selectParserForContentType("text/plain").key).toBe("text");
     expect(selectParserForContentType("text/markdown").key).toBe("markdown");
@@ -193,6 +193,15 @@ describe("parser registry", () => {
     expect(selectParserForContentType("text/x-typescript").key).toBe(
       "basic_code_file",
     );
+    expect(selectParserForContentType("text/csv").key).toBe("csv");
+    expect(
+      selectParserForContentType(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ).key,
+    ).toBe("xlsx");
+    // OCR registers unconditionally (D-PARSE-OCR-3) — health is checked
+    // at parse-time, not selection-time.
+    expect(selectParserForContentType("image/png").key).toBe("ocr");
   });
 
   it("throws UnsupportedContentTypeError for unknown types", () => {
