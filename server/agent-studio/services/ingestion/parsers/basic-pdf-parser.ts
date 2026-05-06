@@ -22,11 +22,11 @@ export const basicPdfTextParser: Parser = {
     // Lazy import — pdf-parse pulls in heavy deps; only loaded when a
     // PDF actually arrives.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParseModule = await import("pdf-parse");
+    const pdfParseModule = (await import("pdf-parse")) as unknown as
+      | ((buf: Buffer) => Promise<{ text: string; numpages: number }>)
+      | { default: (buf: Buffer) => Promise<{ text: string; numpages: number }> };
     const pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number }> =
-      // pdf-parse exports a CJS default; handle both shapes.
-      (pdfParseModule as { default?: typeof pdfParseModule } & typeof pdfParseModule).default ??
-      (pdfParseModule as unknown as (buf: Buffer) => Promise<{ text: string; numpages: number }>);
+      typeof pdfParseModule === "function" ? pdfParseModule : pdfParseModule.default;
 
     const result = await pdfParse(artifact.bytes);
     const fullText = (result.text ?? "").replace(/\r\n/g, "\n");
