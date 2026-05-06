@@ -48,6 +48,12 @@ const ALLOWED_IMPORTER_PREFIXES = [
   // The resolver file itself (and any sibling helper inside the
   // internal subtree) may import each other.
   "server/provider-connections/internal/",
+  // RAC P3: ingestion adapters resolve embedding credentials via the
+  // `withEmbeddingCredential` entry point per D-EMB-2. The ingestion
+  // subtree is the ONLY new external importer this allowlist gains;
+  // retrieval/planner/executor (P4) consume embedded queries via the
+  // adapter contract, not the resolver directly.
+  "server/agent-studio/services/rac/ingestion/",
 ] as const;
 
 /**

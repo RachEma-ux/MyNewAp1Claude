@@ -200,3 +200,81 @@ function buildAuthHeaders(
     Authorization: `Bearer ${pat}`,
   };
 }
+
+// ── RAC P3 — embedding-side credential resolution (D-EMB-2) ──────────
+
+/**
+ * Resolved context for an embedding HTTP call. Same auth surface as
+ * `ResolvedProviderCredentialContext` plus the absolute embeddings
+ * endpoint URL the caller should POST to and the model ref to send
+ * in the request body.
+ */
+export interface ResolvedEmbeddingCredentialContext
+  extends ResolvedProviderCredentialContext {
+  /** Absolute URL: e.g. `https://api.openai.com/v1/embeddings`. */
+  embeddingEndpoint: string;
+  /** Free-text model name forwarded to the upstream `model` field. */
+  modelRef: string;
+}
+
+/**
+ * Resolve a Provider Connection for an embedding call and run `fn`
+ * with it. Mirrors `withProviderCredential` (closure-scoped credential,
+ * never returned to caller) and adds the per-provider embeddings
+ * endpoint URL.
+ *
+ * Per D-EMB-2: ingestion / re-embedding MUST go through this entry
+ * point; reading raw `OPENAI_API_KEY` from `process.env` is a boundary
+ * violation flagged by `scripts/check-provider-credential-resolver-boundary.ts`.
+ *
+ * Endpoint selection rules:
+ *   - `provider.type === "anthropic"` → throws (Anthropic does not
+ *     publish a public embeddings endpoint as of this writing).
+ *   - `provider.type === "ollama"` OR baseUrl contains "ollama" →
+ *     `${baseUrl}/api/embeddings`.
+ *   - default (OpenAI-compatible) → `${baseUrl}/embeddings`.
+ *
+ * Trailing slashes are normalised so callers may pass either form
+ * for `baseUrl`.
+ */
+export async function withEmbeddingCredential<T>(
+  providerConnectionId: number,
+  modelRef: string,
+  fn: (credential: ResolvedEmbeddingCredentialContext) => Promise<T>,
+): Promise<T> {
+  return withProviderCredential(providerConnectionId, async (base) => {
+    const embeddingEndpoint = buildEmbeddingEndpoint(base.baseUrl, base.providerType);
+    return fn({
+      ...base,
+      embeddingEndpoint,
+      modelRef,
+    });
+  });
+}
+
+export class EmbeddingProviderUnsupportedError extends Error {
+  readonly code = "embedding_provider_unsupported";
+  constructor(providerType: string) {
+    super(
+      `Provider type "${providerType}" does not expose a public embeddings endpoint. ` +
+        `Pick a different provider connection for the embedding ref (D-EMB-2).`,
+    );
+    this.name = "EmbeddingProviderUnsupportedError";
+  }
+}
+
+function buildEmbeddingEndpoint(baseUrl: string, providerType: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  if (providerType === "anthropic") {
+    throw new EmbeddingProviderUnsupportedError(providerType);
+  }
+  if (providerType === "ollama" || /ollama/i.test(trimmed)) {
+    return `${trimmed}/api/embeddings`;
+  }
+  // OpenAI-compatible default. Some providers expose `/v1/embeddings`
+  // and store it directly in `baseUrl`; others store the API root and
+  // expect the suffix here. We honour both: if baseUrl already ends in
+  // `/embeddings`, return as-is; otherwise append.
+  if (/\/embeddings$/.test(trimmed)) return trimmed;
+  return `${trimmed}/embeddings`;
+}
