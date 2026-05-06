@@ -108,3 +108,5 @@ export { csvParser } from "./parsers/csv-parser";
 export { xlsxParser } from "./parsers/xlsx-parser";
 export { ocrParser, createOcrParser } from "./parsers/ocr-parser";
 export type { OcrParserDeps } from "./parsers/ocr-parser";
+export { audioParser, createAudioParser } from "./parsers/audio-parser";
+export type { AudioParserDeps } from "./parsers/audio-parser";
