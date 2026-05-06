@@ -55,6 +55,10 @@ import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
 import { racTraceRouter } from "./rac-trace-router";
 import { racEvaluationRouter } from "./rac-evaluation-router";
+import { kbRouter } from "./kb-router";
+import { toolKnowledgeRouter } from "./tool-knowledge-router";
+import { mcpSchemaSyncRouter } from "./mcp-schema-sync-router";
+import { toolApprovalsRouter } from "./tool-approvals-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2127,4 +2131,12 @@ export const agentStudioRouter = router({
   racTrace: racTraceRouter,
   // RAC Phase 8: Evaluation (evaluate / previewRetrieval / runGroundednessCheck)
   racEvaluation: racEvaluationRouter,
+  // Retrofit Phase 11: Knowledge Base read surface (units / provenance)
+  kb: kbRouter,
+  // Retrofit Phase 11: MCP tool knowledge mirror (Phase 7 sync targets)
+  toolKnowledge: toolKnowledgeRouter,
+  // Retrofit Phase 11: MCP schema sync trigger (Phase 7 sync action)
+  mcpSchemaSync: mcpSchemaSyncRouter,
+  // Retrofit Phase 11: ProposedToolCall approval queue (Phase 9 gate)
+  toolApprovals: toolApprovalsRouter,
 });

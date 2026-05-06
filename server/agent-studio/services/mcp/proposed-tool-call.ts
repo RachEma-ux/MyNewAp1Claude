@@ -224,8 +224,8 @@ function computeLiveSchemaHash(tool: McpTool): string {
 function validateArgumentsAgainstSchema(
   args: Record<string, unknown>,
   schema: Record<string, unknown> | undefined,
-): { ok: true } | { ok: false; code: ProposedToolCallValidationCode; message: string } {
-  if (!schema || typeof schema !== "object") return { ok: true };
+): { code: ProposedToolCallValidationCode; message: string } | null {
+  if (!schema || typeof schema !== "object") return null;
   const props = (schema.properties ?? {}) as Record<string, { type?: string }>;
   const required = (schema.required ?? []) as string[];
   const additionalProperties =
@@ -234,7 +234,6 @@ function validateArgumentsAgainstSchema(
   for (const key of required) {
     if (!(key in args)) {
       return {
-        ok: false,
         code: "missing_parameter",
         message: `required parameter "${key}" is missing`,
       };
@@ -243,10 +242,8 @@ function validateArgumentsAgainstSchema(
 
   for (const key of Object.keys(args)) {
     if (!(key in props)) {
-      // strict mode unless schema explicitly allows additionalProperties
       if (additionalProperties === false || additionalProperties === undefined) {
         return {
-          ok: false,
           code: "invented_parameter",
           message: `unknown parameter "${key}" not in tool input schema`,
         };
@@ -257,7 +254,6 @@ function validateArgumentsAgainstSchema(
         const actual = jsType(args[key]);
         if (actual !== expected && !(expected === "integer" && actual === "number")) {
           return {
-            ok: false,
             code: "invented_parameter",
             message: `parameter "${key}" has type ${actual}, expected ${expected}`,
           };
@@ -266,7 +262,7 @@ function validateArgumentsAgainstSchema(
     }
   }
 
-  return { ok: true };
+  return null;
 }
 
 function jsType(value: unknown): string {
@@ -303,12 +299,12 @@ export async function validateProposedToolCall(
   }
 
   // Gate 2 — Argument schema
-  const argResult = validateArgumentsAgainstSchema(call.arguments ?? {}, tool.inputSchema);
-  if (!argResult.ok) {
+  const argFailure = validateArgumentsAgainstSchema(call.arguments ?? {}, tool.inputSchema);
+  if (argFailure) {
     return {
       ok: false,
-      code: argResult.code,
-      message: argResult.message,
+      code: argFailure.code,
+      message: argFailure.message,
     };
   }
 
