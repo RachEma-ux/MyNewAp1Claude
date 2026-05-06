@@ -38,7 +38,10 @@
 // and both go through `gatewayCall("openRouter.modelAccess.execute")`.
 import * as repo from "../repository";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
-import { validateRuntimeToolCall } from "./runtime/proposed-tool-call-runtime";
+import {
+  gateRuntimeDispatch,
+  validateRuntimeToolCall,
+} from "./runtime/proposed-tool-call-runtime";
 import { getSnapshot } from "./mcp/registry";
 import { getAgentProviderBinding } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
@@ -399,14 +402,29 @@ async function runChatWithToolsViaBinding(input: {
             liveTool: spec.liveTool,
             arguments: args,
           });
-          if (!validation.ok) {
+          // Follow-up A2: approval gate after validator. Live chat has
+          // no formal runtime-run row, so sessionId stands in as the
+          // surrogate runtimeRunId on freshly-created approval rows.
+          const verdict = await gateRuntimeDispatch({
+            validation,
+            agentDraftId: input.draftId,
+            runtimeRunId: input.sessionId,
+            description: `chat session ${input.sessionId} · tool ${call.name}`,
+          });
+          if (!verdict.ok) {
+            const gate =
+              verdict.reason === "validator_rejected"
+                ? "proposed_tool_call_validator"
+                : "approval_gate";
             await repo.appendChatMessage({
               sessionId: input.sessionId,
               role: "tool",
               content: JSON.stringify({
-                error: validation.message,
-                code: validation.code,
-                gate: "proposed_tool_call_validator",
+                error: verdict.message,
+                code: verdict.code,
+                reason: verdict.reason,
+                approvalRequestId: verdict.approvalRequestId,
+                gate,
               }),
               toolPayload: { toolCallId: call.id, name: call.name },
             });

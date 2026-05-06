@@ -54,7 +54,10 @@ import type {
 import { dispatchMcpToolCall } from "./services/mcp/dispatcher";
 import { getSnapshot } from "./services/mcp/registry";
 import type { McpTool } from "./services/mcp/types";
-import { validateRuntimeToolCall } from "./services/runtime/proposed-tool-call-runtime";
+import {
+  gateRuntimeDispatch,
+  validateRuntimeToolCall,
+} from "./services/runtime/proposed-tool-call-runtime";
 import {
   CagRequiredError,
   type ComposerMode,
@@ -395,11 +398,26 @@ async function runStreamingToolLoop(args: {
             liveTool: spec.liveTool,
             arguments: parsedArgs,
           });
-          if (!validation.ok) {
+          // Follow-up A2: approval gate after validator. Live chat has
+          // no formal runtime-run row, so sessionId stands in as the
+          // surrogate runtimeRunId on freshly-created approval rows.
+          const verdict = await gateRuntimeDispatch({
+            validation,
+            agentDraftId: draftId,
+            runtimeRunId: sessionId,
+            description: `chat session ${sessionId} · tool ${openaiName}`,
+          });
+          if (!verdict.ok) {
+            const gate =
+              verdict.reason === "validator_rejected"
+                ? "proposed_tool_call_validator"
+                : "approval_gate";
             const errContent = JSON.stringify({
-              error: validation.message,
-              code: validation.code,
-              gate: "proposed_tool_call_validator",
+              error: verdict.message,
+              code: verdict.code,
+              reason: verdict.reason,
+              approvalRequestId: verdict.approvalRequestId,
+              gate,
             });
             await repo.appendChatMessage({
               sessionId,
@@ -411,7 +429,7 @@ async function runStreamingToolLoop(args: {
               type: "tool_end",
               toolName: openaiName,
               ok: false,
-              error: `${validation.code}: ${validation.message}`,
+              error: `${verdict.reason}: ${verdict.message}`,
             });
             continue;
           }
