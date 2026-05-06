@@ -110,3 +110,5 @@ export { ocrParser, createOcrParser } from "./parsers/ocr-parser";
 export type { OcrParserDeps } from "./parsers/ocr-parser";
 export { audioParser, createAudioParser } from "./parsers/audio-parser";
 export type { AudioParserDeps } from "./parsers/audio-parser";
+export { videoParser, createVideoParser } from "./parsers/video-parser";
+export type { VideoParserDeps } from "./parsers/video-parser";
