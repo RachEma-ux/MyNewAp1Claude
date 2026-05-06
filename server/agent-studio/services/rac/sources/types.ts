@@ -28,6 +28,10 @@ export const RAC_SOURCE_TYPES = [
   "tool_result_context",
   "manual_context",
   "external_connector",
+  // Retrofit P4 — NormalizedKnowledgeUnit retrieval (D-NKU-1).
+  "knowledge_unit",
+  // Retrofit P7 — MCP tool knowledge mirror (D-NKU-6).
+  "tool_knowledge",
 ] as const;
 
 export type RacSourceType = (typeof RAC_SOURCE_TYPES)[number];

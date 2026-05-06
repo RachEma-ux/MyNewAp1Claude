@@ -17,6 +17,7 @@ import type { RacIngestionAdapter, RacSource, RacWorkspaceEmbeddingDefault } fro
 import { EmbeddingProviderUnavailableError } from "./types";
 import { graphragAdapter } from "./graphrag-adapter";
 import { localPgvectorAdapter } from "./local-pgvector-adapter";
+import { knowledgeUnitAdapter } from "./knowledge-unit-adapter";
 
 export interface ResolvedEmbeddingBinding {
   providerConnectionId: number;
@@ -41,6 +42,15 @@ export function pickAdapter(sourceType: string): RacIngestionAdapter | null {
       return graphragAdapter;
     case "vector_index":
       return localPgvectorAdapter;
+    // Retrofit P4: NormalizedKnowledgeUnit retrieval over agsKnowledgeUnits.
+    case "knowledge_unit":
+      return knowledgeUnitAdapter;
+    // Retrofit P7: tool knowledge units share the knowledge_unit adapter
+    // since tool_knowledge units are persisted in the SAME agsKnowledgeUnits
+    // table per D-NKU-6 (no parallel pipeline). The Phase 7 sync service
+    // populates the rows; retrieval is the same shape.
+    case "tool_knowledge":
+      return knowledgeUnitAdapter;
     // In-process source types — no separate ingestion adapter.
     case "cag_pack":
     case "memory":
