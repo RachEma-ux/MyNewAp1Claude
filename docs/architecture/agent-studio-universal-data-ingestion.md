@@ -75,7 +75,11 @@ Running validation at retrieval time (per query) was rejected: it duplicates wor
 | BasicPdfTextParser | `application/pdf` | Text only, no OCR; page-level chunking |
 | BasicCodeFileParser | `text/x-{lang}` | Per-function or per-class units; preserves imports |
 
-Future parsers (DOCX, audio, video) are deferred. Unsupported content types fail safely: `IngestionJobService` records the job with `status="unsupported_type"` and the user sees a clear error.
+Future parsers (DOCX) are deferred. Unsupported content types fail safely: `IngestionJobService` records the job with `status="unsupported_type"` and the user sees a clear error.
+
+**Amended 2026-05-06 (follow-up §D4):** five additional parsers shipped after the initial six and are now in `registerDefaultParsers()` — `csv`, `xlsx`, `ocr`, `audio`, `video`. The decision logic for each engine-bound parser (OCR / audio / video) is locked in its own ADR (`agent-studio-ocr-parser.md`, `agent-studio-audio-parser.md`, `agent-studio-video-parser.md`); CSV and xlsx are in-process and need no separate ADR. The retrofit ships **11 parsers total**, not the original six. The "future parsers (DOCX...)" deferral still stands for shapes the §D4 follow-ups did not cover.
+
+**Amended 2026-05-06 (dispatcher widening for engine-bound parsers):** the original D-UI-5 promise — "unsupported content types fail safely as `status='unsupported_type'`" — was implemented as a try/catch around parser **selection** only. The §D4 follow-ups added four engine-bound parsers (OCR, audio, video, pgvector) that register their content types unconditionally but throw `UnsupportedContentTypeError` from `parse()` when their engine is unhealthy (D-PARSE-OCR-3 / -AUDIO-3 / -VIDEO-3 / -PGVECTOR-3). The dispatcher (`universal-ingestion-service.ts`) was widened to catch parse-time `UnsupportedContentTypeError` so engine-down scenarios surface as the same `status="unsupported_type"` operators already understand from missing-parser scenarios. Single shared try/catch covers all current and future engine-bound parsers; no per-parser dispatcher change needed.
 
 ### D-UI-6 — Ingestion never executes tools
 
@@ -88,7 +92,7 @@ The Universal Ingestion path consumes raw artifacts and produces normalized unit
 - **Downstream phases are unblocked.** Phase 4 wires units into the existing RAC retrieval; Phase 8's `ProposedToolCall` evidence references `knowledgeUnitIds` that are guaranteed to be unit IDs from this contract.
 - **Existing pipelines are not deleted in this retrofit.** `server/data-analysis/.../parserRouter.ts` and `server/catalog-import/file-parser.ts` continue to work for their narrow purposes; a follow-up phase can migrate them onto Universal Ingestion if the cost/benefit justifies it.
 - **Validation is upfront.** Ingestion time is more expensive; retrieval time is cheaper and more deterministic. This is the right tradeoff for a governance-sensitive system.
-- **Six parsers is enough for MVP.** The deferred set (DOCX, audio, video, OCR-PDF) is well-known and can land as needed.
+- **Six parsers is enough for MVP — eleven shipped post-MVP.** The original deferred set was DOCX / audio / video / OCR-PDF. §D4 follow-ups closed audio + video + image-OCR (and added CSV + xlsx); DOCX and OCR-PDF remain deferred. See `docs/implementation/agent-studio-retrofit-followups.md` §D4 for the closure record.
 
 ---
 

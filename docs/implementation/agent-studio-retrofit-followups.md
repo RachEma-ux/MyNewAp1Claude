@@ -1,7 +1,7 @@
 # Agent Studio Retrofit — Follow-up Task List
 
 **Owner:** Agent Studio module + Governance
-**Status:** Tracking — none blocking; retrofit closed at `55c8b6b` (P14, 2026-05-06).
+**Status:** Tracking — none blocking; retrofit closed at `55c8b6b` (P14, 2026-05-06). All §A–§D5 follow-ups closed 2026-05-06; review-cleanup PR addresses three latent issues + two doc drift items + adds the missing D-RAC-PLANNER ADR.
 **Source:** Recorded as work was deferred during the 14-phase retrofit; cross-references the closure doc at `docs/implementation/agent-studio-retrofit-acceptance.md`.
 
 This document is the contract for what the retrofit deliberately did *not* do. Each item names the deferral reason, the locked decision it falls under, and a concrete acceptance test for closing it.

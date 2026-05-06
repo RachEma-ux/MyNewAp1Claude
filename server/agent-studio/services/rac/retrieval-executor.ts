@@ -24,6 +24,7 @@ import type {
   RacRetrievalRequest,
   RacRetrievalResult,
 } from "./ingestion";
+import { EmbeddingDimMismatchError } from "./ingestion";
 import type { RetrievalPlan, RetrievalPlanItem } from "./retrieval-planner";
 
 /** D-RET-6 default. Per-profile override flows through `RetrievalPlan.profile.timeoutMs`. */
@@ -37,7 +38,11 @@ export interface ExecutedSourceResult {
   latencyMs: number;
   warnings: string[];
   /** Set when a runnable item failed at execution time (adapter throw, timeout, …). */
-  errorReason?: "timeout" | "adapter_error" | "skipped";
+  errorReason?:
+    | "timeout"
+    | "adapter_error"
+    | "embedding_dim_mismatch"
+    | "skipped";
   skipReason?: NonNullable<RetrievalPlanItem["skipReason"]>;
 }
 
@@ -151,6 +156,20 @@ async function runItem(
       warnings: result.warnings,
     };
   } catch (err) {
+    // D-EMB-3 hard fail surface: a dim mismatch is a configuration
+    // drift (source's pinned dim ≠ adapter's column / index dim), not
+    // a transient adapter failure. Operators see it as a distinct
+    // reason in the trace so they can re-pin the source's embedding
+    // model rather than chasing flaky-adapter ghosts. (Review cleanup.)
+    if (err instanceof EmbeddingDimMismatchError) {
+      return {
+        ...baseResult,
+        chunks: [],
+        latencyMs: Date.now() - start,
+        warnings: [`embedding_dim_mismatch: ${err.message}`],
+        errorReason: "embedding_dim_mismatch",
+      };
+    }
     const isTimeout =
       err instanceof Error && err.message === "rac_retrieval_timeout";
     const reason = isTimeout ? "timeout" : "adapter_error";

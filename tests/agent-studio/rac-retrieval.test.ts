@@ -33,6 +33,7 @@ import type {
   RacRetrievalRequest,
   RacRetrievalResult,
 } from "../../server/agent-studio/services/rac/ingestion";
+import { EmbeddingDimMismatchError } from "../../server/agent-studio/services/rac/ingestion";
 import type {
   RacPolicy,
   RacProfile,
@@ -326,6 +327,41 @@ describe("executor — per-source isolation", () => {
     const out = await executeRetrieval({ plan, query: "q" });
     expect(out.perSource[0].errorReason).toBe("adapter_error");
     expect(out.perSource[0].warnings.some((w) => /upstream_500/.test(w))).toBe(true);
+  });
+
+  it("discriminates EmbeddingDimMismatchError as `embedding_dim_mismatch`, not `adapter_error`", async () => {
+    // D-EMB-3: dim mismatch is a configuration drift signal, not a
+    // transient adapter failure. The trace surfaces it as a distinct
+    // reason so operators re-pin the source's embedding model rather
+    // than chasing flaky-adapter ghosts. (Review cleanup — review
+    // surfaced this conflation.)
+    const dimMismatchAdapter: RacIngestionAdapter = {
+      async search() {
+        throw new EmbeddingDimMismatchError(42, 1536, 768);
+      },
+      async health() {
+        return { status: "ok" as const };
+      },
+    };
+    const plan = fakePlan([
+      {
+        source: makeSource({ id: 42 }),
+        adapter: dimMismatchAdapter,
+        embedding: {
+          providerConnectionId: 100,
+          modelRef: "x",
+          dim: 1536,
+          resolvedFrom: "source",
+        },
+        skipReason: null,
+      },
+    ]);
+    const out = await executeRetrieval({ plan, query: "q" });
+    expect(out.perSource[0].errorReason).toBe("embedding_dim_mismatch");
+    expect(out.perSource[0].chunks).toEqual([]);
+    expect(
+      out.perSource[0].warnings.some((w) => /embedding_dim_mismatch/.test(w)),
+    ).toBe(true);
   });
 
   it("uses DEFAULT_RETRIEVAL_TIMEOUT_MS when profile.timeoutMs is null", () => {

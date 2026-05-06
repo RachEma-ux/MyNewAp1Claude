@@ -395,10 +395,35 @@ async function runStreamingToolLoop(args: {
         // dispatchMcpToolCall. Active gates with this runtime envelope
         // shape: invented_tool, missing_parameter, invented_parameter,
         // quarantined_tool, sandbox_required.
+        //
+        // Defense-in-depth: dispatchKey and spec are built from the same
+        // loop, so spec lookup miss should be impossible. If it happens
+        // anyway, fail closed — never bypass the validator + gate
+        // because of an internal lookup inconsistency. (Review cleanup.)
         const spec = specByOpenaiName.get(openaiName);
+        if (!spec) {
+          const errContent = JSON.stringify({
+            error: "tool spec lookup failed; refusing to dispatch without validator + gate",
+            code: "spec_lookup_failed",
+            gate: "proposed_tool_call_validator",
+          });
+          await repo.appendChatMessage({
+            sessionId,
+            role: "tool",
+            content: errContent,
+            toolPayload: { toolCallId: call.id, name: openaiName },
+          });
+          sendEvent({
+            type: "tool_end",
+            toolName: openaiName,
+            ok: false,
+            error: "spec_lookup_failed",
+          });
+          continue;
+        }
         let runtimeValidation: RuntimeValidationResult | null = null;
         let runtimeVerdict: RuntimeDispatchVerdict | null = null;
-        if (spec) {
+        {
           runtimeValidation = await validateRuntimeToolCall({
             mcpServerId: spec.mcpServerId,
             toolName: spec.remoteToolName,
