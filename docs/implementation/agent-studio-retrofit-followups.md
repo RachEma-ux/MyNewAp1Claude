@@ -113,22 +113,27 @@ These are tracked here for completeness and were marked *not blocking* at retrof
 - **Why carried over:** The retrofit deliberately did not touch these. They produce content at planner-build time rather than via the four-layer ingestion pipeline.
 - **Acceptance:** Each synthesizer either lands as a real `Parser`/`Normalizer` pair under `services/ingestion/parsers/` or is removed from the source-type enum.
 
-### D4 — Additional MVP parsers
+### D4 — Additional MVP parsers (partial ✅)
 
-The retrofit shipped 6 parsers (`text`, `markdown`, `html-snapshot`, `json`, `basic-pdf`, `basic-code`). Common follow-ups:
+**Status:** First parser (CSV) merged at `890ad84` (PR #209, 2026-05-06). The retrofit now ships 7 parsers (`text`, `markdown`, `html-snapshot`, `json`, `basic-pdf`, `basic-code`, `csv`).
 
-- Spreadsheet parser (Excel / CSV with header inference + `table_row` units per D-NKU-2).
+`csvParser` accepts `text/csv`, `application/csv`, `text/tab-separated-values`. Each non-header row becomes a `table_row` unit; first row is the header; canonical text projection is `key: value` lines. Auto-detects delimiter (comma / semicolon / tab); handles quoted fields with embedded commas/newlines/escaped quotes; tolerates LF/CRLF, blank lines, missing trailing newlines, empty/header-only inputs. 16 unit tests.
+
+**Still open** (each can ship independently):
+- Spreadsheet parser (Excel `.xlsx` — needs an external library).
 - Image OCR parser (writes `extracted_artifact` units).
 - Audio transcription parser.
 - Video keyframe + transcript parser.
 
-Each should slot into the existing registry without changes to `runIngestion`.
+### D5 — Pre-existing 10 `ai-types/integration` test failures ✅
 
-### D5 — Pre-existing 10 `ai-types/integration` test failures
+**Status:** CLOSED. Merged at `e645713` (PR #208, 2026-05-06).
 
-- **Files:** `tests/integration/ai-types/execution*.test.ts`, `tests/integration/ai-types/scenario-*.test.ts`.
-- **Status:** These were red on `main` *before* the retrofit and remained red throughout (the documented CI fingerprint). Orthogonal — none of them touch retrofit code paths.
-- **Acceptance:** Diagnose root cause (likely DB seed state mismatch or a timing dependency) and either fix or formally retire the affected scenarios.
+**Root cause:** `vi.mock(path)` in `tests/integration/ai-types/execution.test.ts` and `execution-observability.test.ts` used paths relative to the TEST FILE (`./db`, `../db`, etc.), but vitest resolves mock paths against the file where `vi.mock` is called. The SUT (`server/ai-types/execution.ts`) imported `./db` (= `server/ai-types/db`), `../db` (= `server/db`), `../agents/db`, `../providers/registry` — those resolved to entirely different module identities than the mocks declared in the test files. The mocks never intercepted; the real modules loaded; the tests saw "catalog entry no longer exists" and similar real-DB errors.
+
+**Fix:** Repathed all `vi.mock` calls to use absolute-from-test paths (`../../../server/...`); split the test imports so each symbol came from the same module the SUT imports (conversation/message helpers from `server/db`, catalog/execution helpers from `server/ai-types/db`); replaced module-mock for the registry with port wiring (`setProviderPort({ getRegistry: ... })`, `setAgentPort({ getAgent })`) since the SUT now uses port abstractions.
+
+**Result:** All 10 previously-red tests pass. The "10 pre-existing ai-types failures" are no longer the documented CI fingerprint baseline. **PRs from this point land with canonical 5/5 green.** D4's PR #209 was the first to land with this baseline.
 
 ---
 
