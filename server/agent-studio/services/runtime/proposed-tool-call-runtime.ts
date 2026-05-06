@@ -39,6 +39,11 @@ import {
   type ProposedToolCallValidatorContext,
 } from "../mcp/proposed-tool-call";
 import { readRiskClass } from "../cag/risk-classifier";
+import {
+  createApprovalRequest as defaultCreateApprovalRequest,
+  evaluateApprovalGate as defaultEvaluateApprovalGate,
+  type ApprovalDecision,
+} from "../approval/approval-gate";
 
 export interface RuntimeValidationInput {
   /** Canonical MCP server id (matches the agsMcpToolKnowledge mirror). */
@@ -123,4 +128,156 @@ export async function validateRuntimeToolCall(
     raw: result,
     call,
   };
+}
+
+// ── Approval-gate orchestration (Follow-up A2) ────────────────────────
+
+/**
+ * Reason codes the runtime callers (chat-stream / chat-service) branch
+ * on after the dispatch gate.
+ */
+export type RuntimeDispatchRejection =
+  | "validator_rejected"
+  | "approval_denied"
+  | "approval_expired"
+  | "approval_pending"
+  | "approval_required";
+
+/**
+ * Flattened so callers branch on `ok` cleanly under strictNullChecks:
+ * false. Rejection fields are nullable on the ok-side; the truthy
+ * `ok` is the discriminator the call sites care about.
+ */
+export interface RuntimeDispatchVerdict {
+  ok: boolean;
+  reason: RuntimeDispatchRejection | null;
+  message: string | null;
+  code: ProposedToolCallValidationCode | null;
+  call: ProposedToolCall;
+  approvalRequestId: number | null;
+}
+
+export interface GateRuntimeDispatchInput {
+  validation: RuntimeValidationResult;
+  agentDraftId: number;
+  /**
+   * Used as `runtimeRunId` on a freshly-created approval row. Live chat
+   * has no formal "runtime run" — the chat session id stands in. Schema
+   * column is integer NOT NULL, so a non-zero value is required.
+   */
+  runtimeRunId: number;
+  /** Optional human note recorded with a freshly-created approval row. */
+  description?: string | null;
+  /** Injectable for tests. */
+  evaluateGate?: typeof defaultEvaluateApprovalGate;
+  createRequest?: typeof defaultCreateApprovalRequest;
+}
+
+/**
+ * Compose the validator + approval gate into a single runtime verdict
+ * the chat loops can branch on. Pure orchestration — DB calls happen
+ * inside `evaluateApprovalGate` / `createApprovalRequest` (or the
+ * injected fakes during tests).
+ *
+ * Decision tree:
+ *   1. Validator rejected            → reason="validator_rejected"
+ *   2. requiresApproval=false        → ok=true (no gate)
+ *   3. Gate "permit"                 → ok=true (carries approvalRequestId)
+ *   4. Gate "denied"                 → reason="approval_denied"
+ *   5. Gate "expired"                → reason="approval_expired"
+ *   6. Gate "pending"                → reason="approval_pending"
+ *   7. Gate "approval_required"      → createApprovalRequest, then
+ *                                      reason="approval_required"
+ *                                      (carries new approvalRequestId)
+ */
+export async function gateRuntimeDispatch(
+  input: GateRuntimeDispatchInput,
+): Promise<RuntimeDispatchVerdict> {
+  if (!input.validation.ok) {
+    return {
+      ok: false,
+      reason: "validator_rejected",
+      message: input.validation.message ?? "validator rejected",
+      code: input.validation.code,
+      call: input.validation.call,
+      approvalRequestId: null,
+    };
+  }
+
+  const call = input.validation.call;
+  if (!call.requiresApproval) {
+    return {
+      ok: true,
+      reason: null,
+      message: null,
+      code: null,
+      call,
+      approvalRequestId: null,
+    };
+  }
+
+  const evaluate = input.evaluateGate ?? defaultEvaluateApprovalGate;
+  const createRequest = input.createRequest ?? defaultCreateApprovalRequest;
+
+  const gate = await evaluate({
+    agentDraftId: input.agentDraftId,
+    proposedToolCall: call,
+  });
+
+  switch (gate.decision as ApprovalDecision) {
+    case "permit":
+      return {
+        ok: true,
+        reason: null,
+        message: null,
+        code: null,
+        call,
+        approvalRequestId: gate.approvalRequestId,
+      };
+    case "denied":
+      return {
+        ok: false,
+        reason: "approval_denied",
+        message: gate.reason,
+        code: null,
+        call,
+        approvalRequestId: gate.approvalRequestId,
+      };
+    case "expired":
+      return {
+        ok: false,
+        reason: "approval_expired",
+        message: gate.reason,
+        code: null,
+        call,
+        approvalRequestId: gate.approvalRequestId,
+      };
+    case "pending":
+      return {
+        ok: false,
+        reason: "approval_pending",
+        message: gate.reason,
+        code: null,
+        call,
+        approvalRequestId: gate.approvalRequestId,
+      };
+    case "approval_required": {
+      const created = await createRequest({
+        runtimeRunId: input.runtimeRunId,
+        agentDraftId: input.agentDraftId,
+        proposedToolCall: call,
+        description: input.description ?? null,
+      });
+      return {
+        ok: false,
+        reason: "approval_required",
+        message: created.created
+          ? "approval newly created — awaiting decision"
+          : "approval already pending — awaiting decision",
+        code: null,
+        call,
+        approvalRequestId: created.approvalRequestId,
+      };
+    }
+  }
 }
