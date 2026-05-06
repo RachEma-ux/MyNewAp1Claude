@@ -19,11 +19,21 @@
  *   are exempt because they construct fixture data through object
  *   literals, not assignments.
  *
- * Future Rule C (deferred until RAC assembler lands in P5+):
- *   Only `server/agent-studio/services/runtime/system-prompt-composer.ts`
- *   may import both the CAG resolver and the RAC assembler in the
- *   same file. Today the assembler does not exist; this rule is a
- *   placeholder so the script is the single touchpoint when P5 lands.
+ * Future Rule C (deferred until P6 runtime orchestration lands):
+ *   The original P1E phrasing was "the composer is the only file that
+ *   imports both CAG resolver and RAC assembler". With the P5
+ *   assembler now in place, that simple wording conflicts with the
+ *   planned P6 edits to `chat-stream.ts`, `services/chat.ts`, and
+ *   `services/test-run-binding.ts` — those files will need to import
+ *   `resolveCagPack`, the planner/executor/filter, AND the assembler
+ *   so they can feed the composer. The honest invariant is "no file
+ *   outside the composer combines a CAG section + a retrieval-evidence
+ *   section into a finished prompt string" — which is hard to lint
+ *   structurally without type-aware AST. P6 lands a thin runtime
+ *   orchestrator that owns the resolver→executor→filter→assembler→
+ *   composer dance; once that exists, Rule C becomes "only the
+ *   orchestrator and the composer may import the assembler", which
+ *   IS structurally lintable. Until then, this header is the contract.
  */
 
 import { dirname, join, relative, resolve, sep } from "path";

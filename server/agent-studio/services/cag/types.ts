@@ -80,8 +80,8 @@ export interface CapabilityPackContent {
  * assembler) returns to the composer (D-PRM-1).
  */
 export interface SystemPromptSection {
-  /** Stable section id — `"capability-pack"` for CAG. */
-  id: "capability-pack";
+  /** Stable section id — `"capability-pack"` for CAG, `"retrieval-evidence"` for the P5 RAC assembler. The composer (P1C) overrides this id when emitting; the union is widened so both producers can return a type-honest section without casting. */
+  id: "capability-pack" | "retrieval-evidence";
   text: string;
   tokenEstimate: number;
   /** SHA-256 of `text`; input to the prompt cache key (D-PRM-5). */
