@@ -1,7 +1,9 @@
 # Agent Studio Retrofit — Follow-up Task List
 
 **Owner:** Agent Studio module + Governance
-**Status:** Tracking — none blocking; retrofit closed at `55c8b6b` (P14, 2026-05-06). All §A–§D5 follow-ups closed 2026-05-06; review-cleanup PR addresses three latent issues + two doc drift items + adds the missing D-RAC-PLANNER ADR.
+**Status:** Tracking — none blocking; retrofit closed at `55c8b6b` (P14, 2026-05-06). All §A–§D5 follow-ups closed 2026-05-06; review-cleanup PR addresses three latent issues + two doc drift items + adds the missing D-RAC-PLANNER ADR. Second-pass review cleanup wires the missing CAG compile metadata (D-CAG-RECON-3/4/5) and adds workspace-membership gating to the KB router.
+
+**Known systemic gap (NOT fixed by either cleanup PR):** the agent-studio API surface (kb-router was just hardened, but `tool-approvals-router`, `cag-router`, `rac-*-router` and 1693 lines of legacy router.ts) does NOT enforce per-resource ownership. The existing pattern is "any logged-in user can call the agent-studio surface; mutations are gated through `governedProcedure`." Cross-tenant isolation, where required, comes from `hasWorkspaceAccess(userId, workspaceId)` checks against the `workspace_members` table. The KB router now uses this gate; the rest of the surface inherits the existing posture. Tightening this systemically is a workspace-level architectural conversation, not a retrofit follow-up.
 **Source:** Recorded as work was deferred during the 14-phase retrofit; cross-references the closure doc at `docs/implementation/agent-studio-retrofit-acceptance.md`.
 
 This document is the contract for what the retrofit deliberately did *not* do. Each item names the deferral reason, the locked decision it falls under, and a concrete acceptance test for closing it.
