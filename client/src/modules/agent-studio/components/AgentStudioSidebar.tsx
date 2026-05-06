@@ -63,6 +63,8 @@ export type AgentStudioView =
   | "binding"
   // ── RAC P11: capability pack + RAC config + traces ──
   | "rac"
+  // ── Retrofit P12: Universal KB / Tool Knowledge / Approvals ──
+  | "retrofit"
   // ── Phase 13e: Catalog (global, no agent context) ──
   | "catalog-skills"
   | "catalog-tools"
@@ -139,6 +141,8 @@ const AGENT_GROUPS: SectionGroup[] = [
       { key: "runs", label: "Runs / Traces", icon: Activity },
       // RAC P11 — capability pack + retrieval-augmented context configuration.
       { key: "rac", label: "RAC", icon: ScanSearch },
+      // Retrofit P12 — Universal KB / Tool Knowledge / Approvals queue.
+      { key: "retrofit", label: "Retrofit", icon: BookOpen },
     ],
   },
   {
