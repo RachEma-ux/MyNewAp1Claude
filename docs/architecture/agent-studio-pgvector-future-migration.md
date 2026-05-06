@@ -1,9 +1,9 @@
-# Agent Studio pgvector Future Migration — ADR
+# Agent Studio pgvector — ADR
 
 **Owner:** Agent Studio module + Platform infrastructure
-**Phase:** 1 (Retrofit ADRs)
-**Status:** Adopted as forward-looking; **not** an MVP requirement
-**Authority:** Documents the conditions under which the platform would migrate vector storage into Postgres via pgvector, and what the swap surface looks like. Does NOT authorize the migration.
+**Phase:** 1 (Retrofit ADRs) + Follow-up D1 amendment (2026-05-06)
+**Status:** Adopted as **optional engine** for the retrofit. Activation per `D-PARSE-PGVECTOR-1..4`.
+**Authority:** Picks the engine binding + opt-in activation pattern + graceful-degradation contract. Locks the optional-engine path; does NOT mandate that any deployment install pgvector.
 
 ---
 
@@ -146,9 +146,16 @@ The migration is non-destructive to the external store until step 7 (decommissio
 - A platform-wide flag day.
 - Forcing all sources to migrate at once.
 - Adding pgvector as a Phase 4 prerequisite.
-- Adding a `vector(N)` column to any retrofit-scope table now.
+- Auto-installing the pgvector extension in any deployment.
 
-This ADR is forward-looking. The retrofit (Phases 0–14) does NOT touch vector storage. When/if the triggers in §3 fire, a separate planning + execution arc lands the migration.
+**Amended 2026-05-06 (follow-up D1):** the original wording forbade "adding a `vector(N)` column to any retrofit-scope table now." That clause is rescinded. Trigger §3.4 fired — the retrofit shipped with NO working vector retrieval (`local-pgvector-adapter.ts`, `graphrag-adapter.ts` were stubs; `knowledge-unit-adapter.ts` does jaccard token scoring, not embedding similarity). Adding the optional `vector(1536)` column to `agsKnowledgeChunks` is now authorized under the optional-engine pattern documented in §11.
+
+The amendment does NOT authorize:
+- Installing the pgvector extension in any environment automatically.
+- Backfilling existing embeddings without operator action.
+- Forcing any source to bind to the pgvector adapter.
+
+The column is **nullable**; deployments without the extension installed are unaffected. The adapter probes for the extension at runtime and refuses gracefully when absent (mirrors D-PARSE-OCR-3 / -AUDIO-3 / -VIDEO-3).
 
 ---
 
@@ -158,5 +165,56 @@ This ADR is forward-looking. The retrofit (Phases 0–14) does NOT touch vector 
 - [x] Trigger conditions enumerated.
 - [x] Swap surface described.
 - [x] Migration plan with back-out documented.
-- [x] Explicitly NOT authorized for the retrofit scope.
-- [ ] Re-evaluate when any §3 trigger fires.
+- [x] §3.4 trigger fired (no working vector retrieval shipped with the retrofit).
+- [x] Amended 2026-05-06 to authorize the optional-engine path (see §11).
+
+---
+
+## 11. Optional-engine activation (D-PARSE-PGVECTOR-1..4)
+
+Added 2026-05-06 as part of D1 closure. Mirrors the OCR/audio/video closure pattern.
+
+### 11.1 Decisions
+
+| ID | Decision | One-line rationale |
+|---|---|---|
+| **D-PARSE-PGVECTOR-1** | Engine binding: PostgreSQL pgvector extension on ASDB. Adapter implementation lives at `services/rac/ingestion/local-pgvector-adapter.ts` (was a stub; now real). | Existing per-source adapter slot; ASDB is the natural home since `agsKnowledgeChunks` already lives there. |
+| **D-PARSE-PGVECTOR-2** | No per-workspace credential binding. The pgvector extension is ASDB-resident; the embedding provider that produces vectors is workspace-bound via D-EMB-1 (unchanged). | The "remote provider" criterion in the D4 deferral spec doesn't apply — pgvector is a local Postgres extension, not a credentialed cloud vendor. |
+| **D-PARSE-PGVECTOR-3** | Adapter registers always (deterministic boot). At every `search()` call, probes `pg_extension` for the `vector` extension; refuses gracefully (`status: "unavailable"`, `source_unavailable` warning) when absent. 5-minute health-cache TTL — pgvector availability is much more stable than a remote worker's reachability. | Mirrors OCR/audio/video refusal-on-unhealthy. Operators see `unavailable` instead of an opaque crash; recovery is automatic when the extension installs and the cache flips. |
+| **D-PARSE-PGVECTOR-4** | Wire contract: column is `embedding vector(1536)` on `agsKnowledgeChunks`, nullable. Sources whose embedding dim is not 1536 are refused at search-time with `embedding_dim_mismatch`. Insert/backfill is operator-driven via the manual ops migration in `scripts/migrations/manual/pgvector-optional-engine.sql`. | 1536 is the OpenAI `text-embedding-3-small` dim — the most common in deployments. Other dims need a separate column or a multi-dim side table; that's a future amendment. |
+
+### 11.2 Activation steps (operator runbook)
+
+1. **Confirm the extension is available** on the target ASDB:
+   ```sql
+   SELECT * FROM pg_available_extensions WHERE name = 'vector';
+   ```
+2. **Install the extension** (requires CREATE EXTENSION privilege):
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+3. **Run the manual ops migration**: `psql -d asdb -f scripts/migrations/manual/pgvector-optional-engine.sql`. This adds the nullable `embedding vector(1536)` column to `ags_knowledge_chunks` and creates an HNSW index for cosine similarity.
+4. **Verify**: `SELECT extname, extversion FROM pg_extension WHERE extname='vector';` returns a row.
+5. **Wire a source**: insert an `ags_rac_sources` row with `source_type='vector_index'` and the workspace's 1536-dim embedding binding. The adapter takes over from there.
+6. **Backfill (optional)**: a one-shot script reads existing chunks for that source from the prior store, embeds them, writes to the new column. Throttled per Postgres write budget.
+
+The retrofit's automatic Drizzle migrations do NOT include any pgvector statements. Step 3 is operator-controlled.
+
+### 11.3 Failure modes (D-PARSE-PGVECTOR-3)
+
+| Failure | Adapter behavior | Operator surface |
+|---|---|---|
+| pgvector extension absent | `health()` returns `unavailable` with `pgvector_extension_not_installed`; `search()` returns empty chunks + `source_unavailable` warning | Trace dashboard shows the warning; operator runs the manual ops migration to install |
+| Source dim ≠ 1536 | `health()` returns `degraded` with `embedding_dim_unsupported`; `search()` throws `EmbeddingDimMismatchError` | Trace shows the dim mismatch; operator either re-pins the source's embedding model to 1536 or waits for the multi-dim amendment |
+| `embedding` column is NULL on all chunks | `search()` returns empty chunks (no rows match the cosine query); no warning | Backfill required (operator action) |
+| Postgres connection unavailable | Same as the rest of ASDB-resident adapters: `asdb_unavailable` warning | Existing ASDB health surface |
+
+### 11.4 Test strategy
+
+Unit tests exercise the adapter via injected `getAsDb` + `withEmbeddingCredential` fakes — no live pgvector required. Tests use **deterministic fake data**:
+
+- Fake AS-DB query returns pre-computed `(chunkId, content, score)` triples for the cosine query path.
+- Fake `withEmbeddingCredential` returns a deterministic 1536-dim vector based on a hash of the query text.
+- Fake `pg_extension` probe returns extension-present / extension-absent matrix.
+
+The factory pattern (`createPgvectorAdapter(deps)`) follows D-PARSE-OCR-3's shape exactly.

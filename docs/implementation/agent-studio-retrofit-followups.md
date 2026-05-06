@@ -96,11 +96,22 @@ Audit confirmed: zero bare `z.record(z.something())` patterns remain across `ser
 
 These are tracked here for completeness and were marked *not blocking* at retrofit close.
 
-### D1 — pgvector migration
+### D1 — pgvector migration ✅
 
-- **Doc:** `docs/architecture/agent-studio-pgvector-future-migration.md`
-- **Trigger:** When KB volume crosses the threshold where the existing per-source embedding binding in `agsRacSources` becomes a bottleneck. The migration plan adds a `vector(N)` column to `agsKnowledgeChunks` and rewires the retrieval planner; no changes required to the RAC source registry.
-- **Acceptance:** Latency p95 on a workload that includes vector retrieval drops below the documented target.
+**Status:** CLOSED via the optional-engine path. Merged 2026-05-06.
+
+**What was done:** the original ADR was forward-looking only ("ADR does NOT authorize... adding a `vector(N)` column to any retrofit-scope table now"). Trigger §3.4 fired — the retrofit shipped with NO working vector retrieval (`local-pgvector-adapter.ts`, `graphrag-adapter.ts` were stubs; `knowledge-unit-adapter.ts` does jaccard token scoring, not embedding similarity). Without a working vector adapter the retrofit's `vector_index` source type is gap-shaped.
+
+The ADR was amended to authorize the **optional-engine path** (mirrors D-PARSE-OCR-3 / -AUDIO-3 / -VIDEO-3). New decisions locked: `D-PARSE-PGVECTOR-1..4` in `docs/architecture/agent-studio-pgvector-future-migration.md` §11.
+
+Implementation:
+
+- **Manual ops migration** at `scripts/migrations/manual/pgvector-optional-engine.sql` — operator runs `psql -d asdb -f ...` to install the `vector` extension, add the nullable `embedding vector(1536)` column to `ags_knowledge_chunks`, and create the HNSW cosine index. **NOT in the Drizzle migration sequence** so deployments without pgvector are unaffected.
+- **Real adapter** replacing the stub at `services/rac/ingestion/local-pgvector-adapter.ts`. Factory pattern (`createPgvectorAdapter(deps)`) matches the OCR/audio/video shape exactly. Probes `pg_extension` + `information_schema.columns` per call (cached 5 min — pgvector availability is much more stable than a remote worker's reachability). When the extension is absent, returns `health: unavailable` + `source_unavailable` warning. When the source's embedding dim ≠ 1536, refuses with `embedding_dim_unsupported`. When healthy, runs cosine-similarity SQL via `<=>` operator and normalizes distance → score in [0, 1].
+- **Wire contract** (D-PARSE-PGVECTOR-4): column is `embedding vector(1536)` because OpenAI `text-embedding-3-small` is the dominant deployment dim. Sources with other dims need a separate column or a multi-dim side table; that's a future amendment.
+- **Activation runbook** in §11.2 of the ADR — six steps including pre-flight extension availability check, install, manual migration run, source binding, optional backfill.
+
+**Tests** (16 new in `tests/agent-studio/pgvector-adapter.test.ts`): engine-up happy path with score normalization (`distance 0.0 → score 1.0`, `0.5 → 0.75`, `1.6 → 0.2`), SQL shape verification (`<=>` operator + `ORDER BY` + `LIMIT`), workspace-default fallback when source binding is null, extension-absent + column-absent both surface as `pgvector_extension_not_installed`, dim-mismatch refusal at search-time + at validateIndex-time, `EmbeddingDimMismatchError` thrown when query embedding dim ≠ 1536, source-missing + provider-unresolved + asdb-unavailable warnings, health-cache TTL coalescing within window + recovery after extension-installed flip. All tests use **deterministic fake data** via injected `getDb` + `embedQuery` + `getSource` + `now` — no live pgvector or ASDB required. Existing `rac-ingestion.test.ts` assertions updated to match the new engine-state reason taxonomy. Full agent-studio suite green at 482/482.
 
 ### D2 — Multi-region deployment
 
