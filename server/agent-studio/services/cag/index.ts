@@ -71,3 +71,6 @@ export {
   MANDATORY_ASSERTIONS,
   CAG_MAX_PROMPT_TOKENS,
 } from "./renderer";
+
+export { resolveCagPack } from "./resolver";
+export type { ResolveCagInput, ResolveCagResult } from "./resolver";
