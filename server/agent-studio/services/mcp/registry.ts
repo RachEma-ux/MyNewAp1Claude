@@ -55,7 +55,33 @@ export interface PublishSnapshotInput {
 
 const snapshots = new Map<number, RegistrySnapshot>();
 
+/**
+ * Follow-up A4 — listeners notified after every publishSnapshot. The
+ * registry stays workspace-agnostic; subscribers carry the workspace
+ * context they need (via closures) and decide what to do with the
+ * event. The auto-sync subscriber under `services/mcp/auto-sync.ts`
+ * uses this to mirror live tools into agsMcpToolKnowledge.
+ */
+export type SnapshotListener = (event: {
+  current: RegistrySnapshot;
+  previous: RegistrySnapshot | undefined;
+}) => void | Promise<void>;
+
+const listeners = new Set<SnapshotListener>();
+
 // ── Public API ─────────────────────────────────────────────────────────────
+
+/**
+ * Subscribe to snapshot publishes. Returns an unsubscribe function.
+ * Listeners are best-effort — exceptions are swallowed so a buggy
+ * listener can't break the connect flow.
+ */
+export function subscribeSnapshots(listener: SnapshotListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 /**
  * Publish (or republish) a snapshot for a server. Increments the
@@ -80,7 +106,26 @@ export function publishSnapshot(input: PublishSnapshotInput): RegistrySnapshot {
     resources: Object.freeze([...input.resources]),
   });
   snapshots.set(input.serverId, snapshot);
+  // Follow-up A4: fire listeners after the snapshot is committed so
+  // they observe a registry state that matches what readers see.
+  for (const listener of listeners) {
+    try {
+      const r = listener({ current: snapshot, previous });
+      if (r && typeof (r as Promise<unknown>).catch === "function") {
+        (r as Promise<unknown>).catch(() => {
+          // swallow — listeners are best-effort
+        });
+      }
+    } catch {
+      // swallow — listeners are best-effort
+    }
+  }
   return snapshot;
+}
+
+/** Test helper: clear all listeners. Not part of the production API. */
+export function __clearListenersForTests(): void {
+  listeners.clear();
 }
 
 /**
