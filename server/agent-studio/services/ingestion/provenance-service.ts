@@ -1,0 +1,59 @@
+/**
+ * Provenance service — D-UI-2 mandatory context field #1.
+ *
+ * Persists the source connector + parser + normalizer + raw artifact
+ * hash + ingestion job id triple per unit. Returns the `provenanceId`
+ * the KnowledgeUnitService stores on the unit row (FK).
+ *
+ * Provenance rows are append-only; once written, they're never updated.
+ * If a re-parse produces a unit with the same `contentHash` but a
+ * different parser, that's a new provenance row (the parser changed,
+ * the input didn't — both facts matter).
+ */
+
+import { eq } from "drizzle-orm";
+import { getAsDb } from "../../db/connection";
+import { agsProvenanceRecords } from "../../../../drizzle/tables/agent-studio";
+
+export interface RecordProvenanceInput {
+  workspaceId: number;
+  sourceConnectorKey: string;
+  parserKey: string;
+  normalizerKey: string;
+  rawArtifactHash: string;
+  ingestionJobId?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export async function recordProvenance(
+  input: RecordProvenanceInput,
+): Promise<number> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+  const [row] = await db
+    .insert(agsProvenanceRecords)
+    .values({
+      workspaceId: input.workspaceId,
+      sourceConnectorKey: input.sourceConnectorKey,
+      parserKey: input.parserKey,
+      normalizerKey: input.normalizerKey,
+      rawArtifactHash: input.rawArtifactHash,
+      ingestionJobId: input.ingestionJobId ?? null,
+      metadataJson: input.metadata ?? null,
+    })
+    .returning({ id: agsProvenanceRecords.id });
+  return row.id;
+}
+
+export async function getProvenance(
+  provenanceId: number,
+): Promise<typeof agsProvenanceRecords.$inferSelect | null> {
+  const db = getAsDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(agsProvenanceRecords)
+    .where(eq(agsProvenanceRecords.id, provenanceId))
+    .limit(1);
+  return rows[0] ?? null;
+}
