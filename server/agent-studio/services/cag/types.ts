@@ -133,7 +133,32 @@ export interface CagCapabilityPack {
   updatedAt: Date;
   expiresAt: Date | null;
   lastUsedAt: Date | null;
+  // Retrofit P5 — Cache-Augmented + governance metadata (D-CAG-RECON-2).
+  /** SHA-256 of contentJson — keys cache reuse (D-CAG-RECON-3). */
+  contentHash: string | null;
+  /** SHA-256 of the rendered prompt section text (D-CAG-RECON-4). */
+  compiledHash: string | null;
+  /** Token estimate the renderer projected (separate from runtime actual). */
+  tokenBudgetEstimate: number | null;
+  /** Token estimate the runtime observed post-render. */
+  tokenBudgetActual: number | null;
+  /** 'ok' | 'warn' | 'error' — compile result from build/validate/render. */
+  compileResult: CagCompileResult | null;
+  /** Warnings collected during compile (empty array when clean). */
+  compileWarnings: string[];
+  /** 'cleared' | 'warn' | 'blocked' (D-CAG-RECON-5). */
+  governanceVerdict: CagGovernanceVerdict | null;
+  /** Rule ids when blocked or warn. */
+  governanceBlockers: string[];
+  /** Monotonic counter incremented on every chat-stream that loads the pack. */
+  useCount: number;
 }
+
+/** Retrofit P5 compile-result enum. */
+export type CagCompileResult = "ok" | "warn" | "error";
+
+/** Retrofit P5 governance-verdict enum (D-CAG-RECON-5). */
+export type CagGovernanceVerdict = "cleared" | "warn" | "blocked";
 
 export interface CreatePackInput {
   workspaceId: number;
@@ -149,6 +174,16 @@ export interface CreatePackInput {
   riskSummary?: Record<string, unknown> | null;
   createdBy: number;
   expiresAt?: Date | null;
+  // Retrofit P5 — optional compile + governance metadata. The store
+  // computes contentHash if omitted; callers that already have it
+  // (composer dry-run) can pass it through to avoid re-hashing.
+  contentHash?: string | null;
+  compiledHash?: string | null;
+  tokenBudgetEstimate?: number | null;
+  compileResult?: CagCompileResult | null;
+  compileWarnings?: string[];
+  governanceVerdict?: CagGovernanceVerdict | null;
+  governanceBlockers?: string[];
 }
 
 export interface CreatePackResult {
