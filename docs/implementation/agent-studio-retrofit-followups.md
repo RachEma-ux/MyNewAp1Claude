@@ -42,26 +42,29 @@ Two new surfaces: `services/mcp/registry.ts` gains `subscribeSnapshots(listener)
 
 ## B. Coverage (pure helpers tested; DB-touching paths need ASDB e2e)
 
-### B1 — DB-backed e2e for `syncToolKnowledge`
+### B1 — DB-backed e2e for `syncToolKnowledge` ✅
 
-- **What:** Exercise the full insert / update-on-hash-drift / mark-unavailable path against a live `asdb`.
-- **Decision basis:** Acceptance §3.5 of the closure doc.
-- **Acceptance:** Test asserts `agsMcpToolKnowledge` rows + the cascading `agsKnowledgeUnits` writes match the diff summary returned.
+**Status:** CLOSED. Merged at `05f5e75` (PR #204, 2026-05-06).
 
-### B2 — DB-backed e2e for the approval gate
+`tests/integration/agent-studio/sync-tool-knowledge.integration.test.ts` exercises the full Phase 7 round-trip against a live ASDB: insert path (mirror + `tool_knowledge` units materialize per D-NKU-6), hash-drift path (description change updates row + writes new unit; disappeared tool flips `available=false`), idempotent path (zero updates on re-sync). Auto-skips when DB env unset.
 
-- **What:** Round-trip create → decide allowed → permit → expire → re-decide. Verify `agsRuntimePolicyEvents` rows for each transition (D-APP-EXT-6).
-- **Acceptance:** Idempotency on `(agentDraftId, proposedToolCallHash)` proven against a real unique-ish lookup; `lastUsedAt` bumps only on permit.
+### B2 — DB-backed e2e for the approval gate ✅
 
-### B3 — DB-backed e2e for the trace writers
+**Status:** CLOSED. Merged at `05f5e75` (PR #204, 2026-05-06).
 
-- **What:** Insert a runtime trace, patch it with planner-mode + CAG hash, attach a tool-call trace; verify FK-correct join.
-- **Acceptance:** Reading from the runs page surfaces the joined view; rejection traces show null in approval/governance/dispatch.
+`tests/integration/agent-studio/approval-gate.integration.test.ts` covers the full lifecycle: create + idempotency on `(agentDraftId, proposedToolCallHash)`, evaluate-pending, decide-allowed (expiresAt set + audit row in `agsRuntimePolicyEvents` per D-APP-EXT-6 + lastUsedAt bumped + gate flips to permit), forced expiry → expired, denied stays denied, decide-on-decided returns terminal state without a second audit row.
 
-### B4 — Operator visual review of `RetrofitPage`
+### B3 — DB-backed e2e for the trace writers ✅
 
-- **What:** `client/src/**` is excluded from `tsc` per `tsconfig.json`; only the build job validates JSX. Operator should walk the 5 tabs against a seeded ASDB.
-- **Acceptance:** All 5 tabs render without console errors; allow/deny on the Approvals tab writes through and refreshes the list.
+**Status:** CLOSED. Merged at `05f5e75` (PR #204, 2026-05-06).
+
+`tests/integration/agent-studio/trace-writer.integration.test.ts` covers `recordToolCallTrace` happy path / rejection-nulls-downstream / ok+permit-surfaces-approval, plus `patchRacRuntimeTrace` for `plannerMode` + `plannerReason` + `cagCompiledHash`.
+
+### B4 — Operator visual review of `RetrofitPage` ✅
+
+**Status:** CLOSED (procedure documented). Merged at `05f5e75` (PR #204, 2026-05-06).
+
+Procedure recorded at `docs/implementation/agent-studio-retrofit-page-smoke.md` — per-tab checklist (Ingestion / Knowledge Units / Provenance / Tool Knowledge / Approvals) + cross-cutting checks + failure recording protocol. Operators run the procedure after any PR that touches `RetrofitPage.tsx` or the four P11 routers.
 
 ---
 
