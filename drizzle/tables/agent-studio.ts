@@ -882,10 +882,26 @@ export const agsPendingPermissionRequests = pgTable(
     /** Reason — typically populated for denials and timeouts */
     reason: text("reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // Retrofit P9 (D-APP-EXT-1): ProposedToolCall snapshot + idempotency key
+    /** Full ProposedToolCall payload (Phase 8 envelope) for audit + UI. */
+    proposedToolCallJson: jsonb("proposed_tool_call_json").$type<Record<string, unknown> | null>(),
+    /** SHA-256 of canonicalJson(proposedToolCallJson); idempotency key (D-APP-EXT-2). */
+    proposedToolCallHash: varchar("proposed_tool_call_hash", { length: 64 }),
+    /** Approval ttl per D-APP-EXT-5; null until decidedAt is set. */
+    expiresAt: timestamp("expires_at"),
+    /** Touched on every successful re-use of an `allowed` row. */
+    lastUsedAt: timestamp("last_used_at"),
+    /** Agent draft this approval is scoped to (D-APP-EXT-2 idempotency tuple). */
+    agentDraftId: integer("agent_draft_id"),
   },
   (t) => ({
     runIdx: index("idx_ags_pending_perm_run").on(t.runtimeRunId),
     statusIdx: index("idx_ags_pending_perm_status").on(t.status),
+    // D-APP-EXT-2: idempotent lookup by (draft, hash)
+    draftHashIdx: index("idx_ags_pending_perm_draft_hash").on(
+      t.agentDraftId,
+      t.proposedToolCallHash,
+    ),
   })
 );
 
@@ -1369,6 +1385,25 @@ export const agsCagCapabilityPacks = pgTable(
     sourceHashesJson: jsonb("source_hashes_json").$type<Record<string, string>>().notNull(),
     injectionPolicyJson: jsonb("injection_policy_json").$type<Record<string, unknown> | null>(),
     riskSummaryJson: jsonb("risk_summary_json").$type<Record<string, unknown> | null>(),
+    // Retrofit P5 (D-CAG-RECON-2): Cache-Augmented + governance metadata
+    /** SHA-256 of contentJson — keys cache reuse (D-CAG-RECON-3). */
+    contentHash: varchar("content_hash", { length: 64 }),
+    /** SHA-256 of the rendered prompt section text (D-CAG-RECON-4). */
+    compiledHash: varchar("compiled_hash", { length: 64 }),
+    /** Token estimate the renderer projected (separate from runtime actual). */
+    tokenBudgetEstimate: integer("token_budget_estimate"),
+    /** Token estimate the runtime observed post-render. */
+    tokenBudgetActual: integer("token_budget_actual"),
+    /** 'ok' | 'warn' | 'error' — compile result from build/validate/render. */
+    compileResult: varchar("compile_result", { length: 16 }),
+    /** Warnings collected during compile (empty array when clean). */
+    compileWarnings: jsonb("compile_warnings").$type<string[]>().default([]),
+    /** 'cleared' | 'warn' | 'blocked' (D-CAG-RECON-5). */
+    governanceVerdict: varchar("governance_verdict", { length: 16 }),
+    /** Rule ids when blocked or warn. */
+    governanceBlockers: jsonb("governance_blockers").$type<string[]>().default([]),
+    /** Monotonic counter incremented on every chat-stream that loads the pack. */
+    useCount: integer("use_count").notNull().default(0),
     createdBy: integer("created_by").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1571,6 +1606,20 @@ export const agsRacRuntimeTraces = pgTable(
     perSourceLatencyJson: jsonb("per_source_latency_json").$type<
       Record<string, number> | null
     >(),
+    // Retrofit P6 (D-RAC-PLANNER): explicit planner mode + reason
+    /**
+     * RAC P6 explicit planner mode. One of:
+     * 'no_retrieval' | 'cag_only' | 'knowledge_retrieval' |
+     * 'multimodal_hybrid_retrieval' | 'tool_knowledge_retrieval' |
+     * 'hybrid_cag_rag' | 'hybrid_cag_tool_knowledge' |
+     * 'hybrid_cag_rag_tool_knowledge'.
+     */
+    plannerMode: varchar("planner_mode", { length: 48 }),
+    /** Free-form reason from the planner, surfaced in trace UI. */
+    plannerReason: text("planner_reason"),
+    // Retrofit P5 (D-CAG-RECON-4): hash captured at compose time
+    /** SHA-256 of the rendered prompt section text (D-CAG-RECON-4). */
+    cagCompiledHash: varchar("cag_compiled_hash", { length: 64 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
@@ -1635,3 +1684,376 @@ export const agsRacFeedback = pgTable(
 
 export type AgsRacFeedback = typeof agsRacFeedback.$inferSelect;
 export type InsertAgsRacFeedback = typeof agsRacFeedback.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────────────
+// RETROFIT P2 — Universal Ingestion + Knowledge Base + Tool Knowledge +
+//               ProposedToolCall trace
+//
+// Schema additions for the Agent Studio Universal KB / Universal Ingestion /
+// RAC / RAG / CAG / MCP Tool-Use / Critical Approval retrofit. Locked by:
+//   - docs/architecture/agent-studio-universal-data-ingestion.md (D-UI-1..6)
+//   - docs/architecture/agent-studio-normalized-knowledge-unit.md (D-NKU-1..6)
+//   - docs/architecture/agent-studio-proposed-tool-call.md       (D-PTC-1..6)
+//
+// All tables follow the existing `ags_*` prefix convention. Every row is
+// workspace-scoped; cross-workspace reads are forbidden by the service layer.
+// ────────────────────────────────────────────────────────────────────────────
+
+// ── Provenance (D-UI-2 mandatory context field) ─────────────────────────────
+
+export const agsProvenanceRecords = pgTable(
+  "ags_provenance_records",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Source connector that fetched the raw artifact. */
+    sourceConnectorKey: varchar("source_connector_key", { length: 64 }).notNull(),
+    /** Parser that turned the raw artifact into the parsed document. */
+    parserKey: varchar("parser_key", { length: 64 }).notNull(),
+    /** Normalizer that produced the unit. */
+    normalizerKey: varchar("normalizer_key", { length: 64 }).notNull(),
+    /** SHA-256 of the raw artifact bytes. */
+    rawArtifactHash: varchar("raw_artifact_hash", { length: 64 }).notNull(),
+    /** FK to the ingestion job that produced the unit (null for ad-hoc imports). */
+    ingestionJobId: integer("ingestion_job_id"),
+    /** When the raw artifact was first ingested. */
+    ingestedAt: timestamp("ingested_at").defaultNow().notNull(),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+  },
+  (t) => ({
+    wsRawHashIdx: index("idx_ags_provenance_ws_raw_hash").on(
+      t.workspaceId,
+      t.rawArtifactHash,
+    ),
+    jobIdx: index("idx_ags_provenance_job").on(t.ingestionJobId),
+  }),
+);
+
+export type AgsProvenanceRecord = typeof agsProvenanceRecords.$inferSelect;
+export type InsertAgsProvenanceRecord = typeof agsProvenanceRecords.$inferInsert;
+
+// ── Ingestion artifacts (D-UI-3 raw bytes; not directly retrievable) ────────
+
+export const agsIngestionArtifacts = pgTable(
+  "ags_ingestion_artifacts",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Connector that fetched the artifact. */
+    sourceConnectorKey: varchar("source_connector_key", { length: 64 }).notNull(),
+    /** Original URI / path. */
+    sourceUri: text("source_uri"),
+    /** Reported content type (best-effort). */
+    contentType: varchar("content_type", { length: 128 }),
+    /** SHA-256 of the artifact bytes; same value goes on provenance. */
+    contentHash: varchar("content_hash", { length: 64 }).notNull(),
+    /** Storage backend reference; bytes live OUT of Postgres. */
+    storageRef: text("storage_ref"),
+    /** Bytes count for budgeting. */
+    sizeBytes: integer("size_bytes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    wsHashIdx: uniqueIndex("uniq_ags_ingestion_artifact_ws_hash").on(
+      t.workspaceId,
+      t.contentHash,
+    ),
+  }),
+);
+
+export type AgsIngestionArtifact = typeof agsIngestionArtifacts.$inferSelect;
+export type InsertAgsIngestionArtifact = typeof agsIngestionArtifacts.$inferInsert;
+
+// ── Ingestion jobs (lifecycle wrapper) ──────────────────────────────────────
+
+export const agsIngestionJobs = pgTable(
+  "ags_ingestion_jobs",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Source connector that originated the job. */
+    sourceConnectorKey: varchar("source_connector_key", { length: 64 }).notNull(),
+    /** Optional source URI for logging. */
+    sourceUri: text("source_uri"),
+    /** 'pending' | 'running' | 'succeeded' | 'failed' | 'unsupported_type'. */
+    status: varchar("status", { length: 24 }).notNull().default("pending"),
+    /** Reported content type. */
+    contentType: varchar("content_type", { length: 128 }),
+    /** Counters surfaced in the UI / audit. */
+    artifactsCreated: integer("artifacts_created").notNull().default(0),
+    unitsCreated: integer("units_created").notNull().default(0),
+    chunksCreated: integer("chunks_created").notNull().default(0),
+    extractionsCreated: integer("extractions_created").notNull().default(0),
+    /** Free-form failure reason. */
+    failureReason: text("failure_reason"),
+    requestedBy: integer("requested_by").notNull(),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+  },
+  (t) => ({
+    wsStatusIdx: index("idx_ags_ingestion_jobs_ws_status").on(
+      t.workspaceId,
+      t.status,
+    ),
+  }),
+);
+
+export type AgsIngestionJob = typeof agsIngestionJobs.$inferSelect;
+export type InsertAgsIngestionJob = typeof agsIngestionJobs.$inferInsert;
+
+// ── NormalizedKnowledgeUnit (D-NKU-2 locked shape) ──────────────────────────
+
+export const agsKnowledgeUnits = pgTable(
+  "ags_knowledge_units",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** FK to ags_rac_sources (the source registry from RAC P2). */
+    sourceId: integer("source_id").notNull(),
+    /** Hierarchical parent unit (e.g., a PDF page → child unit). */
+    parentUnitId: integer("parent_unit_id"),
+    /**
+     * D-NKU-2: 'text' | 'markdown_section' | 'html_block' | 'json_object' |
+     * 'pdf_page' | 'code_function' | 'code_class' | 'table_row' |
+     * 'tool_knowledge' | 'extracted_artifact'.
+     */
+    unitType: varchar("unit_type", { length: 32 }).notNull(),
+    /** D-NKU-3: canonical text projection (always present). */
+    contentText: text("content_text").notNull(),
+    /** Optional structured shape for downstream consumers (D-NKU-2). */
+    contentJson: jsonb("content_json").$type<Record<string, unknown> | null>(),
+    /** D-NKU-4: SHA-256 of contentText for dedupe + cache. */
+    contentHash: varchar("content_hash", { length: 64 }).notNull(),
+    /** Source location for citation rendering. */
+    sourceLocation: jsonb("source_location").$type<{
+      uri?: string | null;
+      pageNumber?: number | null;
+      lineRange?: { start: number; end: number } | null;
+      selector?: string | null;
+    } | null>(),
+    /** D-UI-2 mandatory: provenance row. */
+    provenanceId: integer("provenance_id").notNull(),
+    /** D-UI-2 mandatory: permission scope. */
+    permissionContext: jsonb("permission_context").$type<{
+      inheritFromSource: boolean;
+      explicitAclRef?: string | null;
+    }>().notNull(),
+    /** D-UI-2 mandatory: 'fresh' | 'stale' | 'expired'. */
+    freshnessState: varchar("freshness_state", { length: 16 })
+      .notNull()
+      .default("fresh"),
+    lastValidatedAt: timestamp("last_validated_at").defaultNow().notNull(),
+    /** D-UI-4: 'ok' | 'warn' | 'blocked'. */
+    validationStatus: varchar("validation_status", { length: 16 })
+      .notNull()
+      .default("ok"),
+    validationResultId: integer("validation_result_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    archivedAt: timestamp("archived_at"),
+  },
+  (t) => ({
+    wsSourceIdx: index("idx_ags_knowledge_units_ws_source").on(
+      t.workspaceId,
+      t.sourceId,
+    ),
+    contentHashIdx: index("idx_ags_knowledge_units_content_hash").on(t.contentHash),
+    freshnessIdx: index("idx_ags_knowledge_units_freshness").on(t.freshnessState),
+    parentIdx: index("idx_ags_knowledge_units_parent").on(t.parentUnitId),
+  }),
+);
+
+export type AgsKnowledgeUnit = typeof agsKnowledgeUnits.$inferSelect;
+export type InsertAgsKnowledgeUnit = typeof agsKnowledgeUnits.$inferInsert;
+
+// ── Knowledge chunks (D-NKU-1 sibling table) ────────────────────────────────
+
+export const agsKnowledgeChunks = pgTable(
+  "ags_knowledge_chunks",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    unitId: integer("unit_id").notNull(),
+    /** Position within the parent unit. */
+    chunkIndex: integer("chunk_index").notNull().default(0),
+    /** Canonical text for embedding + scoring. */
+    chunkText: text("chunk_text").notNull(),
+    /** SHA-256 of chunkText for dedupe. */
+    chunkHash: varchar("chunk_hash", { length: 64 }).notNull(),
+    /** External vector store reference (D-EMB-1 per-source binding; NOT a vector(N) column). */
+    vectorStoreRef: text("vector_store_ref"),
+    /** Token estimate for budget accounting. */
+    tokenEstimate: integer("token_estimate"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    unitIdx: index("idx_ags_knowledge_chunks_unit").on(t.unitId, t.chunkIndex),
+    wsHashIdx: index("idx_ags_knowledge_chunks_ws_hash").on(
+      t.workspaceId,
+      t.chunkHash,
+    ),
+  }),
+);
+
+export type AgsKnowledgeChunk = typeof agsKnowledgeChunks.$inferSelect;
+export type InsertAgsKnowledgeChunk = typeof agsKnowledgeChunks.$inferInsert;
+
+// ── Extraction results (D-UI-1 extractor layer output) ──────────────────────
+
+export const agsExtractionResults = pgTable(
+  "ags_extraction_results",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Unit the extraction operated on. */
+    unitId: integer("unit_id").notNull(),
+    /** Extractor key from the in-process registry. */
+    extractorKey: varchar("extractor_key", { length: 64 }).notNull(),
+    /** 'code_block' | 'table' | 'url_list' | 'tool_invocation' | ... — extractor-defined. */
+    extractionType: varchar("extraction_type", { length: 64 }).notNull(),
+    /** Structured payload — extractor-defined shape. */
+    payloadJson: jsonb("payload_json").$type<Record<string, unknown>>().notNull(),
+    /** Optional SHA-256 of the canonical payload for dedupe. */
+    payloadHash: varchar("payload_hash", { length: 64 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    unitIdx: index("idx_ags_extraction_results_unit").on(t.unitId),
+    typeIdx: index("idx_ags_extraction_results_type").on(t.extractionType),
+  }),
+);
+
+export type AgsExtractionResult = typeof agsExtractionResults.$inferSelect;
+export type InsertAgsExtractionResult = typeof agsExtractionResults.$inferInsert;
+
+// ── Data validation results (D-UI-4) ────────────────────────────────────────
+
+export const agsDataValidationResults = pgTable(
+  "ags_data_validation_results",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Unit the validation ran against. */
+    unitId: integer("unit_id").notNull(),
+    /** 'ok' | 'warn' | 'blocked'. */
+    status: varchar("status", { length: 16 }).notNull(),
+    /** Flag set when at least one rule fired. */
+    findings: jsonb("findings").$type<Array<{
+      rule: string;
+      severity: "info" | "warn" | "block";
+      message: string;
+      detail?: Record<string, unknown>;
+    }>>().notNull().default([]),
+    /** When the validator ran. */
+    validatedAt: timestamp("validated_at").defaultNow().notNull(),
+    /** Validator implementation key (for audit when rules change). */
+    validatorVersion: varchar("validator_version", { length: 32 }),
+  },
+  (t) => ({
+    unitIdx: index("idx_ags_validation_unit").on(t.unitId),
+    statusIdx: index("idx_ags_validation_status").on(t.status),
+  }),
+);
+
+export type AgsDataValidationResult = typeof agsDataValidationResults.$inferSelect;
+export type InsertAgsDataValidationResult = typeof agsDataValidationResults.$inferInsert;
+
+// ── MCP tool knowledge mirror (Phase 7) ─────────────────────────────────────
+
+export const agsMcpToolKnowledge = pgTable(
+  "ags_mcp_tool_knowledge",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Server id from agsMcpServers (canonical id, not connection id). */
+    mcpServerId: varchar("mcp_server_id", { length: 128 }).notNull(),
+    /** Tool name as advertised by the server. */
+    toolName: varchar("tool_name", { length: 256 }).notNull(),
+    /** Optional version string from the manifest. */
+    toolVersion: varchar("tool_version", { length: 64 }),
+    /** Snapshot of the tool's input/output schema. */
+    schemaSnapshot: jsonb("schema_snapshot").$type<Record<string, unknown>>().notNull(),
+    /** SHA-256 of the canonicalized schemaSnapshot. */
+    schemaHash: varchar("schema_hash", { length: 64 }).notNull(),
+    /** Tool description / summary as advertised. */
+    description: text("description"),
+    /** D-TOOL-1 8-class taxonomy as observed at sync time. */
+    riskClass: varchar("risk_class", { length: 32 }).notNull(),
+    /** When the tool was last seen by the sync service. */
+    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+    /** Flipped to false when the tool disappears from the live registry. */
+    available: boolean("available").notNull().default(true),
+    /** Materialized as a NormalizedKnowledgeUnit; FK to ags_knowledge_units. */
+    knowledgeUnitId: integer("knowledge_unit_id"),
+    /** Optional approval ttl override (D-APP-EXT-5). */
+    approvalTtlSeconds: integer("approval_ttl_seconds"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    wsServerToolIdx: uniqueIndex("uniq_ags_mcp_tool_knowledge_ws_server_tool").on(
+      t.workspaceId,
+      t.mcpServerId,
+      t.toolName,
+    ),
+    schemaHashIdx: index("idx_ags_mcp_tool_knowledge_schema_hash").on(t.schemaHash),
+    availableIdx: index("idx_ags_mcp_tool_knowledge_available").on(t.available),
+  }),
+);
+
+export type AgsMcpToolKnowledge = typeof agsMcpToolKnowledge.$inferSelect;
+export type InsertAgsMcpToolKnowledge = typeof agsMcpToolKnowledge.$inferInsert;
+
+// ── ProposedToolCall trace (D-PTC-5; sibling to runtime traces) ─────────────
+
+export const agsToolCallTraces = pgTable(
+  "ags_tool_call_traces",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    /** Runtime trace this tool-call belongs to. */
+    runtimeTraceId: integer("runtime_trace_id"),
+    runtimeRunId: integer("runtime_run_id"),
+    agentId: integer("agent_id").notNull(),
+    agentDraftId: integer("agent_draft_id").notNull(),
+    messageId: integer("message_id"),
+    /** Full ProposedToolCall envelope (D-PTC-1). */
+    proposedToolCallJson: jsonb("proposed_tool_call_json")
+      .$type<Record<string, unknown>>().notNull(),
+    /** Canonical hash (D-PTC-4). */
+    proposedToolCallHash: varchar("proposed_tool_call_hash", { length: 64 }).notNull(),
+    /** Validator verdict: 'ok' | 'rejected'. */
+    validationVerdict: varchar("validation_verdict", { length: 16 }).notNull(),
+    /** Validator code on rejection (one of D-PTC-2 codes). */
+    validationCode: varchar("validation_code", { length: 64 }),
+    /** Free-form rejection message. */
+    validationMessage: text("validation_message"),
+    /** Approval row id if approval was required. */
+    approvalRequestId: integer("approval_request_id"),
+    /** Approval status at dispatch time: 'allowed' | 'denied' | 'expired' | 'pending' | null. */
+    approvalStatus: varchar("approval_status", { length: 16 }),
+    /** Governance verdict from evaluateMcpPreInvoke. */
+    governanceVerdict: varchar("governance_verdict", { length: 16 }),
+    /** MCP dispatch result: 'ok' | 'error' | 'blocked'. */
+    dispatchResult: varchar("dispatch_result", { length: 16 }),
+    /** Dispatcher's audit row id (FK to agsRuntimePolicyEvents). */
+    dispatchAuditId: integer("dispatch_audit_id"),
+    /** Latency captured by the validator + dispatcher combined. */
+    durationMs: integer("duration_ms"),
+    /** Stripped-stack error message when dispatch failed. */
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    runtimeTraceIdx: index("idx_ags_tool_call_traces_runtime").on(t.runtimeTraceId),
+    agentIdx: index("idx_ags_tool_call_traces_agent").on(t.workspaceId, t.agentId),
+    hashIdx: index("idx_ags_tool_call_traces_hash").on(t.proposedToolCallHash),
+    messageIdx: index("idx_ags_tool_call_traces_message").on(t.messageId),
+  }),
+);
+
+export type AgsToolCallTrace = typeof agsToolCallTraces.$inferSelect;
+export type InsertAgsToolCallTrace = typeof agsToolCallTraces.$inferInsert;
