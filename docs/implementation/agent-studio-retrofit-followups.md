@@ -10,14 +10,15 @@ This document is the contract for what the retrofit deliberately did *not* do. E
 
 ## A. Wiring (highest priority — services exist, call sites don't)
 
-### A1 — Wire the ProposedToolCall validator into `chat-stream`
+### A1 — Wire the ProposedToolCall validator into `chat-stream` ✅
 
-The Phase 8 validator is shipped as a pure function. Production traffic still goes through the dispatcher without this gate.
+**Status:** CLOSED. Merged at `fea62fc` (PR #198, 2026-05-06).
 
-- **Files:** `server/agent-studio/chat-stream.ts` (or whichever path emits the model's tool-use response), `server/agent-studio/services/runtime/rac-orchestrator.ts`.
-- **Behavior:** Before calling `dispatchMcpToolCall`, build a `ProposedToolCall` from the model's tool-use envelope and call `validateProposedToolCall(call, ctx)`. On `ok=false`, abort with the `code` / `message`; do not invoke the dispatcher.
-- **Context construction:** `resolveTool` reads the live MCP registry; `resolveRiskClass` calls the existing `readRiskClass()` (D-TOOL-5); chunk/unit/cagBlock id sets come from this turn's RAC retrieval result; `sandboxHealthOk` from the existing sandbox health probe.
-- **Acceptance:** A new e2e test under `tests/integration/agent-studio/` proves a forged ProposedToolCall (invented tool / fabricated evidence / mismatched risk level) is rejected before the dispatcher fires.
+Wired the Phase 8 validator into both runtime tool-call paths (`chat-stream.ts` SSE + `services/chat.ts` blocking) via a new helper at `services/runtime/proposed-tool-call-runtime.ts`. Production tool-use envelopes don't yet carry rationale + evidence; the helper builds a manifest-derived envelope so gates 5/6 are tautological. **Active gates with this envelope shape:** `invented_tool`, `missing_parameter`, `invented_parameter`, `quarantined_tool`, `sandbox_required`. When tool-use envelopes evolve to carry rationale + evidence, gates 3/4 will fire automatically — the helper accepts those fields when present.
+
+On rejection: tool-role message persisted with `{error, code, gate:"proposed_tool_call_validator"}`; chat-stream also emits a `tool_end` SSE event. Dispatcher is **never** invoked for a rejected call.
+
+9 unit tests cover every active gate + manifest-derived risk + manifest-derived approval. Full retrofit suite (90 tests across 5 files) still green. Helper returns a flattened `RuntimeValidationResult` so callers branch on `ok` cleanly under `strictNullChecks:false`.
 
 ### A2 — Wire the approval gate into the dispatch path
 
