@@ -22,6 +22,75 @@ export type CagPackEventSeverity = "info" | "warn" | "error";
 export type CagPackActorType = "system" | "user" | "scheduler" | "runtime";
 
 /**
+ * Tool risk taxonomy per D-TOOL-1 (RAC_TOOL_CLASSIFICATION.md).
+ * Fixed enumeration; no `unknown` after P0.6. New tools enter as `quarantined`.
+ *
+ * READ from the MCP manifest (D-TOOL-2). Never derived inside CAG.
+ */
+export type ToolRiskClass =
+  | "read_only"
+  | "write"
+  | "external_side_effect"
+  | "destructive"
+  | "credential_sensitive"
+  | "code_execution"
+  | "governance_sensitive"
+  | "quarantined";
+
+/**
+ * Capability pack content — the JSON written to
+ * `ags_cag_capability_packs.content_json`. Built by the P1B builder,
+ * consumed by the P1B renderer to produce a `SystemPromptSection`.
+ *
+ * Per D-TOOL-3, MUST NOT carry raw input schema JSON or example
+ * invocations. Per D-PRM-4 Collision A, the renderer strips the mission
+ * line — `mission` is included here for traceability but never rendered.
+ */
+export interface CapabilityPackContent {
+  identity: {
+    agentId: number;
+    agentDraftId: number;
+    name: string;
+    role: string | null;
+    scope: string | null;
+  };
+  /** Stored for traceability; renderer drops it (D-PRM-4 Collision A). */
+  mission: string | null;
+  skills: Array<{
+    id: number;
+    name: string;
+    summary: string;
+  }>;
+  /** Tools available to this agent. `quarantined` and `credential_sensitive` excluded by builder. */
+  tools: Array<{
+    name: string;
+    serverId: number;
+    serverName: string;
+    summary: string;
+    riskClass: ToolRiskClass;
+    approvalRequired: boolean;
+    sandboxRequired: boolean;
+  }>;
+  /** What the pack is *about*; mirrors `sourceManifestJson.entries`. */
+  sources: Array<{ sourceType: string; refId: string }>;
+}
+
+/**
+ * The single output shape every section producer (CAG renderer, RAC
+ * assembler) returns to the composer (D-PRM-1).
+ */
+export interface SystemPromptSection {
+  /** Stable section id — `"capability-pack"` for CAG. */
+  id: "capability-pack";
+  text: string;
+  tokenEstimate: number;
+  /** SHA-256 of `text`; input to the prompt cache key (D-PRM-5). */
+  contentHash: string;
+  /** Non-fatal notes (truncations, dropped tools, hash drift). */
+  warnings: string[];
+}
+
+/**
  * Source manifest entry — what the pack is *about*. Each entry carries
  * a stable hash so reuse / staleness can be decided without re-fetching
  * the source. See `hashing.ts` for the canonical hash function.
