@@ -43,10 +43,11 @@ export function validationVerdictFromResult(
   result: ProposedToolCallValidationResult,
 ): { verdict: ValidationVerdict; code: string | null; message: string | null } {
   if (result.ok) return { verdict: "ok", code: null, message: null };
+  const failure = result as Extract<ProposedToolCallValidationResult, { ok: false }>;
   return {
     verdict: "rejected",
-    code: result.code,
-    message: result.message,
+    code: failure.code,
+    message: failure.message,
   };
 }
 

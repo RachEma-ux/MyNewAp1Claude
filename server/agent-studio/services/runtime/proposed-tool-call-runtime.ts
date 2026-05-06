@@ -44,6 +44,13 @@ import {
   evaluateApprovalGate as defaultEvaluateApprovalGate,
   type ApprovalDecision,
 } from "../approval/approval-gate";
+import {
+  hashProposedToolCall,
+} from "../mcp/proposed-tool-call";
+import {
+  recordToolCallTrace as defaultRecordToolCallTrace,
+  type DispatchResult,
+} from "./trace-writer";
 
 export interface RuntimeValidationInput {
   /** Canonical MCP server id (matches the agsMcpToolKnowledge mirror). */
@@ -279,5 +286,103 @@ export async function gateRuntimeDispatch(
         approvalRequestId: created.approvalRequestId,
       };
     }
+  }
+}
+
+// ── Trace persistence (Follow-up A3) ──────────────────────────────────
+
+/**
+ * Map a runtime dispatch verdict back onto the `ApprovalDecision`
+ * value the trace builder expects. Validator-rejected and no-approval-
+ * required cases collapse to null (matches buildToolCallTraceRow's
+ * "rejection drops downstream metadata" invariant).
+ */
+export function approvalDecisionFromVerdict(
+  verdict: RuntimeDispatchVerdict,
+): ApprovalDecision | null {
+  if (!verdict.ok) {
+    switch (verdict.reason) {
+      case "approval_denied":
+        return "denied";
+      case "approval_expired":
+        return "expired";
+      case "approval_pending":
+        return "pending";
+      case "approval_required":
+        return "approval_required";
+      case "validator_rejected":
+      default:
+        return null;
+    }
+  }
+  // ok=true — only meaningful when an approval row backed the permit.
+  return verdict.approvalRequestId !== null ? "permit" : null;
+}
+
+export interface PersistRuntimeTraceInput {
+  workspaceId: number;
+  agentId: number;
+  agentDraftId: number;
+  runtimeRunId: number | null;
+  runtimeTraceId: number | null;
+  messageId: number | null;
+  verdict: RuntimeDispatchVerdict;
+  validation: RuntimeValidationResult;
+  /**
+   * Real dispatcher result when dispatch happened. Omit when the call
+   * was blocked by the validator or approval gate.
+   */
+  dispatchResult?: {
+    ok: boolean;
+    error?: { message?: string };
+    durationMs?: number;
+  } | null;
+  /** Optional governance verdict surfaced from evaluateMcpPreInvoke. */
+  governanceVerdict?: string | null;
+  /** Injectable for tests. */
+  recordTrace?: typeof defaultRecordToolCallTrace;
+}
+
+/**
+ * Persist one `agsToolCallTraces` row per runtime tool-call attempt.
+ *
+ * Best-effort: any error from the trace writer is swallowed so trace
+ * persistence never blocks the chat loop. The dispatcher's existing
+ * audit row in `agsRuntimePolicyEvents` remains the source of truth
+ * for security-relevant events; this row is the per-ProposedToolCall
+ * forensic surface (D-PTC-5).
+ */
+export async function persistRuntimeToolCallTrace(
+  input: PersistRuntimeTraceInput,
+): Promise<{ id: number | null }> {
+  const record = input.recordTrace ?? defaultRecordToolCallTrace;
+  const dispatchResult: DispatchResult | null = input.dispatchResult
+    ? input.dispatchResult.ok
+      ? "ok"
+      : "error"
+    : input.verdict.ok
+      ? null
+      : "blocked";
+  try {
+    const r = await record({
+      workspaceId: input.workspaceId,
+      agentId: input.agentId,
+      agentDraftId: input.agentDraftId,
+      runtimeRunId: input.runtimeRunId ?? null,
+      runtimeTraceId: input.runtimeTraceId ?? null,
+      messageId: input.messageId ?? null,
+      proposedToolCall: input.verdict.call,
+      proposedToolCallHash: hashProposedToolCall(input.verdict.call),
+      validation: input.validation.raw,
+      approvalDecision: approvalDecisionFromVerdict(input.verdict),
+      approvalRequestId: input.verdict.approvalRequestId,
+      governanceVerdict: input.governanceVerdict ?? null,
+      dispatchResult,
+      durationMs: input.dispatchResult?.durationMs ?? null,
+      errorMessage: input.dispatchResult?.error?.message ?? null,
+    });
+    return { id: r.id };
+  } catch {
+    return { id: null };
   }
 }

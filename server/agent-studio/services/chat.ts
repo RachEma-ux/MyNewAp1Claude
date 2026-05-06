@@ -40,7 +40,10 @@ import * as repo from "../repository";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
 import {
   gateRuntimeDispatch,
+  persistRuntimeToolCallTrace,
   validateRuntimeToolCall,
+  type RuntimeDispatchVerdict,
+  type RuntimeValidationResult,
 } from "./runtime/proposed-tool-call-runtime";
 import { getSnapshot } from "./mcp/registry";
 import { getAgentProviderBinding } from "../bindings";
@@ -225,6 +228,7 @@ export async function startChatSession(input: {
  */
 async function runChatWithToolsViaBinding(input: {
   sessionId: number;
+  agentId: number;
   draftId: number;
   providerConnectionId: number;
   modelRef: string;
@@ -395,8 +399,10 @@ async function runChatWithToolsViaBinding(input: {
         }
         // Follow-up A1: ProposedToolCall validator runs BEFORE dispatch.
         const spec = specByOpenaiName.get(call.name);
+        let runtimeValidation: RuntimeValidationResult | null = null;
+        let runtimeVerdict: RuntimeDispatchVerdict | null = null;
         if (spec) {
-          const validation = await validateRuntimeToolCall({
+          runtimeValidation = await validateRuntimeToolCall({
             mcpServerId: spec.mcpServerId,
             toolName: spec.remoteToolName,
             liveTool: spec.liveTool,
@@ -405,25 +411,38 @@ async function runChatWithToolsViaBinding(input: {
           // Follow-up A2: approval gate after validator. Live chat has
           // no formal runtime-run row, so sessionId stands in as the
           // surrogate runtimeRunId on freshly-created approval rows.
-          const verdict = await gateRuntimeDispatch({
-            validation,
+          runtimeVerdict = await gateRuntimeDispatch({
+            validation: runtimeValidation,
             agentDraftId: input.draftId,
             runtimeRunId: input.sessionId,
             description: `chat session ${input.sessionId} · tool ${call.name}`,
           });
-          if (!verdict.ok) {
+          if (!runtimeVerdict.ok) {
+            // Follow-up A3: persist a trace row even on rejection.
+            await persistRuntimeToolCallTrace({
+              workspaceId: input.workspaceId,
+              agentId: input.agentId,
+              agentDraftId: input.draftId,
+              runtimeRunId: input.sessionId,
+              runtimeTraceId: null,
+              messageId: null,
+              verdict: runtimeVerdict,
+              validation: runtimeValidation,
+              dispatchResult: null,
+              governanceVerdict: null,
+            });
             const gate =
-              verdict.reason === "validator_rejected"
+              runtimeVerdict.reason === "validator_rejected"
                 ? "proposed_tool_call_validator"
                 : "approval_gate";
             await repo.appendChatMessage({
               sessionId: input.sessionId,
               role: "tool",
               content: JSON.stringify({
-                error: verdict.message,
-                code: verdict.code,
-                reason: verdict.reason,
-                approvalRequestId: verdict.approvalRequestId,
+                error: runtimeVerdict.message,
+                code: runtimeVerdict.code,
+                reason: runtimeVerdict.reason,
+                approvalRequestId: runtimeVerdict.approvalRequestId,
                 gate,
               }),
               toolPayload: { toolCallId: call.id, name: call.name },
@@ -437,6 +456,27 @@ async function runChatWithToolsViaBinding(input: {
           args,
           source: "live_runtime",
         });
+        // Follow-up A3: persist per-dispatch trace row.
+        if (runtimeValidation && runtimeVerdict) {
+          await persistRuntimeToolCallTrace({
+            workspaceId: input.workspaceId,
+            agentId: input.agentId,
+            agentDraftId: input.draftId,
+            runtimeRunId: input.sessionId,
+            runtimeTraceId: null,
+            messageId: null,
+            verdict: runtimeVerdict,
+            validation: runtimeValidation,
+            dispatchResult: {
+              ok: dispatchResult.ok,
+              error: dispatchResult.ok
+                ? undefined
+                : { message: dispatchResult.error?.message },
+              durationMs: dispatchResult.durationMs,
+            },
+            governanceVerdict: null,
+          });
+        }
         const toolContent = dispatchResult.ok
           ? JSON.stringify(dispatchResult.result ?? null)
           : JSON.stringify({
@@ -774,6 +814,7 @@ export async function sendChatMessage(
         try {
           const loopResult = await runChatWithToolsViaBinding({
             sessionId: input.sessionId,
+            agentId: session.agentId,
             draftId: draft.id,
             providerConnectionId: candidateBinding.providerConnectionId!,
             modelRef: candidateBinding.modelRef,

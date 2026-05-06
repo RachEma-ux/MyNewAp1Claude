@@ -56,7 +56,10 @@ import { getSnapshot } from "./services/mcp/registry";
 import type { McpTool } from "./services/mcp/types";
 import {
   gateRuntimeDispatch,
+  persistRuntimeToolCallTrace,
   validateRuntimeToolCall,
+  type RuntimeDispatchVerdict,
+  type RuntimeValidationResult,
 } from "./services/runtime/proposed-tool-call-runtime";
 import {
   CagRequiredError,
@@ -196,6 +199,7 @@ async function runStreamingToolLoop(args: {
   maxTokens: number | undefined;
   systemPrompt: string;
   sessionId: number;
+  agentId: number;
   draftId: number;
   workspaceId: number;
   actorId: number;
@@ -213,6 +217,7 @@ async function runStreamingToolLoop(args: {
     maxTokens,
     systemPrompt,
     sessionId,
+    agentId,
     draftId,
     workspaceId,
     actorId,
@@ -391,8 +396,10 @@ async function runStreamingToolLoop(args: {
         // shape: invented_tool, missing_parameter, invented_parameter,
         // quarantined_tool, sandbox_required.
         const spec = specByOpenaiName.get(openaiName);
+        let runtimeValidation: RuntimeValidationResult | null = null;
+        let runtimeVerdict: RuntimeDispatchVerdict | null = null;
         if (spec) {
-          const validation = await validateRuntimeToolCall({
+          runtimeValidation = await validateRuntimeToolCall({
             mcpServerId: spec.mcpServerId,
             toolName: spec.remoteToolName,
             liveTool: spec.liveTool,
@@ -401,22 +408,36 @@ async function runStreamingToolLoop(args: {
           // Follow-up A2: approval gate after validator. Live chat has
           // no formal runtime-run row, so sessionId stands in as the
           // surrogate runtimeRunId on freshly-created approval rows.
-          const verdict = await gateRuntimeDispatch({
-            validation,
+          runtimeVerdict = await gateRuntimeDispatch({
+            validation: runtimeValidation,
             agentDraftId: draftId,
             runtimeRunId: sessionId,
             description: `chat session ${sessionId} · tool ${openaiName}`,
           });
-          if (!verdict.ok) {
+          if (!runtimeVerdict.ok) {
+            // Follow-up A3: persist a trace row even on rejection so
+            // the runs page surfaces blocked attempts.
+            await persistRuntimeToolCallTrace({
+              workspaceId,
+              agentId,
+              agentDraftId: draftId,
+              runtimeRunId: sessionId,
+              runtimeTraceId: null,
+              messageId: null,
+              verdict: runtimeVerdict,
+              validation: runtimeValidation,
+              dispatchResult: null,
+              governanceVerdict: null,
+            });
             const gate =
-              verdict.reason === "validator_rejected"
+              runtimeVerdict.reason === "validator_rejected"
                 ? "proposed_tool_call_validator"
                 : "approval_gate";
             const errContent = JSON.stringify({
-              error: verdict.message,
-              code: verdict.code,
-              reason: verdict.reason,
-              approvalRequestId: verdict.approvalRequestId,
+              error: runtimeVerdict.message,
+              code: runtimeVerdict.code,
+              reason: runtimeVerdict.reason,
+              approvalRequestId: runtimeVerdict.approvalRequestId,
               gate,
             });
             await repo.appendChatMessage({
@@ -429,7 +450,7 @@ async function runStreamingToolLoop(args: {
               type: "tool_end",
               toolName: openaiName,
               ok: false,
-              error: `${verdict.reason}: ${verdict.message}`,
+              error: `${runtimeVerdict.reason}: ${runtimeVerdict.message}`,
             });
             continue;
           }
@@ -440,6 +461,27 @@ async function runStreamingToolLoop(args: {
           args: parsedArgs,
           source: "live_runtime",
         });
+        // Follow-up A3: persist per-dispatch trace row.
+        if (runtimeValidation && runtimeVerdict) {
+          await persistRuntimeToolCallTrace({
+            workspaceId,
+            agentId,
+            agentDraftId: draftId,
+            runtimeRunId: sessionId,
+            runtimeTraceId: null,
+            messageId: null,
+            verdict: runtimeVerdict,
+            validation: runtimeValidation,
+            dispatchResult: {
+              ok: dispatchResult.ok,
+              error: dispatchResult.ok
+                ? undefined
+                : { message: dispatchResult.error?.message },
+              durationMs: dispatchResult.durationMs,
+            },
+            governanceVerdict: null,
+          });
+        }
         const toolContent = dispatchResult.ok
           ? JSON.stringify(dispatchResult.result ?? null)
           : JSON.stringify({
@@ -771,6 +813,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
             maxTokens,
             systemPrompt,
             sessionId,
+            agentId: (draft as any).agentId ?? draft.id,
             draftId: draft.id,
             workspaceId,
             actorId,
