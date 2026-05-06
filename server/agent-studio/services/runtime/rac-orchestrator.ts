@@ -44,8 +44,10 @@ import {
   filterRetrieval,
   type RetrievalPlan,
   type ExecutedRetrieval,
+  type ExecutedSourceResult,
 } from "../rac/retrieval";
 import { assembleRetrievalEvidence } from "../rac/context-assembler";
+import type { RacRetrievalChunk } from "../rac/ingestion";
 import { listProfilesForDraft, getPolicyForProfile } from "../rac/sources";
 import type { SystemPromptSection } from "../cag";
 
@@ -90,6 +92,20 @@ export interface RuntimeTraceMetrics {
   fallbackReason: string | null;
 }
 
+/**
+ * Per-source executor results passed through to the P7 trace writer
+ * so it can build the `ags_rac_context_blocks` rows. The orchestrator
+ * doesn't reshape this — it's the executor's `perSource` projection
+ * unchanged, plus the included chunks the assembler retained.
+ */
+export interface RuntimeSourceTrace {
+  perSource: ExecutedSourceResult[];
+  /** Chunks the assembler kept in the rendered evidence (ordered by score DESC). */
+  includedChunks: RacRetrievalChunk[];
+  /** Map of `sourceChunkId` → which source it came from, for the per-block trace rows. */
+  chunkSourceMap: Record<string, { sourceId: number; sourceType: string }>;
+}
+
 export interface ResolvedContext {
   capabilityPack: SystemPromptSection | null;
   retrievalEvidence: SystemPromptSection | null;
@@ -97,6 +113,8 @@ export interface ResolvedContext {
   warnings: string[];
   /** P7 trace will persist this; emitted today as a structured object. */
   trace: RuntimeTraceMetrics;
+  /** Per-source executor results + assembled chunks for P7 context-block rows. */
+  sourceTrace: RuntimeSourceTrace;
 }
 
 const PROFILE_KEY_DEFAULT = "default";
@@ -122,6 +140,11 @@ export async function resolveAndAssembleContext(
     truncatedByBudget: 0,
     fallbackReason: null,
   };
+  const sourceTrace: RuntimeSourceTrace = {
+    perSource: [],
+    includedChunks: [],
+    chunkSourceMap: {},
+  };
 
   // ── CAG (P1C) ───────────────────────────────────────────────────
   let capabilityPack: SystemPromptSection | null = null;
@@ -146,7 +169,7 @@ export async function resolveAndAssembleContext(
   // ── Retrieval (P4 + P5) ────────────────────────────────────────
   // Mode=disabled skips retrieval entirely (composer ignores the slot).
   if (input.mode === "disabled") {
-    return { capabilityPack, retrievalEvidence: null, warnings, trace };
+    return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
   // Skip when there's no query text — the planner would fan zero
@@ -154,7 +177,7 @@ export async function resolveAndAssembleContext(
   // profile lookup and keeps the trace clean.
   if (!input.query || input.query.trim().length === 0) {
     trace.fallbackReason ??= "no_query";
-    return { capabilityPack, retrievalEvidence: null, warnings, trace };
+    return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
   const profileKey = input.profileKey ?? PROFILE_KEY_DEFAULT;
@@ -168,7 +191,7 @@ export async function resolveAndAssembleContext(
     // opted in to retrieval, so emit a soft note rather than a
     // warning that would noise up the trace.
     trace.fallbackReason ??= "no_profile";
-    return { capabilityPack, retrievalEvidence: null, warnings, trace };
+    return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
   trace.retrievalEnabled = true;
@@ -190,8 +213,15 @@ export async function resolveAndAssembleContext(
     });
     trace.retrievalLatencyMs = executed.totalLatencyMs;
     trace.chunksReturned = executed.chunks.length;
+    sourceTrace.perSource = executed.perSource;
     for (const r of executed.perSource) {
       trace.perSourceLatencyMs[r.sourceId] = r.latencyMs;
+      for (const c of r.chunks) {
+        sourceTrace.chunkSourceMap[c.sourceChunkId] = {
+          sourceId: r.sourceId,
+          sourceType: r.sourceType,
+        };
+      }
     }
     for (const w of executed.warnings) warnings.push(`exec: ${w}`);
 
@@ -214,6 +244,7 @@ export async function resolveAndAssembleContext(
       warnings: [],
     });
     evidence = assembled.section;
+    sourceTrace.includedChunks = assembled.included;
     trace.chunksIncluded = assembled.includedChunks;
     trace.truncatedByBudget = assembled.droppedByBudget;
     for (const w of assembled.warnings) warnings.push(`assembler: ${w}`);
@@ -229,7 +260,13 @@ export async function resolveAndAssembleContext(
     evidence = null;
   }
 
-  return { capabilityPack, retrievalEvidence: evidence, warnings, trace };
+  return {
+    capabilityPack,
+    retrievalEvidence: evidence,
+    warnings,
+    trace,
+    sourceTrace,
+  };
 }
 
 /**

@@ -61,6 +61,11 @@ import {
   buildRuntimeSystemPrompt,
   RetrievalRequiredError,
 } from "./services/runtime/rac-orchestrator";
+import {
+  writeTrace,
+  writeContextBlocks,
+  buildContextBlockRows,
+} from "./services/rac/trace";
 
 type SseSend = (data: unknown) => void;
 
@@ -651,8 +656,9 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     // applies to BOTH CAG and retrieval per D-PRM-6.
     const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
     let systemPrompt: string;
+    let racBuilt: Awaited<ReturnType<typeof buildRuntimeSystemPrompt>> | null = null;
     try {
-      const built = await buildRuntimeSystemPrompt({
+      racBuilt = await buildRuntimeSystemPrompt({
         mode: cagMode,
         workspaceId,
         agentId: (draft as any).agentId ?? draft.id,
@@ -671,9 +677,9 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
           escalationRules: (draft as any).escalationRules ?? null,
         },
       });
-      systemPrompt = built.systemPrompt;
-      for (const w of built.context.warnings) console.info(`[chat-stream/rac] ${w}`);
-      for (const w of built.composerWarnings) console.info(`[chat-stream/composer] ${w}`);
+      systemPrompt = racBuilt.systemPrompt;
+      for (const w of racBuilt.context.warnings) console.info(`[chat-stream/rac] ${w}`);
+      for (const w of racBuilt.composerWarnings) console.info(`[chat-stream/composer] ${w}`);
     } catch (err) {
       if (err instanceof CagRequiredError) {
         sendEvent({ type: "error", error: err.message, code: "cag_required" });
@@ -747,6 +753,50 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       addMessages: Math.max(2, addedMessages),
       title: autoTitle,
     });
+
+    // RAC P7 — best-effort trace persistence at end-of-stream. We
+    // already have the assistantMessageId via pathResult; the
+    // orchestrator captured the trace metrics + per-source detail.
+    if (racBuilt) {
+      const t = racBuilt.context.trace;
+      const st = racBuilt.context.sourceTrace;
+      writeTrace({
+        workspaceId,
+        agentId: (draft as any).agentId ?? draft.id,
+        agentDraftId: draft.id,
+        sessionId,
+        messageId: pathResult.assistantRowId,
+        actorId,
+        mode: cagMode,
+        cagPackId: t.cagPackId,
+        cagPackVersion: t.cagPackVersion,
+        retrievalEnabled: t.retrievalEnabled,
+        retrievalLatencyMs: t.retrievalEnabled ? t.retrievalLatencyMs : null,
+        chunksReturned: t.chunksReturned,
+        chunksFiltered: t.chunksFiltered,
+        chunksIncluded: t.chunksIncluded,
+        truncatedByBudget: t.truncatedByBudget,
+        fallbackReason: t.fallbackReason,
+        warnings: racBuilt.context.warnings,
+        perSourceLatencyMs: t.perSourceLatencyMs,
+      })
+        .then(async (traceId) => {
+          if (st.includedChunks.length === 0) return;
+          const blocks = buildContextBlockRows({
+            traceId,
+            workspaceId,
+            includedChunks: st.includedChunks,
+            chunkSourceMap: st.chunkSourceMap,
+            perSourceLatencyMs: t.perSourceLatencyMs,
+          });
+          await writeContextBlocks(blocks);
+        })
+        .catch((err) =>
+          console.warn(
+            `[chat-stream/trace] write failed: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+    }
 
     sendEvent({
       type: "done",

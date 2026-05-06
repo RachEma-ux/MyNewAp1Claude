@@ -53,6 +53,7 @@ import { providerBindingsRouter } from "./provider-bindings-router";
 import { cagRouter } from "./cag-router";
 import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
+import { racTraceRouter } from "./rac-trace-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2121,4 +2122,6 @@ export const agentStudioRouter = router({
   racSources: racSourcesRouter,
   // RAC Phase 3: Ingestion adapter contract (preview / register / validate)
   racIngestion: racIngestionRouter,
+  // RAC Phase 7: Trace + feedback (getTrace / submitFeedback)
+  racTrace: racTraceRouter,
 });
