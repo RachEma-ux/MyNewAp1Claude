@@ -19,6 +19,9 @@ export type {
   ToolRiskClass,
   CapabilityPackContent,
   SystemPromptSection,
+  // Retrofit P5 (D-CAG-RECON-2)
+  CagCompileResult,
+  CagGovernanceVerdict,
 } from "./types";
 
 export {
@@ -37,6 +40,9 @@ export {
   markPackStale,
   touchPackLastUsed,
   listPacksForAgent,
+  // Retrofit P5 (D-CAG-RECON-2)
+  markPackUsed,
+  recordPackTokenActual,
 } from "./store";
 
 export {

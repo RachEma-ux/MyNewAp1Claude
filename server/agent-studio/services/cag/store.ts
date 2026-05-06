@@ -15,7 +15,8 @@
  *   - server/documents/* / server/embeddings/* / server/vectordb/*
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { createHash } from "crypto";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection";
 import {
   agsCagCapabilityPacks,
@@ -54,6 +55,16 @@ function rowToPack(row: typeof agsCagCapabilityPacks.$inferSelect): CagCapabilit
     updatedAt: row.updatedAt,
     expiresAt: row.expiresAt ?? null,
     lastUsedAt: row.lastUsedAt ?? null,
+    // Retrofit P5 — compile + governance metadata (D-CAG-RECON-2).
+    contentHash: row.contentHash ?? null,
+    compiledHash: row.compiledHash ?? null,
+    tokenBudgetEstimate: row.tokenBudgetEstimate ?? null,
+    tokenBudgetActual: row.tokenBudgetActual ?? null,
+    compileResult: (row.compileResult ?? null) as CagCapabilityPack["compileResult"],
+    compileWarnings: (row.compileWarnings ?? []) as string[],
+    governanceVerdict: (row.governanceVerdict ?? null) as CagCapabilityPack["governanceVerdict"],
+    governanceBlockers: (row.governanceBlockers ?? []) as string[],
+    useCount: row.useCount ?? 0,
   };
 }
 
@@ -78,6 +89,16 @@ export async function createPack(input: CreatePackInput): Promise<CreatePackResu
 
   const nextVersion = (latest?.packVersion ?? 0) + 1;
 
+  // Retrofit P5 (D-CAG-RECON-3/4): compute contentHash if the caller
+  // didn't pre-compute it; compiledHash is caller-supplied (renderer
+  // produces it). tokenBudgetEstimate defaults to tokenEstimate to
+  // preserve back-compat semantics for callers that haven't migrated.
+  const contentHash =
+    input.contentHash ??
+    createHash("sha256")
+      .update(JSON.stringify(input.contentJson))
+      .digest("hex");
+
   const inserted = await db
     .insert(agsCagCapabilityPacks)
     .values({
@@ -95,6 +116,16 @@ export async function createPack(input: CreatePackInput): Promise<CreatePackResu
       sourceHashesJson: newHashMap,
       injectionPolicyJson: input.injectionPolicy ?? null,
       riskSummaryJson: input.riskSummary ?? null,
+      contentHash,
+      compiledHash: input.compiledHash ?? null,
+      tokenBudgetEstimate:
+        input.tokenBudgetEstimate ?? input.tokenEstimate ?? null,
+      tokenBudgetActual: null,
+      compileResult: input.compileResult ?? "ok",
+      compileWarnings: input.compileWarnings ?? [],
+      governanceVerdict: input.governanceVerdict ?? "cleared",
+      governanceBlockers: input.governanceBlockers ?? [],
+      useCount: 0,
       createdBy: input.createdBy,
       expiresAt: input.expiresAt ?? null,
     })
@@ -256,4 +287,51 @@ export async function listPacksForAgent(
     .orderBy(desc(agsCagCapabilityPacks.packVersion));
 
   return rows.map(rowToPack);
+}
+
+/**
+ * Retrofit P5 (D-CAG-RECON-2 useCount + lastUsedAt): mark a pack as
+ * loaded by the runtime. Atomic increment on `useCount`; sets
+ * `lastUsedAt = now`. Idempotent at the row level (each call always
+ * advances the counter; idempotency is at the per-message-trace level
+ * via the runtime trace's `cagPackId`).
+ *
+ * Returns the updated useCount; callers that emit `pack_loaded` events
+ * forward this through the event payload so reviewers can see how
+ * heavily a pack is exercised.
+ */
+export async function markPackUsed(packId: number): Promise<number> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+  const [row] = await db
+    .update(agsCagCapabilityPacks)
+    .set({
+      useCount: sql`${agsCagCapabilityPacks.useCount} + 1`,
+      lastUsedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(agsCagCapabilityPacks.id, packId))
+    .returning({ useCount: agsCagCapabilityPacks.useCount });
+  return row?.useCount ?? 0;
+}
+
+/**
+ * Retrofit P5 (D-CAG-RECON-2): record the runtime-observed token
+ * budget AFTER the model accepts the prompt. Separate from the
+ * compile-time estimate so reviewers can see how accurate the
+ * renderer's projection was.
+ */
+export async function recordPackTokenActual(
+  packId: number,
+  tokensActual: number,
+): Promise<void> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+  await db
+    .update(agsCagCapabilityPacks)
+    .set({
+      tokenBudgetActual: tokensActual,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsCagCapabilityPacks.id, packId));
 }
