@@ -256,7 +256,96 @@ describe("check-cag-boundary — importer-spec classifier", () => {
   }
 });
 
-// ── 5. Subprocess: script exits 0 on the live tree ───────────────────
+// ── 5. Rule C — assembler-import allow-list (P6 active) ──────────────
+
+describe("check-cag-boundary — Rule C assembler-import allow-list", () => {
+  it("script header documents Rule C as ACTIVE since P6", () => {
+    expect(scriptSrc).toMatch(/Rule C \(active since P6/);
+  });
+
+  it("declares the orchestrator + assembler self-reference as the only allowed importers", () => {
+    expect(scriptSrc).toContain(
+      "server/agent-studio/services/runtime/rac-orchestrator.ts",
+    );
+    expect(scriptSrc).toContain(
+      "server/agent-studio/services/rac/context-assembler.ts",
+    );
+  });
+
+  it("classifier flags non-allowlisted assembler imports + spares allowed callers", () => {
+    const REPO_ROOT = process.cwd();
+    const ASSEMBLER_REL_PATH =
+      "server/agent-studio/services/rac/context-assembler";
+    const ASSEMBLER_IMPORT_ALLOWLIST = [
+      "server/agent-studio/services/runtime/rac-orchestrator.ts",
+      "server/agent-studio/services/rac/context-assembler.ts",
+    ];
+
+    function targetsAssembler(fileAbs: string, spec: string): boolean {
+      const stripped = spec.replace(/\.(tsx?|m?js|cjs)$/, "");
+      if (!/context-assembler/.test(stripped)) return false;
+      const path = require("path") as typeof import("path");
+      let abs: string;
+      if (stripped.startsWith("./") || stripped.startsWith("../")) {
+        abs = path.resolve(path.dirname(fileAbs), stripped);
+      } else if (stripped.startsWith("server/")) {
+        abs = path.resolve(REPO_ROOT, stripped);
+      } else {
+        return false;
+      }
+      const repoRel = path.relative(REPO_ROOT, abs).split(path.sep).join("/");
+      return repoRel === ASSEMBLER_REL_PATH;
+    }
+
+    function isAllowed(fileRel: string): boolean {
+      return ASSEMBLER_IMPORT_ALLOWLIST.includes(fileRel);
+    }
+
+    type Sample = {
+      file: string;
+      spec: string;
+      expectViolation: boolean;
+    };
+    const samples: Sample[] = [
+      // Allowed: orchestrator imports the assembler.
+      {
+        file: "server/agent-studio/services/runtime/rac-orchestrator.ts",
+        spec: "../rac/context-assembler",
+        expectViolation: false,
+      },
+      // Forbidden: chat-stream imports the assembler directly.
+      {
+        file: "server/agent-studio/chat-stream.ts",
+        spec: "./services/rac/context-assembler",
+        expectViolation: true,
+      },
+      // Forbidden: services/chat.ts imports the assembler.
+      {
+        file: "server/agent-studio/services/chat.ts",
+        spec: "./rac/context-assembler",
+        expectViolation: true,
+      },
+      // Allowed: importing some other RAC primitive (not the assembler).
+      {
+        file: "server/agent-studio/chat-stream.ts",
+        spec: "./services/rac/retrieval",
+        expectViolation: false,
+      },
+    ];
+
+    for (const s of samples) {
+      const fileAbs = join(process.cwd(), s.file);
+      const targets = targetsAssembler(fileAbs, s.spec);
+      const violation = targets && !isAllowed(s.file);
+      expect(
+        violation,
+        `file=${s.file} spec=${s.spec} expectViolation=${s.expectViolation}`,
+      ).toBe(s.expectViolation);
+    }
+  });
+});
+
+// ── 6. Subprocess: script exits 0 on the live tree ───────────────────
 
 describe("check-cag-boundary — live tree", () => {
   it("exits 0 with success message on the current repo state", () => {

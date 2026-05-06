@@ -19,21 +19,14 @@
  *   are exempt because they construct fixture data through object
  *   literals, not assignments.
  *
- * Future Rule C (deferred until P6 runtime orchestration lands):
- *   The original P1E phrasing was "the composer is the only file that
- *   imports both CAG resolver and RAC assembler". With the P5
- *   assembler now in place, that simple wording conflicts with the
- *   planned P6 edits to `chat-stream.ts`, `services/chat.ts`, and
- *   `services/test-run-binding.ts` — those files will need to import
- *   `resolveCagPack`, the planner/executor/filter, AND the assembler
- *   so they can feed the composer. The honest invariant is "no file
- *   outside the composer combines a CAG section + a retrieval-evidence
- *   section into a finished prompt string" — which is hard to lint
- *   structurally without type-aware AST. P6 lands a thin runtime
- *   orchestrator that owns the resolver→executor→filter→assembler→
- *   composer dance; once that exists, Rule C becomes "only the
- *   orchestrator and the composer may import the assembler", which
- *   IS structurally lintable. Until then, this header is the contract.
+ * Rule C (active since P6 — runtime orchestration landed):
+ *   The RAC context assembler (`services/rac/context-assembler.ts`)
+ *   may be imported only by the runtime orchestrator
+ *   (`services/runtime/rac-orchestrator.ts`). The composer itself
+ *   does NOT import the assembler — it accepts a pre-rendered
+ *   `SystemPromptSection` from the caller. The orchestrator is the
+ *   single place that combines CAG + retrieval into the composer
+ *   call. Tests import freely.
  */
 
 import { dirname, join, relative, resolve, sep } from "path";
@@ -172,9 +165,64 @@ function isTestFile(fileRel: string): boolean {
   return /\.(test|spec)\.tsx?$/.test(fileRel);
 }
 
+// Rule C — RAC assembler import allow-list.
+const ASSEMBLER_REL_PATH =
+  "server/agent-studio/services/rac/context-assembler";
+
+const ASSEMBLER_IMPORT_ALLOWLIST = [
+  // The orchestrator owns the resolver -> executor -> filter ->
+  // assembler -> composer dance.
+  "server/agent-studio/services/runtime/rac-orchestrator.ts",
+  // The assembler file itself (self-reference protection).
+  "server/agent-studio/services/rac/context-assembler.ts",
+] as const;
+
+function importerSpecifierTargetsAssembler(
+  fileAbs: string,
+  spec: string,
+): boolean {
+  const stripped = spec.replace(/\.(tsx?|m?js|cjs)$/, "");
+  // Quick reject before doing path resolution.
+  if (!/context-assembler/.test(stripped)) return false;
+  let abs: string;
+  if (stripped.startsWith("./") || stripped.startsWith("../")) {
+    abs = require("path").resolve(require("path").dirname(fileAbs), stripped);
+  } else if (stripped.startsWith("server/")) {
+    abs = require("path").resolve(REPO_ROOT, stripped);
+  } else {
+    return false;
+  }
+  const repoRel = require("path").relative(REPO_ROOT, abs).split(sep).join("/");
+  return repoRel === ASSEMBLER_REL_PATH;
+}
+
 function main(): void {
   const violations: Violation[] = [];
   const serverFiles = listSourceFiles(join(REPO_ROOT, "server"));
+
+  // ── Rule C: assembler-import allow-list (whole server/ tree) ──────
+  // Test files are exempt — see Rule B exemption for the same reason.
+  for (const file of serverFiles) {
+    const fileRel = relative(REPO_ROOT, file).split(sep).join("/");
+    if (isTestFile(fileRel)) continue;
+    if ((ASSEMBLER_IMPORT_ALLOWLIST as readonly string[]).includes(fileRel)) continue;
+
+    const src = readFile(file);
+    importRegex.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = importRegex.exec(src)) !== null) {
+      const spec = match[1];
+      if (!importerSpecifierTargetsAssembler(file, spec)) continue;
+      const line = computeLine(src, match.index);
+      violations.push({
+        rule: "cag-boundary/assembler-import",
+        file: fileRel,
+        line,
+        severity: "error",
+        message: `Imports the RAC context assembler ("${spec}"). Per P6 Rule C, only ${ASSEMBLER_IMPORT_ALLOWLIST.join(" and ")} may import it. Route through the orchestrator instead.`,
+      });
+    }
+  }
 
   for (const file of serverFiles) {
     const fileRel = relative(REPO_ROOT, file).split(sep).join("/");
@@ -226,7 +274,7 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log("OK — CAG boundary check passed (Rules A + B).");
+  console.log("OK — CAG boundary check passed (Rules A + B + C).");
   process.exit(0);
 }
 

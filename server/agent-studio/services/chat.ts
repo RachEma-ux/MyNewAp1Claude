@@ -48,12 +48,14 @@ import type {
   ModelAccessToolCall,
 } from "../../openrouter/model-access/types";
 import { evaluateProviderUsePolicy } from "./provider-use-governance";
-import { resolveCagPack } from "./cag";
 import {
-  composeSystemPrompt,
   CagRequiredError,
   type ComposerMode,
 } from "./runtime/system-prompt-composer";
+import {
+  buildRuntimeSystemPrompt,
+  RetrievalRequiredError,
+} from "./runtime/rac-orchestrator";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -652,30 +654,17 @@ export async function sendChatMessage(
     content: input.userMessage,
   });
 
-  // RAC P1C — single composer (D-PRM-1). Replaces the legacy
-  // [systemInstructions + roleInstructions] concat. Mode=disabled
-  // preserves byte-equivalent output (golden-tested).
+  // RAC P6 — runtime orchestrator owns CAG + retrieval + composer.
+  // CagRequiredError / RetrievalRequiredError bubble up to the caller
+  // for chat-error mapping; warnings flow into stdout for ops.
   const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
-  let cagSection = null;
-  let cagWarnings: string[] = [];
-  try {
-    const resolved = await resolveCagPack({
-      workspaceId: options.workspaceId ?? 1,
-      agentId: (draft as any).agentId ?? draft.id,
-      agentDraftId: draft.id,
-      actorId: options.actorId ?? 1,
-      mode: cagMode,
-    });
-    cagSection = resolved.section;
-    cagWarnings = resolved.warnings;
-  } catch (err) {
-    if (err instanceof CagRequiredError) {
-      throw err; // caller maps to chat error response
-    }
-    throw err;
-  }
-  const composedForBinding = composeSystemPrompt({
+  const built = await buildRuntimeSystemPrompt({
     mode: cagMode,
+    workspaceId: options.workspaceId ?? 1,
+    agentId: (draft as any).agentId ?? draft.id,
+    agentDraftId: draft.id,
+    actorId: options.actorId ?? 1,
+    query: input.userMessage,
     draft: {
       name: (draft as any).name ?? null,
       role: (draft as any).role ?? null,
@@ -687,11 +676,10 @@ export async function sendChatMessage(
       successCriteria: (draft as any).successCriteria ?? null,
       escalationRules: (draft as any).escalationRules ?? null,
     },
-    capabilityPack: cagSection,
-    retrievalEvidence: null,
   });
-  for (const w of cagWarnings) console.info(`[chat/cag] ${w}`);
-  for (const w of composedForBinding.warnings) console.info(`[chat/composer] ${w}`);
+  const composedForBinding = { text: built.systemPrompt };
+  for (const w of built.context.warnings) console.info(`[chat/rac] ${w}`);
+  for (const w of built.composerWarnings) console.info(`[chat/composer] ${w}`);
   const systemPromptForBinding = composedForBinding.text;
 
   // Plan v3 Phase 17/18: prefer the binding-driven Model Access path

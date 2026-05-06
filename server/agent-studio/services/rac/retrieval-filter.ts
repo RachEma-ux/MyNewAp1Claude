@@ -25,18 +25,28 @@ import type { RacPolicy } from "./sources";
 
 // ── Locked defaults (D-RET-5) ────────────────────────────────────────
 
-export const DEFAULT_RETRIEVAL_FILTER_CONFIG = Object.freeze({
-  minScore: 0.45,
-  maxChunks: 8,
-  dedupeBy: "hash" as const,
-  freshnessMaxAgeDays: null as number | null,
-  citationRequired: true,
-  sourcePermissionFilter: "workspace_id_match" as const,
-  piiPolicy: "warn" as "warn" | "block" | "none",
-  licensePolicy: "warn" as "warn" | "block" | "none",
-});
+export interface RetrievalFilterConfig {
+  minScore: number;
+  maxChunks: number;
+  dedupeBy: "hash" | "none";
+  freshnessMaxAgeDays: number | null;
+  citationRequired: boolean;
+  sourcePermissionFilter: "workspace_id_match";
+  piiPolicy: "warn" | "block" | "none";
+  licensePolicy: "warn" | "block" | "none";
+}
 
-export type RetrievalFilterConfig = typeof DEFAULT_RETRIEVAL_FILTER_CONFIG;
+export const DEFAULT_RETRIEVAL_FILTER_CONFIG: Readonly<RetrievalFilterConfig> =
+  Object.freeze({
+    minScore: 0.45,
+    maxChunks: 8,
+    dedupeBy: "hash" as const,
+    freshnessMaxAgeDays: null,
+    citationRequired: true,
+    sourcePermissionFilter: "workspace_id_match" as const,
+    piiPolicy: "warn",
+    licensePolicy: "warn",
+  });
 
 export interface FilterRejectionCounts {
   citationRequired: number;
