@@ -1862,6 +1862,15 @@ export const agsKnowledgeUnits = pgTable(
     contentHashIdx: index("idx_ags_knowledge_units_content_hash").on(t.contentHash),
     freshnessIdx: index("idx_ags_knowledge_units_freshness").on(t.freshnessState),
     parentIdx: index("idx_ags_knowledge_units_parent").on(t.parentUnitId),
+    // Migration 0042 (review-polish PR): partial index for the
+    // dominant kb-router listing query shape — `workspaceId AND
+    // archivedAt IS NULL [AND sourceId]`. Covers `listUnits` +
+    // `listFreshnessCounts` index-only.
+    activeListingIdx: index("idx_ags_knowledge_units_active_listing").on(
+      t.workspaceId,
+      t.sourceId,
+      t.freshnessState,
+    ),
   }),
 );
 

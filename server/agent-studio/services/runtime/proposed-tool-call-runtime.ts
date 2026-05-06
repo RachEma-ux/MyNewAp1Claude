@@ -382,7 +382,14 @@ export async function persistRuntimeToolCallTrace(
       errorMessage: input.dispatchResult?.error?.message ?? null,
     });
     return { id: r.id };
-  } catch {
+  } catch (err) {
+    // Best-effort: never block the chat loop on trace-write failure.
+    // Surface as a warning so operators see persistent trace-write
+    // outages (production observability hook). Review-polish PR.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[ags-runtime] tool-call trace write failed (workspace=${input.workspaceId} agent=${input.agentId} draft=${input.agentDraftId}): ${msg}`,
+    );
     return { id: null };
   }
 }
