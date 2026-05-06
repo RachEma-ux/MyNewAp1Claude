@@ -274,6 +274,13 @@
       "when": 1781308800000,
       "tag": "0039_cag_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1781395200000,
+      "tag": "0040_rac_source_registry",
+      "breakpoints": true
     }
   ]
 }
