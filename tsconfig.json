@@ -6,7 +6,6 @@
     "dist",
     "**/*.test.ts",
     "**/agents/**",
-    "**/agent*",
     "**/policies*",
     "**/promotion*",
     "**/drift*",
