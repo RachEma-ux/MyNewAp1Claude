@@ -24,6 +24,7 @@ export {
 
 export { graphragAdapter } from "./graphrag-adapter";
 export { localPgvectorAdapter } from "./local-pgvector-adapter";
+export { knowledgeUnitAdapter } from "./knowledge-unit-adapter";
 
 export {
   pickAdapter,
