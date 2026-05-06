@@ -1,0 +1,344 @@
+/**
+ * Approval Gate — Retrofit P9.
+ *
+ * Locks D-APP-EXT-1..7 from
+ * `docs/architecture/agent-studio-approval-gate-extension.md`.
+ *
+ * Reuses `agsPendingPermissionRequests` (D-APP-EXT-1 — no new approval
+ * table). Phase 8 produces the canonical hash; this gate is idempotent
+ * on `(agentDraftId, proposedToolCallHash)` (D-APP-EXT-2).
+ *
+ * Approval permits MCP dispatch; it does NOT execute the tool
+ * (D-APP-EXT-3). The dispatcher still re-runs governance + MCP schema
+ * validation after the gate clears.
+ *
+ * State transitions write to `agsRuntimePolicyEvents` (D-APP-EXT-6) so
+ * the same ledger that records dispatch events captures the approval
+ * lifecycle.
+ */
+import { and, eq } from "drizzle-orm";
+import { getAsDb } from "../../db/connection";
+import {
+  agsPendingPermissionRequests,
+  agsRuntimePolicyEvents,
+} from "../../../../drizzle/tables/agent-studio";
+import {
+  hashProposedToolCall,
+  type ProposedToolCall,
+} from "../mcp/proposed-tool-call";
+
+// ── Pure state machine (D-APP-EXT-2) ──────────────────────────────────
+
+export type ApprovalDecision =
+  | "permit"
+  | "expired"
+  | "denied"
+  | "pending"
+  | "approval_required";
+
+export interface ApprovalRowSnapshot {
+  status: "pending" | "allowed" | "denied" | "timed_out";
+  expiresAt: Date | null;
+  proposedToolCallHash: string | null;
+}
+
+/**
+ * Pure decision: given a candidate row and the current time, return the
+ * gate verdict. Caller is responsible for the row lookup and any
+ * subsequent writes. Logic is locked to D-APP-EXT-2.
+ *
+ *   - status="allowed" AND expiresAt > now    → permit
+ *   - status="allowed" AND expiresAt <= now   → expired
+ *   - status="timed_out"                      → expired
+ *   - status="denied"                         → denied
+ *   - status="pending"                        → pending
+ *   - row not found                           → approval_required
+ */
+export function decideApprovalState(
+  row: ApprovalRowSnapshot | null,
+  now: Date,
+): ApprovalDecision {
+  if (!row) return "approval_required";
+  switch (row.status) {
+    case "allowed": {
+      if (!row.expiresAt) return "permit"; // legacy row without expiry
+      return row.expiresAt.getTime() > now.getTime() ? "permit" : "expired";
+    }
+    case "denied":
+      return "denied";
+    case "timed_out":
+      return "expired";
+    case "pending":
+      return "pending";
+  }
+}
+
+/**
+ * D-APP-EXT-5: default 1-hour expiry; per-tool override via the Phase 7
+ * mirror (`approvalTtlSeconds`). Returns the effective expiresAt for an
+ * approval that is being marked `allowed` right now.
+ */
+const DEFAULT_APPROVAL_TTL_SECONDS = 3600; // 1 hour
+
+export function computeExpiresAt(
+  decidedAt: Date,
+  ttlSecondsOverride: number | null | undefined,
+): Date {
+  const ttl =
+    typeof ttlSecondsOverride === "number" && ttlSecondsOverride > 0
+      ? ttlSecondsOverride
+      : DEFAULT_APPROVAL_TTL_SECONDS;
+  return new Date(decidedAt.getTime() + ttl * 1000);
+}
+
+// ── Service surface ───────────────────────────────────────────────────
+
+export interface EvaluateApprovalGateInput {
+  agentDraftId: number;
+  proposedToolCall: ProposedToolCall;
+  /** Optional override; tests pin to a fixed clock. */
+  now?: Date;
+}
+
+export interface EvaluateApprovalGateResult {
+  decision: ApprovalDecision;
+  /** Canonical SHA-256 from Phase 8. */
+  proposedToolCallHash: string;
+  /** Existing row id when one was found; null on `approval_required`. */
+  approvalRequestId: number | null;
+  /** Reason code that downstream consumers (dispatcher, trace) surface. */
+  reason: string;
+}
+
+/**
+ * Look up the approval row keyed on `(agentDraftId, proposedToolCallHash)`,
+ * apply the D-APP-EXT-2 state machine, and bump `lastUsedAt` on permit
+ * so the audit trail records every successful re-use.
+ *
+ * Does NOT write `agsRuntimePolicyEvents` here — that's the dispatcher's
+ * job for the dispatch event itself. State-transition rows are written
+ * by `createApprovalRequest` and `decideApprovalRequest` (the two paths
+ * that move the row between statuses).
+ */
+export async function evaluateApprovalGate(
+  input: EvaluateApprovalGateInput,
+): Promise<EvaluateApprovalGateResult> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const hash = hashProposedToolCall(input.proposedToolCall);
+  const now = input.now ?? new Date();
+
+  const rows = await db
+    .select()
+    .from(agsPendingPermissionRequests)
+    .where(
+      and(
+        eq(agsPendingPermissionRequests.agentDraftId, input.agentDraftId),
+        eq(agsPendingPermissionRequests.proposedToolCallHash, hash),
+      ),
+    )
+    .limit(1);
+  const row = rows[0] ?? null;
+
+  const decision = decideApprovalState(
+    row
+      ? {
+          status: row.status as ApprovalRowSnapshot["status"],
+          expiresAt: row.expiresAt,
+          proposedToolCallHash: row.proposedToolCallHash,
+        }
+      : null,
+    now,
+  );
+
+  if (decision === "permit" && row) {
+    await db
+      .update(agsPendingPermissionRequests)
+      .set({ lastUsedAt: now })
+      .where(eq(agsPendingPermissionRequests.id, row.id));
+  }
+
+  return {
+    decision,
+    proposedToolCallHash: hash,
+    approvalRequestId: row?.id ?? null,
+    reason: reasonFor(decision),
+  };
+}
+
+function reasonFor(decision: ApprovalDecision): string {
+  switch (decision) {
+    case "permit":
+      return "approval_active";
+    case "expired":
+      return "approval_expired";
+    case "denied":
+      return "approval_denied";
+    case "pending":
+      return "approval_pending";
+    case "approval_required":
+      return "approval_required";
+  }
+}
+
+// ── Create / decide flows (D-APP-EXT-6 audit) ─────────────────────────
+
+export interface CreateApprovalRequestInput {
+  runtimeRunId: number;
+  agentDraftId: number;
+  proposedToolCall: ProposedToolCall;
+  /** Optional human note surfaced in the approval queue. */
+  description?: string | null;
+}
+
+/**
+ * Persist a new pending approval row keyed on the canonical hash. Idempotency
+ * means the unique-ish lookup is `(agentDraftId, proposedToolCallHash)`;
+ * if a row already exists this returns the existing id rather than
+ * inserting a duplicate.
+ *
+ * Writes a `null → pending` row to `agsRuntimePolicyEvents`.
+ */
+export async function createApprovalRequest(
+  input: CreateApprovalRequestInput,
+): Promise<{ approvalRequestId: number; created: boolean }> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const hash = hashProposedToolCall(input.proposedToolCall);
+
+  const existing = await db
+    .select()
+    .from(agsPendingPermissionRequests)
+    .where(
+      and(
+        eq(agsPendingPermissionRequests.agentDraftId, input.agentDraftId),
+        eq(agsPendingPermissionRequests.proposedToolCallHash, hash),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) {
+    return { approvalRequestId: existing[0].id, created: false };
+  }
+
+  const [created] = await db
+    .insert(agsPendingPermissionRequests)
+    .values({
+      runtimeRunId: input.runtimeRunId,
+      agentDraftId: input.agentDraftId,
+      toolName: input.proposedToolCall.toolName,
+      description: input.description ?? null,
+      rawPayload: { proposedToolCall: input.proposedToolCall as unknown as Record<string, unknown> },
+      proposedToolCallJson: input.proposedToolCall as unknown as Record<string, unknown>,
+      proposedToolCallHash: hash,
+      status: "pending",
+    })
+    .returning();
+
+  await db.insert(agsRuntimePolicyEvents).values({
+    runId: input.runtimeRunId,
+    policyKey: "approval_gate",
+    decision: "pending",
+    reason: "approval_request_created",
+    payload: {
+      approvalRequestId: created.id,
+      agentDraftId: input.agentDraftId,
+      proposedToolCallHash: hash,
+      toolName: input.proposedToolCall.toolName,
+    },
+  });
+
+  return { approvalRequestId: created.id, created: true };
+}
+
+export interface DecideApprovalRequestInput {
+  approvalRequestId: number;
+  status: "allowed" | "denied" | "timed_out";
+  decidedBy?: number | null;
+  reason?: string | null;
+  /** Per-tool override per D-APP-EXT-5; defaults to 1 hour. */
+  ttlSecondsOverride?: number | null;
+  /** Test override. */
+  now?: Date;
+}
+
+/**
+ * Flip status on a pending row. Computes expiresAt for `allowed`
+ * (D-APP-EXT-5). Writes a state-transition row to
+ * `agsRuntimePolicyEvents` (D-APP-EXT-6).
+ */
+export async function decideApprovalRequest(
+  input: DecideApprovalRequestInput,
+): Promise<{
+  ok: boolean;
+  status: string;
+  expiresAt: Date | null;
+  reason: string;
+}> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+
+  const now = input.now ?? new Date();
+  const expiresAt =
+    input.status === "allowed"
+      ? computeExpiresAt(now, input.ttlSecondsOverride ?? null)
+      : null;
+
+  const [updated] = await db
+    .update(agsPendingPermissionRequests)
+    .set({
+      status: input.status,
+      decidedBy: input.decidedBy ?? null,
+      decidedAt: now,
+      expiresAt,
+      reason: input.reason ?? null,
+    })
+    .where(
+      and(
+        eq(agsPendingPermissionRequests.id, input.approvalRequestId),
+        eq(agsPendingPermissionRequests.status, "pending"),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    // Row already terminal — return current state without re-auditing.
+    const existing = await db
+      .select()
+      .from(agsPendingPermissionRequests)
+      .where(eq(agsPendingPermissionRequests.id, input.approvalRequestId))
+      .limit(1);
+    const row = existing[0];
+    if (!row) {
+      return { ok: false, status: "missing", expiresAt: null, reason: "row_not_found" };
+    }
+    return {
+      ok: false,
+      status: row.status,
+      expiresAt: row.expiresAt,
+      reason: "already_decided",
+    };
+  }
+
+  await db.insert(agsRuntimePolicyEvents).values({
+    runId: updated.runtimeRunId,
+    policyKey: "approval_gate",
+    decision: updated.status,
+    reason: input.reason ?? `approval_${updated.status}`,
+    payload: {
+      approvalRequestId: updated.id,
+      decidedBy: input.decidedBy ?? null,
+      proposedToolCallHash: updated.proposedToolCallHash,
+      toolName: updated.toolName,
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    },
+  });
+
+  return {
+    ok: true,
+    status: updated.status,
+    expiresAt,
+    reason: `approval_${updated.status}`,
+  };
+}
