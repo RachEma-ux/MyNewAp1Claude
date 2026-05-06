@@ -19,6 +19,7 @@ import { jsonParser } from "./parsers/json-parser";
 import { basicPdfTextParser } from "./parsers/basic-pdf-parser";
 import { basicCodeFileParser } from "./parsers/basic-code-parser";
 import { csvParser } from "./parsers/csv-parser";
+import { xlsxParser } from "./parsers/xlsx-parser";
 import { UnsupportedContentTypeError, type Parser } from "./types";
 
 const parsers = new Map<string, Parser>();
@@ -68,10 +69,11 @@ export function registerDefaultParsers(): void {
   registerParser(basicPdfTextParser);
   registerParser(basicCodeFileParser);
   registerParser(csvParser);
+  registerParser(xlsxParser);
   defaultsRegistered = true;
 }
 
-/** Reset for tests — restores the six MVP parsers. */
+/** Reset for tests — restores the MVP parsers. */
 export function resetParsersToDefaults(): void {
   clearParsers();
   defaultsRegistered = false;
