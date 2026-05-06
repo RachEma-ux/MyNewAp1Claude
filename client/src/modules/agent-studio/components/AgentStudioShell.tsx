@@ -56,6 +56,7 @@ const AgentMcpPage = lazy(() => import("../pages/AgentMcpPage"));
 const AgentSubagentsPage = lazy(() => import("../pages/AgentSubagentsPage"));
 // RAC P11 — capability pack + retrieval-augmented context inspector
 const RacPage = lazy(() => import("../pages/RacPage"));
+const RetrofitPage = lazy(() => import("../pages/RetrofitPage"));
 // ── Phase 13e: Catalog (global pages, no agent context) ──
 const AgentSkillCatalogPage = lazy(() => import("../pages/AgentSkillCatalogPage"));
 const AgentToolCatalogPage = lazy(() => import("../pages/AgentToolCatalogPage"));
@@ -111,6 +112,8 @@ const VALID_AGENT_VIEWS: AgentStudioView[] = [
   "subagents",
   // RAC P11
   "rac",
+  // Retrofit P12
+  "retrofit",
 ];
 
 function parseRoute(path: string): ParsedRoute {
@@ -412,6 +415,9 @@ export default function AgentStudioShell() {
       // RAC P11 — capability pack + retrieval-augmented context.
       case "rac":
         return <RacPage agentId={agentId!} />;
+      // Retrofit P12 — Universal KB / Tool Knowledge / Approvals.
+      case "retrofit":
+        return <RetrofitPage agentId={agentId!} />;
       default:
         return <AgentOverviewPage agentId={agentId!} />;
     }
