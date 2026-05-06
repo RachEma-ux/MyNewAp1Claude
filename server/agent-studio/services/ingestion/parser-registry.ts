@@ -20,6 +20,7 @@ import { basicPdfTextParser } from "./parsers/basic-pdf-parser";
 import { basicCodeFileParser } from "./parsers/basic-code-parser";
 import { csvParser } from "./parsers/csv-parser";
 import { xlsxParser } from "./parsers/xlsx-parser";
+import { ocrParser } from "./parsers/ocr-parser";
 import { UnsupportedContentTypeError, type Parser } from "./types";
 
 const parsers = new Map<string, Parser>();
@@ -70,6 +71,7 @@ export function registerDefaultParsers(): void {
   registerParser(basicCodeFileParser);
   registerParser(csvParser);
   registerParser(xlsxParser);
+  registerParser(ocrParser);
   defaultsRegistered = true;
 }
 

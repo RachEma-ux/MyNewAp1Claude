@@ -123,31 +123,22 @@ Test coverage: the planner's skipReason matrix test was tightened to a single `c
 
 ### D4 — Additional MVP parsers (partial ✅)
 
-**Status:** Pure in-process parsers (CSV + xlsx) closed. The retrofit now ships **8 parsers**: `text`, `markdown`, `html-snapshot`, `json`, `basic-pdf`, `basic-code`, `csv`, `xlsx`.
+**Status:** CSV + xlsx + OCR closed. The retrofit now ships **9 parsers**: `text`, `markdown`, `html-snapshot`, `json`, `basic-pdf`, `basic-code`, `csv`, `xlsx`, `ocr`.
 
 | Parser | PR | SHA | Notes |
 |---|---|---|---|
 | CSV | [#209](https://github.com/RachEma-ux/MyNewAp1Claude/pull/209) | `890ad84` | `text/csv` / `application/csv` / `text/tab-separated-values`. Each non-header row → `table_row` unit; auto-detects comma/semicolon/tab; handles quoted commas/newlines/quote-quotes; tolerates LF/CRLF, blank lines, missing trailing newlines, empty inputs. 16 unit tests. |
-| XLSX | (this PR) | (TBD) | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (+ macro-enabled variant). Each non-header row of every **visible** sheet → `table_row` unit; multi-sheet workbooks emit one set per sheet with `sheet` field carried in `contentJson` and Excel-style `selector` location (`<sheet>!A<row>`). Hidden / very-hidden sheets skipped (operators don't intend hidden sheets to flow into retrieval). Cell-shape coverage: dates → ISO; hyperlinks → visible text; formula cells → cached result; error cells → error code; rich text → concatenated runs; booleans → `"true"`/`"false"`. Empty cells → `""` (not the literal `null`). Library: `exceljs` (MIT, no native deps; the legacy `xlsx`/SheetJS package was rejected over unaddressed prototype-pollution CVEs). 18 unit tests. |
+| XLSX | [#212](https://github.com/RachEma-ux/MyNewAp1Claude/pull/212) | `ff8e843` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (+ macro-enabled variant). Each non-header row of every **visible** sheet → `table_row` unit; multi-sheet workbooks emit one set per sheet with `sheet` field carried in `contentJson` and Excel-style `selector` location (`<sheet>!A<row>`). Hidden / very-hidden sheets skipped (operators don't intend hidden sheets to flow into retrieval). Cell-shape coverage: dates → ISO; hyperlinks → visible text; formula cells → cached result; error cells → error code; rich text → concatenated runs; booleans → `"true"`/`"false"`. Empty cells → `""` (not the literal `null`). Library: `exceljs` (MIT, no native deps; the legacy `xlsx`/SheetJS package was rejected over unaddressed prototype-pollution CVEs). 18 unit tests. |
+| OCR | (this PR) | (TBD) | `image/{png,jpeg,jpg,tiff,webp,gif}`. Bridges to the existing `data-acquisition` worker's `/ocr` endpoint (D-PARSE-OCR-1). Each successful OCR call → one `extracted_artifact` unit (D-NKU-2) with `text`, `confidence`, and `engine` carried in `contentJson`. Wire contract is `multipart/form-data` POST → JSON `{ text, confidence?, engine? }`. Workspace-shared worker; no per-workspace credential binding (D-PARSE-OCR-2). Parser registers always but throws `UnsupportedContentTypeError` from `parse()` when the worker is unhealthy (D-PARSE-OCR-3); dispatcher widened to catch parse-time `UnsupportedContentTypeError` so the failure surfaces as `status="unsupported_type"`. Health probe cached locally with 30s TTL so the worker's health load stays bounded regardless of OCR throughput. Decision record: `docs/architecture/agent-studio-ocr-parser.md`. 14 unit tests including engine-down + cache-recovery paths. |
 
-**Deferred — each needs an architectural decision before implementation:**
+**Still deferred** — audio (`D-PARSE-AUDIO-N` + per-workspace credential binding mirroring D-EMB-1; the existing `voiceTranscription.ts` Whisper wrapper informs the design) and video (downstream of audio + ffmpeg). Each needs its own decision record before implementation. They sit alongside D1 (pgvector) and D2 (multi-region) as "ready to build, waiting on a decision," not "actively blocked."
 
-The remaining three (image OCR, audio, video) are not the same shape as CSV/xlsx. They each introduce a runtime dependency (an OCR engine, a transcription provider, ffmpeg + transcription) and require a binding decision similar to D-EMB-1's per-source embedding model binding. Until the binding model is decided, an "implement now" PR would either bake in a hard dependency (breaks deployments without that engine) or quietly degrade (breaks operator expectations).
+**Acceptance criteria recorded for the deferral spec** (kept here as the contract for the remaining two):
 
-Existing infrastructure that informs the decision:
-
-- **OCR**: `server/data-analysis/data-acquisition/` already wires `tesseract` and `paddleocr` as **external workers** (HTTP to a Python service). That system uses fallback chains (`tesseract` → `paddleocr` → `llamaparse`). A retrofit OCR parser could either (a) call out to that worker (couples retrofit to the data-acquisition service being live) or (b) ship a pure-JS OCR via `tesseract.js` (large model bundle, slow, but in-process).
-- **Audio**: `server/_core/voiceTranscription.ts` already calls the OpenAI Whisper API (`whisper-1`) with credentials from the workspace secret store. A retrofit audio parser could leverage this directly — but inherits the API-key gate.
-- **Video**: needs ffmpeg for keyframe extraction + audio extraction, then audio transcription. Most complex; no existing infra.
-
-**Sharp acceptance for closing each:**
-
-1. **A `D-PARSE-EXTRACT-N` decision record** that picks the engine (or per-workspace binding model) and locks the graceful-degradation contract: when the engine is unavailable, does the parser fail, return a `parserKey: "<x>", parts: []` shape with a metadata warning, or refuse registration entirely?
-2. **Parser registers conditionally** on engine health — `acceptsContentTypes` only resolves when the engine is reachable. Operators see an `unsupported_type` rather than an opaque crash.
-3. **Per-workspace binding row** (mirroring `D-EMB-1`) when the engine is a remote provider, so workspaces don't share API keys silently.
-4. **Acceptance test coverage** for the engine-down path, not just the happy path.
-
-Until those decisions land, OCR/audio/video sit alongside D1 (pgvector) and D2 (multi-region) as "ready to build, waiting on a decision," not "actively blocked."
+1. **A `D-PARSE-EXTRACT-N` decision record** that picks the engine (or per-workspace binding model) and locks the graceful-degradation contract.
+2. **Parser registration semantics defined** — register conditionally OR register always with a parse-time engine health check (the OCR closure picked the latter).
+3. **Per-workspace binding row** (mirroring `D-EMB-1`) when the engine is a remote provider with workspace-scoped credentials.
+4. **Engine-down test coverage**, not just the happy path.
 
 ### D5 — Pre-existing 10 `ai-types/integration` test failures ✅
 
