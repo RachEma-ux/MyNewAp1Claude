@@ -72,22 +72,23 @@ Procedure recorded at `docs/implementation/agent-studio-retrofit-page-smoke.md` 
 
 These were fixed in PR #193 but are worth recording as follow-up considerations for the broader codebase.
 
-### C1 — `tsconfig.json` exclude policy is fragile
+### C1 — `tsconfig.json` exclude policy ✅
 
-The project excludes `**/agent*`, but `api/router.ts` (entry point) transitively pulls in much of `services/agent-studio/**` once a new chain forms (e.g., P11's router → approval gate → proposed-tool-call). This is *why* the three latent typecheck issues only surfaced at P11. Two clean alternatives:
+**Status:** CLOSED. Merged at `0700893` (PR #206, 2026-05-06).
 
-- (a) Tighten the include surface to `server/_core/**` + transitive (today's effective scope) and accept that latent errors will keep appearing.
-- (b) Drop the `**/agent*` exclude entirely so all of `server/agent-studio/**` is type-checked. Pay the one-time cost of fixing whatever it surfaces.
+Took option (b): dropped `**/agent*` from `tsconfig.json` `exclude`. Effect was +129 agent-studio files in the typecheck graph (7 → 136), covering all of `api/**`, `db/**`, `repository.ts`, `chat-stream.ts`, `manifest.ts`, `bindings.ts`, `boot.ts`, and the schema files. `pnpm run check` stayed green — the latent issues fixed during P11 / A1 / A3 had already covered the cases that mattered. `**/services/**` is still a separate global exclude, so the bulk of agent-studio service code remains out of scope (intentional — those files are too entangled with cross-module imports for the strict-false typechecker to handle today).
 
-Recommendation: (b). The retrofit's pure-helper code paid the cost gracefully; the rest of agent-studio likely has a similar cleanup density.
+### C2 — `pdf-parse` import shape ✅
 
-### C2 — `pdf-parse` import shape
+**Status:** CLOSED (audit). Merged at `0700893` (PR #206, 2026-05-06).
 
-The runtime check `typeof pdfParseModule === "function"` works against both CJS and ESM bundles. If pdf-parse upgrades and changes its export shape again, the test surface in P3 (`tests/agent-studio/ingestion-parsers.test.ts` PDF case) catches it.
+Audit confirmed: the other pdf-parse usage at `server/documents/processor.ts` already uses the equivalent defensive shape `(module as any).default || module`. P3's `basic-pdf-parser` test will catch any future drift. No code change needed.
 
-### C3 — zod arity drift
+### C3 — zod arity drift ✅
 
-`z.record(z.unknown())` worked in older zod and fails in current. If the project upgrades zod again, search for `z.record(z\.[a-z]+)\)` and confirm each call passes both key + value type.
+**Status:** CLOSED (audit). Merged at `0700893` (PR #206, 2026-05-06).
+
+Audit confirmed: zero bare `z.record(z.something())` patterns remain across `server/` + `shared/`. All 5 call-sites use the two-arg form. `tsc` catches any new bare call. No code change needed.
 
 ---
 
