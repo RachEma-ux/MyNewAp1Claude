@@ -53,12 +53,14 @@ import type {
 } from "../openrouter/model-access/types";
 import { dispatchMcpToolCall } from "./services/mcp/dispatcher";
 import { getSnapshot } from "./services/mcp/registry";
-import { resolveCagPack } from "./services/cag";
 import {
-  composeSystemPrompt,
   CagRequiredError,
   type ComposerMode,
 } from "./services/runtime/system-prompt-composer";
+import {
+  buildRuntimeSystemPrompt,
+  RetrievalRequiredError,
+} from "./services/runtime/rac-orchestrator";
 
 type SseSend = (data: unknown) => void;
 
@@ -643,51 +645,48 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       content: userMessage,
     });
 
-    // RAC P1C — single composer (D-PRM-1). The legacy
-    // [systemInstructions + roleInstructions] concat is preserved
-    // byte-for-byte under mode="disabled". CAG_MODE env var picks the
-    // mode; default safe_degraded for chat (D-PRM-6).
+    // RAC P6 — runtime orchestrator owns the locked sequence:
+    // resolveCagPack -> RAC profile/plan/execute/filter/assemble ->
+    // composeSystemPrompt. CAG_MODE env var (default safe_degraded)
+    // applies to BOTH CAG and retrieval per D-PRM-6.
     const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
-    let cagSection = null;
-    let cagWarnings: string[] = [];
+    let systemPrompt: string;
     try {
-      const resolved = await resolveCagPack({
+      const built = await buildRuntimeSystemPrompt({
+        mode: cagMode,
         workspaceId,
         agentId: (draft as any).agentId ?? draft.id,
         agentDraftId: draft.id,
         actorId,
-        mode: cagMode,
+        query: userMessage,
+        draft: {
+          name: (draft as any).name ?? null,
+          role: (draft as any).role ?? null,
+          scope: (draft as any).scope ?? null,
+          mission: (draft as any).mission ?? null,
+          systemInstructions: draft.systemInstructions ?? null,
+          roleInstructions: draft.roleInstructions ?? null,
+          policyInstructions: (draft as any).policyInstructions ?? null,
+          successCriteria: (draft as any).successCriteria ?? null,
+          escalationRules: (draft as any).escalationRules ?? null,
+        },
       });
-      cagSection = resolved.section;
-      cagWarnings = resolved.warnings;
+      systemPrompt = built.systemPrompt;
+      for (const w of built.context.warnings) console.info(`[chat-stream/rac] ${w}`);
+      for (const w of built.composerWarnings) console.info(`[chat-stream/composer] ${w}`);
     } catch (err) {
       if (err instanceof CagRequiredError) {
         sendEvent({ type: "error", error: err.message, code: "cag_required" });
         res.end();
         return;
       }
+      if (err instanceof RetrievalRequiredError) {
+        sendEvent({ type: "error", error: err.message, code: "retrieval_required" });
+        res.end();
+        return;
+      }
       throw err;
     }
-
-    const composed = composeSystemPrompt({
-      mode: cagMode,
-      draft: {
-        name: (draft as any).name ?? null,
-        role: (draft as any).role ?? null,
-        scope: (draft as any).scope ?? null,
-        mission: (draft as any).mission ?? null,
-        systemInstructions: draft.systemInstructions ?? null,
-        roleInstructions: draft.roleInstructions ?? null,
-        policyInstructions: (draft as any).policyInstructions ?? null,
-        successCriteria: (draft as any).successCriteria ?? null,
-        escalationRules: (draft as any).escalationRules ?? null,
-      },
-      capabilityPack: cagSection,
-      retrievalEvidence: null, // RAC P5 placeholder
-    });
-    for (const w of cagWarnings) console.info(`[chat-stream/cag] ${w}`);
-    for (const w of composed.warnings) console.info(`[chat-stream/composer] ${w}`);
-    const systemPrompt = composed.text;
 
     // Pick path based on whether any MCP server for this draft has
     // a live registry snapshot (i.e. is actually connected)

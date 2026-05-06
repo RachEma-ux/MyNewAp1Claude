@@ -44,11 +44,8 @@ import {
   type ProviderUsePolicyReason,
 } from "./provider-use-governance";
 import * as repo from "../repository";
-import { resolveCagPack } from "./cag";
-import {
-  composeSystemPrompt,
-  type ComposerMode,
-} from "./runtime/system-prompt-composer";
+import { buildRuntimeSystemPrompt } from "./runtime/rac-orchestrator";
+import { type ComposerMode } from "./runtime/system-prompt-composer";
 
 /**
  * Reason a test-run could not produce output. Either a binding-policy
@@ -159,24 +156,25 @@ export async function runTestWithBinding(
     };
   }
 
-  // RAC P1C — when caller doesn't supply a systemPrompt, build one
-  // through the single composer (D-PRM-1). Caller-supplied prompts are
-  // passed through unchanged so test fixtures keep working.
+  // RAC P6 — when caller doesn't supply a systemPrompt, build one
+  // through the runtime orchestrator (CAG + RAC + composer in one
+  // call). Caller-supplied prompts pass through unchanged so test
+  // fixtures keep working. We deliberately swallow orchestrator
+  // errors here: test-run is a best-effort path and we'd rather
+  // produce *some* output than fail because retrieval timed out.
   let resolvedSystemPrompt = input.systemPrompt;
   if (!resolvedSystemPrompt) {
     const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
     const draftRow = await repo.getDraftById(input.draftId).catch(() => null);
     if (draftRow) {
       try {
-        const resolvedCag = await resolveCagPack({
+        const built = await buildRuntimeSystemPrompt({
+          mode: cagMode,
           workspaceId: input.workspaceId,
           agentId: (draftRow as any).agentId ?? draftRow.id,
           agentDraftId: draftRow.id,
           actorId: input.actorId,
-          mode: cagMode,
-        });
-        const composed = composeSystemPrompt({
-          mode: cagMode,
+          query: input.prompt,
           draft: {
             name: (draftRow as any).name ?? null,
             role: (draftRow as any).role ?? null,
@@ -188,13 +186,11 @@ export async function runTestWithBinding(
             successCriteria: (draftRow as any).successCriteria ?? null,
             escalationRules: (draftRow as any).escalationRules ?? null,
           },
-          capabilityPack: resolvedCag.section,
-          retrievalEvidence: null,
         });
-        resolvedSystemPrompt = composed.text;
+        resolvedSystemPrompt = built.systemPrompt;
       } catch {
         // Best-effort: fall through to no system prompt; the caller
-        // sees the same behavior as before when CAG resolution fails.
+        // sees the same behavior as before when CAG/RAC resolution fails.
       }
     }
   }
