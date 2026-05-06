@@ -169,10 +169,16 @@ describe("graphragAdapter", () => {
   });
 });
 
-// ── Local pgvector adapter — pre-conditional ─────────────────────────
+// ── Local pgvector adapter — production singleton without ASDB ───────
 
-describe("localPgvectorAdapter", () => {
-  it("search returns pgvector_not_initialized warning", async () => {
+describe("localPgvectorAdapter (production singleton)", () => {
+  // The production singleton wires `getAsDb()` directly. In the test
+  // env ASDB is not initialized, so `getDb()` returns null and the
+  // adapter reports `asdb_unavailable`. The richer engine-state
+  // matrix (extension absent / column absent / dim mismatch / etc.)
+  // is exercised in `pgvector-adapter.test.ts` via injected fakes
+  // per D-PARSE-PGVECTOR-3.
+  it("search returns asdb_unavailable when AS-DB is not configured", async () => {
     const out = await localPgvectorAdapter.search({
       workspaceId: 7,
       sourceId: 99,
@@ -180,13 +186,15 @@ describe("localPgvectorAdapter", () => {
       topK: 5,
     });
     expect(out.chunks).toEqual([]);
-    expect(out.warnings.some((w) => /pgvector_not_initialized/.test(w))).toBe(true);
+    expect(
+      out.warnings.some((w) => /asdb_unavailable|pgvector_extension/.test(w)),
+    ).toBe(true);
   });
 
-  it("health returns unavailable until D-RET-4 conditional fires", async () => {
+  it("health returns unavailable when ASDB or extension is missing", async () => {
     const h = await localPgvectorAdapter.health();
     expect(h.status).toBe("unavailable");
-    expect(h.reason).toMatch(/pgvector_not_initialized/);
+    expect(h.reason).toMatch(/pgvector_extension_not_installed/);
   });
 });
 
