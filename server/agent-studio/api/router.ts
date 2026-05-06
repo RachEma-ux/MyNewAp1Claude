@@ -52,6 +52,7 @@ import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import { providerBindingsRouter } from "./provider-bindings-router";
 import { cagRouter } from "./cag-router";
 import { racSourcesRouter } from "./rac-sources-router";
+import { racIngestionRouter } from "./rac-ingestion-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2118,4 +2119,6 @@ export const agentStudioRouter = router({
   cag: cagRouter,
   // RAC Phase 2: Source registry CRUD (profiles / sources / policies / ws-embedding-default)
   racSources: racSourcesRouter,
+  // RAC Phase 3: Ingestion adapter contract (preview / register / validate)
+  racIngestion: racIngestionRouter,
 });
