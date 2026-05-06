@@ -54,6 +54,7 @@ import { cagRouter } from "./cag-router";
 import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
 import { racTraceRouter } from "./rac-trace-router";
+import { racEvaluationRouter } from "./rac-evaluation-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2124,4 +2125,6 @@ export const agentStudioRouter = router({
   racIngestion: racIngestionRouter,
   // RAC Phase 7: Trace + feedback (getTrace / submitFeedback)
   racTrace: racTraceRouter,
+  // RAC Phase 8: Evaluation (evaluate / previewRetrieval / runGroundednessCheck)
+  racEvaluation: racEvaluationRouter,
 });

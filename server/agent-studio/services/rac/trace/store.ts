@@ -195,6 +195,51 @@ export async function writeContextBlocks(
   );
 }
 
+// ── Score writeback (P8 evaluation) ──────────────────────────────
+
+export interface UpdateTraceScoresInput {
+  traceId: number;
+  workspaceId: number;
+  citationCoverage?: number | null;
+  groundednessScore?: number | null;
+}
+
+/**
+ * Writeback path for the P8 evaluation scorers — populates
+ * `citation_coverage` and/or `groundedness_score` on an existing
+ * trace row. Workspace-scoped: cross-workspace updates throw.
+ */
+export async function updateTraceScores(
+  input: UpdateTraceScoresInput,
+): Promise<AgsRacRuntimeTrace> {
+  const db = getAsDb();
+  if (!db) throw new Error("ASDB unavailable");
+  const patch: Record<string, unknown> = {};
+  if (input.citationCoverage !== undefined) {
+    patch.citationCoverage = input.citationCoverage;
+  }
+  if (input.groundednessScore !== undefined) {
+    patch.groundednessScore = input.groundednessScore;
+  }
+  if (Object.keys(patch).length === 0) {
+    const existing = await getTraceById(input.workspaceId, input.traceId);
+    if (!existing) throw new Error(`trace ${input.traceId} not found`);
+    return existing;
+  }
+  const [row] = await db
+    .update(agsRacRuntimeTraces)
+    .set(patch)
+    .where(
+      and(
+        eq(agsRacRuntimeTraces.id, input.traceId),
+        eq(agsRacRuntimeTraces.workspaceId, input.workspaceId),
+      ),
+    )
+    .returning();
+  if (!row) throw new Error(`trace ${input.traceId} not found in workspace ${input.workspaceId}`);
+  return rowToTrace(row);
+}
+
 // ── Reads (router) ────────────────────────────────────────────────
 
 export async function getTraceById(
