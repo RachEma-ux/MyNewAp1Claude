@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../db", () => ({
+// Mock paths must resolve against the SUT, not the test file. The SUT
+// at server/ai-types/execution.ts imports from `../db`, `../agents/db`,
+// `../providers/registry` — from this test's location those resolve as:
+vi.mock("../../../server/db", () => ({
   createConversation: vi.fn(),
   createExecutionRun: vi.fn(),
   createMessage: vi.fn(),
@@ -12,26 +15,32 @@ vi.mock("../db", () => ({
   updateExecutionRun: vi.fn(),
 }));
 
-vi.mock("../agents/db", () => ({
-  getAgent: vi.fn(),
+vi.mock("../../../server/ai-types/db", () => ({
+  createExecutionRun: vi.fn(),
+  getActiveBundleForEntry: vi.fn(),
+  getCatalogEntryById: vi.fn(),
+  getExecutionRunById: vi.fn(),
+  updateExecutionRun: vi.fn(),
 }));
 
-vi.mock("../providers/registry", () => ({
-  getProviderRegistry: vi.fn(),
-}));
-
+// Imports must match where each symbol actually lives so the
+// vi.mock() registrations above intercept the right module.
 import {
   createConversation,
-  createExecutionRun,
   createMessage,
-  getActiveBundleForEntry,
-  getCatalogEntryById,
   getConversationById,
   getUserWorkspaces,
-  updateExecutionRun,
 } from "../../../server/db";
-import { getProviderRegistry } from "../../../server/providers/registry";
-import { getAgent } from "../../../server/agents/db";
+import {
+  createExecutionRun,
+  getActiveBundleForEntry,
+  getCatalogEntryById,
+  updateExecutionRun,
+} from "../../../server/ai-types/db";
+import {
+  setAgentPort,
+  setProviderPort,
+} from "../../../server/ai-types/ports";
 import { executeCatalogChatStream } from "../../../server/ai-types/execution";
 
 function buildEntry(overrides: Record<string, unknown> = {}) {
@@ -90,6 +99,8 @@ function createStreamingProvider(chunks: string[]) {
 }
 
 describe("catalog execution observability", () => {
+  let stubProvider = createStreamingProvider(["Hello", " world"]);
+
   beforeEach(() => {
     vi.clearAllMocks();
     (createExecutionRun as any).mockResolvedValue({ id: 101 });
@@ -98,10 +109,21 @@ describe("catalog execution observability", () => {
     (getConversationById as any).mockResolvedValue(undefined);
     (getUserWorkspaces as any).mockResolvedValue([{ id: 12 }]);
     (createConversation as any).mockResolvedValue({ id: 44 });
-    (getProviderRegistry as any).mockReturnValue({
-      getProvider: vi.fn().mockReturnValue(createStreamingProvider(["Hello", " world"])),
+    stubProvider = createStreamingProvider(["Hello", " world"]);
+    // SUT uses port abstractions (getProviderPort / getAgentPort) —
+    // wire fake ports rather than mocking the registry/db modules.
+    // Provider port exposes getRegistry() per ICatalogProviderPort.
+    setProviderPort({
+      getRegistry: () =>
+        ({
+          getProvider: (id: number) =>
+            id === 7 ? (stubProvider as any) : undefined,
+          getAllProviders: () => [stubProvider as any],
+        }) as any,
     });
-    (getAgent as any).mockResolvedValue({ id: 17, name: "Source Agent", workspaceId: 3 });
+    setAgentPort({
+      getAgent: async (_id: number) => ({ id: 17, name: "Source Agent" }),
+    });
   });
 
   it("records a blocked execution when the catalog entry has no active published bundle", async () => {
@@ -249,13 +271,18 @@ describe("catalog execution observability", () => {
   it("stores shared blocker categories for runtime failures", async () => {
     (getCatalogEntryById as any).mockResolvedValue(buildEntry());
     (getActiveBundleForEntry as any).mockResolvedValue(buildBundle());
-    (getProviderRegistry as any).mockReturnValue({
-      getProvider: vi.fn().mockReturnValue({
-        name: "OpenAI",
-        generateStream: async function* () {
-          throw new Error("Provider crashed");
-        },
-      }),
+    setProviderPort({
+      getRegistry: () =>
+        ({
+          getProvider: (_id: number) =>
+            ({
+              name: "OpenAI",
+              generateStream: async function* () {
+                throw new Error("Provider crashed");
+              },
+            }) as any,
+          getAllProviders: () => [],
+        }) as any,
     });
 
     const events = [];

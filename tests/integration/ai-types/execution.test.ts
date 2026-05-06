@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppBlockerError } from "../../../server/_core/blockers";
 import { resolveCatalogAgentExecutionTarget } from "../../../server/ai-types/execution";
+import { setAgentPort } from "../../../server/ai-types/ports";
 
 const mocks = vi.hoisted(() => ({
   getCatalogEntryById: vi.fn(),
@@ -8,18 +9,22 @@ const mocks = vi.hoisted(() => ({
   getAgent: vi.fn(),
 }));
 
-vi.mock("./db", () => ({
+// Mock paths must resolve against the SUT, not the test file. The SUT
+// at server/ai-types/execution.ts imports `./db` (= server/ai-types/db)
+// from the test file's location that resolves as below.
+vi.mock("../../../server/ai-types/db", () => ({
   getCatalogEntryById: mocks.getCatalogEntryById,
   getActiveBundleForEntry: mocks.getActiveBundleForEntry,
-}));
-
-vi.mock("../agents/db", () => ({
-  getAgent: mocks.getAgent,
 }));
 
 describe("resolveCatalogAgentExecutionTarget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // SUT calls getAgentPort().getAgent(...) — wire a fake port that
+    // delegates to the mock fn so tests can configure responses.
+    setAgentPort({
+      getAgent: (id: number) => mocks.getAgent(id),
+    });
   });
 
   it("allows a published active callable Catalog agent entry to execute", async () => {
