@@ -54,6 +54,8 @@ const AgentBindingPage = lazy(() => import("../pages/AgentBindingPage"));
 const AgentHooksPage = lazy(() => import("../pages/AgentHooksPage"));
 const AgentMcpPage = lazy(() => import("../pages/AgentMcpPage"));
 const AgentSubagentsPage = lazy(() => import("../pages/AgentSubagentsPage"));
+// RAC P11 — capability pack + retrieval-augmented context inspector
+const RacPage = lazy(() => import("../pages/RacPage"));
 // ── Phase 13e: Catalog (global pages, no agent context) ──
 const AgentSkillCatalogPage = lazy(() => import("../pages/AgentSkillCatalogPage"));
 const AgentToolCatalogPage = lazy(() => import("../pages/AgentToolCatalogPage"));
@@ -107,6 +109,8 @@ const VALID_AGENT_VIEWS: AgentStudioView[] = [
   "hooks",
   "mcp",
   "subagents",
+  // RAC P11
+  "rac",
 ];
 
 function parseRoute(path: string): ParsedRoute {
@@ -405,6 +409,9 @@ export default function AgentStudioShell() {
         return <AgentMcpPage agentId={agentId!} />;
       case "subagents":
         return <AgentSubagentsPage agentId={agentId!} />;
+      // RAC P11 — capability pack + retrieval-augmented context.
+      case "rac":
+        return <RacPage agentId={agentId!} />;
       default:
         return <AgentOverviewPage agentId={agentId!} />;
     }
