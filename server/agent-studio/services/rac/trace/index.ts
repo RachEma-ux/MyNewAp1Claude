@@ -6,6 +6,7 @@ export {
   writeTrace,
   writeContextBlocks,
   buildContextBlockRows,
+  updateTraceScores,
   getTraceById,
   getTraceForMessage,
   listContextBlocks,
@@ -15,4 +16,5 @@ export {
   type WriteContextBlockInput,
   type RecordFeedbackInput,
   type FeedbackVerdict,
+  type UpdateTraceScoresInput,
 } from "./store";
