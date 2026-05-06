@@ -88,7 +88,12 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
         actorType: "system",
         createdBy: input.actorId,
         metadata: { violations },
-      }).catch(() => {});
+      }).catch((err) => {
+        // Best-effort event log — surface failures to operators
+        // instead of swallowing silently (review-polish PR).
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[ags-cag] pack event log failed: ${msg}`);
+      });
       if (input.mode === "strict") {
         throw new CagRequiredError(
           `CAG validation failed: ${violations.slice(0, 3).join("; ")}`,
@@ -157,13 +162,21 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
           actorType: "system",
           packVersion: latest.packVersion,
           createdBy: input.actorId,
-        }).catch(() => {});
+        }).catch((err) => {
+        // Best-effort event log — surface failures to operators
+        // instead of swallowing silently (review-polish PR).
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[ags-cag] pack event log failed: ${msg}`);
+      });
       }
     }
 
     for (const w of compileWarnings) warnings.push(w);
 
-    await touchPackLastUsed(pack.id).catch(() => {});
+    await touchPackLastUsed(pack.id).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ags-cag] touchPackLastUsed failed (pack=${pack.id}): ${msg}`);
+    });
     await appendPackEvent({
       workspaceId: input.workspaceId,
       agentDraftId: input.agentDraftId,
@@ -174,7 +187,10 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       packVersion: pack.packVersion,
       createdBy: input.actorId,
       metadata: { reused },
-    }).catch(() => {});
+    }).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ags-cag] pack_used event log failed: ${msg}`);
+    });
 
     return { section, pack, warnings };
   } catch (err) {
