@@ -119,18 +119,13 @@ describe("planner — buildItem skip-reason matrix", () => {
     expect(item.embedding).toBeNull();
   });
 
-  it("flags in-process source types as in_process_pending (memory/workspace_context/...)", () => {
-    for (const t of [
-      "cag_pack",
-      "memory",
-      "workspace_context",
-      "project_context",
-      "tool_result_context",
-      "manual_context",
-    ] as const) {
-      const item = buildItem(makeSource({ sourceType: t }), wsDefault);
-      expect(item.skipReason, `source_type=${t}`).toBe("in_process_pending");
-    }
+  it("flags cag_pack as in_process_pending (CAG renders it outside RAC)", () => {
+    // The legacy synthesizer types — memory / workspace_context /
+    // project_context / tool_result_context / manual_context — were
+    // dropped from the enum at D3 closure. Only `cag_pack` remains
+    // adapter-less because the CAG resolver renders it directly.
+    const item = buildItem(makeSource({ sourceType: "cag_pack" }), wsDefault);
+    expect(item.skipReason).toBe("in_process_pending");
   });
 
   it("flags document_collection / external_connector as no_adapter (P4 wiring pending)", () => {

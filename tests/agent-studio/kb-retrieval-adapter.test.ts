@@ -42,20 +42,31 @@ describe("RAC_SOURCE_TYPES — enum extension", () => {
     expect(RAC_SOURCE_TYPES).toContain("tool_knowledge");
   });
 
-  it("preserves all original 10 source types", () => {
+  it("preserves the 5 retained original source types after D3 closure", () => {
+    // Five legacy synthesizer types (memory, workspace_context,
+    // project_context, tool_result_context, manual_context) were
+    // removed from the enum at D3 closure — they had no producer and
+    // the runtime-synthesizer shape never fit the ingestion pipeline.
     for (const t of [
       "cag_pack",
-      "memory",
       "document_collection",
       "vector_index",
       "graph_index",
+      "external_connector",
+    ]) {
+      expect(RAC_SOURCE_TYPES).toContain(t);
+    }
+  });
+
+  it("D3 closure: legacy synthesizer types no longer in the enum", () => {
+    for (const t of [
+      "memory",
       "workspace_context",
       "project_context",
       "tool_result_context",
       "manual_context",
-      "external_connector",
     ]) {
-      expect(RAC_SOURCE_TYPES).toContain(t);
+      expect(RAC_SOURCE_TYPES).not.toContain(t);
     }
   });
 });

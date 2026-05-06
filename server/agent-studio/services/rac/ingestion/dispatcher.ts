@@ -28,13 +28,12 @@ export interface ResolvedEmbeddingBinding {
 }
 
 /**
- * Map a source type to its adapter. Returns null for in-process types
- * (`memory`, `workspace_context`, `tool_result_context`,
- * `manual_context`, `cag_pack`) — those are handled by the executor's
- * built-in synthesizers, not by the ingestion adapter contract.
+ * Map a source type to its adapter. Returns null for `cag_pack` — that
+ * source type is rendered directly by the CAG resolver, outside the
+ * RAC retrieval path, so it never resolves to an adapter here.
  *
  * `document_collection` and `external_connector` are listed but stay
- * unbound until P4 lands the Qdrant wrapper / per-registration adapter.
+ * unbound until the Qdrant wrapper / per-registration adapter lands.
  */
 export function pickAdapter(sourceType: string): RacIngestionAdapter | null {
   switch (sourceType) {
@@ -51,15 +50,10 @@ export function pickAdapter(sourceType: string): RacIngestionAdapter | null {
     // populates the rows; retrieval is the same shape.
     case "tool_knowledge":
       return knowledgeUnitAdapter;
-    // In-process source types — no separate ingestion adapter.
+    // CAG pack — rendered by the CAG resolver, not retrieved through RAC.
     case "cag_pack":
-    case "memory":
-    case "workspace_context":
-    case "project_context":
-    case "tool_result_context":
-    case "manual_context":
       return null;
-    // Wired in P4 when Qdrant + external-connector adapters land.
+    // Wired when Qdrant + external-connector adapters land.
     case "document_collection":
     case "external_connector":
       return null;

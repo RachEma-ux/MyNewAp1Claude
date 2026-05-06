@@ -107,11 +107,19 @@ These are tracked here for completeness and were marked *not blocking* at retrof
 - **Status:** Single-region remains the operational baseline.
 - **Trigger:** When operations team formally requests it. The retrofit's row keys (workspaceId-scoped) are already amenable to per-region sharding.
 
-### D3 — In-process synthesizers (legacy carryover)
+### D3 — In-process synthesizers (legacy carryover) ✅
 
-- **Source types:** `memory`, `workspace_context`, `project_context`, `tool_result_context`, `manual_context` — all flagged `in_process_synthesizer_pending` from the prior RAC arc (pre-retrofit).
-- **Why carried over:** The retrofit deliberately did not touch these. They produce content at planner-build time rather than via the four-layer ingestion pipeline.
-- **Acceptance:** Each synthesizer either lands as a real `Parser`/`Normalizer` pair under `services/ingestion/parsers/` or is removed from the source-type enum.
+**Status:** CLOSED via Path B (enum removal). Merged 2026-05-06.
+
+**What was done:** The five synthesizer source types — `memory`, `workspace_context`, `project_context`, `tool_result_context`, `manual_context` — were removed from `RAC_SOURCE_TYPES` (`server/agent-studio/services/rac/sources/types.ts`) and from `pickAdapter`'s switch (`services/rac/ingestion/dispatcher.ts`) and from `IN_PROCESS_TYPES` in the planner. The acceptance criterion explicitly allowed either path — Parser/Normalizer pair OR enum removal — and Path B was the correct one given:
+
+1. **No producer in the codebase.** Exhaustive grep across `server/`, `client/`, migrations, and seeds turned up zero `createSource({ sourceType: "memory"|... })` call sites. The five types existed only as enum entries that nobody ever instantiated.
+2. **Shape mismatch.** These types were carried over to produce content at planner-build time from runtime state (workspace metadata, recent tool results, agent memory, user-curated blocks). RAC's four-layer pipeline is built for raw artifact → Parser → Normalizer → chunks → embedding → similarity retrieval. Synthesized live state is a fixed text snippet that does not benefit from vector retrieval; forcing it through the pipeline would have been an architectural mistake.
+3. **Right home elsewhere.** When a real consumer surfaces, the right home for "inject workspace metadata into the prompt" is a **CAG system-prompt section**, not a RAC source row. CAG already supports versioned, hashed, governance-tagged prompt sections that compile into the runtime prompt — this is exactly what these synthesizer types were trying to express.
+
+`cag_pack` remains in the enum and remains the only `in_process_pending` skipReason — it is rendered directly by the CAG resolver, outside the RAC retrieval path. The executor's warning text was updated from `in_process_synthesizer_pending: ... (deferred from P3 — slated for P4 follow-up or P5/P6)` to `cag_rendered: source_type=cag_pack is rendered by the CAG resolver, not retrieved through RAC` to reflect that this is no longer a deferral.
+
+Test coverage: the planner's skipReason matrix test was tightened to a single `cag_pack` case, and `kb-retrieval-adapter.test.ts` gained a regression assertion that the five removed types are no longer in `RAC_SOURCE_TYPES`. CLAUDE.md `## Deferred Scope` and `agent-studio-retrofit-acceptance.md` §3.5 had their "in-process synthesizers" bullets removed.
 
 ### D4 — Additional MVP parsers (partial ✅)
 

@@ -7,9 +7,10 @@
  * P7 trace, and forwards adapter warnings into a structured result.
  *
  * Boundaries:
- *   - In-process source types (planner flagged `in_process_pending`)
- *     get an `in_process_synthesizer_pending` warning + empty result.
- *     Concrete synthesizers are deferred to a P4 follow-up or P5/P6.
+ *   - Source types flagged `in_process_pending` by the planner are
+ *     rendered by CAG (today: only `cag_pack`); the executor records
+ *     them in the trace with an empty chunk list so callers can tell
+ *     "registered but CAG-handled" from "missing entirely".
  *   - Adapter exceptions are caught and turned into `adapter_error`
  *     warnings; one bad source never breaks the whole retrieval.
  *   - The executor never embeds the query itself (today's gap-shaped
@@ -173,7 +174,7 @@ function skipReasonWarnings(
       return [`disabled: source row enabled=false`];
     case "in_process_pending":
       return [
-        `in_process_synthesizer_pending: source_type=${sourceType} requires an in-process synthesizer (deferred from P3 — slated for P4 follow-up or P5/P6)`,
+        `cag_rendered: source_type=${sourceType} is rendered by the CAG resolver, not retrieved through RAC`,
       ];
     case "no_adapter":
       return [`no_adapter: source_type=${sourceType} has no registered adapter`];

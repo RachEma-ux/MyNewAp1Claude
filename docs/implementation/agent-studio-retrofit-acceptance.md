@@ -79,8 +79,9 @@ Each row links to the merged PR; the SHA is the squash-merge SHA on `main`.
 
 - **pgvector migration** — documented as future at `docs/architecture/agent-studio-pgvector-future-migration.md`. Current retrofit uses `agsRacSources` per-source embedding binding (D-EMB-1).
 - **Multi-region operations** — single-region remains the operational baseline.
-- **In-process synthesizers** for `memory` / `workspace_context` / `project_context` / `tool_result_context` / `manual_context` source types — flagged `in_process_synthesizer_pending`; carried over from the prior RAC arc.
 - **DB-backed e2e for sync / approval / trace writers** — pure helpers tested here; live-ASDB e2e land in Phase 13 follow-up. The pure surfaces lock the contract.
+
+> Resolved follow-ups: the legacy in-process synthesizer carryover (`memory` / `workspace_context` / `project_context` / `tool_result_context` / `manual_context`) was closed at D3 (2026-05-06) by removing those source types from the enum — they had no producer and the synthesizer shape never fit the four-layer ingestion pipeline. See `docs/implementation/agent-studio-retrofit-followups.md` §D3.
 
 ---
 
