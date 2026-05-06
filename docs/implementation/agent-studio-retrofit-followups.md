@@ -20,29 +20,23 @@ On rejection: tool-role message persisted with `{error, code, gate:"proposed_too
 
 9 unit tests cover every active gate + manifest-derived risk + manifest-derived approval. Full retrofit suite (90 tests across 5 files) still green. Helper returns a flattened `RuntimeValidationResult` so callers branch on `ok` cleanly under `strictNullChecks:false`.
 
-### A2 — Wire the approval gate into the dispatch path
+### A2 — Wire the approval gate into the dispatch path ✅
 
-P9 ships `evaluateApprovalGate` / `createApprovalRequest` / `decideApprovalRequest`. The dispatcher does not yet route high/critical-risk calls through them.
+**Status:** CLOSED. Merged at `23a7bf2` (PR #200, 2026-05-06).
 
-- **Files:** `server/agent-studio/services/mcp/dispatcher.ts` (the chokepoint).
-- **Behavior:** After P8 validation passes, if `normalized.requiresApproval=true`, call `evaluateApprovalGate({agentDraftId, proposedToolCall})`. On `permit` → continue to the existing governance + MCP path. On `denied | expired` → reject. On `pending | approval_required` → call `createApprovalRequest(...)` and return without dispatching; the chat loop surfaces the approval prompt.
-- **Acceptance:** A high-risk tool call queues an approval row with `(agentDraftId, proposedToolCallHash)` idempotency; re-running the agent with the same evidence + arguments hits the existing row; calling `decideApprovalRequest({status:"allowed"})` from the operator UI permits the next dispatch attempt; expiry naturally blocks subsequent attempts.
+`gateRuntimeDispatch` composes the validator + approval gate into a single runtime verdict. Decision tree: validator-rejected → reason=`validator_rejected`; `requiresApproval=false` → ok=true (gate not invoked); gate `permit` → ok=true; gate `denied`/`expired`/`pending` → matching reason; gate `approval_required` → `createApprovalRequest`, then reason=`approval_required`. Wired into both `chat-stream.ts` and `services/chat.ts`. Live chat has no formal runtime-run row — `sessionId` stands in as the surrogate `runtimeRunId` on freshly-created approval rows. 8 unit tests with injected fakes for `evaluateApprovalGate` / `createApprovalRequest`.
 
-### A3 — Wire the trace writer
+### A3 — Wire the trace writer ✅
 
-P10 ships `recordToolCallTrace` + `patchRacRuntimeTrace`. The dispatcher emits its existing audit row but doesn't write the per-ProposedToolCall trace yet.
+**Status:** CLOSED. Merged at `c49b83f` (PR #201, 2026-05-06).
 
-- **Files:** `server/agent-studio/services/mcp/dispatcher.ts` (post-dispatch), `services/runtime/rac-orchestrator.ts` (before/after compose).
-- **Behavior:** Per dispatch, build the row with `buildToolCallTraceRow({...})` and call `recordToolCallTrace(...)`. Per turn, after planner mode is derived and CAG is composed, call `patchRacRuntimeTrace(traceId, {plannerMode, plannerReason, cagCompiledHash})`.
-- **Acceptance:** Open `/agent-studio/:agentId/runs/:runId` and see one `agsToolCallTraces` row per dispatch attempt with verdict + approval + governance + dispatch surfaces; the underlying `agsRacRuntimeTraces` row carries planner mode + CAG hash.
+`persistRuntimeToolCallTrace` writes one `agsToolCallTraces` row per runtime tool-call attempt — rejected by validator, rejected by approval gate, dispatched ok, dispatched error. `dispatchResult` becomes `"ok" | "error" | "blocked"`; `errorMessage` and `durationMs` from the dispatcher; `approvalDecision` derived from the verdict. Best-effort writer — failures are swallowed so trace persistence never blocks the chat loop. `agentId` threaded through the inner runtime loops in both `chat-stream.ts` and `services/chat.ts`. Latent narrowing bug in `trace-writer.ts(48)` fixed in-flight (same `Extract<...>` cast pattern as the original P11 fix). 14 unit tests cover every dispatch shape and verdict-to-decision mapping.
 
-### A4 — Auto-trigger `syncToolKnowledge` on registry republish
+### A4 — Auto-trigger `syncToolKnowledge` on registry republish ✅
 
-P7 ships the sync service; P11 exposes it via `mcpSchemaSync.sync`. Today the only callers are operator-driven.
+**Status:** CLOSED. Merged at `fed8969` (PR #202, 2026-05-06).
 
-- **Files:** `server/agent-studio/services/mcp/registry.ts` (`publishSnapshot` callsite), `server/agent-studio/services/mcp/mcp-manager.ts`.
-- **Behavior:** When the registry publishes a new snapshot for an `mcpServerId`, call `syncToolKnowledge` with the new tools list. Capture changed tool names; if any have a `tool_knowledge` knowledge unit referenced by a CAG pack, mark those packs for recompile (D-CAG-RECON-3 cache invalidation).
-- **Acceptance:** Reconnect an MCP server with a tool whose description changed — a new run sees the updated description in retrieval, and the affected CAG pack carries a fresh `compiledHash`.
+Two new surfaces: `services/mcp/registry.ts` gains `subscribeSnapshots(listener)` (returns unsubscribe). `publishSnapshot` fires every listener with `{current, previous}` after the snapshot is committed. Listener exceptions and async rejections swallowed so a buggy subscriber never breaks the connect flow. `services/mcp/auto-sync.ts` wraps `syncToolKnowledge` as a registry subscriber via `installAutoSync({resolveContext})`. The resolver translates the registry's per-process `serverId` into the workspace + canonical-server-id + knowledge-source-id triple `syncToolKnowledge` needs; returning `null` skips the publish (opt-in path). Sync failures fire `onError` but never throw. Subscriber is **not auto-mounted yet** — operators explicitly call `installAutoSync` after they have a `tool_knowledge` `agsRacSources` row. 10 unit tests cover the listener API + orchestration.
 
 ---
 
