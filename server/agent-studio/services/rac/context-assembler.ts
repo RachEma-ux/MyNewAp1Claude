@@ -65,6 +65,8 @@ export interface AssembledRetrievalEvidence {
   section: SystemPromptSection | null;
   /** How many input chunks made it into the rendered text. */
   includedChunks: number;
+  /** The actual chunks that made it into the rendered text, in the order they appear. P7 trace reads this to write per-block rows. */
+  included: RacRetrievalChunk[];
   /** Chunks dropped solely by the assembler's budget (filter rejections aren't counted here). */
   droppedByBudget: number;
   warnings: string[];
@@ -79,6 +81,7 @@ export function assembleRetrievalEvidence(
     return {
       section: null,
       includedChunks: 0,
+      included: [],
       droppedByBudget: 0,
       warnings: carriedWarnings,
     };
@@ -94,6 +97,7 @@ export function assembleRetrievalEvidence(
 
   const HEADER = "## Retrieval Evidence";
   const blocks: string[] = [];
+  const included: RacRetrievalChunk[] = [];
   let runningTokens = estimateTokens(HEADER);
   let dropped = 0;
   let lowestIncludedScore: number | null = null;
@@ -106,6 +110,7 @@ export function assembleRetrievalEvidence(
       continue;
     }
     blocks.push(block);
+    included.push(chunk);
     runningTokens += blockTokens;
     lowestIncludedScore = chunk.score;
   }
@@ -120,6 +125,7 @@ export function assembleRetrievalEvidence(
     return {
       section: null,
       includedChunks: 0,
+      included: [],
       droppedByBudget: ordered.length,
       warnings: carriedWarnings,
     };
@@ -144,6 +150,7 @@ export function assembleRetrievalEvidence(
       warnings: carriedWarnings,
     },
     includedChunks: blocks.length,
+    included,
     droppedByBudget: dropped,
     warnings: carriedWarnings,
   };

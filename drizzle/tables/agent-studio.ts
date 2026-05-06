@@ -1537,3 +1537,101 @@ export type AgsRacWorkspaceEmbeddingDefault =
   typeof agsRacWorkspaceEmbeddingDefault.$inferSelect;
 export type InsertAgsRacWorkspaceEmbeddingDefault =
   typeof agsRacWorkspaceEmbeddingDefault.$inferInsert;
+
+// ── RAC Phase 7 — Trace, observability, feedback ──────────────────────────
+
+export const agsRacRuntimeTraces = pgTable(
+  "ags_rac_runtime_traces",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    agentId: integer("agent_id").notNull(),
+    agentDraftId: integer("agent_draft_id").notNull(),
+    sessionId: integer("session_id"),
+    messageId: integer("message_id"),
+    actorId: integer("actor_id").notNull(),
+    /** ComposerMode: 'disabled' | 'safe_degraded' | 'strict' */
+    mode: varchar("mode", { length: 16 }).notNull(),
+    cagPackId: integer("cag_pack_id"),
+    cagPackVersion: integer("cag_pack_version"),
+    retrievalEnabled: boolean("retrieval_enabled").notNull().default(false),
+    /** D-RET-6: REQUIRED non-null when retrievalEnabled=true. */
+    retrievalLatencyMs: integer("retrieval_latency_ms"),
+    chunksReturned: integer("chunks_returned").notNull().default(0),
+    chunksFiltered: integer("chunks_filtered").notNull().default(0),
+    chunksIncluded: integer("chunks_included").notNull().default(0),
+    truncatedByBudget: integer("truncated_by_budget").notNull().default(0),
+    tokenBudgetUsed: integer("token_budget_used"),
+    tokenBudgetTruncated: integer("token_budget_truncated").notNull().default(0),
+    citationCoverage: real("citation_coverage"),
+    /** P8 evaluation may overwrite this asynchronously. */
+    groundednessScore: real("groundedness_score"),
+    fallbackReason: varchar("fallback_reason", { length: 64 }),
+    warningsJson: jsonb("warnings_json").$type<string[] | null>(),
+    perSourceLatencyJson: jsonb("per_source_latency_json").$type<
+      Record<string, number> | null
+    >(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    wsAgentCreatedIdx: index("idx_ags_rac_traces_ws_agent_created").on(
+      t.workspaceId,
+      t.agentId,
+      t.createdAt,
+    ),
+    messageIdx: index("idx_ags_rac_traces_message").on(t.messageId),
+    sessionIdx: index("idx_ags_rac_traces_session").on(t.sessionId),
+  }),
+);
+
+export type AgsRacRuntimeTrace = typeof agsRacRuntimeTraces.$inferSelect;
+export type InsertAgsRacRuntimeTrace = typeof agsRacRuntimeTraces.$inferInsert;
+
+export const agsRacContextBlocks = pgTable(
+  "ags_rac_context_blocks",
+  {
+    id: serial("id").primaryKey(),
+    traceId: integer("trace_id").notNull(),
+    workspaceId: integer("workspace_id").notNull(),
+    sourceId: integer("source_id").notNull(),
+    sourceType: varchar("source_type", { length: 32 }).notNull(),
+    sourceChunkId: varchar("source_chunk_id", { length: 255 }).notNull(),
+    citation: varchar("citation", { length: 512 }),
+    contentHash: varchar("content_hash", { length: 128 }).notNull(),
+    score: real("score").notNull(),
+    rank: integer("rank").notNull(),
+    sourceLatencyMs: integer("source_latency_ms"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    traceIdx: index("idx_ags_rac_blocks_trace").on(t.traceId, t.rank),
+    sourceIdx: index("idx_ags_rac_blocks_source").on(t.sourceId),
+  }),
+);
+
+export type AgsRacContextBlock = typeof agsRacContextBlocks.$inferSelect;
+export type InsertAgsRacContextBlock = typeof agsRacContextBlocks.$inferInsert;
+
+export const agsRacFeedback = pgTable(
+  "ags_rac_feedback",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspace_id").notNull(),
+    agentId: integer("agent_id").notNull(),
+    messageId: integer("message_id").notNull(),
+    traceId: integer("trace_id"),
+    /** 'thumbs_up' | 'thumbs_down' */
+    verdict: varchar("verdict", { length: 16 }).notNull(),
+    note: text("note"),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    messageUniq: uniqueIndex("uniq_ags_rac_feedback_message").on(t.messageId),
+    wsAgentIdx: index("idx_ags_rac_feedback_ws_agent").on(t.workspaceId, t.agentId),
+  }),
+);
+
+export type AgsRacFeedback = typeof agsRacFeedback.$inferSelect;
+export type InsertAgsRacFeedback = typeof agsRacFeedback.$inferInsert;
