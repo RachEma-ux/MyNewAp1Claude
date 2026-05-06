@@ -70,16 +70,12 @@ Repository: `RachEma-ux/MyNewAp1Claude`. AGENTS.md is the authoritative repo ope
 
 ## Implementation Status
 
-Tracked in `docs/implementation/agent-studio-roadmap-delta.md` (Phase 0 deliverable) and the per-phase memory entry `~/.claude/projects/-root/memory/project_rac_progress.md`. RAC roadmap (P1A–P12) shipped 2026-05-06; current retrofit (Universal KB + Ingestion + ProposedToolCall + Approval Gate + UI) is in progress.
-
-## Current Phase
-
-Phase 1 — CLAUDE.md and missing ADRs. Updated in this commit.
+Tracked in `docs/implementation/agent-studio-roadmap-delta.md` (Phase 0 deliverable) and the per-phase memory entry `~/.claude/projects/-root/memory/project_rac_progress.md`. RAC roadmap (P1A–P12) shipped 2026-05-06. Retrofit (Universal KB + Ingestion + ProposedToolCall + Approval Gate + UI) **CLOSED 2026-05-06** at P14 (`55c8b6b`); follow-ups §A wiring, §B coverage, §C latent cleanup, §D1 pgvector optional engine, §D2 multi-region forward-looking ADR, §D3 synthesizer enum removal, §D4 five extension parsers (CSV/xlsx/OCR/audio/video), §D5 ai-types vi.mock repair all closed. The retrofit ships **11 parsers** total (text, markdown, html-snapshot, json, basic-pdf, basic-code, csv, xlsx, ocr, audio, video).
 
 ## Deferred Scope
 
-- pgvector migration — documented as future, not blocking. Optional-engine activation closed at D1 (`docs/architecture/agent-studio-pgvector-future-migration.md` §11).
 - Multi-region deployment — single-region remains the operational baseline. Forward-looking ADR locks the deferral + trigger conditions + swap surface (`docs/architecture/agent-studio-multi-region.md`).
+- DOCX + OCR-PDF parsers — listed in D-UI-5's original deferral set; §D4 closed audio/video/image-OCR but DOCX and PDF-with-images stay open behind future `D-PARSE-DOCX-N` / `D-PARSE-OCRPDF-N` ADRs.
 
 ---
 

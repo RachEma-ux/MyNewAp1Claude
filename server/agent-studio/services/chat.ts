@@ -398,10 +398,27 @@ async function runChatWithToolsViaBinding(input: {
           continue;
         }
         // Follow-up A1: ProposedToolCall validator runs BEFORE dispatch.
+        // Defense-in-depth: dispatchKey and spec are built from the same
+        // loop, so spec lookup miss should be impossible. If it happens
+        // anyway, fail closed — never bypass the validator + gate
+        // because of an internal lookup inconsistency. (Review cleanup.)
         const spec = specByOpenaiName.get(call.name);
+        if (!spec) {
+          await repo.appendChatMessage({
+            sessionId: input.sessionId,
+            role: "tool",
+            content: JSON.stringify({
+              error: "tool spec lookup failed; refusing to dispatch without validator + gate",
+              code: "spec_lookup_failed",
+              gate: "proposed_tool_call_validator",
+            }),
+            toolPayload: { toolCallId: call.id, name: call.name },
+          });
+          continue;
+        }
         let runtimeValidation: RuntimeValidationResult | null = null;
         let runtimeVerdict: RuntimeDispatchVerdict | null = null;
-        if (spec) {
+        {
           runtimeValidation = await validateRuntimeToolCall({
             mcpServerId: spec.mcpServerId,
             toolName: spec.remoteToolName,

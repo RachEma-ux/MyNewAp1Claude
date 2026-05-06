@@ -152,12 +152,22 @@ export async function runIngestion(
     const normalizer =
       (request.normalizerKey && getNormalizer(request.normalizerKey)) ??
       identityNormalizer;
-    const inputs = normalizer.normalize({
-      workspaceId: request.workspaceId,
-      sourceId: request.sourceId,
-      document: parsed,
-      permissionContext: request.permissionContext,
-    });
+    let inputs;
+    try {
+      inputs = normalizer.normalize({
+        workspaceId: request.workspaceId,
+        sourceId: request.sourceId,
+        document: parsed,
+        permissionContext: request.permissionContext,
+      });
+    } catch (e) {
+      // Normalizer failure means the parsed document can't be split
+      // into units. Fail the job with a structured reason so it's
+      // distinguishable from generic "failed".
+      const reason = `normalizer_failed: ${e instanceof Error ? e.message : String(e)}`;
+      await completeJob({ jobId, status: "failed", ...counters, failureReason: reason });
+      return { jobId, status: "failed", ...counters, failureReason: reason };
+    }
 
     // ── Persist provenance once per job ──
     const provenanceId = await recordProvenance({
@@ -188,6 +198,9 @@ export async function runIngestion(
     }
 
     // ── Layer 4: Extractor.extract ──
+    // Per-unit extraction failures are isolated — one bad extraction
+    // never breaks the rest of the job (mirrors the per-unit insertUnit
+    // skip pattern above for KnowledgeUnitContractError).
     if (request.extractorKeys && request.extractorKeys.length > 0) {
       const db = getAsDb();
       if (!db) throw new Error("ASDB unavailable");
@@ -198,23 +211,34 @@ export async function runIngestion(
           const unitId = insertedUnitIds[i];
           const unitInput = inputs[i];
           if (!unitInput) continue;
-          const extractions = await extractor.extract({
-            workspaceId: request.workspaceId,
-            unitId,
-            unitType: unitInput.unitType,
-            contentText: unitInput.contentText,
-            contentJson: unitInput.contentJson ?? null,
-          });
-          for (const ext of extractions) {
-            await db.insert(agsExtractionResults).values({
+          try {
+            const extractions = await extractor.extract({
               workspaceId: request.workspaceId,
               unitId,
-              extractorKey,
-              extractionType: ext.extractionType,
-              payloadJson: ext.payloadJson,
-              payloadHash: ext.payloadHash ?? null,
+              unitType: unitInput.unitType,
+              contentText: unitInput.contentText,
+              contentJson: unitInput.contentJson ?? null,
             });
-            counters.extractionsCreated += 1;
+            for (const ext of extractions) {
+              try {
+                await db.insert(agsExtractionResults).values({
+                  workspaceId: request.workspaceId,
+                  unitId,
+                  extractorKey,
+                  extractionType: ext.extractionType,
+                  payloadJson: ext.payloadJson,
+                  payloadHash: ext.payloadHash ?? null,
+                });
+                counters.extractionsCreated += 1;
+              } catch {
+                // One extraction insert failure must not cascade —
+                // continue to the next extraction. The job still
+                // succeeds for the rest.
+              }
+            }
+          } catch {
+            // Extractor logic error on this unit. Skip — other units
+            // may still extract successfully.
           }
         }
       }

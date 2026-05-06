@@ -215,6 +215,32 @@ describe("audioParser — engine-unconfigured (D-PARSE-AUDIO-3)", () => {
       expect((e as Error).message).toContain("BUILT_IN_FORGE_API_KEY");
     }
   });
+
+  it("recovery: after env-vars are set, next call routes normally (parity with OCR/video)", async () => {
+    // Closure variables let us flip env state mid-test without
+    // re-creating the parser — this exercises the same recovery path
+    // OCR's TTL cache covers, but audio has no cache so each call
+    // re-reads env directly.
+    let envState = { forgeApiUrl: "", forgeApiKey: "" };
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ text: "recovered", language: "en", duration: 1, segments: [] }),
+    );
+    const parser = createAudioParser({
+      getEnv: () => envState,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await expect(parser.parse(audioArtifact())).rejects.toBeInstanceOf(
+      UnsupportedContentTypeError,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    envState = { forgeApiUrl: "https://forge.test/api", forgeApiKey: "fake-key" };
+    const r = await parser.parse(audioArtifact());
+    expect(r.parts).toHaveLength(1);
+    expect(r.parts[0].text).toBe("recovered");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("audioParser — engine runtime errors", () => {
