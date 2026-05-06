@@ -22,6 +22,7 @@ import { csvParser } from "./parsers/csv-parser";
 import { xlsxParser } from "./parsers/xlsx-parser";
 import { ocrParser } from "./parsers/ocr-parser";
 import { audioParser } from "./parsers/audio-parser";
+import { videoParser } from "./parsers/video-parser";
 import { UnsupportedContentTypeError, type Parser } from "./types";
 
 const parsers = new Map<string, Parser>();
@@ -74,6 +75,7 @@ export function registerDefaultParsers(): void {
   registerParser(xlsxParser);
   registerParser(ocrParser);
   registerParser(audioParser);
+  registerParser(videoParser);
   defaultsRegistered = true;
 }
 
