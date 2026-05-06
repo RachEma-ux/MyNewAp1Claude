@@ -29,6 +29,7 @@ export const EXPORT_ELIGIBILITY_GATES = [
   "metadata_complete",
   "not_already_imported",
   "no_duplicate_canonical_entry",
+  "rac_readiness",
 ] as const;
 
 export type ExportEligibilityGate = typeof EXPORT_ELIGIBILITY_GATES[number];
@@ -223,6 +224,27 @@ export async function evaluateExportEligibility(
       gate: "no_duplicate_canonical_entry",
       pass: true,
       reason: "duplicate-check not run (no lookup provided)",
+    });
+  }
+
+  // 10. RAC P10 — D-TOOL-4 + D-SBX-2 hard-block matrix.
+  //     "blocked" status = quarantined tool OR code_execution without
+  //     a healthy sandbox. "degraded" passes (export proceeds with a
+  //     surfaced warning); only "blocked" is a hard gate failure.
+  const rac = candidate.racReadiness;
+  if (rac.status === "blocked") {
+    gates.push({
+      gate: "rac_readiness",
+      pass: false,
+      reason: `racStatus=blocked; reasons=[${rac.reasons.join(",")}]`,
+    });
+  } else {
+    gates.push({
+      gate: "rac_readiness",
+      pass: true,
+      reason: rac.status === "degraded"
+        ? `racStatus=degraded (warnings only); reasons=[${rac.reasons.join(",")}]`
+        : "racStatus=ready",
     });
   }
 

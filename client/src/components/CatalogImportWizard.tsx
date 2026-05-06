@@ -1083,6 +1083,31 @@ export function CatalogImportWizard({
                                 {String(c.status)}
                               </Badge>
                             )}
+                            {/* RAC P10 — readiness badge (D-TOOL-4 + D-SBX-2). */}
+                            {(() => {
+                              const rac = (c as any).racReadiness as
+                                | {
+                                    status?: "ready" | "degraded" | "blocked";
+                                    reasons?: string[];
+                                  }
+                                | undefined;
+                              if (!rac?.status || rac.status === "ready") {
+                                return null;
+                              }
+                              const tone =
+                                rac.status === "blocked"
+                                  ? "bg-red-900/30 text-red-300 border-red-800/40"
+                                  : "bg-amber-900/30 text-amber-300 border-amber-800/40";
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] ${tone}`}
+                                  title={(rac.reasons ?? []).join(", ")}
+                                >
+                                  RAC: {rac.status}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                         </div>
                       </label>

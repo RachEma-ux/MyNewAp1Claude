@@ -22,9 +22,13 @@
 
 import { computeExportGovernanceVerdict } from "./governance-adapter";
 import { computeAgentReadinessSnapshot } from "./readiness";
+import { computeRacReadiness, probeSandboxForExport } from "./rac-readiness";
+import type { ToolRiskClass } from "./cag/types";
 import {
   type AgentStudioExportCandidate,
   type AgentStudioExportStatus,
+  type AgentStudioRacReadinessSnapshot,
+  type AgentStudioSandboxHealthSnapshot,
 } from "../shared/export-candidate";
 
 // ───────────────────────────────────────────────────────────────────
@@ -79,6 +83,25 @@ export interface ExportCatalogLookups {
   loadCatalogEntryForAgent: (
     agentId: number,
   ) => Promise<CatalogRowSnapshot | null>;
+  /**
+   * RAC P10 — resolved risk classes for every tool the agent uses.
+   * Production wiring walks `ags_draft_tool_bindings` for the agent's
+   * current draft and asks the MCP registry for each tool's
+   * `riskClass` (D-TOOL-5: registry is the single source of truth).
+   * Tests inject a fake. Optional so callers that don't implement it
+   * yet (legacy tests) get an empty list — the readiness matrix then
+   * resolves to `"ready"`, matching the prior behaviour.
+   */
+  listAgentToolRiskClasses?: (
+    agentId: number,
+  ) => Promise<ReadonlyArray<ToolRiskClass>>;
+  /**
+   * RAC P10 — sandbox health snapshot. Production wiring calls
+   * `probeSandboxForExport()`. Tests inject a fake to drive the
+   * `code_execution` hard-block branch deterministically.
+   * Returns `null` when no sandbox impl is registered.
+   */
+  getSandboxHealth?: () => Promise<AgentStudioSandboxHealthSnapshot | null>;
 }
 
 function deriveExportStatus(
@@ -91,9 +114,16 @@ function deriveExportStatus(
    * the status surface honest about what it actually checks.
    */
   _readinessReady: boolean,
+  /**
+   * RAC P10 — when the RAC matrix hard-blocks (quarantined tool or
+   * `code_execution` without sandbox), the export-status flag flips to
+   * `"blocked"` so downstream consumers (catalog wizard, gateway list)
+   * see the same verdict the eligibility gate will fail on.
+   */
+  racBlocked: boolean,
 ): AgentStudioExportStatus {
   if (!catalogRow) {
-    if (!governanceCleared) return "blocked";
+    if (!governanceCleared || racBlocked) return "blocked";
     return "ready";
   }
   if (catalogRow.legacyImportState === "legacy_imported_unresolved") {
@@ -111,14 +141,32 @@ export async function buildExportCandidate(
   const agent = agents.find((a) => a.id === agentId);
   if (!agent) return null;
 
-  const [governance, readiness, binding, activeReleaseId, catalogRow] =
-    await Promise.all([
-      computeExportGovernanceVerdict({ agentId, computedBy }),
-      computeAgentReadinessSnapshot({ agentId, computedBy }),
-      lookups.resolveAgentBinding(agentId),
-      lookups.resolveActiveReleaseId(agentId),
-      lookups.loadCatalogEntryForAgent(agentId),
-    ]);
+  const [
+    governance,
+    readiness,
+    binding,
+    activeReleaseId,
+    catalogRow,
+    toolRiskClasses,
+    sandboxHealth,
+  ] = await Promise.all([
+    computeExportGovernanceVerdict({ agentId, computedBy }),
+    computeAgentReadinessSnapshot({ agentId, computedBy }),
+    lookups.resolveAgentBinding(agentId),
+    lookups.resolveActiveReleaseId(agentId),
+    lookups.loadCatalogEntryForAgent(agentId),
+    lookups.listAgentToolRiskClasses
+      ? lookups.listAgentToolRiskClasses(agentId)
+      : Promise.resolve<ReadonlyArray<ToolRiskClass>>([]),
+    lookups.getSandboxHealth
+      ? lookups.getSandboxHealth()
+      : probeSandboxForExport(),
+  ]);
+
+  const racReadiness: AgentStudioRacReadinessSnapshot = computeRacReadiness({
+    toolRiskClasses,
+    sandboxHealth,
+  });
 
   return {
     workspaceId: agent.workspaceId,
@@ -139,6 +187,7 @@ export async function buildExportCandidate(
       receiptId: governance.receiptId,
       blockerRules: governance.blockers.map((b) => b.rule),
     },
+    racReadiness,
     binding,
     capabilities: agent.capabilities ?? [],
     sourceModule: "agentStudio",
@@ -148,6 +197,7 @@ export async function buildExportCandidate(
       catalogRow,
       governance.status === "cleared",
       readiness.publishReady,
+      racReadiness.status === "blocked",
     ),
   };
 }
@@ -279,6 +329,7 @@ export async function prepareExportRegisterPayload(
             lifecycleState: candidate.lifecycleState,
             readiness: candidate.readiness,
             governance: candidate.governance,
+            racReadiness: candidate.racReadiness,
             binding: candidate.binding,
             capabilities: candidate.capabilities,
             sourceModule: candidate.sourceModule,

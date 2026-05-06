@@ -61,6 +61,8 @@ function makeLookups(opts: {
   binding?: any;
   releaseId?: number | null;
   catalogRow?: { id: number; legacyImportState: string | null; activeSourceVersionId: number | null } | null;
+  toolRiskClasses?: ReadonlyArray<string>;
+  sandboxHealth?: { ok: boolean; impl: string } | null;
 }): ExportCatalogLookups {
   return {
     listPublishedAgents: vi.fn(async (filter) => {
@@ -79,6 +81,16 @@ function makeLookups(opts: {
     ),
     resolveActiveReleaseId: vi.fn(async () => opts.releaseId ?? 555),
     loadCatalogEntryForAgent: vi.fn(async () => opts.catalogRow ?? null),
+    listAgentToolRiskClasses: vi.fn(
+      async () => (opts.toolRiskClasses ?? []) as any,
+    ),
+    // Pass `null` explicitly to drive the unbound-sandbox path; default
+    // is healthy node:vm.
+    getSandboxHealth: vi.fn(async () =>
+      opts.sandboxHealth === undefined
+        ? { ok: true, impl: "node-vm" }
+        : opts.sandboxHealth,
+    ),
   };
 }
 
@@ -182,6 +194,92 @@ describe("buildExportCandidate — Phase 30", () => {
       "user:1",
       makeLookups({ agents: [happyAgent] }),
     );
+    expect(r!.exportStatus).toBe("blocked");
+  });
+
+  // ── RAC P10 — D-TOOL-4 + D-SBX-2 wiring ──────────────────────────
+
+  it("racReadiness=ready when read_only-only + healthy sandbox", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["read_only"],
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("ready");
+    expect(r!.exportStatus).toBe("ready");
+  });
+
+  it("racReadiness=blocked + exportStatus=blocked when code_execution + no sandbox", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["code_execution"],
+        sandboxHealth: null,
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("blocked");
+    expect(r!.racReadiness.reasons).toContain("sandbox_required");
+    // RAC hard-block flips exportStatus too (deriveExportStatus).
+    expect(r!.exportStatus).toBe("blocked");
+  });
+
+  it("racReadiness=blocked when code_execution + unhealthy sandbox", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["code_execution"],
+        sandboxHealth: { ok: false, impl: "node-vm" },
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("blocked");
+    expect(r!.racReadiness.reasons).toContain("sandbox_unhealthy");
+    expect(r!.exportStatus).toBe("blocked");
+  });
+
+  it("racReadiness=ready when code_execution + healthy sandbox", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["code_execution"],
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("ready");
+    expect(r!.exportStatus).toBe("ready");
+  });
+
+  it("racReadiness=degraded does NOT flip exportStatus", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["write"],
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("degraded");
+    expect(r!.exportStatus).toBe("ready");
+  });
+
+  it("racReadiness=blocked when any tool is quarantined", async () => {
+    const r = await buildExportCandidate(
+      1,
+      "user:1",
+      makeLookups({
+        agents: [happyAgent],
+        toolRiskClasses: ["read_only", "quarantined"],
+      }),
+    );
+    expect(r!.racReadiness.status).toBe("blocked");
+    expect(r!.racReadiness.reasons).toContain("quarantined_tool");
     expect(r!.exportStatus).toBe("blocked");
   });
 });
@@ -308,7 +406,7 @@ describe("prepareExportRegisterPayload — Phase 30", () => {
     expect(cfg.exportDto.sourceRefId).toBe(1);
     expect(cfg.exportDto.governance.status).toBe("cleared");
     expect(Array.isArray(cfg.eligibilityGates)).toBe(true);
-    expect(cfg.eligibilityGates.length).toBe(9);
+    expect(cfg.eligibilityGates.length).toBe(10);
     // No forbidden keys leaked
     const flat = JSON.stringify(cfg).toLowerCase();
     expect(flat).not.toContain("apikey");

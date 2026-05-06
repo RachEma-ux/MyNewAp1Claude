@@ -19,6 +19,7 @@
  */
 
 import type { ExportGovernanceStatus } from "../services/governance-adapter";
+import type { ToolRiskClass } from "../services/cag/types";
 
 /**
  * Status of the export pipeline for one candidate. Distinct from the
@@ -61,6 +62,59 @@ export interface AgentStudioReadinessSnapshot {
   publishReady: boolean;
 }
 
+/**
+ * RAC P10 — Export-time RAC readiness verdict (D-TOOL-4 + D-SBX-2).
+ *
+ *   - `"ready"`     — agent uses only `read_only` tools, OR uses
+ *                     `code_execution` and the sandbox is healthy.
+ *   - `"degraded"`  — agent uses one or more side-effecting risk
+ *                     classes (write / external_side_effect / destructive /
+ *                     governance_sensitive / credential_sensitive). Export
+ *                     proceeds; the wizard surfaces the warning.
+ *   - `"blocked"`   — hard-block: agent includes a `quarantined` tool,
+ *                     OR uses `code_execution` while the sandbox
+ *                     prerequisite (D-SBX-2) is unmet.
+ *
+ * Per D-TOOL-5 the underlying `riskClass` lookup MUST come from the
+ * MCP tool registry; this DTO only carries the resolved verdict and
+ * the small `toolRisk` summary the UI renders.
+ */
+export type RacReadinessStatus = "ready" | "degraded" | "blocked";
+
+/**
+ * Snapshot of the tool-sandbox health at the moment readiness was
+ * computed. `null` when no sandbox impl is registered (treated as a
+ * hard-block precondition for `code_execution`).
+ */
+export interface AgentStudioSandboxHealthSnapshot {
+  ok: boolean;
+  /** Concrete impl name, e.g. `"node-vm"`. */
+  impl: string;
+}
+
+export interface AgentStudioRacReadinessSnapshot {
+  status: RacReadinessStatus;
+  /**
+   * Stable codes — used by audit + the wizard badge tooltip. Examples:
+   * `"sandbox_required"`, `"quarantined_tool"`,
+   * `"write_requires_approval"`, etc. Order matches the matrix walk so
+   * audit diffs are deterministic.
+   */
+  reasons: string[];
+  /** Compact summary so the UI doesn't need the full risk-class list. */
+  toolRisk: {
+    hasReadOnly: boolean;
+    hasRisky: boolean;
+    hasCodeExecution: boolean;
+    hasQuarantined: boolean;
+    /** Distinct ToolRiskClass values observed on this agent. */
+    classes: ToolRiskClass[];
+  };
+  /** null when the sandbox registry is unbound (hard-block precondition). */
+  sandboxHealth: AgentStudioSandboxHealthSnapshot | null;
+  computedAt: string;
+}
+
 export interface AgentStudioExportCandidate {
   // Identity
   workspaceId: number;
@@ -75,6 +129,9 @@ export interface AgentStudioExportCandidate {
   // Verdicts (Phase 27 + Phase 28 outputs)
   readiness: AgentStudioReadinessSnapshot;
   governance: AgentStudioGovernanceVerdictSnapshot;
+
+  // RAC P10 export-time verdict (D-TOOL-4 + D-SBX-2 hard-block matrix).
+  racReadiness: AgentStudioRacReadinessSnapshot;
 
   // Binding + provider/model refs (Phase 11+ / Phase 8)
   binding: {
@@ -118,6 +175,7 @@ export const AGENT_STUDIO_EXPORT_CANDIDATE_KEYS = [
   "lifecycleState",
   "readiness",
   "governance",
+  "racReadiness",
   "binding",
   "capabilities",
   "sourceModule",
