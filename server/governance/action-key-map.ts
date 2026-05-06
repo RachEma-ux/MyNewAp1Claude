@@ -461,6 +461,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "agentStudio.providerBindings.remove": "agentStudio.providerBindings.remove",
   "agentStudio.providerBindings.validate": "agentStudio.providerBindings.validate",
   "agentStudio.providerBindings.resolveForRun": "agentStudio.providerBindings.resolveForRun",
+  "agentStudio.cag.refreshPack": "agentStudio.cag.refreshPack",
   "agentStudio.exportCatalog.listCandidates": "agentStudio.exportCatalog.listCandidates",
   "agentStudio.exportCatalog.getCandidate": "agentStudio.exportCatalog.getCandidate",
   "agentStudio.exportCatalog.exportCandidate": "agentStudio.exportCatalog.exportCandidate",
