@@ -38,6 +38,7 @@
 // and both go through `gatewayCall("openRouter.modelAccess.execute")`.
 import * as repo from "../repository";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
+import { validateRuntimeToolCall } from "./runtime/proposed-tool-call-runtime";
 import { getSnapshot } from "./mcp/registry";
 import { getAgentProviderBinding } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
@@ -106,6 +107,12 @@ interface ChatToolSpec {
   openaiName: string;
   /** Dispatcher key `mcp__<serverName>__<remoteToolName>` */
   dispatchKey: string;
+  /** Canonical server name (matches the agsMcpToolKnowledge mirror). */
+  mcpServerId: string;
+  /** Remote tool name (without the dispatch-key prefix). */
+  remoteToolName: string;
+  /** Live snapshot of the tool for the runtime validator (Follow-up A1). */
+  liveTool: import("./mcp/types").McpTool;
   /** OpenAI tool schema */
   schema: {
     type: "function";
@@ -149,6 +156,9 @@ async function buildToolsForDraft(draftId: number): Promise<ChatToolSpec[]> {
       specs.push({
         openaiName,
         dispatchKey,
+        mcpServerId: server.name,
+        remoteToolName: tool.name,
+        liveTool: tool,
         schema: {
           type: "function",
           function: {
@@ -226,6 +236,9 @@ async function runChatWithToolsViaBinding(input: {
 }) {
   const dispatchKeyByOpenaiName = new Map<string, string>(
     input.tools.map((t) => [t.openaiName, t.dispatchKey]),
+  );
+  const specByOpenaiName = new Map<string, ChatToolSpec>(
+    input.tools.map((t) => [t.openaiName, t]),
   );
   const toolSchemas = input.tools.map((t) => t.schema);
 
@@ -376,6 +389,29 @@ async function runChatWithToolsViaBinding(input: {
             toolPayload: { toolCallId: call.id, name: call.name },
           });
           continue;
+        }
+        // Follow-up A1: ProposedToolCall validator runs BEFORE dispatch.
+        const spec = specByOpenaiName.get(call.name);
+        if (spec) {
+          const validation = await validateRuntimeToolCall({
+            mcpServerId: spec.mcpServerId,
+            toolName: spec.remoteToolName,
+            liveTool: spec.liveTool,
+            arguments: args,
+          });
+          if (!validation.ok) {
+            await repo.appendChatMessage({
+              sessionId: input.sessionId,
+              role: "tool",
+              content: JSON.stringify({
+                error: validation.message,
+                code: validation.code,
+                gate: "proposed_tool_call_validator",
+              }),
+              toolPayload: { toolCallId: call.id, name: call.name },
+            });
+            continue;
+          }
         }
         const dispatchResult = await dispatchMcpToolCall({
           agentDraftId: input.draftId,
