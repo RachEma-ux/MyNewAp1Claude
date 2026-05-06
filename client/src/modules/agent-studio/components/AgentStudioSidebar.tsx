@@ -33,6 +33,7 @@ import {
   Library,
   Store,
   Network,
+  ScanSearch,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -60,6 +61,8 @@ export type AgentStudioView =
   | "subagents"
   // ── Plan v3 Phase 14: provider/model binding picker ──
   | "binding"
+  // ── RAC P11: capability pack + RAC config + traces ──
+  | "rac"
   // ── Phase 13e: Catalog (global, no agent context) ──
   | "catalog-skills"
   | "catalog-tools"
@@ -134,6 +137,8 @@ const AGENT_GROUPS: SectionGroup[] = [
     items: [
       { key: "governance", label: "Governance", icon: ShieldCheck },
       { key: "runs", label: "Runs / Traces", icon: Activity },
+      // RAC P11 — capability pack + retrieval-augmented context configuration.
+      { key: "rac", label: "RAC", icon: ScanSearch },
     ],
   },
   {
