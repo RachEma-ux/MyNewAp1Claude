@@ -66,14 +66,16 @@ export interface PlanRetrievalInput {
   profileId: number;
 }
 
-const IN_PROCESS_TYPES: ReadonlySet<string> = new Set([
-  "cag_pack",
-  "memory",
-  "workspace_context",
-  "project_context",
-  "tool_result_context",
-  "manual_context",
-]);
+/**
+ * Source types that intentionally have no RAC adapter because the CAG
+ * resolver renders them directly. Today this is just `cag_pack`; the
+ * five legacy synthesizer types (`memory`, `workspace_context`,
+ * `project_context`, `tool_result_context`, `manual_context`) were
+ * removed from the source-type enum at D3 closure since nothing
+ * produced them and the synthesizer shape never fit the ingestion
+ * pipeline.
+ */
+const IN_PROCESS_TYPES: ReadonlySet<string> = new Set(["cag_pack"]);
 
 /**
  * Build the plan. Pure I/O; no upstream HTTP; no embedding calls.

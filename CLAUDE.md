@@ -79,7 +79,6 @@ Phase 1 — CLAUDE.md and missing ADRs. Updated in this commit.
 ## Deferred Scope
 
 - pgvector migration — documented as future, not blocking.
-- In-process synthesizers for `memory` / `workspace_context` / `project_context` / `tool_result_context` / `manual_context` source types — flagged `in_process_synthesizer_pending` from the prior RAC arc.
 - Multi-region deployment guidance — single-region remains the operational baseline.
 
 ---

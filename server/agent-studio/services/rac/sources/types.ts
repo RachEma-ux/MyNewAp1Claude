@@ -16,17 +16,21 @@
  * Locked source-type enum (D-RET-1). Adding a new value requires a
  * RAC PR; until then `external_connector` is the catch-all (with an
  * explicit adapter registration in P3).
+ *
+ * Removed at D3 closure (2026-05-06): `memory`, `workspace_context`,
+ * `project_context`, `tool_result_context`, `manual_context`. Those
+ * types had no producer in the codebase and the runtime-synthesizer
+ * shape they implied does not fit the four-layer ingestion pipeline
+ * (no raw artifact → no Parser → no chunks). When a real consumer
+ * surfaces, the right home is a CAG system-prompt section, not a RAC
+ * source. `cag_pack` remains because the CAG resolver renders it
+ * directly outside the RAC retrieval path.
  */
 export const RAC_SOURCE_TYPES = [
   "cag_pack",
-  "memory",
   "document_collection",
   "vector_index",
   "graph_index",
-  "workspace_context",
-  "project_context",
-  "tool_result_context",
-  "manual_context",
   "external_connector",
   // Retrofit P4 — NormalizedKnowledgeUnit retrieval (D-NKU-1).
   "knowledge_unit",
