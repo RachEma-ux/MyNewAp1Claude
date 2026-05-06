@@ -98,6 +98,20 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       return { section: null, pack: null, warnings };
     }
 
+    // D-CAG-RECON-4: render BEFORE persist so the compiledHash (SHA-256
+    // of the rendered prompt text) flows into createPack. The renderer
+    // is pure — same content always yields the same section — so we
+    // can render once here and reuse the result regardless of cache
+    // hit / miss. (Review cleanup — was previously rendered after
+    // createPack, leaving compiledHash NULL forever.)
+    const section = renderCapabilityPack(built.content);
+    const renderWarnings = section.warnings;
+    const compileWarnings = [
+      ...built.warnings.map((w) => `cag-builder: ${w}`),
+      ...renderWarnings.map((w) => `cag-renderer: ${w}`),
+    ];
+    const compileResult = renderWarnings.length > 0 ? "warn" : "ok";
+
     const newHashMap = manifestToHashMap(built.sourceManifest);
     const latest = await getLatestPack(input.agentDraftId);
 
@@ -118,6 +132,15 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
         contentJson: built.content as unknown as Record<string, unknown>,
         sourceManifest: built.sourceManifest,
         createdBy: input.actorId,
+        // D-CAG-RECON-3/4/5: persist compile + governance metadata so
+        // traces can verify which pack version actually rendered and
+        // which validation outcome it shipped under.
+        compiledHash: section.contentHash,
+        compileResult,
+        compileWarnings,
+        governanceVerdict: "cleared",
+        governanceBlockers: [],
+        tokenBudgetEstimate: section.tokenEstimate,
       });
       pack = created.pack;
       reused = created.reused;
@@ -138,8 +161,7 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       }
     }
 
-    const section = renderCapabilityPack(pack.contentJson as unknown as CapabilityPackContent);
-    for (const w of built.warnings) warnings.push(`cag-builder: ${w}`);
+    for (const w of compileWarnings) warnings.push(w);
 
     await touchPackLastUsed(pack.id).catch(() => {});
     await appendPackEvent({

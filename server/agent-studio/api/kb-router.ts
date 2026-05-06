@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { getAsDb } from "../db/connection";
+import { hasWorkspaceAccess } from "../../db/workspaces";
 import {
   agsKnowledgeUnits,
   agsProvenanceRecords,
@@ -33,6 +34,23 @@ function asdb() {
   return db;
 }
 
+/**
+ * Workspace-membership gate. The retrofit's KB tables carry a
+ * `workspaceId` column per D-UI-2; this gate ensures clients can only
+ * query workspaces they belong to. Mirrors the pattern documents-crud
+ * has used since before the retrofit. (Review cleanup — kb-router was
+ * trusting client-supplied `workspaceId` without validation.)
+ */
+async function assertWorkspaceAccess(userId: number, workspaceId: number): Promise<void> {
+  const ok = await hasWorkspaceAccess(userId, workspaceId);
+  if (!ok) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `User ${userId} does not have access to workspace ${workspaceId}`,
+    });
+  }
+}
+
 export const kbRouter = router({
   listUnits: protectedProcedure
     .input(
@@ -42,7 +60,8 @@ export const kbRouter = router({
         includeArchived: z.boolean().default(false),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
       const db = asdb();
       const conds = [eq(agsKnowledgeUnits.workspaceId, input.workspaceId)];
       if (typeof input.sourceId === "number") {
@@ -66,7 +85,8 @@ export const kbRouter = router({
         unitId: z.number().int().positive(),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
       const db = asdb();
       const rows = await db
         .select()
@@ -90,7 +110,8 @@ export const kbRouter = router({
         provenanceId: z.number().int().positive(),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
       const db = asdb();
       const rows = await db
         .select()
@@ -110,7 +131,8 @@ export const kbRouter = router({
 
   listFreshnessCounts: protectedProcedure
     .input(workspaceRefSchema)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
       const db = asdb();
       const rows = await db
         .select({
