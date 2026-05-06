@@ -226,6 +226,38 @@ describe("persistRuntimeToolCallTrace", () => {
     expect(r.id).toBeNull();
   });
 
+  it("recordTrace failure surfaces a console.warn breadcrumb (PR #220)", async () => {
+    // Polish PR #220 upgraded the silent `.catch(() => {})` to
+    // `console.warn` so persistent ASDB outages leave a breadcrumb
+    // operators can grep. This test guards against a future refactor
+    // accidentally re-silencing the path.
+    const recordTrace = vi.fn().mockRejectedValue(new Error("ASDB unavailable"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await persistRuntimeToolCallTrace({
+        workspaceId: 7,
+        agentId: 8,
+        agentDraftId: 9,
+        runtimeRunId: 50,
+        runtimeTraceId: null,
+        messageId: null,
+        verdict: okVerdict(),
+        validation: okValidation(),
+        dispatchResult: { ok: true, durationMs: 10 },
+        recordTrace,
+      });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const msg = warnSpy.mock.calls[0][0] as string;
+      expect(msg).toContain("[ags-runtime] tool-call trace write failed");
+      expect(msg).toContain("workspace=7");
+      expect(msg).toContain("agent=8");
+      expect(msg).toContain("draft=9");
+      expect(msg).toContain("ASDB unavailable");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it("computes proposedToolCallHash from the verdict's call", async () => {
     const recordTrace = vi.fn().mockResolvedValue({ id: 105 });
     await persistRuntimeToolCallTrace({
