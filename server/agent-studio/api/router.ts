@@ -50,6 +50,7 @@ import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { getRunTree, invokeSubagent } from "../services/subagent-runner";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import { providerBindingsRouter } from "./provider-bindings-router";
+import { cagRouter } from "./cag-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2112,4 +2113,6 @@ export const agentStudioRouter = router({
   chat: chatRouter,
   // Plan v3 Phase 14: provider/model binding picker
   providerBindings: providerBindingsRouter,
+  // RAC Phase 1D: Capability Pack preview/refresh APIs
+  cag: cagRouter,
 });

@@ -632,6 +632,20 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # RAC Phase 1D — operator-triggered Capability Pack rebuild for an
+  # Agent Studio draft. Writes one row to `ags_cag_capability_packs`
+  # only when the source manifest hash drifted (idempotent on match);
+  # appendPackEvent emits an audit row either way. R2 because the blast
+  # radius is a single agent draft and the pack carries no credential
+  # material (validator rejects FORBIDDEN_BINDING_KEYS-shaped fields).
+  agentStudio.cag.refreshPack:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   model.importToCatalog:
     domain: model
     risk: R2
