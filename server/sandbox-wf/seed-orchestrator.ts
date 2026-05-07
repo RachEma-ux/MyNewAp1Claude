@@ -19,7 +19,8 @@
 import { createHash } from "crypto";
 import { eq, like } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { createCatalogEntry, createPublishBundle } from "../ai-types/public-api";
+import { createPublishBundle, getCatalogEntryById } from "../ai-types/public-api";
+import { gatewayCall } from "../platform/modules/module-gateway";
 import { agents } from "../../drizzle/tables/agents";
 import { providers } from "../../drizzle/tables/providers";
 import { catalogEntries } from "../../drizzle/tables/catalog";
@@ -183,27 +184,51 @@ export async function seedWfOrchestrators(): Promise<{ seeded: boolean; count: n
       callable: true as const,
     };
 
-    const entry = await createCatalogEntry({
-      name: def.catalogName,
-      displayName: def.name,
-      description: def.description,
-      entryType: "agent",
-      sourceType: "agent",
-      sourceId: agent.id,
-      category: "orchestration",
-      subCategory: "workflow",
-      capabilities: def.capabilities,
-      scope: "app",
-      status: "active",
-      origin: "system",
-      reviewState: "approved",
-      approvedBy: 1,
-      approvedAt: new Date(),
-      providerId,
-      config,
-      tags: ["published", "agent", "wf-orchestrator", "maestro"],
-      createdBy: 1,
+    // Plan v3 Phase 34: route through aiTypes.catalog.register so the
+    // Phase-25 duplicate guard, Phase-39 event, and canonical audit
+    // chain run on seed-orchestrator's catalog write. The publish step
+    // (Step C below) keeps its direct createPublishBundle call —
+    // gateway publish migration is out of scope for this phase.
+    const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      ctx: {
+        sourceModule: "sandbox-wf",
+        targetModule: "aiTypes",
+        actionKey: "aiTypes.catalog.register",
+        governanceReceiptId: `sandbox-wf-bootstrap-${def.catalogName}-${Date.now()}`,
+        actorId: 1,
+      },
+      input: {
+        entryType: "agent",
+        sourceType: "agent",
+        sourceId: agent.id,
+        fields: {
+          name: def.catalogName,
+          displayName: def.name,
+          description: def.description,
+          category: "orchestration",
+          subCategory: "workflow",
+          capabilities: def.capabilities,
+          scope: "app",
+          status: "active",
+          origin: "system",
+          reviewState: "approved",
+          approvedBy: 1,
+          approvedAt: new Date(),
+          providerId,
+          config,
+          tags: ["published", "agent", "wf-orchestrator", "maestro"],
+          createdBy: 1,
+        },
+        registeredBy: 1,
+        sourceModule: "sandbox-wf",
+      },
     });
+    const entry = await getCatalogEntryById(result.entryId);
+    if (!entry) {
+      throw new Error(
+        `[sandbox-wf] register returned entryId=${result.entryId} but getCatalogEntryById was null`,
+      );
+    }
 
     // ── Step C: Create publish bundle (passes gate 6) ──────────────
     const snapshot = {
