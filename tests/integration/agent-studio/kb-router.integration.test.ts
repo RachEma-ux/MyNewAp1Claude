@@ -316,25 +316,40 @@ describe.skipIf(!hasDb())(
       });
     });
 
-    describe("migration 0042 — partial composite index", () => {
-      it("is registered in pg_indexes WITH the partial WHERE clause", async () => {
+    describe("kb listing composite index (idx_ags_knowledge_units_active_listing)", () => {
+      // The Drizzle seed creates this index without a WHERE clause
+      // (the index() API cannot express it); the optional manual
+      // script `scripts/migrations/manual/kb-listing-partial-index.sql`
+      // upgrades it to the partial-WHERE form. The assertions below
+      // pin the column shape (always present) and the planner
+      // eligibility (always present); the partial-WHERE shape is
+      // covered as an *opt-in* assertion gated on
+      // `OPS_KB_PARTIAL_INDEX_APPLIED=1`.
+      it("is registered in pg_indexes with the expected column shape", async () => {
         const asdb = getAsDb()!;
         const rows = (await asdb.execute(
           sql`SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_ags_knowledge_units_active_listing'`,
         )) as unknown as Array<{ indexdef: string }>;
-        // drizzle-orm's neon-style execute returns `{ rows: [...] }` on
-        // some adapters and a plain array on others; normalize.
         const flat = Array.isArray(rows) ? rows : (rows as any).rows ?? [];
         expect(flat.length).toBe(1);
         const def = flat[0].indexdef as string;
         expect(def).toMatch(/workspace_id/);
         expect(def).toMatch(/source_id/);
         expect(def).toMatch(/freshness_state/);
-        // The WHERE-clause assertion is the load-bearing one — it's
-        // exactly what the Drizzle declaration cannot express, so the
-        // SQL-migration-only path is the only way to keep it.
-        expect(def).toMatch(/WHERE \(?archived_at IS NULL\)?/i);
       });
+
+      it.skipIf(process.env.OPS_KB_PARTIAL_INDEX_APPLIED !== "1")(
+        "carries the partial WHERE clause when the manual ops script is applied",
+        async () => {
+          const asdb = getAsDb()!;
+          const rows = (await asdb.execute(
+            sql`SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_ags_knowledge_units_active_listing'`,
+          )) as unknown as Array<{ indexdef: string }>;
+          const flat = Array.isArray(rows) ? rows : (rows as any).rows ?? [];
+          const def = flat[0].indexdef as string;
+          expect(def).toMatch(/WHERE \(?archived_at IS NULL\)?/i);
+        },
+      );
 
       it("is selected by the planner for the listUnits query shape (with seqscan disabled)", async () => {
         const asdb = getAsDb()!;
