@@ -19,7 +19,7 @@ import {
   getCatalogEntryById,
   updateCatalogEntry,
   getCatalogEntryVersions,
-} from "../../../server/db/catalog";
+} from "../../../server/ai-types/public-api";
 import {
   isCatalogEntryAvailableForAppUse,
   checkCatalogAvailability,

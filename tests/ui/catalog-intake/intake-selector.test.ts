@@ -20,7 +20,7 @@ import {
 import {
   getCatalogEntries,
   getCatalogEntryById,
-} from "../../../server/db/catalog";
+} from "../../../server/ai-types/public-api";
 import { isCatalogEntryAvailableForAppUse } from "../../../server/ai-types/availability";
 import { getCatalogState } from "../../../shared/catalog-state";
 

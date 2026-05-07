@@ -20,7 +20,7 @@ import {
   getCatalogEntryById,
   updateCatalogEntry,
   approveCatalogEntry,
-} from "../../../server/db/catalog";
+} from "../../../server/ai-types/public-api";
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,

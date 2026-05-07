@@ -15,7 +15,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { hasDb, cleanup, createTestEntry } from "./helpers/db-harness";
-import { getCatalogEntries, getCatalogEntryById } from "../../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById } from "../../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("FK Migration Safety — Real DB (Scenario 5)", () => {
   afterEach(async () => {

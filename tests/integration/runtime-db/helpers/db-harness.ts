@@ -144,7 +144,7 @@ export async function createTestEntry(overrides: Partial<{
   category: string;
   createdBy: number;
 }> = {}) {
-  const { createCatalogEntry } = await import("../../../../server/db/catalog");
+  const { createCatalogEntry } = await import("../../../../server/ai-types/public-api");
 
   const entry = await createCatalogEntry({
     name: overrides.name ?? testUniqueName("entry"),
@@ -179,7 +179,7 @@ export async function createTestBundle(catalogEntryId: number, overrides: Partia
   publishedBy: number;
   policyDecision: string;
 }> = {}) {
-  const { createPublishBundle } = await import("../../../../server/db/catalog");
+  const { createPublishBundle } = await import("../../../../server/ai-types/public-api");
   const { createHash } = await import("crypto");
 
   const snapshot = overrides.snapshot ?? { config: {}, name: "test-snapshot" };
@@ -203,7 +203,7 @@ export async function createTestBundle(catalogEntryId: number, overrides: Partia
  * draft → approved → tagged published → activated
  */
 export async function makeEntryAvailable(entryId: number) {
-  const { updateCatalogEntry, approveCatalogEntry } = await import("../../../../server/db/catalog");
+  const { updateCatalogEntry, approveCatalogEntry } = await import("../../../../server/ai-types/public-api");
 
   // Approve
   await approveCatalogEntry(entryId, 1);
@@ -222,7 +222,7 @@ export async function makeEntryAvailable(entryId: number) {
   const bundle = await createTestBundle(entryId);
 
   // Re-read the entry
-  const { getCatalogEntryById } = await import("../../../../server/db/catalog");
+  const { getCatalogEntryById } = await import("../../../../server/ai-types/public-api");
   const entry = await getCatalogEntryById(entryId);
   return { entry: entry!, bundle };
 }

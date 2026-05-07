@@ -12,7 +12,7 @@ import {
   createTestEntry,
   assertI7_StructuredFKPreferred,
 } from "../../helpers/governance-harness";
-import { getCatalogEntryById } from "../../../server/db/catalog";
+import { getCatalogEntryById } from "../../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("FK Integrity — I7", () => {
   afterEach(async () => {

@@ -215,7 +215,10 @@ describe("Catalog Contract — Execution Eligibility", () => {
 
 describe("Catalog Contract — DB Functions", () => {
   it("catalog DB module exports all required CRUD operations", async () => {
-    const catalog = await import("../../server/db/catalog");
+    // Plan v3 Phase 31 (Phase 26.1): the `server/db/catalog` shim was
+    // deleted; canonical AI Types catalog ops are now exposed through
+    // `server/ai-types/public-api.ts`.
+    const catalog = await import("../../server/ai-types/public-api");
     expect(typeof catalog.getCatalogEntries).toBe("function");
     expect(typeof catalog.getCatalogEntryById).toBe("function");
     expect(typeof catalog.createCatalogEntry).toBe("function");

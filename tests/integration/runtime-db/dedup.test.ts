@@ -12,7 +12,7 @@ import {
   cleanup,
   createTestEntry,
 } from "../../helpers/governance-harness";
-import { getCatalogEntries, getCatalogEntryById } from "../../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById } from "../../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("Dedup Safety — DB Level", () => {
   afterEach(async () => {

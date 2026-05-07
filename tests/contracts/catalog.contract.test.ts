@@ -25,7 +25,7 @@ import {
   updateCatalogEntry,
   approveCatalogEntry,
   deleteCatalogEntry,
-} from "../../server/db/catalog";
+} from "../../server/ai-types/public-api";
 import {
   checkCatalogAvailability,
   isCatalogEntryAvailableForAppUse,
@@ -197,7 +197,7 @@ describe.runIf(hasDb)("Catalog Contract — I2, I4, I6", () => {
   // ══════════════════════════════════════════════════════════════════════
 
   it("I6: version record is created when entry is updated", async () => {
-    const { getCatalogEntryVersions } = await import("../../server/db/catalog");
+    const { getCatalogEntryVersions } = await import("../../server/ai-types/public-api");
 
     const entry = await createTestEntry({ config: { v: 1 } });
 

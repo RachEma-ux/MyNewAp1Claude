@@ -14,7 +14,7 @@ import {
   createTestEntry,
   assertI7_StructuredFKPreferred,
 } from "../../helpers/governance-harness";
-import { getCatalogEntryById, getCatalogEntries } from "../../../server/db/catalog";
+import { getCatalogEntryById, getCatalogEntries } from "../../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("Scenario 5 — Legacy FK + Structured FK", () => {
   afterEach(async () => {

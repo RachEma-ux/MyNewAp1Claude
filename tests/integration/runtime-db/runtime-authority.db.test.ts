@@ -10,7 +10,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { hasDb, cleanup, createTestEntry, createTestBundle, makeEntryAvailable } from "./helpers/db-harness";
-import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry, approveCatalogEntry, getActiveBundleForEntry, deleteCatalogEntry } from "../../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry, approveCatalogEntry, getActiveBundleForEntry, deleteCatalogEntry } from "../../../server/ai-types/public-api";
 import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 import { getCatalogState, getCatalogStateForDomainEntity } from "../../../shared/catalog-state";
 

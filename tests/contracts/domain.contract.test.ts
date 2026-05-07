@@ -19,7 +19,7 @@ import {
   assertI4_OnlyCatalogApprovedActive,
   assertI7_StructuredFKPreferred,
 } from "../helpers/governance-harness";
-import { getCatalogEntries, getCatalogEntryById } from "../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById } from "../../server/ai-types/public-api";
 import { isCatalogEntryAvailableForAppUse } from "../../server/ai-types/availability";
 
 describe.runIf(hasDb)("Domain Contract — I1, I3, I7", () => {

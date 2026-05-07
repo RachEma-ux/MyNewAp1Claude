@@ -11,7 +11,7 @@ import {
   cleanup,
   createTestEntry,
 } from "../../helpers/governance-harness";
-import { getCatalogEntryById, getCatalogEntries } from "../../../server/db/catalog";
+import { getCatalogEntryById, getCatalogEntries } from "../../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("Legacy Fallback — FK Resolution", () => {
   afterEach(async () => {

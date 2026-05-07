@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { hasDb, cleanup, createTestEntry, createTestBundle, makeEntryAvailable } from "./helpers/db-harness";
-import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry, approveCatalogEntry, getActiveBundleForEntry } from "../../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry, approveCatalogEntry, getActiveBundleForEntry } from "../../../server/ai-types/public-api";
 import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 import { getCatalogState } from "../../../shared/catalog-state";
 
@@ -196,7 +196,7 @@ describe.runIf(hasDb)("Catalog Lifecycle — Real DB", () => {
   // ==========================================================================
 
   it("config updates create new version records", async () => {
-    const { getCatalogEntryVersions } = await import("../../../server/db/catalog");
+    const { getCatalogEntryVersions } = await import("../../../server/ai-types/public-api");
 
     const entry = await createTestEntry({
       config: { step: 1 },
