@@ -27,7 +27,7 @@ import * as comm from "../communication/communication.service";
 import {
   resolveCatalogAgentExecutionTarget,
   resolveServiceAgentExecutionTarget,
-} from "../ai-types/execution";
+} from "../ai-types/public-api";
 
 async function resolveWorkspaceId(
   userId: number,

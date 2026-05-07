@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { sdk } from '../_core/sdk';
 import { executeAgent } from './executor';
 import { AppBlockerError, createGenericTechnicalBlocker } from '../_core/blockers';
-import { invokeCatalogEntry } from '../ai-types/invoke';
+import { invokeCatalogEntry } from '../ai-types/public-api';
 
 function getDevOrAuthenticatedUser(req: Request) {
   if (process.env.DEV_MODE === "true") {

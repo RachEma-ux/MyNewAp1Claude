@@ -20,12 +20,7 @@
 # Ordering: alphabetical for review stability. Comments (#) and blank
 # lines are ignored by the check.
 
-server/_core/index.ts
-server/agents/executor.ts
-server/agents/stream.ts
 server/db.ts
 server/db/catalog.ts
 server/db/index.ts
 server/platform/modules/module-routers.ts
-server/routers/catalog-registry.ts
-server/routers/conversations.ts

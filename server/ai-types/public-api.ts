@@ -121,6 +121,39 @@ export {
 } from "./import-normalizer";
 export type { ImportRowLike } from "./import-normalizer";
 
+// Execution surface — agent-execution target resolution + catalog
+// chat-stream + execution event types. Used by the legacy agents/* and
+// routers/conversations chat paths plus the catalog registry.
+export {
+  resolveCatalogAgentExecutionTarget,
+  resolveServiceAgentExecutionTarget,
+  catalogExecutionQuerySchema,
+  executeCatalogChatStream,
+  executeServiceAgentStream,
+  getExecutionRunForUi,
+} from "./execution";
+export type {
+  CatalogAgentExecutionTarget,
+  ServiceAgentExecutionTarget,
+  CatalogExecutionEvent,
+  ReasoningLlmContext,
+} from "./execution";
+
+// Invoke surface — generic catalog-entry invocation + target resolution
+// (delegates to the execution surface above).
+export {
+  resolveInvokeTarget,
+  invokeCatalogEntry,
+} from "./invoke";
+export type {
+  CatalogInvokeInput,
+  CatalogInvokeResolution,
+} from "./invoke";
+
+// Module boot. The platform layer calls this from `_core/index.ts` at
+// startup; sibling modules should not.
+export { bootAiTypesModule } from "./boot";
+
 // Re-export the drizzle-schema row + insert types for callers using the
 // helpers above. Keeps caller imports tight (single `from "../ai-types/public-api"`)
 // instead of forcing a parallel `from "../../drizzle/schema"` import.

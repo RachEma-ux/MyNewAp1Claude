@@ -11,8 +11,7 @@ import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
 import { handleAgentStudioChatStream } from "../agent-studio/chat-stream";
-import { catalogExecutionQuerySchema } from "../ai-types/execution";
-import { invokeCatalogEntry } from "../ai-types/invoke";
+import { catalogExecutionQuerySchema, invokeCatalogEntry, bootAiTypesModule } from "../ai-types/public-api";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb, ensureDefaultWorkspace } from "../db";
@@ -26,7 +25,6 @@ import { ideProxyRouter } from "../code-studio/opencode/ide-proxy";
 import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
 import { syncCapabilitiesOnBoot } from "../workspace/seed/syncCapabilitiesOnBoot";
-import { bootAiTypesModule } from "../ai-types/boot";
 import { registerAllManifests } from "../platform/modules/manifests";
 import { configureRuntime, getRuntimeManager } from "../platform/modules/runtime-manager";
 

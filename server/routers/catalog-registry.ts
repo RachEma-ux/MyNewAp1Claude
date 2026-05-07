@@ -14,7 +14,7 @@ import {
   getCatalogAuditEvents,
   listExecutionRuns,
 } from "../db";
-import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../ai-types/execution";
+import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../ai-types/public-api";
 
 export const catalogRegistryRouter = router({
   /**
