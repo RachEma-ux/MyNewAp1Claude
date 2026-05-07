@@ -115,6 +115,27 @@ const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
   // list was dropped because the workspace admin owns model selection
   // via the binding. If this entry is restored, the local provider
   // chain has returned and the lint should fail.
+  // LR-08: CLOSED in Phase 29.6. `server/chat/stream.ts` direct-imports
+  // `stream` from `server/openrouter/model-access` (gateway-call form
+  // collapses streams to a single result; SSE needs real streaming).
+  // Binding resolves via D-PR-4 two-step lookup:
+  // `listActiveForProvider({workspaceId, providerCatalogEntryId: providerId})`
+  // first; falls back to `resolveWorkspaceDefaultBinding({workspaceId,
+  // role: "chat"})` when (I) misses. Refuses with `binding_required`
+  // when both miss. `executeInvokeAgent` adopts Path B (refuse) per
+  // D-PR-5 — legacy `agents`-table rows return a soft-error result with
+  // `error: "legacy_agents_table_unsupported"`. Note that LR-08 never
+  // had a boundary-lint allowlist entry — its registry consumption was
+  // one layer below this lint's surface (`getProviderRegistry()` reads
+  // the legacy `providers` table, not `process.env`). The closure is
+  // tracked here for completeness.
+  //
+  // Phase 29 final state: PMB-D1-EXEMPT is the ONLY remaining allowlist
+  // entry. All five Phase-29-deadline LRs (LR-01 / LR-02 / LR-03 /
+  // LR-04 / LR-08) are migrated; their closure rationale lives in the
+  // comment block above and is regression-tested by the tripwires in
+  // `tests/pmb/boundary.test.ts`.
+  //
   // The Phase 5 seed script itself — once created, it is the ONE
   // legitimate reader of provider env vars by design.
   {

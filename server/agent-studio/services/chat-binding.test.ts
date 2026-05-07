@@ -23,8 +23,27 @@ vi.mock("../repository", () => ({
   listMcpServers: vi.fn(() => Promise.resolve([])),
 }));
 
+// PMB Phase 29.7 — mock must include FORBIDDEN_BINDING_KEYS because
+// `services/cag/validator.ts` (transitively imported via the chat path)
+// reads it at module-load time. Mocking only `getAgentProviderBinding`
+// turns the constant into `undefined` and crashes module init in
+// `cag/validator.ts:70` (`.map((k) => k.toLowerCase())` on undefined).
+// Mirror the actual export from `../bindings:132`.
 vi.mock("../bindings", () => ({
   getAgentProviderBinding: vi.fn(),
+  FORBIDDEN_BINDING_KEYS: [
+    "apiKey",
+    "api_key",
+    "pat",
+    "encryptedPat",
+    "encrypted_pat",
+    "secret",
+    "Authorization",
+    "authorization",
+    "x-api-key",
+    "Bearer",
+    "apiKeyEnvVar",
+  ] as const,
 }));
 
 vi.mock("../../provider-connections/public-api", () => ({
@@ -49,6 +68,44 @@ vi.mock("./mcp/registry", () => ({
 
 vi.mock("./mcp/dispatcher", () => ({
   dispatchMcpToolCall: vi.fn(),
+}));
+
+// PMB Phase 29.7 — short-circuit the RAC runtime so the chat-binding
+// tests don't try to query ASDB through `listProfilesForDraft`. The
+// chat path calls `buildRuntimeSystemPrompt` which transitively hits
+// `rac/sources/store.ts` — and the rac-orchestrator subtree was added
+// to chat.ts after this test file was written, breaking it
+// transitively. Mocking the orchestrator's two public entry points
+// keeps the test focused on the binding-routing logic it actually
+// asserts.
+vi.mock("./runtime/rac-orchestrator", () => ({
+  buildRuntimeSystemPrompt: vi.fn(async () => ({
+    systemPrompt: "stub system prompt",
+    context: {
+      mode: "no_retrieval" as const,
+      capabilityPack: null,
+      retrievalEvidence: [],
+      warnings: [],
+      sourceTraces: [],
+      metrics: undefined,
+    },
+    composerWarnings: [],
+    truncations: [],
+    cacheKey: "stub-cache-key",
+  })),
+  resolveAndAssembleContext: vi.fn(async () => ({
+    mode: "no_retrieval" as const,
+    capabilityPack: null,
+    retrievalEvidence: [],
+    warnings: [],
+    sourceTraces: [],
+    metrics: undefined,
+  })),
+  RetrievalRequiredError: class extends Error {
+    constructor(public readonly reasons: string[] = []) {
+      super("retrieval required");
+    }
+  },
 }));
 
 import * as repo from "../repository";
