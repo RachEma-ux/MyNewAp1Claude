@@ -1862,10 +1862,12 @@ export const agsKnowledgeUnits = pgTable(
     contentHashIdx: index("idx_ags_knowledge_units_content_hash").on(t.contentHash),
     freshnessIdx: index("idx_ags_knowledge_units_freshness").on(t.freshnessState),
     parentIdx: index("idx_ags_knowledge_units_parent").on(t.parentUnitId),
-    // Migration 0042 (review-polish PR): partial index for the
-    // dominant kb-router listing query shape — `workspaceId AND
-    // archivedAt IS NULL [AND sourceId]`. Covers `listUnits` +
-    // `listFreshnessCounts` index-only.
+    // Composite index for the dominant kb-router listing query shape —
+    // `workspaceId [AND sourceId]` with `archived_at IS NULL` as a hot
+    // filter. Drizzle's `index()` API cannot express the partial WHERE
+    // clause; ASDB seed.ts creates this non-partial version. Operators
+    // can apply `scripts/migrations/manual/kb-listing-partial-index.sql`
+    // to upgrade it to the partial-WHERE form for archive-heavy workloads.
     activeListingIdx: index("idx_ags_knowledge_units_active_listing").on(
       t.workspaceId,
       t.sourceId,
