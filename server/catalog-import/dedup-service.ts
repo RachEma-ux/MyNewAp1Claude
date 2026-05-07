@@ -1,7 +1,7 @@
 /**
  * Deduplication Service — Exact + fuzzy matching against existing catalog entries
  */
-import { getCatalogEntries } from "../db";
+import { getCatalogEntries } from "../ai-types/public-api";
 import type { PreviewEntry, DuplicateStatus, PreviewSummary } from "@shared/catalog-import-types";
 
 // ============================================================================

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * check:ai-types-public-api-boundary  (Plan v3 Phase 26)
+ * check:ai-types-public-api-boundary  (Plan v3 Phase 26 + Phase 31)
  *
  * Enforces that code outside `server/ai-types/` may only import from
  * the AI Types public-API surface (`public-api.ts`, `manifest.ts`,
@@ -9,12 +9,9 @@
  * `import-normalizer`, `projection`, `availability`, `publishing`,
  * `legacy-import`, `register`, `router`, `boot`) is private.
  *
- * Mode: baseline-allow.
- *   - The 18 known offenders are listed in
- *     `scripts/baseline/ai-types-public-api-boundary.txt`. They are
- *     reported as WARNINGS; the run still exits 0.
- *   - Any NEW file that imports a private module is reported as a
- *     FAILURE; the run exits 1.
+ * Mode: **strict** (Phase 31 / Phase 26.1, 2026-05-07).
+ *   - Any file that imports a private module is reported as a
+ *     FAILURE; the run exits 1. There is no baseline.
  *   - Files inside `server/ai-types/` are exempt.
  *   - Test files (*.test.ts) are exempt — tests routinely poke at
  *     internals; this is acceptable per the existing Plan v3 pattern
@@ -24,15 +21,11 @@
  * compound script.
  */
 
-import { readFileSync, statSync } from "fs";
+import { statSync } from "fs";
 import { join, relative } from "path";
 import { walkSourceFiles } from "./module-tools/walk";
 
 const ROOT = process.cwd();
-const BASELINE_PATH = join(
-  ROOT,
-  "scripts/baseline/ai-types-public-api-boundary.txt",
-);
 
 const PUBLIC_SURFACE = new Set([
   "public-api",
@@ -44,25 +37,10 @@ const PUBLIC_SURFACE = new Set([
 ]);
 
 interface Finding {
-  severity: "fail" | "warn";
+  severity: "fail";
   file: string;
   line: number;
   evidence: string;
-}
-
-function loadBaseline(): Set<string> {
-  try {
-    const raw = readFileSync(BASELINE_PATH, "utf8");
-    const out = new Set<string>();
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      out.add(trimmed);
-    }
-    return out;
-  } catch {
-    return new Set();
-  }
 }
 
 /**
@@ -86,10 +64,11 @@ function detectPrivateImport(line: string): string | null {
   return null;
 }
 
-function scanFile(absPath: string, rel: string, findings: Finding[], baseline: Set<string>): void {
+function scanFile(absPath: string, rel: string, findings: Finding[]): void {
   let content: string;
   try {
-    content = readFileSync(absPath, "utf8");
+    const fs = require("fs") as typeof import("fs");
+    content = fs.readFileSync(absPath, "utf8");
   } catch {
     return;
   }
@@ -97,9 +76,8 @@ function scanFile(absPath: string, rel: string, findings: Finding[], baseline: S
   for (let i = 0; i < lines.length; i++) {
     const submodule = detectPrivateImport(lines[i]);
     if (!submodule) continue;
-    const isBaselined = baseline.has(rel);
     findings.push({
-      severity: isBaselined ? "warn" : "fail",
+      severity: "fail",
       file: rel,
       line: i + 1,
       evidence: `imports ai-types/${submodule} (private)`,
@@ -108,7 +86,6 @@ function scanFile(absPath: string, rel: string, findings: Finding[], baseline: S
 }
 
 function main(): void {
-  const baseline = loadBaseline();
   const findings: Finding[] = [];
 
   const serverDir = join(ROOT, "server");
@@ -125,7 +102,7 @@ function main(): void {
     } catch {
       continue;
     }
-    scanFile(abs, rel, findings, baseline);
+    scanFile(abs, rel, findings);
   }
 
   // Also scan scripts/ for completeness — they are server-side too.
@@ -139,30 +116,24 @@ function main(): void {
     } catch {
       continue;
     }
-    scanFile(abs, rel, findings, baseline);
+    scanFile(abs, rel, findings);
   }
 
   console.log("AI Types Public-API Boundary");
   console.log("=============================");
-  const fails = findings.filter((f) => f.severity === "fail");
-  const warns = findings.filter((f) => f.severity === "warn");
-  for (const f of fails) {
+  for (const f of findings) {
     console.log(`  [FAIL] ${f.file}:${f.line} — ${f.evidence}`);
   }
-  for (const w of warns) {
-    console.log(`  [warn] ${w.file}:${w.line} — ${w.evidence}`);
-  }
   console.log("");
-  console.log(`Failures: ${fails.length}`);
-  console.log(`Baseline warnings: ${warns.length}`);
-  if (fails.length > 0) {
+  console.log(`Failures: ${findings.length}`);
+  if (findings.length > 0) {
     console.log(
-      "FAIL — new AI Types boundary violation(s). Either migrate the import to `ai-types/public-api.ts` or add to scripts/baseline/ai-types-public-api-boundary.txt with a deadline-tracked LR entry.",
+      "FAIL — AI Types boundary violation(s). Migrate the import to `ai-types/public-api.ts`.",
     );
     process.exit(1);
   }
   console.log(
-    "OK — no new AI Types public-API boundary violations beyond the baseline.",
+    "OK — all AI Types imports go through the public-API surface.",
   );
   process.exit(0);
 }

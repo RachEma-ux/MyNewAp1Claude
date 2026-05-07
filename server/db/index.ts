@@ -16,4 +16,6 @@ export * from "./agents";
 export * from "./conversations";
 export * from "./workflows";
 export * from "./llms";
-export * from "../ai-types/db";
+// Plan v3 Phase 31 (Phase 26.1) — barrel re-export of ai-types/db stripped.
+// Catalog/taxonomy/audit helpers now live behind `ai-types/public-api.ts`;
+// import them explicitly from there. The boundary lint enforces this.

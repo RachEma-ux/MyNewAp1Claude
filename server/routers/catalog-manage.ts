@@ -46,7 +46,7 @@ import {
   getEntryClassifications,
   setEntryClassifications,
   seedTaxonomy,
-} from "../db";
+} from "../ai-types/public-api";
 import { createHash } from "crypto";
 
 /**

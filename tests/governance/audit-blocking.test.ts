@@ -18,7 +18,7 @@ import {
   updateCatalogEntry,
   approveCatalogEntry,
   getCatalogEntryVersions,
-} from "../../server/db/catalog";
+} from "../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("Audit Blocking — I6", () => {
   afterEach(async () => {
@@ -83,7 +83,7 @@ describe.runIf(hasDb)("Audit Blocking — I6", () => {
   });
 
   it("I6: second bundle supersedes the first", async () => {
-    const { getActiveBundleForEntry } = await import("../../server/db/catalog");
+    const { getActiveBundleForEntry } = await import("../../server/ai-types/public-api");
 
     const entry = await createTestEntry({
       entryType: "agent",

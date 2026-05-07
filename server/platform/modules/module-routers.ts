@@ -21,7 +21,7 @@ import { psRouter } from "../../ps/ps.router";
 import { hrRouter } from "../../hr/router";
 import { organizationManagementRouter } from "../../organization-management/router";
 import { cultureValuesRouter } from "../../culture-values/router";
-import { aiTypesRouter } from "../../ai-types/router";
+import { aiTypesRouter } from "../../ai-types/public-api";
 import { kgraAgentRouter } from "../../kgra-agent/router";
 import { communicationRouter } from "../../communication/router";
 import { pmCentralRouter } from "../../pm-central/router";

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { hasDb, cleanup, createTestEntry, makeEntryAvailable } from "./helpers/db-harness";
-import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry } from "../../../server/db/catalog";
+import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry } from "../../../server/ai-types/public-api";
 import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 import { getCatalogState } from "../../../shared/catalog-state";
 

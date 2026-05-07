@@ -13,7 +13,7 @@ import {
   createCatalogEntry,
   getCatalogEntryById,
   updateCatalogEntry,
-} from "../db";
+} from "./db";
 import { catalogEntries } from "../../drizzle/schema";
 import { getDb } from "../db/connection";
 import { eq, and } from "drizzle-orm";

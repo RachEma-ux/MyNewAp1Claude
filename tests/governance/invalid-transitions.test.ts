@@ -16,10 +16,10 @@ import {
   getCatalogEntryById,
   updateCatalogEntry,
   deleteCatalogEntry,
-} from "../../server/db/catalog";
+} from "../../server/ai-types/public-api";
 import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
-import { getCatalogEntries } from "../../server/db/catalog";
+import { getCatalogEntries } from "../../server/ai-types/public-api";
 
 describe.runIf(hasDb)("Invalid Transitions — Governance Guard", () => {
   afterEach(async () => {

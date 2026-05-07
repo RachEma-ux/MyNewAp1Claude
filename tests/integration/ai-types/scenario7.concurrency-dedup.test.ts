@@ -19,7 +19,7 @@ import {
   getCatalogEntries,
   getCatalogEntryById,
   updateCatalogEntry,
-} from "../../../server/db/catalog";
+} from "../../../server/ai-types/public-api";
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
@@ -72,7 +72,7 @@ describe.runIf(hasDb)("Scenario 7 — Concurrency + Dedup", () => {
   });
 
   it("concurrent bundle creation on same entry: latest wins", async () => {
-    const { getActiveBundleForEntry } = await import("../../../server/db/catalog");
+    const { getActiveBundleForEntry } = await import("../../../server/ai-types/public-api");
 
     const entry = await createTestEntry({
       entryType: "agent",
