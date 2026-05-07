@@ -269,6 +269,73 @@ export async function bootAgentStudio(): Promise<void> {
       },
     });
 
+    // PMB Phase 30.1 — workspace-default-binding admin surface.
+    // Three gateway actions wrap the upsert/delete/list primitives in
+    // workspace-default-bindings.ts (29.1b). Reads do not require receipts;
+    // writes do (D-WDB-7). The handlers do not return credential material.
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.workspaceDefaultBindings.list",
+      handler: async (input) => {
+        const { workspaceId } = input as { workspaceId: number };
+        if (typeof workspaceId !== "number")
+          throw new Error("workspaceId is required");
+        const { listWorkspaceDefaultBindings } = await import(
+          "./workspace-default-bindings"
+        );
+        return listWorkspaceDefaultBindings(workspaceId);
+      },
+      descriptor: {
+        key: "agentStudio.workspaceDefaultBindings.list",
+        description: "List workspace default provider bindings (all roles)",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.workspaceDefaultBindings.upsert",
+      handler: async (input) => {
+        const { upsertWorkspaceDefaultBinding } = await import(
+          "./workspace-default-bindings"
+        );
+        const payload = input as Parameters<
+          typeof upsertWorkspaceDefaultBinding
+        >[0];
+        return upsertWorkspaceDefaultBinding(payload);
+      },
+      descriptor: {
+        key: "agentStudio.workspaceDefaultBindings.upsert",
+        description:
+          "Set or update the workspace default provider binding for a role (chat / embedding / tool / classifier); calls Phase 8 eligibility gate",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.workspaceDefaultBindings.delete",
+      handler: async (input) => {
+        const { deleteWorkspaceDefaultBinding } = await import(
+          "./workspace-default-bindings"
+        );
+        const payload = input as Parameters<
+          typeof deleteWorkspaceDefaultBinding
+        >[0];
+        const removed = await deleteWorkspaceDefaultBinding(payload);
+        return { workspaceId: payload.workspaceId, role: payload.role, removed };
+      },
+      descriptor: {
+        key: "agentStudio.workspaceDefaultBindings.delete",
+        description:
+          "Clear the workspace default provider binding for a role (idempotent)",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
     // Plan v3 Phase 30 — Export Catalog gateway actions.
     registerPublicApi({
       module: "agentStudio",
