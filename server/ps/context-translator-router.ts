@@ -25,7 +25,7 @@ import {
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
 } from "../ai-types/service-runtime";
-import { getCatalogEntryById, getCatalogEntries } from "../ai-types/db";
+import { getCatalogEntryById, getCatalogEntries } from "../ai-types/public-api";
 import {
   getDefaultReasoningLlmRef,
   getDefaultReasoningProviderRef,

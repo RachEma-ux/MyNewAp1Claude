@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { eq, sql } from "drizzle-orm";
 import { createAppBlockerError } from "../_core/blockers";
-import { getActiveBundleForEntry, getCatalogEntryById } from "../ai-types/db";
+import { getActiveBundleForEntry, getCatalogEntryById } from "../ai-types/public-api";
 import { getDb } from "../db/connection";
 import {
   catalogEntries,

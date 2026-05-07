@@ -27,12 +27,9 @@ server/catalog-import/router.ts
 server/db.ts
 server/db/catalog.ts
 server/db/index.ts
-server/governance/router.ts
-server/llm/authority.ts
 server/modules/pmt/context-translator-agent.ts
 server/modules/pmt/idea-builder-agent.ts
 server/platform/modules/module-routers.ts
-server/providers/catalog-guard.ts
 server/providers/router.ts
 server/ps/context-translator-router.ts
 server/routers/agents.ts
