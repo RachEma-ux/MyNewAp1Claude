@@ -225,9 +225,10 @@ export const botsRouter = router({
    * Import a deployable bot into the Catalog as a candidate.
    * Mirrors models.importToCatalog and agents.importToCatalog.
    *
-   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
-   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`
-   * for the migration recipe. Removal is gated on caller migration (Phase 26.1).
+   * @deprecated Plan v3 Phase 47 / Phase 32 — thin wrapper around
+   * `aiTypes.catalog.register`. New callers should call the gateway
+   * action directly to avoid the wrapper hop.
+   * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`.
    */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
