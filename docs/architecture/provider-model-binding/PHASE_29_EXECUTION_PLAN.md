@@ -79,10 +79,10 @@ Shipped:
 The central new decision Phase 29 owns. Four of five callers have no workspace-scoped agent; they need a default binding to resolve.
 
 - [x] **29.1a — Decision record.** `WORKSPACE_DEFAULT_BINDING_DECISION.md` shipped, locking **D-WDB-1..8** (Option A: dedicated `ags_workspace_default_provider_bindings` table keyed by `(workspaceId, role)`; roles `chat`/`embedding`/`tool`/`classifier`; read API at `server/agent-studio/workspace-default-bindings.ts`; operator-applied migration per #223 lesson; D-WDB-5 documents the `workspaceId` threading required for LR-02 / LR-04).
-- [ ] **29.1b — Implementation per ADR.** Drizzle table declaration in `drizzle/tables/agent-studio.ts` + operator-applied SQL at `scripts/migrations/manual/workspace-default-provider-bindings.sql` + `resolveWorkspaceDefaultBinding` read API + unit tests + smoke verification (`\d` confirms table on local ASDB).
-- [ ] **Acceptance:** ADR locked (29.1a ✓); primitive lands; tests cover the lookup path.
-- [ ] **Estimate:** 1–2 PRs, ~250 LOC.
-- [ ] **Pause if:** ~~the §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers~~ — closed at 29.1a: D-WDB-1 picks Option A; D-WDB-5 documents the per-caller threading.
+- [x] **29.1b — Implementation per ADR.** Shipped: Drizzle table `agsWorkspaceDefaultProviderBindings` in `drizzle/tables/agent-studio.ts` + operator-applied SQL at `scripts/migrations/manual/workspace-default-provider-bindings.sql` + read API `resolveWorkspaceDefaultBinding` + internal write helpers `upsertWorkspaceDefaultBinding` / `deleteWorkspaceDefaultBinding` / `listWorkspaceDefaultBindings` + 18 unit tests covering all D-WDB-3 reasons + role lattice + write-path eligibility gate + credential-shape audit.
+- [x] **Acceptance:** ADR locked (29.1a ✓); primitive lands (29.1b ✓); 18/18 tests green; `pnpm run check` clean.
+- [ ] **29.1c — Admin surface (deferred follow-up).** Gateway action `agentStudio.workspaceDefaultBindings.set` + tRPC endpoint + admin UI for setting per-role workspace defaults. Per D-WDB-7 the writes need a receipt descriptor; the internal write helpers (`upsertWorkspaceDefaultBinding` etc.) are already in place. **Not blocking** the 4 caller-migration sub-phases — they consume the read API only; admins set defaults via direct SQL or by calling the internal write helpers from a one-off script until 29.1c lands.
+- [ ] **Pause if:** ~~the §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers~~ — closed at 29.1a (D-WDB-1 picks Option A; D-WDB-5 documents the per-caller threading).
 
 ### 29.2 — `providerRouter` migration ADR
 

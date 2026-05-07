@@ -1310,6 +1310,65 @@ export type AgsAgentProviderBinding = typeof agsAgentProviderBindings.$inferSele
 export type InsertAgsAgentProviderBinding =
   typeof agsAgentProviderBindings.$inferInsert;
 
+// ── PMB Phase 29.1b: workspace default provider bindings ────────────────────
+//
+// Phase 29's central new primitive (D-WDB-1..8 in
+// `docs/architecture/provider-model-binding/WORKSPACE_DEFAULT_BINDING_DECISION.md`).
+// Workspace-default Provider Connection lookup keyed by `(workspaceId, role)`.
+//
+// Consumed by the 4 deferred Phase 29 caller migrations (LR-02 / LR-03 /
+// LR-04 / LR-08) — all callers that have no AS draft id at the call site,
+// just a workspace context.
+//
+// Critical invariants (mirrored from `agsAgentProviderBindings`):
+//   - NO secret-shaped column. Credentials live exclusively in
+//     `provider_secrets` (Provider Connections module). The reader
+//     projection at `server/agent-studio/workspace-default-bindings.ts`
+//     never returns an apiKey-shaped field.
+//   - `workspaceId` is a SOFT FK (no PG constraint) — workspaces live on
+//     the main DB, not ASDB (Phase 12.5 boundary).
+//   - `role` is a free TEXT column, not an enum — D-WDB-4 enumerates the
+//     contract roles (`chat` / `embedding` / `tool` / `classifier`) but
+//     adding a role does not require a migration.
+//
+export const agsWorkspaceDefaultProviderBindings = pgTable(
+  "ags_workspace_default_provider_bindings",
+  {
+    id: serial("id").primaryKey(),
+
+    workspaceId: integer("workspace_id").notNull(),
+    /**
+     * D-WDB-4: contract roles are `chat` | `embedding` | `tool` | `classifier`.
+     * Stored as varchar so future role values can be added without a
+     * migration; the application layer enforces the role lattice.
+     */
+    role: varchar("role", { length: 32 }).notNull(),
+
+    providerConnectionId: integer("provider_connection_id").notNull(),
+    providerCatalogEntryId: integer("provider_catalog_entry_id"),
+    /** e.g. "gpt-4o-mini", "text-embedding-3-small". */
+    modelRef: varchar("model_ref", { length: 255 }).notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    /** Optional audit pointer; nullable so platform-installed defaults can omit it. */
+    updatedBy: integer("updated_by"),
+  },
+  (t) => ({
+    workspaceRoleIdx: uniqueIndex(
+      "uniq_ags_workspace_default_bindings_ws_role",
+    ).on(t.workspaceId, t.role),
+    providerConnectionIdx: index(
+      "idx_ags_workspace_default_bindings_provider_connection",
+    ).on(t.providerConnectionId),
+  }),
+);
+
+export type AgsWorkspaceDefaultProviderBinding =
+  typeof agsWorkspaceDefaultProviderBindings.$inferSelect;
+export type InsertAgsWorkspaceDefaultProviderBinding =
+  typeof agsWorkspaceDefaultProviderBindings.$inferInsert;
+
 // ── Plan v3 Phase 40: catalog-sync log ──────────────────────────────────────
 //
 // Persisted log of `aiTypes.catalog.{registered,published,deprecated}` events
