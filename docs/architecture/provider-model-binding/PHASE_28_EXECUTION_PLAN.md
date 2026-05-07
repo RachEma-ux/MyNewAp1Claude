@@ -126,20 +126,18 @@ All three callers share the workspace-default-binding upstream dependency that d
 
 **Closed by:** scope deferral lands as part of 28.4 / 28.5 paired updates in the Phase 28 plan. No separate evidence doc needed beyond the embed decision record (which already captures the LR-04 reclassification).
 
-### 28.6 — Model Access streaming-with-tool-calls + MCP-bridge primitive
+### 28.6 — Model Access openllm-agent bridge primitive `[bundle]`
 
-The largest new Model Access surface. LR-01 (simulation) is the only caller, but the primitive itself is reusable for any future tool-loop runtime.
+**Scope reality check during 28.6a (28.6's decision record):** the original plan named two primitives (streaming-with-tool-calls + MCP-bridge). Investigation showed:
 
-Two physical primitives are likely needed:
+- `runViaOpenAIDirect` is non-streaming single-turn — the existing `execute` primitive covers it. No new primitive needed.
+- `runViaOpenllmAgent` is the actual complexity (WebSocket bridge with `permissionResolver` callback, MCP-server `configure_session`, typed event stream). One primitive, not two.
 
-1. **Streaming-with-tool-calls** — token-by-token streaming + tool-call deltas + tool-result interleaving. Today's `modelAccess.stream` is streaming-only with no tool-call support.
-2. **MCP-bridge** — bridge into the openllm-agent2 WebSocket runtime that simulation uses. The bridge handles the `permissionResolver` callback shape that today flows through the AS adapter.
+There is no current consumer for a generic streaming-with-tool-calls primitive — building one now violates "don't add features beyond what the task requires." 28.6 ships **only the openllm-agent bridge primitive**.
 
-- [ ] **28.6a — Decision record.** Author `docs/architecture/provider-model-binding/MODEL_ACCESS_TOOL_LOOP_DECISION.md` (D-MA-TOOL-1..N): primitive shape, where the WebSocket bridge lives (Model Access vs. a sibling module), `permissionResolver` callback contract, MCP server lifecycle, governance/receipt policy.
-- [ ] **28.6b — Streaming-with-tool-calls primitive.** New action `openRouter.modelAccess.streamWithTools` in `server/openrouter/model-access/stream-with-tools.ts`. Returns an async-iterator of typed deltas (`{kind:"text",text} | {kind:"tool_call_delta",...} | {kind:"tool_result_request",...}`). Direct streaming consumers can import from `server/openrouter/model-access` per the existing pattern.
-- [ ] **28.6c — MCP-bridge primitive.** Either a new `modelAccess.runViaMcpBridge` action OR a sibling `server/openrouter/model-access/mcp-bridge.ts` module (decided in 28.6a). Hosts the WebSocket lifecycle the AS adapter holds today.
-- [ ] **28.6d** — Tests: tool-call stream parsing, tool-result round-trip, permission-resolver invocation, MCP-bridge connect/disconnect/refusal modes.
-- [ ] **Acceptance:** primitives land with full test coverage; decision doc references the locked DRs.
+- [x] **28.6a — Decision record.** `MODEL_ACCESS_TOOL_LOOP_DECISION.md` locks D-MA-TOOL-1..8: direct-import shape (mirroring `stream()` precedent because `permissionResolver` callback can't pass through gateway-call serialization), location inside Model Access subtree (D2 boundary requirement), `permissionResolver` callback contract unchanged from today, input/output shape via `withProviderCredential`, hybrid receipt policy (callers gate upstream), MCP-server lifecycle preserved (configure_session sent when array non-empty), bridge does NOT do multi-turn tool loops.
+- [ ] **28.6b — Implementation + tests.** New `server/openrouter/model-access/run-via-openllm-bridge.ts` (~300 LOC, relocate-and-rewire from the AS adapter); test file mirrors the existing adapter tests; `types.ts` additions; `index.ts` re-export. AS adapter loses `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveProviderApiKey` (those die in 28.7); retains URL derivation helpers until simulation stops importing them.
+- [ ] **Acceptance:** primitive lands with test coverage matching today's adapter; `pnpm run check` clean; `MODEL_ACCESS_CONTRACT.md` documents the new direct-import surface.
 - [ ] **Authority:** full autonomous merge.
 
 ### 28.7 — LR-01 simulation migration
