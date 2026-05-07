@@ -197,76 +197,71 @@ export async function executeSendEmail(node: any, context: ExecutionContext): Pr
 }
 
 /**
- * Invoke Agent Action Executor
+ * Invoke Agent Action Executor.
+ *
+ * **PMB Phase 29.6b (LR-08 closure — Path B):** the legacy `agents`
+ * table is the pre-Agent-Studio orchestration system, marked out of
+ * retrofit scope by `CLAUDE.md` ("`server/agents/` — Legacy agent
+ * orchestration (pre-Agent-Studio; out of retrofit scope)"). Per
+ * D-PR-5 in `PROVIDER_ROUTER_MIGRATION_DECISION.md`, the path forward
+ * for `executeInvokeAgent` is Path B (refuse): return `binding_required`
+ * for legacy `agents`-table rows; admins migrate the workflow to an
+ * Agent Studio agent.
+ *
+ * Path B was preferred over Path A (backfill an AS draft on first
+ * invocation) and Path C (dual-table support keeping `getProviderRegistry()`
+ * alive in this one path). Path A is non-trivial for code explicitly
+ * marked out-of-retrofit-scope; Path C re-introduces the D1-violation
+ * registry path AT THE TIME we're closing it.
+ *
+ * Pre-condition check (run before promoting to production): enumerate
+ * active automation workflows that hit `executeInvokeAgent` with a
+ * legacy `agentId` from the `agents` table. If non-zero, an operator
+ * needs to either delete the workflow or migrate the legacy agent into
+ * Agent Studio before this code path can be exercised cleanly.
+ *
+ *   SELECT COUNT(*) FROM workflow_executions
+ *    WHERE workflow_id IN (
+ *      SELECT workflow_id FROM workflow_blocks
+ *       WHERE block_type = 'invokeAgent'
+ *         AND data->>'agentId' IS NOT NULL
+ *    );
  */
 export async function executeInvokeAgent(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[InvokeAgent] Executing node ${node.id}`);
-  
+
   const { agentId, input } = node.data || {};
-  
+
   if (!agentId) {
     throw new Error("Invoke Agent: agentId is required");
   }
-  
+
   const db = getDb();
   if (!db) {
     throw new Error("Database not available");
   }
-  
-  // Fetch agent from database
+
+  // Fetch agent from legacy `agents` table for the surfacing message.
   const agents: any = await db.execute(
-    sql`SELECT * FROM agents WHERE id = ${agentId}`
+    sql`SELECT * FROM agents WHERE id = ${agentId}`,
   );
-  
   const agent = agents[0][0];
-  if (!agent) {
-    throw new Error(`Agent ${agentId} not found`);
-  }
-  
-  // Execute the agent by sending input to its configured provider
-  const { getProviderRegistry } = await import("../providers/registry");
-  const registry = getProviderRegistry();
-  const providers = registry.getAllProviders();
+  const agentName = agent?.name ?? `agent #${agentId}`;
 
-  if (providers.length === 0) {
-    return {
-      agentId,
-      agentName: agent.name,
-      input,
-      output: "No LLM providers available to execute agent",
-      executedAt: new Date(),
-    };
-  }
-
-  try {
-    const provider = providers[0];
-    const systemPrompt = agent.systemPrompt || `You are ${agent.name}.`;
-    const response = await provider.generate({
-      messages: [
-        { role: "system" as const, content: systemPrompt },
-        { role: "user" as const, content: typeof input === "string" ? input : JSON.stringify(input) },
-      ],
-    });
-
-    return {
-      agentId,
-      agentName: agent.name,
-      input,
-      output: response.content,
-      model: response.model,
-      usage: response.usage,
-      executedAt: new Date(),
-    };
-  } catch (error: any) {
-    return {
-      agentId,
-      agentName: agent.name,
-      input,
-      output: `Agent execution failed: ${error.message}`,
-      executedAt: new Date(),
-      error: error.message,
-    };
-  }
+  // Path B (refuse): return a soft-error result. The workflow
+  // execution engine surfaces this via the result payload's `error`
+  // field; CI/UI can detect it and prompt the operator.
+  return {
+    agentId,
+    agentName,
+    input,
+    output:
+      `Agent execution refused: legacy agents-table row #${agentId} cannot be invoked post-PMB-Phase-29.6b. ` +
+      `Path B (refuse) — D-PR-5 in PROVIDER_ROUTER_MIGRATION_DECISION.md. ` +
+      `Migrate this agent to Agent Studio (server/agent-studio/) and update the workflow to reference the new draft id.`,
+    executedAt: new Date(),
+    error: "legacy_agents_table_unsupported",
+  };
 }
 
 /**
