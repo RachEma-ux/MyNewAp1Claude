@@ -18,7 +18,7 @@ import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 import { decrypt, isEncrypted } from "../_core/encryption";
 import { getAuditLogger } from "../services/auditLogger";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
+import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/public-api";
 import { getCatalogState } from "@shared/catalog-state";
 import type { Provider } from "../../drizzle/schema";
 

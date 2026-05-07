@@ -20,7 +20,7 @@
 
 import { getAvailableProvider, callLLM, parseLLMJson } from "./idea-builder-agent";
 import type { Message } from "../../providers/types";
-import { createCatalogEntry, updateCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/db";
+import { createCatalogEntry, updateCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/public-api";
 import type { TranslateResponse, QuestionTableRow, AnsweredQuestionRow, QuestionTableResponse, ClarificationPayload, ClarificationChoiceGroup, ClarificationOption, ClarificationSubmission } from "@shared/ps-context-translator-types";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
