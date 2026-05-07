@@ -566,12 +566,13 @@ export const agentsRouter = router({
     }),
 
   /**
-   * @deprecated Plan v3 Phase 47 — bypasses `aiTypes.catalog.register`.
-   * Use the gateway action `aiTypes.catalog.register` (Phase 25) instead,
-   * which runs the duplicate-prevention guard, threads governance receipts,
-   * and emits `aiTypes.catalog.registered` for downstream subscribers.
+   * @deprecated Plan v3 Phase 47 / Phase 32 — thin wrapper around
+   * `aiTypes.catalog.register`. Phase 32 migrated the body to delegate
+   * to the canonical gateway action; this procedure exists only for
+   * backward-compat with existing UI callers. New code should call
+   * `aiTypes.catalog.register` (Phase 25) directly to avoid the
+   * wrapper hop.
    * See `docs/architecture/provider-model-binding/LEGACY_PATH_DEPRECATION.md`.
-   * Removal is gated on caller migration (Phase 26.1).
    */
   importToCatalog: governedProcedure
     .input(z.object({ id: z.number() }))
