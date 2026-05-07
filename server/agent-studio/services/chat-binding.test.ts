@@ -296,7 +296,22 @@ describe("sendChatMessage — tool-call binding path (Phase 18)", () => {
         {
           name: "echo",
           description: "echoes args",
-          inputSchema: { type: "object", properties: {} },
+          // Plan v3 Phase 33: the schema must list every parameter the
+          // test feeds through `arguments`. The Phase-18 ProposedToolCall
+          // validator rejects `invented_parameter` for any arg key not
+          // declared in `inputSchema.properties` (defense-in-depth
+          // against model-fabricated args).
+          inputSchema: {
+            type: "object",
+            properties: { x: { type: "number" } },
+          },
+          // Plan v3 Phase 33: D-TOOL-1's quarantined-by-default validator
+          // (`services/cag/risk-classifier.ts:48`) requires every tool to
+          // carry an explicit `riskClass`; tools without one are
+          // default-denied. Real MCP tools self-declare per the spec —
+          // mirror that here so the validator passes through to the
+          // dispatcher.
+          riskClass: "read_only",
         },
       ],
     });

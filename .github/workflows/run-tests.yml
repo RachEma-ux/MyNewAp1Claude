@@ -88,11 +88,10 @@ jobs:
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
 
-      # ── Layer 5: PMB Unit Tests (Phase 30.4) ───────────────────────
+      # ── Layer 5: PMB Unit Tests (Phase 30.4 + Phase 33) ────────────
       # Targeted curated subset of `server/**/*.test.ts` covering the
       # Provider/Model Binding contract surface. NOT the whole
-      # `server/**` tree — that includes the still-broken
-      # chat-binding.test.ts tool-loop tests deferred as a §B-followup.
+      # `server/**` tree (147 files; most aren't PMB-relevant).
       # Per the project's standing OOM-safe pattern (CLAUDE.md):
       # `--pool=forks --poolOptions.forks.singleFork`.
       #
@@ -104,10 +103,14 @@ jobs:
       #   - openrouter/model-access/run-via-openllm-bridge.test.ts (Phase 28.6b)
       #   - openrouter/model-access/embed.test.ts (Phase 28.4)
       #   - providers/pricing.test.ts (Phase 30.2)
+      #   - agent-studio/services/chat-binding.test.ts (Phase 33 —
+      #     was deferred since Phase 28; tool-loop tests fixed by
+      #     adding D-TOOL-1 `riskClass: "read_only"` to the test mock)
       - name: PMB unit tests (Layer 5)
         run: |
           npx vitest run \
             server/agent-studio/workspace-default-bindings.test.ts \
+            server/agent-studio/services/chat-binding.test.ts \
             server/embeddings/service.test.ts \
             server/operators/provider-hub.test.ts \
             server/openrouter/manifest-receipt-policy.test.ts \
