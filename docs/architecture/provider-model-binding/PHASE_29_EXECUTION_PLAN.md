@@ -1,0 +1,271 @@
+# Phase 29 — Execution Plan
+
+**Captured:** 2026-05-07 against `main@5a75613` (post-Phase-28 closure).
+**Branch (this doc):** `docs/pmb-phase-29-0-execution-plan`.
+**Owner:** Planner role per AGENTS.md; full autonomous-execution authority granted by user 2026-05-07.
+
+**Supersedes** `PHASE_29_SCOPING.md`, which captured the Phase-28-deferral-era scope. This doc is the plan-frozen authoritative source going forward.
+
+---
+
+## 1. Why Phase 29 exists
+
+Phase 28 closed with **2 LRs migrated** (LR-06 extracted; LR-09 was already fixed by PR #100), **2 new Model Access primitives** (`embed` + `runViaOpenllmBridge`), and **4 LRs deferred to Phase 29**. The deferrals share one structural theme: they're **caller-side migrations** — the consumers of Model Access need workspace/binding wiring that Phase 28's primitive-layer scope didn't fit.
+
+| LR | Caller | Primitive | Workspace context? |
+|---|---|---|---|
+| LR-01 | `agent-studio/services/simulation.ts:567, 808, 826` | `runViaOpenllmBridge` (28.6b) + `execute` (existing) | **Has `draft.id`** — independent of §29.1 |
+| LR-02 | `embeddings/service.ts:54, 59` | `openRouter.modelAccess.embed` (28.4) | None |
+| LR-03 | `documents/processor.ts:339` | Closes transitively with LR-02 | None |
+| LR-04 | `operators/provider-hub.ts:78` | `openRouter.modelAccess.execute` (existing; reclassified from "embedding" in 28.4) | None |
+| LR-08 | `chat/stream.ts:70` + `automation/block-executors.ts:228` | `execute`/`stream` (existing) + routing-layer migration | None |
+
+**The unifying decision:** §29.1 — workspace-default-binding. Four of the five callers have **no workspace-scoped agent** to resolve a binding from. They need a "platform default" or "workspace default" binding concept that doesn't exist today.
+
+**The other big rewrite:** §29.2/29.3 — `providerRouter`. Phase 28.3's scope discovery showed that `server/inference/provider-router.ts:resolvePlan` itself reads `getProviderRegistry()` at lines 17, 137, 205. Closing LR-08 cleanly requires migrating this routing layer to Model Access, not just rewiring the two LR-08 call sites.
+
+---
+
+## 2. Scope and out-of-scope
+
+### In scope
+
+- **5 caller migrations** (LR-01, LR-02 + LR-03 transitive, LR-04, LR-08).
+- **§29.1 workspace-default-binding** decision + schema/migration (or platform-agent pattern, decided in 29.1 ADR).
+- **§29.2/29.3 `providerRouter` routing-layer** migration onto Model Access.
+- **Boundary lint allowlist purge** for LR-01/02/03/04 entries (LR-08 has no boundary entry — its registry consumption is one layer down).
+- **Live-smoke discipline** for the 5 caller migrations: each PR's test plan includes a smoke step against the dev server. CI green is necessary but insufficient; smoke-test results take precedence.
+
+### Out of scope
+
+- D2 multi-region deployment (CLAUDE.md deferral).
+- D-PARSE-DOCX-N, D-PARSE-OCRPDF-N parsers (CLAUDE.md deferrals).
+- Frontend Module-Gateway plan (`FUTURE_FRONTEND_TRPC_CLEANUP.md`).
+- The `code-studio/opencode/provider-sync.ts` legacy `providers`-table reader (different threat model; will outlive Phase 29).
+- The `kgra-agent/nodes.ts` providers-list reader (also out of D1 violation scope — it just lists names/types).
+- Issue #226 drizzle-kit metadata drift (separate filed issue).
+
+### Plan v3 follow-ups (separate plans)
+
+- Phase 26.1 barrel-strip + caller migration.
+- Direction B's D-LC-5 promotion of `deprecateCatalogEntry`.
+
+---
+
+## 3. Sub-phase decomposition
+
+Cheap-dependency-first ordering. **LR-01 ships first** because it's independent of §29.1.
+
+### 29.0 — Plan freeze (this PR)
+
+- [ ] Land `PHASE_29_EXECUTION_PLAN.md` (this doc); supersede `PHASE_29_SCOPING.md` with a header note.
+- [ ] Update `LEGACY_EXCEPTION_REGISTER.md` Phase 29 sub-phase mapping table to point at this plan doc.
+- [ ] **Acceptance:** doc lands; `pnpm run check` clean; CI green.
+
+### 29.0a — LR-01 simulation migration `[bundle]`
+
+Independent of §29.1 — `simulation.ts` already has `draft.id` in scope and AS agents have bindings via Plan v3 Phase 11.
+
+- [ ] **29.0a.1 — Migrate `simulation.ts`** call sites (lines 567, 808, 826). Replace `resolveOpenllmEndpoint(providerConfig)` with `resolveForRun({draftId})` lookup. Replace `runViaOpenAIDirect(...)` with `gatewayCall` to `openRouter.modelAccess.execute`. Replace `runViaOpenllmAgent(...)` with direct-import of `runViaOpenllmBridge`. Reshape ~6 metadata-payload references (`endpoint.source`, `endpoint.wsUrl`, `endpoint.provider`, `endpoint.model`).
+- [ ] **29.0a.2 — Adapter dead-code purge.** Delete `runViaOpenllmAgent`, `runViaOpenAIDirect`, `resolveProviderApiKey`, `resolveOpenllmEndpoint` from `agent-studio/adapters/openllm-runtime-adapter.ts`. Delete `agent-studio/adapters/openai-direct-adapter.ts` entirely. Update `chat-binding.test.ts` mock (drop `resolveProviderApiKey` mock).
+- [ ] **29.0a.3 — Stale-comment cleanup.** Update `chat.ts:17, 32, 35`, `api/router.ts:1925`, `code-studio/opencode/provider-sync.ts:110` — references to deleted functions.
+- [ ] **29.0a.4 — Boundary updates.** Purge LR-01 allowlist entry from `check-provider-key-env-boundary.ts`. Update `tests/pmb/boundary.test.ts:345-356` tripwire (was checking imports of `resolveProviderApiKey`; now asserts the function is gone from the codebase).
+- [ ] **29.0a.5 — Register update.** LR-01 row → `migrated`.
+- [ ] **Acceptance:** boundary lint green without LR-01 allowlist entry; `pnpm run check` clean; **live-smoke required** — exercise an agent simulation in dev to confirm the bridge primitive replaces the deleted adapter behavior cleanly.
+- [ ] **Authority:** full autonomous merge (within Phase 29 grant).
+- [ ] **Estimate:** 1–2 PRs, ~300 LOC across 8+ files.
+
+### 29.1 — Workspace default binding ADR + schema
+
+The central new decision Phase 29 owns. Four of five callers have no workspace-scoped agent; they need a default binding to resolve.
+
+- [ ] **29.1a — Decision record.** Author `WORKSPACE_DEFAULT_BINDING_DECISION.md` (D-WDB-1..N): which path to take? **Three options to evaluate:**
+  - **(A)** New table `workspace_default_provider_bindings` — explicit (workspace_id, role) → providerConnectionId mapping. Schema work + migration.
+  - **(B)** Platform-agent pattern — synthetic AS agent owned by workspace whose binding IS the workspace default. No schema change; reuses existing AS binding infra.
+  - **(C)** Per-caller default — each caller picks its own default policy. No new shared infra.
+- [ ] **29.1b — Implementation per ADR.** Schema migration if needed (manual SQL per #223 lesson — ASDB doesn't run drizzle); read API; unit tests.
+- [ ] **Acceptance:** ADR locked; primitive lands; tests cover the lookup path.
+- [ ] **Estimate:** 1–2 PRs, ~150–250 LOC.
+- [ ] **Pause if:** the §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers. Surface options instead of forcing a fit.
+
+### 29.2 — `providerRouter` migration ADR
+
+- [ ] **29.2a — Decision record.** Author `PROVIDER_ROUTER_MIGRATION_DECISION.md` (D-PR-1..N): does `providerRouter` survive as a routing+selection layer that delegates to Model Access for the actual upstream call, or does it dissolve entirely with callers calling Model Access directly? Plus: what to do about the legacy `agents` table in `executeInvokeAgent` (Path A backfill / Path B refuse / Path C dual-table support).
+- [ ] **Estimate:** 1 PR, ~100 LOC ADR.
+- [ ] **Pause if:** neither dissolve nor layer-over is obviously cheaper.
+
+### 29.3 — `providerRouter` implementation
+
+- [ ] **29.3a — Implement per 29.2 ADR.** If "layer over": rewire `resolvePlan` to invoke Model Access internally. If "dissolve": migrate the 3 callers (chat-stream, batch service, hybrid router — verify list during 29.3 prep).
+- [ ] **29.3b — Tests.** Unit tests for the routing path's new shape.
+- [ ] **Acceptance:** `getProviderRegistry()` consumption inside `provider-router.ts` removed (or the file is deleted); CI green.
+- [ ] **Estimate:** 2–3 PRs, ~300–500 LOC.
+
+### 29.4 — LR-02/03 embeddings caller migration
+
+Depends on §29.1 (workspace-default binding lookup).
+
+- [ ] **29.4a — Migrate `embeddings/service.ts`.** Replace `process.env.OPENAI_API_KEY` + `new OpenAI(...)` with `gatewayCall` to `openRouter.modelAccess.embed`. Resolve binding via §29.1 lookup. Service signature stays compatible.
+- [ ] **29.4b — Verify LR-03 closes transitively.** `documents/processor.ts:339` calls `getEmbeddingService()` — should work unchanged once LR-02 closes.
+- [ ] **29.4c — Boundary purge.** Remove LR-02 + LR-03 allowlist entries.
+- [ ] **Acceptance:** boundary lint green; **live-smoke required** — exercise document upload + RAG retrieval in dev.
+- [ ] **Estimate:** 1 PR, ~150 LOC.
+
+### 29.5 — LR-04 operators caller migration
+
+Depends on §29.1.
+
+- [ ] **29.5a — Migrate `operators/provider-hub.ts:78`.** This is a **chat-completion** caller (`/v1/chat/completions` with `gpt-4o-mini`), reclassified in 28.4 from the original "embedding-endpoint" grouping. Replace with `gatewayCall` to `openRouter.modelAccess.execute`. Resolve binding via §29.1.
+- [ ] **29.5b — Boundary purge.** Remove LR-04 allowlist entry.
+- [ ] **Acceptance:** boundary lint green; **live-smoke required** — exercise an operator (e.g., classifier or summarizer) in dev.
+- [ ] **Estimate:** 1 PR, ~150 LOC.
+
+### 29.6 — LR-08 `/api/chat/stream` + `executeInvokeAgent`
+
+Depends on §29.1 + §29.2/29.3.
+
+- [ ] **29.6a — Migrate `chat/stream.ts`.** Resolve binding via §29.1 (workspace default). Replace `getProviderRegistry()` + `provider.generateStream(...)` with Model Access streaming call. Preserve SSE shape, RAG-context injection, cost tracking, unified-routing audit reasons.
+- [ ] **29.6b — Migrate `automation/block-executors.ts:executeInvokeAgent`.** Per §29.2 Path A/B/C: backfill AS draft / refuse legacy / dual-table support. Replace `getProviderRegistry()` with `resolveForRun` (or §29.1 default) + `gatewayCall` to `execute`.
+- [ ] **29.6c — `chat-binding.test.ts` cleanup.** The "fall through to legacy path" tests at lines 184–211 reference behavior that no longer exists. Either delete or rewrite to assert the post-Phase-29 shape.
+- [ ] **Acceptance:** boundary lint green (no LR-08 allowlist entry to purge — the violation was always one layer down); **live-smoke required** — exercise the legacy chat UI at `client/src/pages/Chat.tsx` and an automation workflow that uses `executeInvokeAgent`.
+- [ ] **Estimate:** 1–2 PRs, ~300 LOC.
+
+### 29.7 — Boundary-lint allowlist purge
+
+- [ ] Final allowlist sweep — confirm LR-01/02/03/04 entries removed (each sub-phase did its own; this is the audit gate). Remaining entries: only `<seed-script>` for `seed-from-env.ts` (PMB-D1-EXEMPT).
+- [ ] Update boundary lint comments to reflect closure.
+- [ ] **Acceptance:** `pnpm exec tsx scripts/check-provider-key-env-boundary.ts` passes with the leanest allowlist since Phase 5 stub creation.
+- [ ] **Estimate:** 1 PR, ~50 LOC.
+
+### 29.8 — Closure report + register reconciliation
+
+- [ ] Author `docs/evidence/provider-model-binding/PHASE_29_CLOSURE_REPORT.md` mirroring `PHASE_28_CLOSURE_REPORT.md`. Inventory: every LR row at start of Phase 29 → final state; boundary lint diff; PR ledger; new ADRs.
+- [ ] Update `LEGACY_EXCEPTION_REGISTER.md` aggregate counts.
+- [ ] Update memory: `project_phase_29_authority.md` flipped to CLOSED.
+- [ ] **Acceptance:** all 5 deferred LR rows flipped from `open` to `migrated`.
+- [ ] **Estimate:** 1 PR, ~250 LOC docs.
+
+---
+
+## 4. Decision matrix
+
+Mirrors `PHASE_28_EXECUTION_PLAN.md` §4. Cap: **zero new TEMPORARY_EXCEPTION_WITH_DEADLINE entries** unless plan triggers a pause.
+
+| # | Path | Register | Decision | Sub-phase | Risk |
+|---|---|---|---|---|---|
+| 1 | `simulation.ts:808, 826` | LR-01 | MIGRATE_TO_MODEL_ACCESS via `execute` + `runViaOpenllmBridge` | 29.0a | Medium — no simulation runtime tests; live-smoke is the catch. |
+| 2 | `embeddings/service.ts:54, 59` | LR-02 | MIGRATE_TO_MODEL_ACCESS via `embed` (Phase 28.4 primitive) | 29.4a | Low — single hard-coded var; primitive is straightforward. |
+| 3 | `documents/processor.ts:339` | LR-03 | TRANSITIVE_CLOSE via LR-02 | 29.4b | Low. |
+| 4 | `operators/provider-hub.ts:78` | LR-04 | MIGRATE_TO_MODEL_ACCESS via `execute` (existing primitive) | 29.5a | Low. |
+| 5 | `chat/stream.ts:70` | LR-08 | MIGRATE_TO_MODEL_ACCESS via `stream` (existing) | 29.6a | Medium — live chat UI consumer; live-smoke required. |
+| 6 | `automation/block-executors.ts:228` | LR-08 | MIGRATE_TO_MODEL_ACCESS via `execute`; legacy-`agents`-table strategy per §29.2 | 29.6b | Medium — automation workflows; live-smoke required. |
+| 7 | `inference/provider-router.ts:17, 137, 205` | LR-08 (transitive) | MIGRATE OR DISSOLVE per §29.2 | 29.3 | Medium — workspace-routing infrastructure. |
+
+**Cap: 0 / 1 allowed new exceptions.** All decisions are MIGRATE; no deferrals planned. Pause and surface if any sub-phase wants to introduce a new TEMPORARY_EXCEPTION.
+
+---
+
+## 5. Test strategy
+
+### Per sub-phase
+
+- **29.0a (LR-01 simulation):** TypeScript catches missed `endpoint.X` references at compile time. Boundary lint catches `resolveProviderApiKey` re-introduction. **Live-smoke required:** run an agent simulation in dev with mock+live runtime modes; confirm the new bridge primitive produces the same trace shape.
+- **29.1 (default binding):** unit tests for the lookup path; integration tests if a new schema lands.
+- **29.2/29.3 (providerRouter):** unit tests for the new routing shape; integration tests against `/api/chat/stream` end-to-end after 29.6a lands.
+- **29.4 (embeddings):** unit tests for the migrated `generateEmbedding(text)` path; integration test gated by `describe.skipIf(!hasOpenAIKey())`.
+- **29.5 (operators):** unit tests for `callProviderHub({operator, ...})`; integration test against a known operator.
+- **29.6 (chat-stream + executeInvokeAgent):** existing tests in `chat-binding.test.ts` need cleanup; new tests for the workspace-default-binding integration.
+
+### Cross-cutting
+
+- **Boundary lint:** every sub-phase that purges an allowlist entry runs `pnpm exec tsx scripts/check-provider-key-env-boundary.ts` post-migration.
+- **CI fingerprint:** Phase 29 baseline is **5/5 green** (Phase 28 close-out at `5a75613`). Any sub-phase that regresses below 5/5 pauses for diagnosis; per-shard flake protocol applies (memory: `feedback_ci_test_shard_flakes.md`).
+- **Live-smoke discipline:** sub-phases 29.0a, 29.4, 29.5, 29.6 all require live-app smoke verification per the Phase 28 closure-report lesson. CI green is necessary but insufficient.
+
+---
+
+## 6. Open questions (resolved during execution)
+
+### 6.1 — Workspace-default-binding shape
+
+Three options laid out in §29.1a. Default decision: choose the option that minimizes new schema work AND fits all 4 non-LR-01 callers. If no option fits all 4, surface the conflict before locking.
+
+### 6.2 — `providerRouter`: dissolve or layer?
+
+Decision lands in 29.2. Tentative: **layer over** Model Access — `resolvePlan` keeps its routing/selection contract but invokes `modelAccess.execute|stream` internally instead of provider-registry calls. This preserves the existing chat-stream + batch-service + hybrid-router contracts. **Re-evaluate once 29.6 prep maps the 3 known callers** — if dissolution is cheaper because callers can call Model Access directly, that path wins.
+
+### 6.3 — `executeInvokeAgent` legacy-`agents`-table strategy
+
+Three paths in §29.2:
+- **Path A (backfill):** create an AS draft on first invocation. Adds migration logic.
+- **Path B (refuse):** return `binding_required` for legacy `agents` table rows. Simplest; might break automation workflows in dev.
+- **Path C (dual-table):** keep registry path for legacy agents + Model Access path for AS agents. Preserves back-compat at the cost of keeping `getProviderRegistry()` alive in this one path.
+
+**Default decision:** Path B if no production automation workflows depend on legacy `agents`; Path C if they do. **Verify in 29.6b prep** by querying ASDB for legacy-agents-table workflows.
+
+---
+
+## 7. Sizing
+
+| Sub-phase | PRs | LOC estimate | Smoke required |
+|---|---|---|---|
+| 29.0 (this) | 1 | ~350 docs | No |
+| 29.0a (LR-01 simulation) | 1–2 | ~300 + tests | **Yes** |
+| 29.1 (default binding ADR + impl) | 1–2 | ~150–250 + tests | No |
+| 29.2 (providerRouter ADR) | 1 | ~100 ADR | No |
+| 29.3 (providerRouter impl) | 2–3 | ~300–500 + tests | No |
+| 29.4 (LR-02/03 embeddings) | 1 | ~150 | **Yes** |
+| 29.5 (LR-04 operators) | 1 | ~150 | **Yes** |
+| 29.6 (LR-08 chat-stream + executeInvokeAgent) | 1–2 | ~300 + tests | **Yes** |
+| 29.7 (boundary-lint sweep) | 1 | ~50 | No |
+| 29.8 (closure report) | 1 | ~250 docs | No |
+| **Total** | **11–14** | **~2,000–2,600 LOC** | 4 sub-phases |
+
+Comparable to Phase 28 (9 PRs / ~2,500–3,000 LOC, depending on counting). The novel work is concentrated in §29.1 (workspace-default binding) and §29.3 (`providerRouter` migration); the rest is mechanical caller migration on top of Phase 28's primitives.
+
+---
+
+## 8. CI fingerprint expectation
+
+Phase 29 baseline is **5/5 green** as of `5a75613`. Any sub-phase that regresses below 5/5 pauses for diagnosis; the test-shard-flake protocol (rerun-failed-jobs once before diagnosing) applies.
+
+---
+
+## 9. Authority and pause conditions
+
+**Authority:** full autonomous commit/push/merge for any PR scoped inside this plan, per memory `project_phase_29_authority.md`.
+
+**Pause and surface for sign-off if:**
+
+- Any sub-phase requires a *new* TEMPORARY_EXCEPTION_WITH_DEADLINE (cap: 0).
+- §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers — surface the conflict.
+- §29.2 `providerRouter` decision: neither dissolve nor layer-over is obviously cheaper — surface options.
+- Live-smoke regression on simulation, chat-stream, embeddings, or operators paths.
+- Discovery that a deferred caller's migration is structurally bigger than this plan estimated (the same six-instance Phase 28 pattern).
+- Pre-existing red CI on a sub-phase PR not on the known-flaky-shard list.
+
+**Reporting:** local/committed/pushed format; single end-of-phase summary at 29.8.
+
+---
+
+## 10. Cross-references
+
+- `PHASE_28_CLOSURE_REPORT.md` — origin of the 5 deferred callers + the six-instance scope-discovery lesson.
+- `PHASE_28_EXECUTION_PLAN.md` — the precedent plan structure this doc mirrors.
+- `LEGACY_EXCEPTION_REGISTER.md` — source of truth for LR rows; updated incrementally per sub-phase.
+- `MODEL_ACCESS_CONTRACT.md` — current Model Access surface (4 gateway-callable + 1 direct-import primitive).
+- `MODEL_ACCESS_EMBED_DECISION.md` — D-MA-EMBED-1..7 (consumed by 29.4).
+- `MODEL_ACCESS_TOOL_LOOP_DECISION.md` — D-MA-TOOL-1..8 (consumed by 29.0a).
+- `PHASE_28_LR_08_DEFERRAL_DECISION.md` — origin of the §29.1 + §29.2/29.3 unifying decisions.
+- `PHASE_28_LR_01_DEFERRAL_DECISION.md` — origin of 29.0a's first-sub-phase status.
+- `PHASE_29_SCOPING.md` — superseded by this plan.
+
+---
+
+## 11. Lesson carried forward from Phase 28
+
+> When locking a sub-phase scope, re-grep current code AND walk the call graph one-or-two hops out. The register snapshots scope at write-time; code drifts; chain-of-trust through earlier plan docs amplifies stale assumptions.
+
+This plan was prepared by re-grepping the 5 caller line numbers against `main@5a75613` — confirmed unchanged from Phase 28's closure-report claims. Future Phase 29 sub-phases should do the same prep step before committing to LOC estimates.
+
+The four-instance Phase 28 deferral pattern (28.3 LR-08, 28.4 LR-04 reclassification, 28.7 LR-01 deferral) means Phase 29 inherits ~5 callers worth of work that the register entries originally framed as smaller. **Treat this plan's estimates as ceiling-without-discovery, not as committed scope.** Any sub-phase prep that surfaces a new structural mismatch with the plan should pause and surface, not force a fit.
