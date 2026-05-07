@@ -4,6 +4,8 @@
 **Branch (this doc):** `docs/pmb-phase-29-0-execution-plan`.
 **Owner:** Planner role per AGENTS.md; full autonomous-execution authority granted by user 2026-05-07.
 
+**Status (2026-05-07): PHASE 29 CLOSED.** All 5 deferred LRs (LR-01 / LR-02 / LR-03 / LR-04 / LR-08) migrated; boundary-lint allowlist purged to 1 entry (`PMB-D1-EXEMPT` for the seed script). 11 PRs landed at 5/5 green throughout. Closure summary in `docs/evidence/provider-model-binding/PHASE_29_CLOSURE_REPORT.md`.
+
 **Supersedes** `PHASE_29_SCOPING.md`, which captured the Phase-28-deferral-era scope. This doc is the plan-frozen authoritative source going forward.
 
 ---
@@ -151,16 +153,17 @@ Shipped:
 - [x] **`chat-binding.test.ts` partial cleanup** (per 29.6d). Two of seven tests fixed; the remaining 2 (tool-loop assertions) deferred as a non-blocking §B-followup test-infra item.
 - [x] **Acceptance:** `pnpm run check` clean; boundary lint clean (only pre-existing untracked-file violation in `scripts/dev/` remains, unrelated). All 5 LRs (LR-01 / LR-02 / LR-03 / LR-04 / LR-08) closed and tripwire-tested in `tests/pmb/boundary.test.ts`.
 - [x] **Net diff:** 2 files changed (boundary lint script comment + chat-binding.test.ts mock), ~80 LOC added, ~5 LOC deleted.
-- [ ] **Acceptance:** `pnpm exec tsx scripts/check-provider-key-env-boundary.ts` passes with the leanest allowlist since Phase 5 stub creation.
-- [ ] **Estimate:** 1 PR, ~50 LOC.
+- [x] **Acceptance:** `pnpm exec tsx scripts/check-provider-key-env-boundary.ts` passes with the leanest allowlist since Phase 5 stub creation (1 entry, `PMB-D1-EXEMPT`).
 
-### 29.8 — Closure report + register reconciliation
+### 29.8 — Closure report + register reconciliation — **CLOSED**
 
-- [ ] Author `docs/evidence/provider-model-binding/PHASE_29_CLOSURE_REPORT.md` mirroring `PHASE_28_CLOSURE_REPORT.md`. Inventory: every LR row at start of Phase 29 → final state; boundary lint diff; PR ledger; new ADRs.
-- [ ] Update `LEGACY_EXCEPTION_REGISTER.md` aggregate counts.
-- [ ] Update memory: `project_phase_29_authority.md` flipped to CLOSED.
-- [ ] **Acceptance:** all 5 deferred LR rows flipped from `open` to `migrated`.
-- [ ] **Estimate:** 1 PR, ~250 LOC docs.
+Shipped:
+
+- [x] **Author `PHASE_29_CLOSURE_REPORT.md`.** Mirrors `PHASE_28_CLOSURE_REPORT.md`. Inventory: every LR row at start of Phase 29 → final state (all 5 migrated); boundary lint diff (4 entries purged, 1 remaining); 11-PR ledger; 2 scope-discovery events; 5 new lessons.
+- [x] **Update `LEGACY_EXCEPTION_REGISTER.md` aggregate counts.** All 5 Phase-29-deadline LRs flipped to `migrated`. Phase 29 sub-phase mapping table updated.
+- [x] **Update memory.** `MEMORY.md` Phase 29 entry set to "CLOSED". `project_phase_29_authority.md` flipped to closed. New `project_pmb_phase_29_complete.md` captures the 11-PR summary + 5 carry-forward lessons for future sessions.
+- [x] **Acceptance:** all 5 deferred LR rows flipped from `open` to `migrated`.
+- [x] **Net diff:** ~600 LOC docs (closure report + register edits + plan-doc final state + memory updates).
 
 ---
 
