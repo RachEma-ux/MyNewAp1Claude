@@ -14,8 +14,9 @@
  *       3. Builds the LLM request: system prompt from draft.system
  *          Instructions + draft.roleInstructions, then all past
  *          messages, then the new user message
- *       4. Calls runViaOpenAIDirect (same adapter the simulation
- *          engine uses) — no openllm-agent2 required
+ *       4. Calls `openRouter.modelAccess.execute` via the platform
+ *          gateway — Plan v3 D4 surface; credentials resolved
+ *          internally by Model Access
  *       5. Persists the assistant response + updates session totals
  *       6. Returns the assistant message to the client
  *
@@ -29,13 +30,13 @@
  * MVP scope: text-only, no tool calls, no streaming. Tool calls and
  * streaming are both additive follow-ups that don't change the data
  * model — tool calls become role="tool" messages, streaming wraps
- * the same runViaOpenAIDirect call with an onToken callback.
+ * the same `modelAccess.execute` call with an onToken callback.
  */
 
-// Phase 27.5 — `openai` SDK + `resolveProviderApiKey` + `Message` from
-// the legacy provider-types are no longer imported here. Direction A is
-// now exclusive on this file: the binding-aware paths are the only ones,
-// and both go through `gatewayCall("openRouter.modelAccess.execute")`.
+// Phase 29.0a — `openai` SDK and the legacy `runViaOpenAIDirect` /
+// `resolveProviderApiKey` adapter functions are deleted from the
+// codebase. Direction A is exclusive on this file: the binding-aware
+// paths go through `gatewayCall("openRouter.modelAccess.execute")`.
 import * as repo from "../repository";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
 import {

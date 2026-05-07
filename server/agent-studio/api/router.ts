@@ -1922,8 +1922,10 @@ const catalogToolsRouter = router({
 //
 // Dedicated multi-turn chat interface for Agent Studio agents, like
 // OpenCode's chat view but scoped to ags_* agents. Persists sessions
-// and messages in asdb, calls GPT-4 via runViaOpenAIDirect (the same
-// adapter the simulation engine uses — no openllm-agent2 required).
+// and messages in asdb, calls the model via
+// `openRouter.modelAccess.execute` through the platform gateway
+// (Phase 29.0a — replaces the legacy `runViaOpenAIDirect` adapter
+// path that simulation also used to share).
 //
 // Trust level: protectedProcedure for everything (chat is a local
 // interaction, not a governed mutation — the per-call governance

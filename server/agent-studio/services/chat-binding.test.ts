@@ -51,10 +51,6 @@ vi.mock("./mcp/dispatcher", () => ({
   dispatchMcpToolCall: vi.fn(),
 }));
 
-vi.mock("../adapters/openllm-runtime-adapter", () => ({
-  resolveProviderApiKey: vi.fn(() => undefined),
-}));
-
 import * as repo from "../repository";
 import { getAgentProviderBinding } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
@@ -191,10 +187,11 @@ describe("sendChatMessage — binding path (Phase 17)", () => {
       { workspaceId: 1, actorId: 1 },
     );
 
-    // Should fall through to legacy path (no gateway call), and the
-    // legacy path will fail because resolveProviderApiKey is mocked
-    // to return undefined. The point of this test is that the gateway
-    // is NOT called for a null-PCID binding.
+    // The point of this test is that the gateway is NOT called for a
+    // null-PCID binding. After Phase 27.5 removed the legacy fallback
+    // and Phase 29.0a deleted `resolveProviderApiKey`, sendChatMessage
+    // returns a structured `binding_required`-style failure for
+    // null-PCID bindings rather than attempting any upstream call.
     expect(mockedGateway).not.toHaveBeenCalled();
     expect(r.ok).toBe(false);
   });
