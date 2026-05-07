@@ -88,6 +88,32 @@ jobs:
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
 
+      # ── Layer 5: PMB Unit Tests (Phase 30.4) ───────────────────────
+      # Targeted curated subset of `server/**/*.test.ts` covering the
+      # Provider/Model Binding contract surface. NOT the whole
+      # `server/**` tree — that includes the still-broken
+      # chat-binding.test.ts tool-loop tests deferred as a §B-followup.
+      # Per the project's standing OOM-safe pattern (CLAUDE.md):
+      # `--pool=forks --poolOptions.forks.singleFork`.
+      #
+      # Files covered:
+      #   - workspace-default-bindings.test.ts (Phase 29.1b)
+      #   - embeddings/service.test.ts (Phase 29.4b)
+      #   - operators/provider-hub.test.ts (Phase 29.5)
+      #   - openrouter/manifest-receipt-policy.test.ts (Phase 20 + 29.4a)
+      #   - openrouter/model-access/run-via-openllm-bridge.test.ts (Phase 28.6b)
+      #   - openrouter/model-access/embed.test.ts (Phase 28.4)
+      - name: PMB unit tests (Layer 5)
+        run: |
+          npx vitest run \
+            server/agent-studio/workspace-default-bindings.test.ts \
+            server/embeddings/service.test.ts \
+            server/operators/provider-hub.test.ts \
+            server/openrouter/manifest-receipt-policy.test.ts \
+            server/openrouter/model-access/run-via-openllm-bridge.test.ts \
+            server/openrouter/model-access/embed.test.ts \
+            --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+
       # ── Static Governance Guard ─────────────────────────────────────
       # Scans source code for forbidden patterns that violate governance invariants.
       - name: Static governance invariant scan
