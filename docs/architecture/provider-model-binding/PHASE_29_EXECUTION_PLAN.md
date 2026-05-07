@@ -106,11 +106,15 @@ Shipped:
 
 Depends on §29.1 (workspace-default binding lookup).
 
-- [ ] **29.4a — Migrate `embeddings/service.ts`.** Replace `process.env.OPENAI_API_KEY` + `new OpenAI(...)` with `gatewayCall` to `openRouter.modelAccess.embed`. Resolve binding via §29.1 lookup. Service signature stays compatible.
-- [ ] **29.4b — Verify LR-03 closes transitively.** `documents/processor.ts:339` calls `getEmbeddingService()` — should work unchanged once LR-02 closes.
+**Scope discovery (2026-05-07, surfaced during 29.4 prep):** `modelAccess.embed`'s receipt policy refuses non-test intents without a `governanceReceiptId`. The two LR-02/03 caller paths (`documents/processor.ts` document indexing + `agents/executor.ts` legacy RAG retrieval) have no user-attributed receipt source — there's no AS run, no chat boundary, just infrastructure. Migrating with `intent="agent-run"` would break document upload + legacy RAG at runtime. Migrating with `intent="agent-test"` lies about intent and masks the receipt policy for production paths.
+
+**Resolution:** split into 29.4a (extend the receipt-policy contract) + 29.4b (the actual caller migration). Mirrors the Phase 28 primitive-then-caller pattern.
+
+- [x] **29.4a — Add `system-internal` intent variant exempt from the receipt policy.** Extends `ModelAccessIntent` enum with `"system-internal"`; updates `enforceModelAccessReceipt` in `server/openrouter/manifest.ts` to exempt the new intent (joining `agent-test` in the allowlist); updates the error message; updates `RECEIPT_POLICY.md` with the rationale + when-to-use-it guidance; adds 4 tests to `manifest-receipt-policy.test.ts` (system-internal exempt for execute/stream/embed; error message advertises both exempt intents). Audit for `system-internal` calls is captured by the `correlationId` + the calling subsystem's own audit log.
+- [ ] **29.4b — Migrate `embeddings/service.ts` + thread `workspaceId` through callers.** Replace `process.env.OPENAI_API_KEY` + `new OpenAI(...)` with `gatewayCall` to `openRouter.modelAccess.embed` using `intent: "system-internal"`. Resolve binding via `resolveWorkspaceDefaultBinding({workspaceId, role:"embedding"})` from 29.1b. Service public methods (`generateEmbedding`, `generateEmbeddings`, `storeChunkEmbeddings`, `searchSimilarChunks`) take `workspaceId`. LR-03 (`documents/processor.ts:339`) threads `input.workspaceId`; legacy executor (`agents/executor.ts:137, 312`) threads `options.workspaceId`. Drop the `getEmbeddingService()` singleton cache (per D-WDB-5 — caching is workspace-aware now).
 - [ ] **29.4c — Boundary purge.** Remove LR-02 + LR-03 allowlist entries.
 - [ ] **Acceptance:** boundary lint green; **live-smoke required** — exercise document upload + RAG retrieval in dev.
-- [ ] **Estimate:** 1 PR, ~150 LOC.
+- [ ] **Estimate:** 2 PRs (29.4a + 29.4b), ~250 LOC total. 29.4a alone is ~80 LOC; 29.4b is ~170 LOC.
 
 ### 29.5 — LR-04 operators caller migration
 

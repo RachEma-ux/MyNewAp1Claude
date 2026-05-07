@@ -18,7 +18,29 @@ export type ModelAccessIntent =
   | "agent-test"
   | "agent-run"
   | "evaluation"
-  | "chat";
+  | "chat"
+  /**
+   * PMB Phase 29.4a — system-internal calls invoked by infrastructure
+   * (document indexing, embedding-backed RAG retrieval, operator
+   * classifiers, automation invokeAgent fallbacks) where the caller
+   * has no `governanceReceiptId` because the work is not user-attributed.
+   *
+   * Like `agent-test`, this intent is **exempt from the receipt policy**
+   * (`enforceModelAccessReceipt` in `server/openrouter/manifest.ts`).
+   * Unlike `agent-test`, it is NOT a test — calls do hit live providers
+   * and consume budget. The exemption exists because the receipt policy
+   * was designed for user-facing chat/run paths, not infrastructure.
+   *
+   * Audit/observability for `system-internal` calls is captured by:
+   *   - the `correlationId` carried on every Model Access result
+   *   - the calling subsystem's own audit log (e.g., document upload
+   *     audit, agent runtime trace, operator job ledger)
+   *
+   * Use `agent-run` / `chat` / `evaluation` whenever the caller has
+   * a real user context AND can mint a receipt. `system-internal` is
+   * the explicit "infrastructure" lane.
+   */
+  | "system-internal";
 
 /**
  * Per Plan v3 Fix N4 (separate `role` from `intent`):

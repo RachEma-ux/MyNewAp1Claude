@@ -293,4 +293,96 @@ describe("openRouter.modelAccess.embed — per-intent receipt policy (Phase 28.4
     })) as { status: string };
     expect(r.status).toBe("ok");
   });
+
+  // PMB Phase 29.4a — `system-internal` intent exemption (the new
+  // infrastructure-call lane introduced for LR-02/03/04/08 callers
+  // that have no user-attributed receipt source: document indexing,
+  // RAG retrieval, operator classifiers, automation fallbacks).
+  it("allows intent=system-internal without a receipt (Phase 29.4a)", async () => {
+    const r = (await gatewayCall({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.embed",
+        workspaceId: 1,
+        actorId: 1,
+      },
+      input: {
+        providerConnectionId: 42,
+        modelRef: "text-embedding-3-small",
+        inputs: "hello",
+        intent: "system-internal",
+        workspaceId: 1,
+        actorId: 1,
+      },
+    })) as { status: string; embeddings: number[][] };
+    expect(r.status).toBe("ok");
+    expect(r.embeddings).toEqual([[0.1, 0.2, 0.3]]);
+  });
+});
+
+describe("openRouter.modelAccess.execute / .stream — system-internal intent exemption (Phase 29.4a)", () => {
+  it("execute allows intent=system-internal without a receipt", async () => {
+    const r = (await gatewayCall({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.execute",
+        workspaceId: 1,
+        actorId: 1,
+      },
+      input: {
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        messages: [{ role: "user", content: "hi" }],
+        intent: "system-internal",
+        workspaceId: 1,
+        actorId: 1,
+      },
+    })) as { status: string };
+    expect(r.status).toBe("ok");
+  });
+
+  it("stream allows intent=system-internal without a receipt", async () => {
+    const r = (await gatewayCall({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.stream",
+        workspaceId: 1,
+        actorId: 1,
+      },
+      input: {
+        providerConnectionId: 42,
+        modelRef: "gpt-4o-mini",
+        messages: [{ role: "user", content: "hi" }],
+        intent: "system-internal",
+        workspaceId: 1,
+        actorId: 1,
+      },
+    })) as { status: string };
+    expect(r.status).toBe("ok");
+  });
+
+  it("error message advertises both exempt intents", async () => {
+    await expect(
+      gatewayCall({
+        ctx: {
+          sourceModule: "agentStudio",
+          targetModule: "openRouter",
+          actionKey: "openRouter.modelAccess.execute",
+          workspaceId: 1,
+          actorId: 1,
+        },
+        input: {
+          providerConnectionId: 42,
+          modelRef: "gpt-4o-mini",
+          messages: [{ role: "user", content: "hi" }],
+          intent: "agent-run",
+          workspaceId: 1,
+          actorId: 1,
+        },
+      }),
+    ).rejects.toThrow(/system-internal.*exempt/);
+  });
 });
