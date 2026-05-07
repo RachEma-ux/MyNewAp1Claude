@@ -131,6 +131,12 @@ export const openRouterManifest: ModuleManifest = {
     // it `false` and enforce per-intent in the handler:
     //   - `intent === "agent-test"` → no receipt required (sandboxed
     //     test runs).
+    //   - `intent === "system-internal"` → no receipt required (PMB
+    //     Phase 29.4a — infrastructure calls without a user-attributed
+    //     receipt source: document indexing, RAG retrieval, operator
+    //     classifiers, automation invokeAgent fallbacks). Audit is
+    //     captured by the correlationId + the calling subsystem's
+    //     own audit log.
     //   - any other intent (`agent-run` / `chat` / `evaluation`)
     //     → receipt required; handler throws if missing.
     // See `docs/architecture/provider-model-binding/RECEIPT_POLICY.md`.
@@ -139,10 +145,10 @@ export const openRouterManifest: ModuleManifest = {
       sealed: { governanceReceiptId?: string },
       action: "execute" | "stream" | "embed",
     ): void => {
-      if (intent === "agent-test") return;
+      if (intent === "agent-test" || intent === "system-internal") return;
       if (sealed?.governanceReceiptId) return;
       throw new Error(
-        `[ModelAccess] Action 'openRouter.modelAccess.${action}' with intent='${intent}' requires a governance receipt. Test intent ('agent-test') is exempt.`,
+        `[ModelAccess] Action 'openRouter.modelAccess.${action}' with intent='${intent}' requires a governance receipt. Test intent ('agent-test') and infrastructure intent ('system-internal') are exempt.`,
       );
     };
 
