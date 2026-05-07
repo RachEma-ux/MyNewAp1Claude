@@ -192,6 +192,15 @@ export interface ProviderHubRequest {
   temperature: number;
   responseFormat: "json";
   traceId: string;
+  /**
+   * PMB Phase 29.5 — workspace context required for the workspace-default
+   * `classifier` binding lookup. Without it, callProviderHub throws
+   * `OperatorBindingError("workspace_required")`. The orchestrator threads
+   * this from `job.intent.workspaceId` (which is itself optional on
+   * `Intent` — operators that can't resolve a workspace cannot call the
+   * hub at all post-29.5).
+   */
+  workspaceId: number;
 }
 
 export interface ProviderHubResponse {

@@ -117,14 +117,18 @@ Depends on §29.1 (workspace-default binding lookup).
 - [ ] **Live-smoke pending:** exercise document upload + RAG retrieval in dev — same discipline as 29.0a's smoke note. The new failure mode is `EmbeddingResolutionError` instead of "env var unset", so the smoke verifies the workspace-default-binding lookup actually fires.
 - [x] **Net diff:** 8 files changed, ~600 insertions, ~140 deletions. Slightly above the ADR's ~170-LOC 29.4b estimate due to D-WDB-3 reason mapping + tripwire tests + caller threading depth.
 
-### 29.5 — LR-04 operators caller migration
+### 29.5 — LR-04 operators caller migration — **CLOSED**
 
-Depends on §29.1.
+Depends on §29.1 + §29.4a (`system-internal` intent).
 
-- [ ] **29.5a — Migrate `operators/provider-hub.ts:78`.** This is a **chat-completion** caller (`/v1/chat/completions` with `gpt-4o-mini`), reclassified in 28.4 from the original "embedding-endpoint" grouping. Replace with `gatewayCall` to `openRouter.modelAccess.execute`. Resolve binding via §29.1.
-- [ ] **29.5b — Boundary purge.** Remove LR-04 allowlist entry.
-- [ ] **Acceptance:** boundary lint green; **live-smoke required** — exercise an operator (e.g., classifier or summarizer) in dev.
-- [ ] **Estimate:** 1 PR, ~150 LOC.
+Shipped:
+
+- [x] **29.5a — Migrate `operators/provider-hub.ts:callProviderHub`.** Dropped local `getOpenAIClient`/`getOllamaClient` provider-chain. `ProviderHubRequest.workspaceId` added; binding resolves via `resolveWorkspaceDefaultBinding({workspaceId, role:"classifier"})`; upstream call routes through `gatewayCall(openRouter.modelAccess.execute)` with `intent: "system-internal"`. Per-operator `OPERATOR_MODEL_CONSTRAINTS` (maxTokens, maxTemperature) preserved as governance guardrails. `allowedModels` list dropped (workspace admin owns model selection via the binding — if a workspace admin configures a model that doesn't fit an operator's risk profile, the fix is changing the binding, not adding hard-coded model lists). JSON-validation retry loop (max 2 attempts: initial + 1 retry with stricter system prompt) preserved. New `OperatorBindingError` with typed reasons.
+- [x] **29.5b — `BaseOperator.generatePlan` threads `job.intent.workspaceId`.** Refuses jobs without a workspace context with a clear error (operators that can't resolve a workspace cannot call the hub at all post-29.5).
+- [x] **29.5c — Boundary purge.** LR-04 allowlist entry removed from `scripts/check-provider-key-env-boundary.ts`. Three new tripwire tests in `tests/pmb/boundary.test.ts` (`Phase 29.5 invariant — LR-04 closure`): no `process.env.<X>_API_KEY` reads; no `getOpenAIClient`/`getOllamaClient` definitions; calls `gatewayCall` against `openRouter.modelAccess.execute` with `intent: "system-internal"`.
+- [x] **Acceptance:** `pnpm run check` clean; boundary lint clean (only pre-existing untracked-file violation remains); 31/31 tests green (9 new in `provider-hub.test.ts` + 22 in `boundary.test.ts` including 3 new tripwires).
+- [ ] **Live-smoke pending:** exercise an operator job (builder/auditor/governance/deploy) in dev — confirm the workspace classifier binding resolves and the `system-internal` intent path produces a valid SyscallBatch.
+- [x] **Net diff:** ~7 files changed, ~500 insertions, ~290 deletions. The 290-line deletion includes the local `getOpenAIClient`/`getOllamaClient` chain + `getAvailableOllamaModels` cache + `pickBestOllamaModel`; provider selection now happens at the workspace-default-binding layer.
 
 ### 29.6 — LR-08 `/api/chat/stream` + `executeInvokeAgent`
 

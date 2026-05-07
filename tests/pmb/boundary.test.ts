@@ -437,6 +437,47 @@ describe("Phase 29.4b invariant — LR-02/LR-03 closure", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 29.5 invariant — operators provider hub no longer reads
+// provider env vars
+// ────────────────────────────────────────────────────────────────────
+
+describe("Phase 29.5 invariant — LR-04 closure", () => {
+  it("`server/operators/provider-hub.ts` does not read process.env.<X>_API_KEY", () => {
+    const src = readFileSync("server/operators/provider-hub.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    const re =
+      /process\.env(?:\.([A-Z0-9_]+)|\[\s*["']([A-Z0-9_]+)["']\s*\])/g;
+    const offenders: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(stripped))) {
+      const key = m[1] ?? m[2];
+      if (key && key.endsWith("_API_KEY")) {
+        offenders.push(`process.env.${key}`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("`server/operators/provider-hub.ts` does not define `getOpenAIClient` or `getOllamaClient` (deleted in 29.5)", () => {
+    const src = readFileSync("server/operators/provider-hub.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    expect(stripped).not.toMatch(/\bfunction\s+getOpenAIClient\b/);
+    expect(stripped).not.toMatch(/\bfunction\s+getOllamaClient\b/);
+  });
+
+  it("`server/operators/provider-hub.ts` calls `gatewayCall` against `openRouter.modelAccess.execute` with `intent: \"system-internal\"`", () => {
+    const src = readFileSync("server/operators/provider-hub.ts", "utf8");
+    expect(src).toMatch(/gatewayCall\s*</);
+    expect(src).toMatch(/openRouter\.modelAccess\.execute/);
+    expect(src).toMatch(/intent:\s*"system-internal"/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
 // Invariant 6 — Provider Connections public API returns no secrets
 // ────────────────────────────────────────────────────────────────────
 

@@ -103,14 +103,18 @@ const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
   // RAG caller threads `options.workspaceId` into `searchSimilarChunks`.
   // If you see these entries restored, something has regressed and the
   // lint should fail.
-  // LR-04: Operators hub. Same shape and deadline as LR-02.
-  {
-    file: "server/operators/provider-hub.ts",
-    envKey: "OPENAI_API_KEY",
-    registerId: "LR-04",
-    deadlinePhase: "Phase 28",
-    reason: "Operator runtime; same Model Access embedding-endpoint dependency as LR-02.",
-  },
+  // LR-04: CLOSED in Phase 29.5. `server/operators/provider-hub.ts` was
+  // migrated onto the workspace-default-binding lookup
+  // (`resolveWorkspaceDefaultBinding`, role='classifier') +
+  // `gatewayCall(openRouter.modelAccess.execute)` with
+  // `intent="system-internal"` (the infrastructure-call lane from Phase
+  // 29.4a). The local `getOpenAIClient`/`getOllamaClient` provider chain
+  // was removed; provider selection now lives at the workspace level.
+  // The per-operator `OPERATOR_MODEL_CONSTRAINTS` (max tokens, max
+  // temperature) governance guardrails are preserved; the `allowedModels`
+  // list was dropped because the workspace admin owns model selection
+  // via the binding. If this entry is restored, the local provider
+  // chain has returned and the lint should fail.
   // The Phase 5 seed script itself — once created, it is the ONE
   // legitimate reader of provider env vars by design.
   {

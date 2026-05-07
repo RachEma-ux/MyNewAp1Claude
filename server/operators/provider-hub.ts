@@ -1,197 +1,88 @@
 /**
- * Provider Hub Router — Unified LLM Gateway for Operators
+ * Provider Hub Router — Unified LLM Gateway for Operators.
  *
- * ALL operator LLM calls MUST go through this module.
- * No operator may call OpenAI, Ollama, or any provider directly.
+ * ALL operator LLM calls MUST go through this module. No operator may
+ * call OpenAI / Ollama / Anthropic directly.
  *
- * Features:
- *   - Single endpoint abstraction
- *   - Provider selection with fallback
- *   - Response normalization
- *   - JSON output validation for operators
- *   - Token/temperature/model enforcement per operator
- *   - Full audit trail per request
+ * **PMB Phase 29.5 (LR-04 closure):** the previous local provider-chain
+ * (`getOpenAIClient` + `getOllamaClient`, both reading the OpenAI env
+ * var directly) is gone. Provider selection now lives at the workspace
+ * level — each
+ * workspace's `classifier` default binding (table:
+ * `ags_workspace_default_provider_bindings`, role: `"classifier"`) names
+ * the provider connection + model used by every operator call from
+ * that workspace.
+ *
+ * Migration shape:
+ *   1. `callProviderHub` takes a `workspaceId` on its request.
+ *   2. Resolves the workspace's classifier default via
+ *      `resolveWorkspaceDefaultBinding`.
+ *   3. Dispatches through `gatewayCall(openRouter.modelAccess.execute)`
+ *      with `intent: "system-internal"` (29.4a — operator runtime is
+ *      infrastructure, not user-attributed; receipt policy exempts it).
+ *   4. The per-operator `OPERATOR_MODEL_CONSTRAINTS` (max tokens,
+ *      max temperature) are preserved as governance guardrails. The
+ *      `allowedModels` list is dropped: the workspace admin owns model
+ *      selection via the binding. If a workspace admin configures a
+ *      model that doesn't fit an operator's risk profile, the fix is
+ *      changing the binding — not adding hard-coded model lists here.
+ *   5. JSON-validation retry loop is preserved — the LLM may not
+ *      always return valid JSON, and the hub retries once with a
+ *      stricter system prompt.
+ *
+ * Failure modes (typed via `OperatorBindingError`):
+ *   - `workspace_required` — no `workspaceId` on the request
+ *   - `default_not_set` — workspace has no classifier default
+ *   - `provider_connection_missing` / `_disabled` / `_unhealthy` —
+ *     binding's provider connection failed eligibility
  */
 
-import { v4 as uuidv4 } from "uuid";
 import type { ProviderHubRequest, ProviderHubResponse, OperatorName } from "@shared/operator-types";
+import { gatewayCall } from "../platform/modules/module-gateway";
+import { resolveWorkspaceDefaultBinding } from "../agent-studio/workspace-default-bindings";
+import type {
+  ModelAccessExecuteInput,
+  ModelAccessResult,
+} from "../openrouter/model-access/types";
 
 // ============================================================================
-// Operator Model Constraints
+// Operator Model Constraints (governance guardrails)
 // ============================================================================
+//
+// `allowedModels` was dropped in Phase 29.5 — see file-level docs.
 
 interface OperatorModelConstraints {
-  allowedModels: string[];
   maxTokens: number;
   maxTemperature: number;
-  preferredProvider: "openai" | "ollama" | "anthropic" | "auto";
-  fallbackProvider: "openai" | "ollama" | "anthropic" | "none";
 }
 
 const OPERATOR_MODEL_CONSTRAINTS: Record<OperatorName, OperatorModelConstraints> = {
-  builder: {
-    allowedModels: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "phi3", "tinyllama", "llama3.1", "codellama", "deepseek-coder"],
-    maxTokens: 16384,
-    maxTemperature: 0.7,
-    preferredProvider: "auto",
-    fallbackProvider: "ollama",
-  },
-  auditor: {
-    allowedModels: ["gpt-4o-mini", "gpt-4o", "phi3", "tinyllama", "llama3.1", "mistral"],
-    maxTokens: 8192,
-    maxTemperature: 0.3,
-    preferredProvider: "auto",
-    fallbackProvider: "ollama",
-  },
-  governance: {
-    allowedModels: ["gpt-4o", "gpt-4o-mini", "phi3", "tinyllama", "llama3.1"],
-    maxTokens: 4096,
-    maxTemperature: 0.1,
-    preferredProvider: "auto",
-    fallbackProvider: "ollama",
-  },
-  deploy: {
-    allowedModels: ["gpt-4o-mini", "gpt-4o", "phi3", "tinyllama", "llama3.1"],
-    maxTokens: 8192,
-    maxTemperature: 0.2,
-    preferredProvider: "auto",
-    fallbackProvider: "ollama",
-  },
+  builder: { maxTokens: 16384, maxTemperature: 0.7 },
+  auditor: { maxTokens: 8192, maxTemperature: 0.3 },
+  governance: { maxTokens: 4096, maxTemperature: 0.1 },
+  deploy: { maxTokens: 8192, maxTemperature: 0.2 },
 };
 
 // ============================================================================
-// Provider Clients
+// Errors
 // ============================================================================
 
-interface ProviderClient {
-  name: string;
-  available: boolean;
-  call(systemPrompt: string, userPrompt: string, model: string, maxTokens: number, temperature: number): Promise<{
-    content: string;
-    model: string;
-    tokensUsed: number;
-    latencyMs: number;
-  }>;
-}
-
-async function getOpenAIClient(): Promise<ProviderClient> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  return {
-    name: "openai",
-    available: !!apiKey,
-    async call(systemPrompt, userPrompt, model, maxTokens, temperature) {
-      if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-      const start = Date.now();
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: model || "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: maxTokens,
-          temperature,
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text();
-        throw new Error(`OpenAI API error ${response.status}: ${errBody}`);
-      }
-
-      const data = await response.json() as any;
-      return {
-        content: data.choices[0].message.content,
-        model: data.model,
-        tokensUsed: data.usage?.total_tokens || 0,
-        latencyMs: Date.now() - start,
-      };
-    },
-  };
-}
-
-// Cache of locally available Ollama models (refreshed once per process)
-let _ollamaModelsCache: string[] | null = null;
-
-async function getAvailableOllamaModels(baseUrl: string): Promise<string[]> {
-  if (_ollamaModelsCache) return _ollamaModelsCache;
-  try {
-    const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
-    if (!resp.ok) return [];
-    const data = await resp.json() as any;
-    _ollamaModelsCache = (data.models || []).map((m: any) => m.name?.replace(/:latest$/, "") || "");
-    console.log(`[ProviderHub] Ollama models available: ${_ollamaModelsCache!.join(", ")}`);
-    return _ollamaModelsCache!;
-  } catch {
-    return [];
+export class OperatorBindingError extends Error {
+  constructor(
+    public readonly workspaceId: number,
+    public readonly reason:
+      | "workspace_required"
+      | "default_not_set"
+      | "provider_connection_missing"
+      | "provider_connection_disabled"
+      | "provider_connection_unhealthy",
+  ) {
+    super(
+      `[ProviderHub] Workspace ${workspaceId} has no usable classifier binding (reason=${reason}). ` +
+        `Configure the default via ags_workspace_default_provider_bindings (role='classifier').`,
+    );
+    this.name = "OperatorBindingError";
   }
-}
-
-function pickBestOllamaModel(allowedModels: string[], availableModels: string[]): string | null {
-  // Try exact match first (prefer models earlier in the allowed list — higher priority)
-  for (const allowed of allowedModels) {
-    if (availableModels.includes(allowed)) return allowed;
-  }
-  // Try prefix match (e.g. "phi3" matches "phi3:3.8b")
-  for (const allowed of allowedModels) {
-    const match = availableModels.find(m => m.startsWith(allowed));
-    if (match) return match;
-  }
-  return null;
-}
-
-async function getOllamaClient(): Promise<ProviderClient> {
-  const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-  const availableModels = await getAvailableOllamaModels(baseUrl);
-  return {
-    name: "ollama",
-    available: availableModels.length > 0,
-    async call(systemPrompt, userPrompt, model, maxTokens, temperature) {
-      const start = Date.now();
-      // Use the requested model if available, otherwise pick the best available one
-      const effectiveModel = availableModels.includes(model) ? model
-        : availableModels.includes(model.replace(/:latest$/, "")) ? model.replace(/:latest$/, "")
-        : model; // fallback to requested — Ollama will error if not found
-
-      const response = await fetch(`${baseUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: effectiveModel,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: false,
-          options: {
-            num_predict: maxTokens,
-            temperature,
-          },
-          format: "json",
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        throw new Error(`Ollama API error ${response.status}: ${errText}`);
-      }
-
-      const data = await response.json() as any;
-      return {
-        content: data.message?.content || "",
-        model: data.model || effectiveModel,
-        tokensUsed: (data.eval_count || 0) + (data.prompt_eval_count || 0),
-        latencyMs: Date.now() - start,
-      };
-    },
-  };
 }
 
 // ============================================================================
@@ -203,89 +94,98 @@ export async function callProviderHub(request: ProviderHubRequest): Promise<Prov
   if (!constraints) {
     throw new Error(`Unknown operator: ${request.operator}`);
   }
+  if (!request.workspaceId) {
+    throw new OperatorBindingError(0, "workspace_required");
+  }
 
-  // Enforce constraints
+  // Resolve workspace classifier default binding
+  const binding = await resolveWorkspaceDefaultBinding({
+    workspaceId: request.workspaceId,
+    role: "classifier",
+  });
+  if (!binding) {
+    throw new OperatorBindingError(request.workspaceId, "default_not_set");
+  }
+  if (!binding.ok) {
+    throw new OperatorBindingError(
+      request.workspaceId,
+      binding.reason ?? "provider_connection_missing",
+    );
+  }
+
+  // Enforce per-operator constraints (governance guardrails preserved
+  // even when the workspace admin's binding allows higher caps).
   const effectiveMaxTokens = Math.min(request.maxTokens, constraints.maxTokens);
   const effectiveTemperature = Math.min(request.temperature, constraints.maxTemperature);
 
-  // Build provider chain
-  const openai = await getOpenAIClient();
-  const ollama = await getOllamaClient();
-  const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-  const availableOllamaModels = await getAvailableOllamaModels(ollamaBaseUrl);
+  // Strict-JSON system-prompt suffix used when the first attempt
+  // returns invalid JSON. The retry happens once.
+  const STRICT_JSON_HINT =
+    "\n\nCRITICAL: Your previous response was not valid JSON. You MUST respond with valid JSON only.";
 
-  const providerChain: Array<{ client: ProviderClient; model: string }> = [];
+  const start = Date.now();
+  let attempt = 0;
+  let lastResult: ModelAccessResult | null = null;
 
-  // Pick best model for each provider
-  const bestOllamaModel = pickBestOllamaModel(constraints.allowedModels, availableOllamaModels);
-  const openaiModel = constraints.allowedModels.find(m => m.startsWith("gpt-")) || "gpt-4o-mini";
+  // Retry loop: max 2 attempts (initial + 1 retry on JSON parse failure)
+  while (attempt < 2) {
+    const systemPrompt =
+      attempt === 0 ? request.systemPrompt : request.systemPrompt + STRICT_JSON_HINT;
 
-  if (constraints.preferredProvider === "auto") {
-    if (openai.available) providerChain.push({ client: openai, model: openaiModel });
-    if (ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
-  } else if (constraints.preferredProvider === "openai") {
-    if (openai.available) providerChain.push({ client: openai, model: openaiModel });
-    if (constraints.fallbackProvider === "ollama" && ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
-  } else if (constraints.preferredProvider === "ollama") {
-    if (ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
-    if (constraints.fallbackProvider === "openai" && openai.available) providerChain.push({ client: openai, model: openaiModel });
-  }
+    const result = await gatewayCall<ModelAccessExecuteInput, ModelAccessResult>({
+      ctx: {
+        sourceModule: "operators",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.execute",
+        workspaceId: request.workspaceId,
+      },
+      input: {
+        providerConnectionId: binding.providerConnectionId,
+        modelRef: binding.modelRef,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: request.userPrompt },
+        ],
+        intent: "system-internal",
+        workspaceId: request.workspaceId,
+        actorId: 0,
+        temperature: effectiveTemperature,
+        tokenBudget: effectiveMaxTokens,
+      },
+    });
 
-  if (providerChain.length === 0) {
-    throw new Error(`No LLM providers available (OpenAI key: ${openai.available ? "set" : "not set"}, Ollama models: [${availableOllamaModels.join(",")}], needed: [${constraints.allowedModels.join(",")}])`);
-  }
-
-  // Try providers in order with fallback
-  let lastError: Error | null = null;
-  let fallbackUsed = false;
-
-  for (let i = 0; i < providerChain.length; i++) {
-    const { client: provider, model } = providerChain[i];
-
-    try {
-      const result = await provider.call(
-        request.systemPrompt,
-        request.userPrompt,
-        model,
-        effectiveMaxTokens,
-        effectiveTemperature,
+    lastResult = result;
+    if (result.status !== "ok" || !result.output) {
+      throw new Error(
+        `[ProviderHub] modelAccess.execute failed for operator '${request.operator}' on workspace ${request.workspaceId}: ${result.error ?? "no output"}`,
       );
+    }
 
-      // Validate JSON response
-      let content = result.content.trim();
-      try {
-        JSON.parse(content);
-      } catch {
-        // Retry once with same provider asking for valid JSON
-        const retryResult = await provider.call(
-          request.systemPrompt + "\n\nCRITICAL: Your previous response was not valid JSON. You MUST respond with valid JSON only.",
-          request.userPrompt,
-          model,
-          effectiveMaxTokens,
-          effectiveTemperature,
-        );
-        content = retryResult.content.trim();
-        JSON.parse(content); // Will throw if still invalid, triggering fallback
-      }
-
-      console.log(`[ProviderHub] ${request.operator}/${request.jobId} → ${provider.name}/${model} (${result.tokensUsed} tokens, ${result.latencyMs}ms${fallbackUsed ? ", fallback" : ""})`);
-
+    const content = result.output.trim();
+    try {
+      JSON.parse(content);
+      // Valid JSON — return.
+      const latencyMs = Date.now() - start;
+      console.log(
+        `[ProviderHub] ${request.operator}/${request.jobId} → ${binding.modelRef} (${result.usage?.totalTokens ?? 0} tokens, ${latencyMs}ms${attempt > 0 ? ", retry" : ""})`,
+      );
       return {
         content,
-        model: result.model,
-        provider: provider.name,
-        tokensUsed: result.tokensUsed,
-        latencyMs: result.latencyMs,
+        model: result.modelRef,
+        provider: `pcid:${binding.providerConnectionId}`,
+        tokensUsed: result.usage?.totalTokens ?? 0,
+        latencyMs,
         traceId: request.traceId,
-        fallbackUsed,
+        fallbackUsed: false,
       };
-    } catch (error: any) {
-      lastError = error;
-      fallbackUsed = true;
-      console.warn(`[ProviderHub] ${provider.name} failed for ${request.operator}: ${error.message}`);
-      continue;
+    } catch {
+      attempt += 1;
+      // fall through to retry
     }
   }
 
-  throw new Error(`All providers failed for operator "${request.operator}": ${lastError?.message}`);
+  // Both attempts produced invalid JSON.
+  throw new Error(
+    `[ProviderHub] Operator '${request.operator}' produced invalid JSON twice on workspace ${request.workspaceId} (last raw output ${(lastResult?.output ?? "").slice(0, 200)}…)`,
+  );
 }
