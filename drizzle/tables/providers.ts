@@ -376,3 +376,47 @@ export const registryPatchArtifacts = pgTable("registry_patch_artifacts", {
 
 export type RegistryPatchArtifact = typeof registryPatchArtifacts.$inferSelect;
 export type InsertRegistryPatchArtifact = typeof registryPatchArtifacts.$inferInsert;
+
+// ============================================================================
+// PMB Phase 30.2 — Workspace pricing config
+// ============================================================================
+//
+// Per-workspace, per-model pricing overrides for chat-stream cost-tracking.
+// Read at binding-resolution time alongside `resolveChatBinding`. Lookup
+// order in `getModelPricing(workspaceId, modelRef)`:
+//
+//   1. Workspace-config row from this table.
+//   2. Built-in defaults table in `server/providers/pricing.ts`
+//      (OpenAI + Anthropic public prices as of 2026-05-07).
+//   3. Fallback to `0` with a `console.warn` (better than always `0`).
+//
+// Currency stays USD-only at Phase 30.2; multi-currency support is a
+// future Phase-30+ extension if/when needed.
+//
+// Soft FK on `workspaceId` (workspaces live on main DB; matches the
+// existing `providerConnections` pattern in this same file).
+//
+export const workspacePricingConfig = pgTable(
+  "workspace_pricing_config",
+  {
+    id: serial("id").primaryKey(),
+    workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+    /** e.g. "gpt-4o-mini", "text-embedding-3-small", "claude-sonnet-4-6". */
+    modelRef: varchar("modelRef", { length: 255 }).notNull(),
+    inputCostPer1kTokens: decimal("inputCostPer1kTokens", { precision: 12, scale: 6 }).notNull(),
+    outputCostPer1kTokens: decimal("outputCostPer1kTokens", { precision: 12, scale: 6 }).notNull(),
+    currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    updatedBy: integer("updatedBy"),
+  },
+  (table) => ({
+    workspaceModelIdx: uniqueIndex("uniq_workspace_pricing_ws_model").on(
+      table.workspaceId,
+      table.modelRef,
+    ),
+  }),
+);
+
+export type WorkspacePricingConfig = typeof workspacePricingConfig.$inferSelect;
+export type InsertWorkspacePricingConfig = typeof workspacePricingConfig.$inferInsert;

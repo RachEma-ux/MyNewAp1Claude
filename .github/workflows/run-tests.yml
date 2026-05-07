@@ -103,6 +103,7 @@ jobs:
       #   - openrouter/manifest-receipt-policy.test.ts (Phase 20 + 29.4a)
       #   - openrouter/model-access/run-via-openllm-bridge.test.ts (Phase 28.6b)
       #   - openrouter/model-access/embed.test.ts (Phase 28.4)
+      #   - providers/pricing.test.ts (Phase 30.2)
       - name: PMB unit tests (Layer 5)
         run: |
           npx vitest run \
@@ -112,6 +113,7 @@ jobs:
             server/openrouter/manifest-receipt-policy.test.ts \
             server/openrouter/model-access/run-via-openllm-bridge.test.ts \
             server/openrouter/model-access/embed.test.ts \
+            server/providers/pricing.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
 
       # ── Static Governance Guard ─────────────────────────────────────
