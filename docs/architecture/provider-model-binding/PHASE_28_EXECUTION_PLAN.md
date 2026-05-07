@@ -159,14 +159,24 @@ Closed by:
 
 **Lesson reinforced (sixth time this Phase 28 batch):** the prescribed sub-phase shape doesn't always match what the call site actually needs. Five of the six discoveries came from re-grepping current code rather than static review of the docs.
 
-### 28.8 — Plan-close audit + register reconciliation
+### 28.8 — Plan-close audit + register reconciliation — **CLOSED**
 
-- [ ] Author `docs/evidence/provider-model-binding/PHASE_28_CLOSURE_REPORT.md` mirroring `DIRECTION_A_REVERIFICATION_AFTER_PHASE_27.md`. Inventory: every LR row at start of Phase 28 → current state; boundary lint diff; allowlist diff; new primitives; new tests added.
-- [ ] Update `LEGACY_EXCEPTION_REGISTER.md` aggregate counts at the bottom.
-- [ ] Update `EXECUTION_CHECKLIST.md` to mark Phase 28 closed (note: the checklist's "Phase 28" entry is the original Plan v3 Readiness owner work, NOT this LR-closure batch — disambiguate with a footnote).
-- [ ] Update `CLAUDE.md` if any new operator runbook step lands (LR-06 in particular).
-- [ ] **Acceptance:** all six LR rows flipped from "open" to "migrated" or "permanently exempted"; closure report evidence-complete.
-- [ ] **Authority:** full autonomous merge — final sub-phase.
+Closure report shipped at `docs/evidence/provider-model-binding/PHASE_28_CLOSURE_REPORT.md`. Phase 28 final state:
+
+- **2 LRs migrated:** LR-06 (`autoProvisionProviders` extracted to `seed-from-env.ts`) + LR-09 (ALREADY_FIXED, register documentation gap).
+- **1 LR reclassified:** LR-04 (chat-completion caller, not embedding).
+- **4 LRs deferred to Phase 29:** LR-01, LR-02, LR-03, LR-08 — all caller-side migrations grouped under one phase.
+- **2 new Model Access primitives:** `embed` (D-MA-EMBED-1..7) + `runViaOpenllmBridge` (D-MA-TOOL-1..8).
+- **1 boundary lint allowlist entry purged** (LR-06).
+- **Zero new TEMPORARY_EXCEPTION_WITH_DEADLINEs.** Cap stayed 0 / 1 allowed.
+- **47 net new tests** added.
+- **CI 5/5 green** through every Phase 28 PR.
+
+The original goal ("close LR-01..09 register entries") is half-met: 2 of 7 migrated, 5 deferred to Phase 29. The honest framing is: **Phase 28 = primitive layer + low-risk closures; Phase 29 = caller migration layer.** That's the structure of the work the call sites actually require.
+
+Phase 29 is **not yet authorized** for autonomous execution. User re-grant required before Phase 29 starts.
+
+**Lessons summarized in the closure report (the six-instance pattern):** when locking a sub-phase scope, walk the actual call sites first AND walk the call graph one or two hops out. The register snapshots scope at write-time; code drifts. PR #223 (migration 0042) and PR #224 (`useCount` field) established the same shape; six Phase 28 sub-phases reinforced it.
 
 ---
 
