@@ -82,15 +82,18 @@ Scoped narrowly to the env-read elimination; preserved the legacy `providers` ta
 
 **Out of scope (filed as latent follow-up):** porting the three `providers`-table readers (`provider-sync.ts:48`, `web-instance-manager.ts:71`, `kgra-agent/nodes.ts:33`) to `provider_connections`. The pre-existing latent bug in `provider-sync.ts` / `web-instance-manager.ts` (encrypted blob written to `auth.json` / spawn env without decrypt) is documented but not fixed in this sub-phase.
 
-### 28.3 — LR-08 migration: `/api/chat/stream` + `executeInvokeAgent` `[bundle]`
+### 28.3 — LR-08 migration — **DEFERRED → Phase 29**
 
-Both surfaces today consume `getProviderRegistry()`. After 28.2 closes, the registry is no longer env-seeded — but both surfaces still bypass Plan v3 binding/Model Access.
+Scope discovery during execution surfaced that LR-08's prescribed fix materially underestimated the migration. The register treats LR-08 as "two callers consume `getProviderRegistry()`," but reality is that the workspace-scoped **routing layer** (`server/inference/provider-router.ts:resolvePlan`) is itself a registry consumer at lines 17, 137, 205. Closing LR-08 cleanly requires migrating the routing layer, not just the two named callers. Plus two unresolved decisions: workspace-default binding (chat-stream has no `agentId`), and legacy-`agents`-table support (`executeInvokeAgent` operates on `agents`, not `ags_agent_drafts`).
 
-- [ ] **28.3a — `/api/chat/stream` migration.** Migrate `server/chat/stream.ts` to: resolve the workspace's default provider binding via `agentStudio.providerBindings.resolveForRun` (or the equivalent for non-AS sessions — see open question §6.1) → call `openRouter.modelAccess.stream` via gateway. Removes `getProviderRegistry` dependency. The legacy chat UI is the only caller.
-- [ ] **28.3b — `executeInvokeAgent` migration.** Migrate `server/automation/block-executors.ts:executeInvokeAgent` (lines 202–270) to: resolve the agent's binding via `agentStudio.providerBindings.resolveForRun` → call `openRouter.modelAccess.execute`. Removes `getProviderRegistry` dependency.
-- [ ] **28.3c** — Boundary-lint allowlist purge for both surfaces.
-- [ ] **Acceptance:** chat-stream + executeInvokeAgent integration tests pass against Model Access; LR-08 row flips to `migrated`; legacy chat UI still works in dev.
-- [ ] **Authority:** full autonomous merge.
+**Decision: DEFER to Phase 29.** Deadline rolls forward; per the Phase 27.4 precedent, a deadline roll is not a new TEMPORARY_EXCEPTION. User authorized the deferral on 2026-05-07 after surfacing the scope discovery.
+
+Closed by:
+
+- `docs/evidence/provider-model-binding/PHASE_28_LR_08_DEFERRAL_DECISION.md` — full rationale.
+- `docs/architecture/provider-model-binding/PHASE_29_SCOPING.md` — Phase 29 scope, tentative sub-phase decomposition, sizing.
+
+**Lesson reinforced (third time this Phase 28 batch):** when closing a register row, re-grep against current `main` AND walk the call graph one or two hops out. Same chain-of-trust drift caught in 28.1 (LR-09 already fixed) and 28.2 (LR-06 had downstream readers the register didn't name).
 
 ### 28.4 — Model Access embedding-execute primitive
 
