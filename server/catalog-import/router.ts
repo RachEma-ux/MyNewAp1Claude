@@ -13,7 +13,8 @@ import {
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
 import { parseFileContent, buildFileImportPreview } from "./file-parser";
-import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById, updateCatalogEntry } from "../db";
+import { getDb } from "../db";
+import { createCatalogEntry, createCatalogAuditEvent, getCatalogEntryById, updateCatalogEntry } from "../ai-types/public-api";
 import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";

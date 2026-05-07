@@ -61,12 +61,14 @@ export {
   createCatalogEntry,
   updateCatalogEntry,
   approveCatalogEntry,
+  deleteCatalogEntry,
   setEntryClassifications,
   createCatalogAuditEvent,
   createPublishBundle,
   recallPublishBundle,
   createExecutionRun,
   updateExecutionRun,
+  seedTaxonomy,
 } from "./db";
 
 // Service-runtime helpers — resolve a service-based agent target from the
@@ -153,6 +155,11 @@ export type {
 // Module boot. The platform layer calls this from `_core/index.ts` at
 // startup; sibling modules should not.
 export { bootAiTypesModule } from "./boot";
+
+// Module router. The platform layer mounts this from
+// `server/platform/modules/module-routers.ts` at app boot; sibling
+// modules should not import it directly.
+export { aiTypesRouter } from "./router";
 
 // Re-export the drizzle-schema row + insert types for callers using the
 // helpers above. Keeps caller imports tight (single `from "../ai-types/public-api"`)

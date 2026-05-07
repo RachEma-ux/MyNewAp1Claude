@@ -70,7 +70,7 @@ import {
   createCatalogAuditEvent,
   getTaxonomyNodes,
   setEntryClassifications,
-} from "../db";
+} from "../ai-types/public-api";
 
 // ============================================================================
 // Input Validation Schemas
