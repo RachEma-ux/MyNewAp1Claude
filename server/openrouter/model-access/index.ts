@@ -7,6 +7,10 @@
 
 export { execute, stream, validateBinding } from "./execute";
 export { embed } from "./embed";
+export {
+  runViaOpenllmBridge,
+  deriveOpenllmWsUrl,
+} from "./run-via-openllm-bridge";
 export type {
   ModelAccessIntent,
   ModelAccessMessage,
@@ -18,5 +22,12 @@ export type {
   ModelAccessEmbedResult,
   ValidateBindingInput,
   ValidateBindingResult,
+  BridgePermissionDecision,
+  BridgePermissionResolver,
+  BridgeMcpServerConfig,
+  BridgeSessionConfigResult,
+  BridgeUsage,
+  RunViaOpenllmBridgeInput,
+  RunViaOpenllmBridgeResult,
 } from "./types";
 export { ModelAccessError } from "./types";

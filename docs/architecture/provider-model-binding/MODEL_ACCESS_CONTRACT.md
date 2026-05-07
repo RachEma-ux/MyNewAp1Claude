@@ -8,14 +8,15 @@ upstream HTTP calls combine.
 
 ## What Model Access is
 
-A facade over the upstream-provider runtime client. Four actions:
+A facade over the upstream-provider runtime client. Four gateway-callable actions plus one direct-import primitive:
 
-| Action | Purpose | Receipt |
+| Surface | Purpose | Receipt |
 |---|---|---|
 | `openRouter.modelAccess.execute` | Non-streaming completion | hybrid |
 | `openRouter.modelAccess.stream` | Streaming completion | hybrid |
 | `openRouter.modelAccess.validateBinding` | Reference/policy check, no upstream HTTP | none |
 | `openRouter.modelAccess.embed` | Embedding generation (single + batch); OpenAI-compatible only — Phase 28.4, D-MA-EMBED-1..7 | hybrid |
+| `runViaOpenllmBridge` (direct-import) | openllm-agent2 WebSocket bridge with `permissionResolver` callback + MCP `configure_session` — Phase 28.6, D-MA-TOOL-1..8 | hybrid (caller-enforced upstream; not gateway-callable because the callback can't serialize) |
 
 `config.update` is a separate non-runtime action for OpenRouter's
 own configuration plane.
@@ -135,6 +136,14 @@ playground) do this.
 - `server/openrouter/model-access/embed.test.ts` — happy path
   (single + batch), Anthropic refusal, failure modes, dimension
   pass-through, correlation-id echo (Phase 28.4 D-MA-EMBED-1..7).
+- `server/openrouter/model-access/run-via-openllm-bridge.test.ts` —
+  18 tests covering open/token/done happy path, permission_request
+  flow (allow / deny-fallback / needs_human / resolver throws),
+  configure_session (ack / no-ack timeout / not-sent-when-empty),
+  failure modes (WebSocket error / close-before-done / overall
+  timeout / credential resolution failure), and apiKey extraction
+  from Authorization vs x-api-key headers (Phase 28.6
+  D-MA-TOOL-1..8).
 - `server/openrouter/manifest-receipt-policy.test.ts` — hybrid receipt
   policy for execute / stream / embed.
 - `tests/pmb/boundary.test.ts` invariant 5 — `process.env` read scan.

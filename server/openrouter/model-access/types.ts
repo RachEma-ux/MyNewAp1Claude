@@ -165,6 +165,145 @@ export interface ValidateBindingResult {
   latencyMs: number;
 }
 
+// ── Phase 28.6 — openllm-agent bridge primitive types ───────────────
+
+/**
+ * Phase 28.6 (D-MA-TOOL-3): permission decision returned by the
+ * caller-supplied resolver callback.
+ *
+ *  - "allow"        → respond `{ allowed: true }` to openllm-agent2
+ *  - "deny"         → respond `{ allowed: false }`
+ *  - "needs_human"  → still respond `{ allowed: false }` (no
+ *                     interactive UI yet) but log a policy event
+ */
+export type BridgePermissionDecision = "allow" | "deny" | "needs_human";
+
+/**
+ * Phase 28.6 (D-MA-TOOL-3): caller-supplied permission resolver.
+ * Called once per `{type:"permission_request"}` message from the
+ * openllm-agent2 WebSocket. Falls back to "deny" if omitted (Phase 1b
+ * safety default preserved).
+ */
+export type BridgePermissionResolver = (request: {
+  toolName?: string;
+  toolKey?: string;
+  description?: string;
+  rawPayload: Record<string, unknown>;
+}) => BridgePermissionDecision | Promise<BridgePermissionDecision>;
+
+/**
+ * Phase 28.6 (D-MA-TOOL-6): MCP server config sent to the bridge as
+ * part of `configure_session`. Mirrors the upstream
+ * `McpServerConfig` shape (`src/services/mcp/types.ts` in
+ * openllm-agent2). The discriminated union covers the 5 transports
+ * Studio drafts use today; the upstream patch accepts the full
+ * 8-transport union so future additions pass straight through.
+ *
+ * OAuth tokens are decrypted **server-side BEFORE** being put into
+ * this object (decision #9a). The bridge MUST NOT log the `headers`
+ * field — it may contain bearer tokens.
+ */
+export type BridgeMcpServerConfig =
+  | {
+      type: "stdio";
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+    }
+  | { type: "http"; url: string; headers?: Record<string, string> }
+  | { type: "sse"; url: string; headers?: Record<string, string> }
+  | { type: "websocket"; url: string; headers?: Record<string, string> }
+  | { type: "sdk"; serverName: string };
+
+/**
+ * Phase 28.6: result of the `configure_session` handshake. Populated
+ * when the upstream bridge replies with `{type:"session_configured"}`
+ * within the 2-second feature-detection window.
+ */
+export interface BridgeSessionConfigResult {
+  mcpServerCount: number;
+  mcpToolCount: number;
+  errors: Array<{ serverName: string; error: string }>;
+}
+
+/**
+ * Phase 28.6: token + cost usage parsed from the `{type:"done"}`
+ * message. Provider-tolerant (Anthropic / OpenAI / Gemini / Ollama
+ * field aliases all collapse here). All fields optional because
+ * shape varies by provider; the parser bails to `undefined` if no
+ * field matches.
+ */
+export interface BridgeUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  /** USD * 1_000_000 (microcents) — int math, no float drift */
+  costMicrocents?: number;
+  /** Original payload as received, for forensic display */
+  raw?: Record<string, unknown>;
+}
+
+/**
+ * Phase 28.6 (D-MA-TOOL-4): input for the openllm-agent bridge
+ * primitive. Replaces the legacy adapter's `wsUrl + apiKey + provider`
+ * fields with `providerConnectionId`. The bridge resolves the
+ * credential internally via `withProviderCredential`, derives the
+ * WebSocket URL from `baseUrl`, and extracts the API key from the
+ * resolved auth headers.
+ */
+export interface RunViaOpenllmBridgeInput {
+  providerConnectionId: number;
+  modelRef: string;
+  /** The user message to send as the first turn */
+  message: string;
+  /** Hard timeout for the whole run (default 60s; simulation uses 6 min) */
+  timeoutMs?: number;
+  /** AbortSignal — when aborted, sends {type:"cancel"} and closes the WS */
+  signal?: AbortSignal;
+  /** Phase 1c: caller-supplied permission resolver (D-MA-TOOL-3) */
+  permissionResolver?: BridgePermissionResolver;
+  /** Phase 18: MCP servers to inject via configure_session */
+  mcpServers?: BridgeMcpServerConfig[];
+  /** Phase 18: scope hint forwarded to openllm-agent2 MCP plugin */
+  mcpScope?: "project" | "user" | "managed";
+  /** Phase 18: configure_session ack timeout (default 2s) */
+  sessionConfigureTimeoutMs?: number;
+  /** Streaming callbacks (optional — caller can collect via the result) */
+  onToken?: (chunk: string) => void;
+  onPermissionRequest?: (payload: Record<string, unknown>) => void;
+  onPolicyEvent?: (payload: Record<string, unknown>) => void;
+  onError?: (message: string) => void;
+  onSessionConfigured?: (result: BridgeSessionConfigResult) => void;
+  /** Identity for governance/telemetry (D-MA-TOOL-5) */
+  intent: ModelAccessIntent;
+  workspaceId: number;
+  actorId: number;
+  correlationId?: string;
+}
+
+/**
+ * Phase 28.6 (D-MA-TOOL-4): result of the bridge run.
+ */
+export interface RunViaOpenllmBridgeResult {
+  ok: boolean;
+  text: string;
+  tokenCount: number;
+  durationMs: number;
+  error?: string;
+  finalizedNormally: boolean;
+  usage?: BridgeUsage;
+  permissionEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
+  policyEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
+  /**
+   *  - null     → no `configure_session` was sent
+   *  - object   → upstream acknowledged with counts/errors
+   *  - "no_ack" → upstream silently dropped the message; live run
+   *               proceeded WITHOUT MCP injection
+   */
+  sessionConfig: BridgeSessionConfigResult | "no_ack" | null;
+  correlationId?: string;
+}
+
 /** Normalized error class for Model Access execution failures. */
 export class ModelAccessError extends Error {
   constructor(
