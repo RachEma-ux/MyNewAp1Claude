@@ -136,9 +136,14 @@ All three callers share the workspace-default-binding upstream dependency that d
 There is no current consumer for a generic streaming-with-tool-calls primitive — building one now violates "don't add features beyond what the task requires." 28.6 ships **only the openllm-agent bridge primitive**.
 
 - [x] **28.6a — Decision record.** `MODEL_ACCESS_TOOL_LOOP_DECISION.md` locks D-MA-TOOL-1..8: direct-import shape (mirroring `stream()` precedent because `permissionResolver` callback can't pass through gateway-call serialization), location inside Model Access subtree (D2 boundary requirement), `permissionResolver` callback contract unchanged from today, input/output shape via `withProviderCredential`, hybrid receipt policy (callers gate upstream), MCP-server lifecycle preserved (configure_session sent when array non-empty), bridge does NOT do multi-turn tool loops.
-- [ ] **28.6b — Implementation + tests.** New `server/openrouter/model-access/run-via-openllm-bridge.ts` (~300 LOC, relocate-and-rewire from the AS adapter); test file mirrors the existing adapter tests; `types.ts` additions; `index.ts` re-export. AS adapter loses `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveProviderApiKey` (those die in 28.7); retains URL derivation helpers until simulation stops importing them.
-- [ ] **Acceptance:** primitive lands with test coverage matching today's adapter; `pnpm run check` clean; `MODEL_ACCESS_CONTRACT.md` documents the new direct-import surface.
-- [ ] **Authority:** full autonomous merge.
+- [x] **28.6b — Implementation + tests.** Shipped:
+  - `server/openrouter/model-access/run-via-openllm-bridge.ts` (~440 LOC) — full bridge implementation. `withProviderCredential` resolves credentials inside Model Access (D2 boundary preserved); WS URL derived from `baseUrl`; apiKey extracted from `Authorization: Bearer X` (with x-api-key fallback for Anthropic-style headers). Direct-import async function, no gateway-call wrapper.
+  - `server/openrouter/model-access/run-via-openllm-bridge.test.ts` — 18 unit tests with hoisted fake `ws` mock + `awaitWs()` helper to wait past the credential-resolver microtask. Covers happy path / permission flow (allow / deny-fallback / needs_human / resolver throws) / configure_session (ack / no-ack timeout / not-sent-when-empty) / WebSocket failures (error event / close-before-done / overall timeout) / credential resolution failure / Bearer + x-api-key extraction.
+  - `types.ts` — added `BridgePermissionDecision`, `BridgePermissionResolver`, `BridgeMcpServerConfig`, `BridgeSessionConfigResult`, `BridgeUsage`, `RunViaOpenllmBridgeInput`, `RunViaOpenllmBridgeResult`.
+  - `index.ts` — re-exported `runViaOpenllmBridge`, `deriveOpenllmWsUrl`, all 7 new types.
+  - `MODEL_ACCESS_CONTRACT.md` — documents the new direct-import surface.
+  - AS adapter unchanged in this PR — its `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveProviderApiKey` continue to exist alongside the new primitive. They die in 28.7 when simulation swaps over.
+- [x] **Acceptance — met:** 18/18 tests pass; `pnpm run check` clean; contract doc updated.
 
 ### 28.7 — LR-01 simulation migration
 
