@@ -24,7 +24,7 @@ import {
   checkServiceHealthByName,
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
-} from "../ai-types/service-runtime";
+} from "../ai-types/public-api";
 import { getCatalogEntryById, getCatalogEntries } from "../ai-types/public-api";
 import {
   getDefaultReasoningLlmRef,

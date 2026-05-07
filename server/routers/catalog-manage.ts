@@ -89,7 +89,7 @@ import { normalizeDiscovery, toArtifactSummary } from "../governance/discovery-a
 import { TRPCError } from "@trpc/server";
 import { createAppBlockerError, appBlockerToTRPCError } from "../_core/blockers";
 import { evaluateStageReview } from "../governance/stage-review";
-import { createModel as createDomainModel, createLlm as createDomainLlm, resolveProviderFromCatalogEntry } from "../ai-types/service";
+import { createModel as createDomainModel, createLlm as createDomainLlm, resolveProviderFromCatalogEntry } from "../ai-types/public-api";
 
 // ── Rate Limiting & Caching ─────────────────────────────────────────
 const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
