@@ -62,29 +62,25 @@ Closed by `PHASE_28_OPENCODE_SUBPROCESS_DECISION.md`. LR-09 row in register flip
 
 **Lesson:** when closing a register row, re-grep the file against current `main` rather than trusting the prior doc's snapshot. Same chain-of-trust drift that PR #223 (migration 0042) and PR #224 (`useCount` field) surfaced.
 
-### 28.2 — LR-06 extract: `seed-from-env.ts` `[bundle]`
+### 28.2 — LR-06 extract: `seed-from-env.ts` (Scope A) — **CLOSED**
 
-Highest-risk register entry per the register itself ("High — this IS the env-to-runtime path Decision D1 forbids"). No upstream Model Access dep.
+Scoped narrowly to the env-read elimination; preserved the legacy `providers` table as the write target for back-compat with three readers (`provider-sync.ts`, `web-instance-manager.ts`, `kgra-agent/nodes.ts`). Migrating those readers to `provider_connections` is deferred to a follow-up sub-phase.
 
-**Today's flow** (`_core/index.ts:120-140`):
+**Shipped:**
 
-```
-boot → autoProvisionProviders(): for each PROVIDER_ENV_VAR pair, if process.env[var] set → upsert into legacy `providers` table with apiKey field
-```
+- [x] `scripts/provider-connections/seed-from-env.ts` — full implementation with `--dry-run` / `--force` flags, idempotent skip-existing default, four outcome states (`created` / `rotated` / `skipped_already_exists` / `skipped_no_env`), DI-friendly `seedProvidersFromEnv()` for testing.
+- [x] `_core/index.ts` — removed `autoProvisionProviders` block + `ENV_PROVIDER_MAP` constant + `encrypt` import; replaced with `maybeWarnUnseededProviders()` dev-mode hint that only logs when `DEV_MODE=true` AND env vars are set AND providers table is empty.
+- [x] `scripts/check-provider-key-env-boundary.ts` — purged the `_core/index.ts` `<dynamic>` allowlist entry. The `<seed-script>` sentinel for `seed-from-env.ts` was already in place from Phase 5.
+- [x] `CLAUDE.md` — added step 4d to the Local App Launch Procedure.
+- [x] `tests/scripts/seed-from-env.test.ts` — 7 unit tests covering all four outcome states + encryption pipeline + DB-unavailable error path.
 
-**Target flow:**
+**Acceptance — met:**
 
-```
-operator/CI runs `pnpm tsx scripts/provider-connections/seed-from-env.ts` → for each env var, write encrypted secret into `provider_connections` (the Plan v3 source-of-truth table)
-boot → no env-key reading; fails closed if `provider_connections` is empty in dev (with a one-line "did you run seed-from-env.ts?" hint)
-```
+- [x] Boundary lint green without the `_core/index.ts` allowlist entry.
+- [x] Seed-script tests 7/7.
+- [x] LR-06 row in register flipped to `migrated`.
 
-- [ ] **28.2a** — Author `scripts/provider-connections/seed-from-env.ts`. Read same env-var set as today (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY`); write to `provider_connections` via the existing encryption path (mirror what the operator UI uses). Idempotent: re-running with the same env values is a no-op; with new values, rotates the secret.
-- [ ] **28.2b** — Remove the `autoProvisionProviders()` block from `_core/index.ts`. Replace with a dev-mode check: if `provider_connections` is empty AND `DEV_MODE=true`, log a one-liner pointing at the new script, but don't block boot.
-- [ ] **28.2c** — Update boundary lint: `check-provider-key-env-boundary.ts` removes the `<dynamic>` allowlist entry for `_core/index.ts:120-140`.
-- [ ] **28.2d** — Update CLAUDE.md "Local App Launch Procedure" to add `seed-from-env.ts` as a one-time setup step before first `npm run dev`.
-- [ ] **Acceptance:** boundary lint green without the allowlist entry; dev boot works on a fresh DB after running the seed script; LR-06 row in register flips to `migrated`.
-- [ ] **Authority:** full autonomous merge. Risk note: this is the "silently breaks dev startup" surface; the PR must include a manual-test note exercising fresh-DB boot.
+**Out of scope (filed as latent follow-up):** porting the three `providers`-table readers (`provider-sync.ts:48`, `web-instance-manager.ts:71`, `kgra-agent/nodes.ts:33`) to `provider_connections`. The pre-existing latent bug in `provider-sync.ts` / `web-instance-manager.ts` (encrypted blob written to `auth.json` / spawn env without decrypt) is documented but not fixed in this sub-phase.
 
 ### 28.3 — LR-08 migration: `/api/chat/stream` + `executeInvokeAgent` `[bundle]`
 

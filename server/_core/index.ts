@@ -22,7 +22,6 @@ import { startCleanupInterval } from "../catalog-import/session-service";
 import { getSession } from "../catalog-import/session-service";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { encrypt } from "./encryption";
 import { ideProxyRouter } from "../code-studio/opencode/ide-proxy";
 import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
@@ -110,37 +109,36 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   return port;
 }
 
-const ENV_PROVIDER_MAP = [
-  { envKey: "OPENAI_API_KEY", name: "OpenAI", type: "openai" },
-  { envKey: "ANTHROPIC_API_KEY", name: "Anthropic", type: "anthropic" },
-  { envKey: "GOOGLE_API_KEY", name: "Google", type: "google" },
-  { envKey: "GROQ_API_KEY", name: "Groq", type: "groq" },
+const PROVIDER_ENV_KEYS = [
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "GOOGLE_API_KEY",
+  "GROQ_API_KEY",
 ] as const;
 
-async function autoProvisionProviders() {
+/**
+ * Phase 28.2 (LR-06 closure): the runtime no longer reads provider
+ * keys from `process.env`. Operators run
+ * `pnpm tsx scripts/provider-connections/seed-from-env.ts` once at
+ * provisioning time. In dev mode, surface a one-line hint when env
+ * vars are present but the providers table is empty — easy to miss
+ * the first time someone clones the repo.
+ */
+async function maybeWarnUnseededProviders() {
+  if (process.env.DEV_MODE !== "true") return;
+  const setEnvKeys = PROVIDER_ENV_KEYS.filter((k) => !!process.env[k]);
+  if (setEnvKeys.length === 0) return;
   try {
     const db = getDb();
     if (!db) return;
-
-    for (const { envKey, name, type } of ENV_PROVIDER_MAP) {
-      const apiKey = process.env[envKey];
-      if (!apiKey) continue;
-
-      // Check if provider already exists
-      const existing = await db.select().from(providersTable).where(eq(providersTable.type, type)).limit(1);
-      if (existing.length > 0) continue;
-
-      await db.insert(providersTable).values({
-        name,
-        type,
-        enabled: true,
-        priority: 50,
-        config: { apiKey: encrypt(apiKey) },
-      });
-      console.log(`[AutoProvision] Created ${name} provider from ${envKey}`);
-    }
-  } catch (error: any) {
-    console.warn(`[AutoProvision] Skipped — ${error.message}`);
+    const existing = await db.select({ id: providersTable.id }).from(providersTable).limit(1);
+    if (existing.length > 0) return;
+    console.warn(
+      `[DevMode] Provider env vars set (${setEnvKeys.join(", ")}) but the providers table is empty. ` +
+        `Run \`pnpm tsx scripts/provider-connections/seed-from-env.ts\` once to seed encrypted rows.`,
+    );
+  } catch {
+    // DB unavailable on a fresh boot is fine — this is just a hint.
   }
 }
 
@@ -180,8 +178,10 @@ async function startServer() {
   // Ensure at least one workspace exists (idempotent)
   await ensureDefaultWorkspace();
 
-  // Auto-provision providers from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
-  await autoProvisionProviders();
+  // Phase 28.2: provider seeding moved to
+  // `scripts/provider-connections/seed-from-env.ts`. In dev, surface
+  // a hint when env vars are set but no providers exist.
+  await maybeWarnUnseededProviders();
 
   // Wire AI Types module ports (provider, agent, governance adapters)
   bootAiTypesModule();
