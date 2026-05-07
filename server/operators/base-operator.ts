@@ -35,6 +35,16 @@ export abstract class BaseOperator {
   async generatePlan(job: OperatorJob): Promise<SyscallBatch> {
     const userPrompt = this.buildUserPrompt(job);
 
+    // PMB Phase 29.5 — workspaceId is required by the post-LR-04
+    // provider hub. Operator jobs without a workspace context cannot
+    // resolve a classifier binding and are refused before any
+    // upstream call.
+    if (!job.intent.workspaceId) {
+      throw new Error(
+        `[Operator/${this.name}] Job ${job.jobId} cannot be planned without a workspaceId on the intent (PMB Phase 29.5).`,
+      );
+    }
+
     const request: ProviderHubRequest = {
       operator: this.name,
       jobId: job.jobId,
@@ -44,6 +54,7 @@ export abstract class BaseOperator {
       temperature: job.constraints.temperature,
       responseFormat: "json",
       traceId: job.traceId,
+      workspaceId: job.intent.workspaceId,
     };
 
     const response: ProviderHubResponse = await callProviderHub(request);
