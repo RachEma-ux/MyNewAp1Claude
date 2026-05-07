@@ -95,6 +95,7 @@ When asked to open/start/run the app on localhost:3000, ALWAYS follow these step
 4. Ensure main DB exists: `psql -d mynewap1claude -c "SELECT 1;" || createdb mynewap1claude`
 4b. Ensure ASDB exists (Agent Studio dedicated DB, Phase 12.5): `psql -d asdb -c "SELECT 1;" || createdb asdb`
 4c. Ensure RAGDB exists (RAG Knowledge Graph DB): `psql -d ragdb -c "SELECT 1;" || createdb ragdb`
+4d. Seed provider rows from env (one-time per fresh DB; idempotent — Phase 28.2 replaced the boot-time `autoProvisionProviders` block with this script): `pnpm tsx scripts/provider-connections/seed-from-env.ts`
 5. Start dev server: `TMPDIR=/data/data/com.termux/files/usr/tmp nohup npm run dev > /data/data/com.termux/files/usr/tmp/dev-server.log 2>&1 &`
 6. Wait and verify: `/data/data/com.termux/files/usr/bin/sleep 5 && tail -3 /data/data/com.termux/files/usr/tmp/dev-server.log` — confirm `Server running on http://localhost:3000/`
 7. Open: `xdg-open "http://localhost:3000/"`

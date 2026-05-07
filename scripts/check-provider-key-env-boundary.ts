@@ -78,21 +78,13 @@ interface AllowedOccurrence {
 }
 
 const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
-  // LR-06: the existing autoProvisionProviders boot block in
-  // `_core/index.ts` reads provider keys at startup to seed the
-  // legacy `providers` table. Plan v3 RETIRE decision (Phase 27.4
-  // matrix item #8): replace with `scripts/provider-connections/seed-from-env.ts`.
-  // The actual extract requires moving the encrypted-secret write
-  // target from the legacy `providers` table to `provider_connections`,
-  // which is a focused Phase 28 follow-up.
-  {
-    file: "server/_core/index.ts",
-    envKey: "<dynamic>",
-    registerId: "LR-06",
-    deadlinePhase: "Phase 28",
-    reason:
-      "autoProvisionProviders ENV_PROVIDER_MAP boot seed. Phase 27.4 decision: RETIRE; extract owned by Phase 28.",
-  },
+  // LR-06: CLOSED in Phase 28.2 (`f0fa131`-onwards). The
+  // `autoProvisionProviders` boot block was extracted to
+  // `scripts/provider-connections/seed-from-env.ts`. The script is
+  // allowed to read provider env vars (it's the one legitimate path
+  // per Plan v3 D1) and is allowlisted by file-name match below.
+  // The boot file no longer reads provider env keys; if you see this
+  // entry restored, something has regressed and the lint should fail.
   // LR-01 (Phase 27.7 narrowed): Agent Studio runtime adapter —
   // `process.env[pc.apiKeyEnvVar]`. After Phase 27.3 (chat-stream)
   // and Phase 27.5 (services/chat.ts) closed their callers,
