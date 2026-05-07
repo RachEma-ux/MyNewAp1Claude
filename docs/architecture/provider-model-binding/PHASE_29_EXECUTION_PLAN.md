@@ -78,14 +78,11 @@ Shipped:
 
 The central new decision Phase 29 owns. Four of five callers have no workspace-scoped agent; they need a default binding to resolve.
 
-- [ ] **29.1a — Decision record.** Author `WORKSPACE_DEFAULT_BINDING_DECISION.md` (D-WDB-1..N): which path to take? **Three options to evaluate:**
-  - **(A)** New table `workspace_default_provider_bindings` — explicit (workspace_id, role) → providerConnectionId mapping. Schema work + migration.
-  - **(B)** Platform-agent pattern — synthetic AS agent owned by workspace whose binding IS the workspace default. No schema change; reuses existing AS binding infra.
-  - **(C)** Per-caller default — each caller picks its own default policy. No new shared infra.
-- [ ] **29.1b — Implementation per ADR.** Schema migration if needed (manual SQL per #223 lesson — ASDB doesn't run drizzle); read API; unit tests.
-- [ ] **Acceptance:** ADR locked; primitive lands; tests cover the lookup path.
-- [ ] **Estimate:** 1–2 PRs, ~150–250 LOC.
-- [ ] **Pause if:** the §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers. Surface options instead of forcing a fit.
+- [x] **29.1a — Decision record.** `WORKSPACE_DEFAULT_BINDING_DECISION.md` shipped, locking **D-WDB-1..8** (Option A: dedicated `ags_workspace_default_provider_bindings` table keyed by `(workspaceId, role)`; roles `chat`/`embedding`/`tool`/`classifier`; read API at `server/agent-studio/workspace-default-bindings.ts`; operator-applied migration per #223 lesson; D-WDB-5 documents the `workspaceId` threading required for LR-02 / LR-04).
+- [ ] **29.1b — Implementation per ADR.** Drizzle table declaration in `drizzle/tables/agent-studio.ts` + operator-applied SQL at `scripts/migrations/manual/workspace-default-provider-bindings.sql` + `resolveWorkspaceDefaultBinding` read API + unit tests + smoke verification (`\d` confirms table on local ASDB).
+- [ ] **Acceptance:** ADR locked (29.1a ✓); primitive lands; tests cover the lookup path.
+- [ ] **Estimate:** 1–2 PRs, ~250 LOC.
+- [ ] **Pause if:** ~~the §29.1 ADR can't pick one shape that fits all 4 non-LR-01 callers~~ — closed at 29.1a: D-WDB-1 picks Option A; D-WDB-5 documents the per-caller threading.
 
 ### 29.2 — `providerRouter` migration ADR
 
