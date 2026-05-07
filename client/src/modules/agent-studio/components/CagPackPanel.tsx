@@ -11,6 +11,10 @@
  * Tools render their `riskClass` badge so D-TOOL-4 hard-block conditions
  * (quarantined, code_execution-without-sandbox) are visible without
  * cross-referencing the export wizard.
+ *
+ * The Identity card surfaces the D-CAG-RECON-2 exercise counters
+ * (`useCount` + `lastUsedAt`) so operators can triage warm vs. orphaned
+ * packs without joining `ags_cag_pack_events` against the pack table.
  */
 
 import { useState } from "react";
@@ -50,6 +54,9 @@ export default function CagPackPanel({ workspaceId, agentId }: Props) {
   );
 
   const pack = packQuery.data;
+  const exercise = pack as
+    | { useCount?: number | null; lastUsedAt?: Date | string | null }
+    | undefined;
   const content = (pack as { contentJson?: any } | undefined)?.contentJson as
     | {
         identity?: { name?: string; role?: string | null; scope?: string | null };
@@ -98,6 +105,12 @@ export default function CagPackPanel({ workspaceId, agentId }: Props) {
               <div className="text-xs text-muted-foreground">
                 role: {content.identity?.role ?? "—"} · scope:{" "}
                 {content.identity?.scope ?? "—"}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                used: {exercise?.useCount ?? 0}× · last:{" "}
+                {exercise?.lastUsedAt
+                  ? new Date(exercise.lastUsedAt).toLocaleString()
+                  : "never"}
               </div>
             </div>
             <Button

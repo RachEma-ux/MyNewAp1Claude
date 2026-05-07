@@ -507,6 +507,40 @@ describe("RETROFIT D-RET-1 (post-D3) — 7 retained source types", () => {
   });
 });
 
+// ── D-CAG-RECON-2 — useCount + lastUsedAt wiring (post-PR #224) ───────
+
+describe("RETROFIT D-CAG-RECON-2 — useCount/lastUsedAt wiring (post-PR #224)", () => {
+  it("CAG service exposes the atomic-increment helper and not the removed timestamp-only helper", async () => {
+    // Tripwire: PR #224 fixed the resolver to call `markPackUsed`
+    // (atomic increment) instead of `touchPackLastUsed` (timestamp-only,
+    // left useCount pinned at 0). The dead helper was removed at the
+    // same time. If a future PR re-introduces a timestamp-only helper
+    // and rewires the resolver to it, this assertion fails.
+    const cag = await import("../../server/agent-studio/services/cag");
+    expect(typeof (cag as any).markPackUsed).toBe("function");
+    expect((cag as any).touchPackLastUsed).toBeUndefined();
+  });
+
+  it("resolver source still calls markPackUsed (regression guard)", async () => {
+    // Content-level tripwire that complements the export-shape check
+    // above. If someone restores a timestamp-only call site without
+    // re-exporting it, the export check passes but the wiring is dead;
+    // this assertion makes sure the resolver continues to invoke the
+    // atomic-increment helper.
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const src = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../../server/agent-studio/services/cag/resolver.ts",
+      ),
+      "utf8",
+    );
+    expect(src).toMatch(/markPackUsed\s*\(/);
+    expect(src).not.toMatch(/touchPackLastUsed\s*\(/);
+  });
+});
+
 // ── D-CAG-RECON-3/4/5 — pack metadata flows through createPack ────────
 
 describe("RETROFIT D-CAG-RECON-3/4/5 — compile metadata wiring (post-PR #219)", () => {
