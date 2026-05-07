@@ -268,7 +268,8 @@ export async function processDocumentUpload(
     processDocumentBackground(
       document.id,
       buffer,
-      input.fileType
+      input.fileType,
+      input.workspaceId,
     ).catch((error) => {
       console.error(`[DocumentProcessor] Background processing failed for document ${document.id}:`, error);
     });
@@ -290,7 +291,8 @@ export async function processDocumentUpload(
 async function processDocumentBackground(
   documentId: number,
   buffer: Buffer,
-  fileType: string
+  fileType: string,
+  workspaceId: number,
 ) {
   const {
     updateDocumentStatus,
@@ -335,33 +337,34 @@ async function processDocumentBackground(
 
     await createDocumentChunks(chunkRecords);
 
-    // Generate and store embeddings if OpenAI API key is configured
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        console.log(`[DocumentProcessor] Generating embeddings for document ${documentId}`);
-        const { getEmbeddingService } = await import('../embeddings/service');
-        const embeddingService = getEmbeddingService();
-        
-        // Get the saved chunks with their IDs
-        const savedChunks = await getDocumentChunks(documentId);
-        
-        // Store embeddings
-        await embeddingService.storeChunkEmbeddings(
-          savedChunks.map(chunk => ({
-            id: chunk.id,
-            content: chunk.content,
-            documentId: chunk.documentId,
-            chunkIndex: chunk.chunkIndex,
-          }))
-        );
-        
-        console.log(`[DocumentProcessor] Embeddings generated for document ${documentId}`);
-      } catch (embError) {
-        console.error(`[DocumentProcessor] Failed to generate embeddings for document ${documentId}:`, embError);
-        // Don't fail the entire process if embeddings fail
-      }
-    } else {
-      console.log(`[DocumentProcessor] Skipping embeddings (OPENAI_API_KEY not configured)`);
+    // Generate and store embeddings via the workspace's `embedding`
+    // default binding (PMB Phase 29.4b). The previous gate on the
+    // OpenAI provider env var is replaced by an
+    // `EmbeddingResolutionError` raised from inside the service when
+    // the workspace has no usable embedding binding configured.
+    try {
+      console.log(`[DocumentProcessor] Generating embeddings for document ${documentId}`);
+      const { getEmbeddingService } = await import('../embeddings/service');
+      const embeddingService = getEmbeddingService();
+
+      const savedChunks = await getDocumentChunks(documentId);
+      await embeddingService.storeChunkEmbeddings(
+        savedChunks.map(chunk => ({
+          id: chunk.id,
+          content: chunk.content,
+          documentId: chunk.documentId,
+          chunkIndex: chunk.chunkIndex,
+        })),
+        workspaceId,
+      );
+
+      console.log(`[DocumentProcessor] Embeddings generated for document ${documentId}`);
+    } catch (embError) {
+      // Don't fail the document upload if embeddings fail. The most
+      // common cause is `EmbeddingResolutionError` (workspace has no
+      // embedding default binding) — operators surface this via the
+      // workspace settings UI when 29.1c admin surface lands.
+      console.error(`[DocumentProcessor] Failed to generate embeddings for document ${documentId}:`, embError);
     }
 
     // Update status to completed

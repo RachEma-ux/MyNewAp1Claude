@@ -134,7 +134,7 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
   let retrievedChunks: Array<{ documentId: number; content: string; similarity: number }> = [];
   if (executionConfig.hasDocumentAccess) {
     try {
-      const chunks = await embeddingService.searchSimilarChunks(userMessage, 3);
+      const chunks = await embeddingService.searchSimilarChunks(userMessage, 3, options.workspaceId);
       retrievedChunks = chunks.map((c: any) => ({
         documentId: c.documentId,
         content: c.content,
@@ -309,7 +309,7 @@ export async function* executeAgentStream(options: AgentExecutionOptions): Async
 
   if (executionConfig.hasDocumentAccess) {
     try {
-      const chunks = await embeddingService.searchSimilarChunks(userMessage, 3);
+      const chunks = await embeddingService.searchSimilarChunks(userMessage, 3, options.workspaceId);
 
       if (chunks.length > 0) {
         const contextMessage = `Relevant context from documents:

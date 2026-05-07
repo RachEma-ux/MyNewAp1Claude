@@ -93,25 +93,16 @@ const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
   // `runViaOpenAIDirect` / `runViaOpenllmAgent` / `resolveOpenllmEndpoint`
   // in the codebase). If you see this entry restored, the adapter has
   // returned and the lint should fail.
-  // LR-02: Embeddings. Phase 27.4 decision: TEMPORARY_EXCEPTION_WITH_DEADLINE.
-  // Deferred to Phase 28 alongside the Model Access embedding-execute
-  // primitive (Model Access today is chat/stream/validateBinding only).
-  {
-    file: "server/embeddings/service.ts",
-    envKey: "OPENAI_API_KEY",
-    registerId: "LR-02",
-    deadlinePhase: "Phase 28",
-    reason:
-      "Embeddings runtime; deferred to Phase 28 — depends on Model Access embedding-execute primitive.",
-  },
-  // LR-03: Documents. Same shape and deadline as LR-02.
-  {
-    file: "server/documents/processor.ts",
-    envKey: "OPENAI_API_KEY",
-    registerId: "LR-03",
-    deadlinePhase: "Phase 28",
-    reason: "Document processor; same Model Access embedding-endpoint dependency as LR-02.",
-  },
+  // LR-02 + LR-03: CLOSED in Phase 29.4b. Both `server/embeddings/service.ts`
+  // and `server/documents/processor.ts` were migrated onto the workspace-
+  // default-binding lookup (`resolveWorkspaceDefaultBinding`, role='embedding')
+  // + `gatewayCall(openRouter.modelAccess.embed)` with `intent="system-internal"`
+  // (the new infrastructure-call lane added in Phase 29.4a). The
+  // `process.env.OPENAI_API_KEY` reads at lines 54/59 of service.ts and
+  // line 339 of processor.ts are gone. The legacy `agents/executor.ts`
+  // RAG caller threads `options.workspaceId` into `searchSimilarChunks`.
+  // If you see these entries restored, something has regressed and the
+  // lint should fail.
   // LR-04: Operators hub. Same shape and deadline as LR-02.
   {
     file: "server/operators/provider-hub.ts",

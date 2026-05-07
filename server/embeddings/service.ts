@@ -1,21 +1,90 @@
-import { QdrantClient } from '@qdrant/js-client-rest';
-import OpenAI from 'openai';
-
 /**
- * Vector embedding service for document chunks
+ * Vector embedding service for document chunks.
+ *
+ * PMB Phase 29.4b — credential resolution moved off the OpenAI env-var
+ * read onto the workspace-default-binding lookup. Public methods now
+ * take a `workspaceId` argument; the service resolves the workspace's
+ * `embedding` default binding via `resolveWorkspaceDefaultBinding`
+ * (PMB Phase 29.1b) and dispatches to
+ * `gatewayCall(openRouter.modelAccess.embed)` with `intent: "system-internal"`
+ * (PMB Phase 29.4a — infrastructure-call lane exempt from the receipt
+ * policy because document indexing / RAG retrieval have no
+ * user-attributed receipt source).
+ *
+ * Per D-WDB-5, the previous singleton cache is gone — each call resolves
+ * the binding for its workspace. Callers that need a long-lived handle
+ * still get a service instance via `getEmbeddingService(...)`, but the
+ * Qdrant client is the only mutable state held on the instance.
+ *
+ * `EmbeddingResolutionError` is thrown when the workspace has no
+ * embedding default binding configured OR the linked Provider Connection
+ * fails eligibility (D-WDB-3 reasons: `default_not_set`,
+ * `provider_connection_missing`, `provider_connection_disabled`,
+ * `provider_connection_unhealthy`). This replaces the previous
+ * "OPENAI_API_KEY not configured" error with a typed reason.
  */
+
+import { QdrantClient } from "@qdrant/js-client-rest";
+import { gatewayCall } from "../platform/modules/module-gateway";
+import { resolveWorkspaceDefaultBinding } from "../agent-studio/workspace-default-bindings";
+import type {
+  ModelAccessEmbedInput,
+  ModelAccessEmbedResult,
+} from "../openrouter/model-access/types";
+
+const DEFAULT_COLLECTION = "documents";
+const DEFAULT_EMBED_BATCH_SIZE = 100;
+
+export class EmbeddingResolutionError extends Error {
+  constructor(
+    public readonly workspaceId: number,
+    public readonly reason:
+      | "default_not_set"
+      | "provider_connection_missing"
+      | "provider_connection_disabled"
+      | "provider_connection_unhealthy",
+  ) {
+    super(
+      `[Embeddings] Workspace ${workspaceId} has no usable embedding binding (reason=${reason}). ` +
+        `Configure the default via ags_workspace_default_provider_bindings (role='embedding').`,
+    );
+    this.name = "EmbeddingResolutionError";
+  }
+}
+
+interface ResolvedEmbeddingBinding {
+  providerConnectionId: number;
+  modelRef: string;
+}
+
+async function resolveBindingOrThrow(
+  workspaceId: number,
+): Promise<ResolvedEmbeddingBinding> {
+  const result = await resolveWorkspaceDefaultBinding({
+    workspaceId,
+    role: "embedding",
+  });
+  if (!result) {
+    throw new EmbeddingResolutionError(workspaceId, "default_not_set");
+  }
+  if (!result.ok) {
+    throw new EmbeddingResolutionError(
+      workspaceId,
+      result.reason ?? "provider_connection_missing",
+    );
+  }
+  return {
+    providerConnectionId: result.providerConnectionId,
+    modelRef: result.modelRef,
+  };
+}
+
 export class EmbeddingService {
   private qdrant: QdrantClient | null = null;
-  private openai: OpenAI | null = null;
   private collectionName: string;
-  private embeddingModel: string;
 
-  constructor(
-    collectionName: string = 'documents',
-    embeddingModel: string = 'text-embedding-3-small'
-  ) {
+  constructor(collectionName: string = DEFAULT_COLLECTION) {
     this.collectionName = collectionName;
-    this.embeddingModel = embeddingModel;
   }
 
   /**
@@ -24,19 +93,16 @@ export class EmbeddingService {
   private async initQdrant() {
     if (this.qdrant) return this.qdrant;
 
-    // Use in-memory Qdrant for simplicity (no external service needed)
-    this.qdrant = new QdrantClient({ url: ':memory:' });
-    
-    // Create collection if it doesn't exist
+    this.qdrant = new QdrantClient({ url: ":memory:" });
+
     try {
       await this.qdrant.getCollection(this.collectionName);
       console.log(`[Embeddings] Using existing collection: ${this.collectionName}`);
-    } catch (error) {
-      // Collection doesn't exist, create it
+    } catch {
       await this.qdrant.createCollection(this.collectionName, {
         vectors: {
-          size: 1536, // text-embedding-3-small dimension
-          distance: 'Cosine',
+          size: 1536,
+          distance: "Cosine",
         },
       });
       console.log(`[Embeddings] Created collection: ${this.collectionName}`);
@@ -46,81 +112,98 @@ export class EmbeddingService {
   }
 
   /**
-   * Initialize OpenAI client
+   * Generate embedding for a single text.
+   * Resolves the workspace's `embedding` default and routes through Model Access.
    */
-  private initOpenAI() {
-    if (this.openai) return this.openai;
+  async generateEmbedding(text: string, workspaceId: number): Promise<number[]> {
+    const binding = await resolveBindingOrThrow(workspaceId);
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+    const result = await gatewayCall<ModelAccessEmbedInput, ModelAccessEmbedResult>({
+      ctx: {
+        sourceModule: "embeddings",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.embed",
+        workspaceId,
+      },
+      input: {
+        providerConnectionId: binding.providerConnectionId,
+        modelRef: binding.modelRef,
+        inputs: text,
+        intent: "system-internal",
+        workspaceId,
+        actorId: 0,
+      },
+    });
+
+    if (result.status !== "ok" || result.embeddings.length === 0) {
+      throw new Error(
+        `[Embeddings] modelAccess.embed failed for workspace ${workspaceId}: ${result.error ?? "no embeddings returned"}`,
+      );
     }
-
-    this.openai = new OpenAI({ apiKey });
-    return this.openai;
+    return result.embeddings[0];
   }
 
   /**
-   * Generate embedding for a single text
+   * Generate embeddings for multiple texts in a single batch call.
    */
-  async generateEmbedding(text: string): Promise<number[]> {
-    const openai = this.initOpenAI();
+  async generateEmbeddings(
+    texts: string[],
+    workspaceId: number,
+  ): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    const binding = await resolveBindingOrThrow(workspaceId);
 
-    try {
-      const response = await openai.embeddings.create({
-        model: this.embeddingModel,
-        input: text,
-      });
+    const result = await gatewayCall<ModelAccessEmbedInput, ModelAccessEmbedResult>({
+      ctx: {
+        sourceModule: "embeddings",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.embed",
+        workspaceId,
+      },
+      input: {
+        providerConnectionId: binding.providerConnectionId,
+        modelRef: binding.modelRef,
+        inputs: texts,
+        intent: "system-internal",
+        workspaceId,
+        actorId: 0,
+      },
+    });
 
-      return response.data[0].embedding;
-    } catch (error) {
-      console.error('[Embeddings] Error generating embedding:', error);
-      throw new Error(`Failed to generate embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (result.status !== "ok") {
+      throw new Error(
+        `[Embeddings] modelAccess.embed batch failed for workspace ${workspaceId}: ${result.error ?? "unknown error"}`,
+      );
     }
+    return result.embeddings;
   }
 
   /**
-   * Generate embeddings for multiple texts in batch
+   * Store document chunk embeddings in vector database.
+   * Each batch resolves the binding once and routes through Model Access.
    */
-  async generateEmbeddings(texts: string[]): Promise<number[][]> {
-    const openai = this.initOpenAI();
-
-    try {
-      const response = await openai.embeddings.create({
-        model: this.embeddingModel,
-        input: texts,
-      });
-
-      return response.data.map(item => item.embedding);
-    } catch (error) {
-      console.error('[Embeddings] Error generating embeddings:', error);
-      throw new Error(`Failed to generate embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Store document chunk embeddings in vector database
-   */
-  async storeChunkEmbeddings(chunks: Array<{
-    id: number;
-    content: string;
-    documentId: number;
-    chunkIndex: number;
-  }>): Promise<void> {
+  async storeChunkEmbeddings(
+    chunks: Array<{
+      id: number;
+      content: string;
+      documentId: number;
+      chunkIndex: number;
+    }>,
+    workspaceId: number,
+  ): Promise<void> {
     if (chunks.length === 0) return;
 
     const qdrant = await this.initQdrant();
-
-    // Generate embeddings in batches
-    const batchSize = 100;
     const allPoints = [];
 
-    for (let i = 0; i < chunks.length; i += batchSize) {
-      const batch = chunks.slice(i, i + batchSize);
-      const texts = batch.map(chunk => chunk.content);
-      
-      console.log(`[Embeddings] Generating embeddings for batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)}`);
-      const embeddings = await this.generateEmbeddings(texts);
+    for (let i = 0; i < chunks.length; i += DEFAULT_EMBED_BATCH_SIZE) {
+      const batch = chunks.slice(i, i + DEFAULT_EMBED_BATCH_SIZE);
+      const texts = batch.map((chunk) => chunk.content);
+
+      console.log(
+        `[Embeddings] Generating embeddings for batch ${Math.floor(i / DEFAULT_EMBED_BATCH_SIZE) + 1}/${Math.ceil(chunks.length / DEFAULT_EMBED_BATCH_SIZE)}`,
+      );
+      const embeddings = await this.generateEmbeddings(texts, workspaceId);
 
       const points = batch.map((chunk, idx) => ({
         id: chunk.id,
@@ -129,51 +212,50 @@ export class EmbeddingService {
           documentId: chunk.documentId,
           chunkIndex: chunk.chunkIndex,
           content: chunk.content,
+          workspaceId,
         },
       }));
-
       allPoints.push(...points);
     }
 
-    // Upsert all points to Qdrant
     await qdrant.upsert(this.collectionName, {
       wait: true,
       points: allPoints,
     });
-
     console.log(`[Embeddings] Stored ${allPoints.length} chunk embeddings`);
   }
 
   /**
-   * Search for similar chunks using vector similarity
+   * Search for similar chunks using vector similarity.
    */
   async searchSimilarChunks(
     query: string,
-    limit: number = 5,
-    documentIds?: number[]
-  ): Promise<Array<{
-    id: number;
-    score: number;
-    documentId: number;
-    chunkIndex: number;
-    content: string;
-  }>> {
+    limit: number,
+    workspaceId: number,
+    documentIds?: number[],
+  ): Promise<
+    Array<{
+      id: number;
+      score: number;
+      documentId: number;
+      chunkIndex: number;
+      content: string;
+    }>
+  > {
     const qdrant = await this.initQdrant();
+    const queryEmbedding = await this.generateEmbedding(query, workspaceId);
 
-    // Generate query embedding
-    const queryEmbedding = await this.generateEmbedding(query);
+    const filter = documentIds
+      ? {
+          must: [
+            {
+              key: "documentId",
+              match: { any: documentIds },
+            },
+          ],
+        }
+      : undefined;
 
-    // Build filter if documentIds provided
-    const filter = documentIds ? {
-      must: [{
-        key: 'documentId',
-        match: {
-          any: documentIds,
-        },
-      }],
-    } : undefined;
-
-    // Search in Qdrant
     const results = await qdrant.search(this.collectionName, {
       vector: queryEmbedding,
       limit,
@@ -181,7 +263,7 @@ export class EmbeddingService {
       with_payload: true,
     });
 
-    return results.map(result => ({
+    return results.map((result) => ({
       id: result.id as number,
       score: result.score,
       documentId: (result.payload as Record<string, unknown>)?.documentId as number,
@@ -191,34 +273,26 @@ export class EmbeddingService {
   }
 
   /**
-   * Delete embeddings for a document
+   * Delete embeddings for a document.
+   * Workspace-agnostic: relies on the documentId as the dedupe key.
    */
   async deleteDocumentEmbeddings(documentId: number): Promise<void> {
     const qdrant = await this.initQdrant();
-
     await qdrant.delete(this.collectionName, {
       wait: true,
       filter: {
-        must: [{
-          key: 'documentId',
-          match: { value: documentId },
-        }],
+        must: [{ key: "documentId", match: { value: documentId } }],
       },
     });
-
     console.log(`[Embeddings] Deleted embeddings for document ${documentId}`);
   }
 
   /**
-   * Get collection statistics
+   * Get collection statistics.
    */
-  async getStats(): Promise<{
-    vectorCount: number;
-    collectionName: string;
-  }> {
+  async getStats(): Promise<{ vectorCount: number; collectionName: string }> {
     const qdrant = await this.initQdrant();
     const info = await qdrant.getCollection(this.collectionName);
-
     return {
       vectorCount: info.points_count || 0,
       collectionName: this.collectionName,
@@ -226,18 +300,22 @@ export class EmbeddingService {
   }
 }
 
-// Singleton instance
 let embeddingService: EmbeddingService | null = null;
 
 /**
- * Get or create embedding service instance
+ * Get or create an embedding service handle. The handle is workspace-
+ * agnostic — `workspaceId` is passed per call. The Qdrant client is
+ * the only state held on the instance.
+ *
+ * Note: the previous (pre-29.4b) version held `embeddingModel` on the
+ * instance. Model selection is now per-call via the workspace's
+ * `embedding` default binding (`resolveWorkspaceDefaultBinding`).
  */
 export function getEmbeddingService(
   collectionName?: string,
-  embeddingModel?: string
 ): EmbeddingService {
   if (!embeddingService) {
-    embeddingService = new EmbeddingService(collectionName, embeddingModel);
+    embeddingService = new EmbeddingService(collectionName);
   }
   return embeddingService;
 }
