@@ -8,6 +8,7 @@ import { sanitizeErrorForLogging } from '../_core/log-utils';
 import { listActiveForProvider } from '../provider-connections/public-api';
 import { resolveWorkspaceDefaultBinding } from '../agent-studio/workspace-default-bindings';
 import { stream as modelAccessStream } from '../openrouter/model-access';
+import { getModelPricing, computeCost } from '../providers/pricing';
 
 // Zod schema for chat stream request body
 const chatStreamSchema = z.object({
@@ -289,13 +290,13 @@ export async function handleChatStream(req: Request, res: Response) {
           const completionTokens = finalUsage?.outputTokens ?? tokenCount;
           const totalTokens = finalUsage?.totalTokens ?? promptTokens + completionTokens;
 
-          // Cost tracking: per-model pricing lives at the workspace
-          // settings layer post-29.6a; we record token counts only.
-          // The previous `provider.getCostPerToken()` registry hook is
-          // gone with the registry usage; cost calculation moves to
-          // a Phase-30 follow-up alongside the admin-UI for workspace
-          // defaults (29.1c).
-          const cost = 0;
+          // PMB Phase 30.2 — restore cost-tracking via the workspace
+          // pricing config. Lookup order: workspace_pricing_config row →
+          // BUILT_IN_PRICING (OpenAI + Anthropic public list-prices) →
+          // fallback to 0 with a console.warn. Best-effort: pricing
+          // failures never block the chat call.
+          const pricing = await getModelPricing(wsId, binding.modelRef);
+          const cost = computeCost(pricing, promptTokens, completionTokens);
 
           // Track usage (workspace context only — per-provider id no
           // longer applies cleanly post-LR-08; we track providerConnectionId
@@ -319,6 +320,8 @@ export async function handleChatStream(req: Request, res: Response) {
               totalTokens,
             },
             cost,
+            currency: pricing.currency,
+            pricingSource: pricing.source,
             sources: ragSources.length > 0 ? ragSources : undefined,
             routing: routingPlan ? {
               requestId: routingPlan.requestId,
