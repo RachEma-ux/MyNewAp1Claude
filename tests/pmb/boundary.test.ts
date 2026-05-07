@@ -277,24 +277,18 @@ describe("Phase 42 invariant 5 — Model Access does not read process.env provid
 // ────────────────────────────────────────────────────────────────────
 //
 // After Phase 27.3 (chat-stream → Model Access) and 27.5 (services/chat.ts
-// fallback removal), the only remaining LR-01 reader of provider env vars
-// in Agent Studio is the simulation engine (sole approved Phase 27
-// exception, documented in PHASE_27_SIMULATION_ENGINE_DECISION.md). This
-// invariant locks that scope: any *new* Agent Studio file that reads
-// `process.env.<X>_API_KEY` or instantiates `new OpenAI({...})` is a
-// regression and must fail CI.
+// fallback removal) and Phase 29.0a (LR-01 simulation migration onto
+// Model Access primitives + adapter dead-code purge), there is NO
+// remaining LR-01 surface inside Agent Studio. The allowlist is empty
+// by design: any Agent Studio file that reads `process.env.<X>_API_KEY`
+// or instantiates `new OpenAI({...})` is now a regression and must
+// fail CI.
 
-describe("Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is locked to simulation only", () => {
-  const ALLOWED_AS_PATHS = new Set<string>([
-    // The shared resolver. Its sole runtime caller after 27.3/27.5 is
-    // simulation; the resolver itself is allowlisted in the boundary
-    // script with the LR-01 register link.
-    "server/agent-studio/adapters/openllm-runtime-adapter.ts",
-    // Simulation live-runtime branch — the explicit Phase 27.6 exception.
-    "server/agent-studio/services/simulation.ts",
-    // Adapter modules invoked exclusively by simulation.
-    "server/agent-studio/adapters/openai-direct-adapter.ts",
-  ]);
+describe("Phase 27.7 + 29.0a invariant 5b — Agent Studio raw provider-key surface is fully closed", () => {
+  // Phase 29.0a deleted `openllm-runtime-adapter.ts` and
+  // `openai-direct-adapter.ts` outright; simulation now resolves
+  // credentials via Model Access. No allowlist entries remain.
+  const ALLOWED_AS_PATHS = new Set<string>([]);
 
   const NON_PROVIDER_KEYS = new Set(["BUILT_IN_FORGE_API_KEY", "OMNIRAG_API_KEY"]);
 
@@ -342,7 +336,7 @@ describe("Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is l
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
-  it("no Agent Studio source outside the simulation allowlist imports resolveProviderApiKey", () => {
+  it("no Agent Studio source imports `resolveProviderApiKey` (function deleted in Phase 29.0a)", () => {
     const files = walkTs("server/agent-studio", { skipTests: true });
     const offenders: string[] = [];
     for (const f of files) {
@@ -350,11 +344,42 @@ describe("Phase 27.7 invariant 5b — Agent Studio raw provider-key surface is l
       if (ALLOWED_AS_PATHS.has(rel)) continue;
       const src = readFileSync(f, "utf8");
       // Match a real import of resolveProviderApiKey (not a doc/comment).
+      // The function was deleted entirely in Phase 29.0a; any restored
+      // import is a regression of the LR-01 closure.
       const stripped = src
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/\/\/[^\n]*/g, "");
       if (/\bimport\b[^;]*\bresolveProviderApiKey\b/.test(stripped)) {
         offenders.push(rel);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("no source defines `resolveProviderApiKey` / `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveOpenllmEndpoint` (deleted in Phase 29.0a)", () => {
+    const files = [
+      ...walkTs("server/agent-studio", { skipTests: true }),
+      ...walkTs("server/openrouter", { skipTests: true }),
+    ];
+    const offenders: string[] = [];
+    const deleted = [
+      "resolveProviderApiKey",
+      "runViaOpenllmAgent",
+      "runViaOpenAIDirect",
+      "resolveOpenllmEndpoint",
+    ];
+    for (const f of files) {
+      const rel = relPath(f);
+      const src = readFileSync(f, "utf8");
+      const stripped = src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*/g, "");
+      for (const name of deleted) {
+        // Match a real definition (export function / function / const X =).
+        const re = new RegExp(`\\b(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\b|\\bconst\\s+${name}\\s*=`);
+        if (re.test(stripped)) {
+          offenders.push(`${rel} (defines ${name})`);
+        }
       }
     }
     expect(offenders, offenders.join("\n")).toEqual([]);

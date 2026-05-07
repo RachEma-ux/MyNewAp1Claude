@@ -106,10 +106,11 @@ export async function syncProviderKeysToOpenCode(): Promise<{
     // Fix: never mutate process.env from this sync. If a child
     // OpenCode process needs the keys, pass them explicitly through
     // `spawn`'s env option using a decrypted value — don't pollute
-    // the parent's global env. Other code paths that resolve provider
-    // keys (Agent Studio's resolveProviderApiKey, etc.) continue to
-    // read the original .env / boot-time env that hasn't been
-    // tampered with.
+    // the parent's global env. Phase 29.0a deleted Agent Studio's
+    // `resolveProviderApiKey` adapter; provider credentials there now
+    // resolve through `openRouter.modelAccess.*` via the platform
+    // gateway. The provider env vars themselves stay readable from
+    // .env / boot-time env (this opencode sync still reads them).
 
   } catch (err: any) {
     errors.push(`DB access failed: ${err.message}`);

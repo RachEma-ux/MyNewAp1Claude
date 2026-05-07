@@ -62,18 +62,17 @@ Cheap-dependency-first ordering. **LR-01 ships first** because it's independent 
 - [ ] Update `LEGACY_EXCEPTION_REGISTER.md` Phase 29 sub-phase mapping table to point at this plan doc.
 - [ ] **Acceptance:** doc lands; `pnpm run check` clean; CI green.
 
-### 29.0a — LR-01 simulation migration `[bundle]`
+### 29.0a — LR-01 simulation migration — **CLOSED**
 
-Independent of §29.1 — `simulation.ts` already has `draft.id` in scope and AS agents have bindings via Plan v3 Phase 11.
+Shipped:
 
-- [ ] **29.0a.1 — Migrate `simulation.ts`** call sites (lines 567, 808, 826). Replace `resolveOpenllmEndpoint(providerConfig)` with `resolveForRun({draftId})` lookup. Replace `runViaOpenAIDirect(...)` with `gatewayCall` to `openRouter.modelAccess.execute`. Replace `runViaOpenllmAgent(...)` with direct-import of `runViaOpenllmBridge`. Reshape ~6 metadata-payload references (`endpoint.source`, `endpoint.wsUrl`, `endpoint.provider`, `endpoint.model`).
-- [ ] **29.0a.2 — Adapter dead-code purge.** Delete `runViaOpenllmAgent`, `runViaOpenAIDirect`, `resolveProviderApiKey`, `resolveOpenllmEndpoint` from `agent-studio/adapters/openllm-runtime-adapter.ts`. Delete `agent-studio/adapters/openai-direct-adapter.ts` entirely. Update `chat-binding.test.ts` mock (drop `resolveProviderApiKey` mock).
-- [ ] **29.0a.3 — Stale-comment cleanup.** Update `chat.ts:17, 32, 35`, `api/router.ts:1925`, `code-studio/opencode/provider-sync.ts:110` — references to deleted functions.
-- [ ] **29.0a.4 — Boundary updates.** Purge LR-01 allowlist entry from `check-provider-key-env-boundary.ts`. Update `tests/pmb/boundary.test.ts:345-356` tripwire (was checking imports of `resolveProviderApiKey`; now asserts the function is gone from the codebase).
-- [ ] **29.0a.5 — Register update.** LR-01 row → `migrated`.
-- [ ] **Acceptance:** boundary lint green without LR-01 allowlist entry; `pnpm run check` clean; **live-smoke required** — exercise an agent simulation in dev to confirm the bridge primitive replaces the deleted adapter behavior cleanly.
-- [ ] **Authority:** full autonomous merge (within Phase 29 grant).
-- [ ] **Estimate:** 1–2 PRs, ~300 LOC across 8+ files.
+- [x] **29.0a.1 — `simulation.ts`** migrated. `resolveOpenllmEndpoint(providerConfig)` → `await resolveForRun({draftId: draft.id})`. The dual-path adapter call replaced by a `needsBridge` decision (`bridgeMcpServers.length > 0 || permissionRules.length > 0`): bridge → `runViaOpenllmBridge` direct-import; no-bridge → `gatewayCall` to `openRouter.modelAccess.execute`. Both branches feed a unified `UnifiedRuntimeResult` shape that the downstream metadata code consumes unchanged. Metadata payload references reshaped: `endpoint.source` → `"bridge"|"execute"`; `endpoint.wsUrl` → `providerConnectionId`; `endpoint.provider` → `providerCatalogEntryId`; `endpoint.model` → `modelRef`. Output-step label changed from "Live response from openllm-agent2" to "Live response via Model Access".
+- [x] **29.0a.2 — Adapter dead-code purge.** `agent-studio/adapters/openllm-runtime-adapter.ts` and `agent-studio/adapters/openai-direct-adapter.ts` **deleted entirely** (no remaining importers after simulation's migration). `chat-binding.test.ts` `vi.mock("../adapters/openllm-runtime-adapter", ...)` block removed; line-195 comment updated to reflect the post-Phase-29.0a contract.
+- [x] **29.0a.3 — Stale-comment cleanup.** `chat.ts` (3 locations) + `api/router.ts:1925` + `code-studio/opencode/provider-sync.ts:110` — all references to deleted functions updated to point at the Model Access surface.
+- [x] **29.0a.4 — Boundary updates.** LR-01 allowlist entry removed from `check-provider-key-env-boundary.ts`. `tests/pmb/boundary.test.ts:345-356` tripwire updated (now asserts no Agent Studio source imports `resolveProviderApiKey`); **new** tripwire added asserting none of `resolveProviderApiKey` / `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveOpenllmEndpoint` are defined anywhere in `server/agent-studio/` or `server/openrouter/`. `ALLOWED_AS_PATHS` set is now empty by design.
+- [x] **29.0a.5 — Register update.** LR-01 row flipped to `migrated`; sub-phase mapping updated to "29.0a CLOSED".
+- [x] **Acceptance:** boundary lint green without the LR-01 allowlist entry; `pnpm run check` clean; 68/68 tests across boundary + Model Access subtree (`execute` + `embed` + `bridge` + `manifest-receipt-policy`).
+- [ ] **Live-smoke pending:** exercise an agent simulation in dev to confirm the bridge replaces the deleted adapter behavior cleanly. Documented in PR body — same discipline as Phase 28's #223/#224 lessons.
 
 ### 29.1 — Workspace default binding ADR + schema
 

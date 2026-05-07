@@ -25,14 +25,25 @@ import * as mcpManager from "./mcp/mcp-manager";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
 import { previewRetrieval } from "../adapters/knowledge-adapter";
+// Phase 29.0a: simulation now resolves the agent's binding via
+// `resolveForRun` and routes live runs through Model Access:
+//   - `runViaOpenllmBridge` (direct-import) for runs that need the
+//     openllm-agent2 WebSocket protocol (MCP servers + permission flow)
+//   - `openRouter.modelAccess.execute` (gateway-call) for everything
+//     else — lighter HTTP path
+// Plan v3 D1 boundary preserved: simulation never touches process.env
+// for credentials. Model Access resolves them internally via
+// `withProviderCredential`. Phase 28.6b shipped the bridge primitive;
+// Phase 28.4 shipped the embed primitive (not consumed here).
+import { resolveForRun } from "../bindings";
+import { gatewayCall } from "../../platform/modules/module-gateway";
 import {
-  resolveOpenllmEndpoint,
-  runViaOpenllmAgent,
-  type PermissionDecision,
-  type PermissionResolver,
-  type McpServerConfigForBridge,
-} from "../adapters/openllm-runtime-adapter";
-import { runViaOpenAIDirect } from "../adapters/openai-direct-adapter";
+  runViaOpenllmBridge,
+  type BridgePermissionDecision as PermissionDecision,
+  type BridgePermissionResolver as PermissionResolver,
+  type BridgeMcpServerConfig as McpServerConfigForBridge,
+  type ModelAccessResult,
+} from "../../openrouter/model-access";
 
 /**
  * Phase 1c: Match a tool name against a permission-rule tool pattern.
@@ -564,8 +575,15 @@ export async function runSimulation(input: {
   // adapter and use its real response. Otherwise stay deterministic.
   if (!aborted) {
     const providerConfig = (draft.providerConfig ?? {}) as Record<string, unknown>;
-    const endpoint = resolveOpenllmEndpoint(providerConfig);
-    const useLiveRuntime = !toggles.mockedTools && endpoint !== null;
+    // Phase 29.0a: replaces `resolveOpenllmEndpoint(providerConfig)`. Live
+    // runs require the agent to have a hosted Provider Connection
+    // binding (`providerConnection !== null`); local-provider bindings
+    // and unbound agents stay deterministic-only.
+    const bindingResult = await resolveForRun({ draftId: draft.id });
+    const useLiveRuntime =
+      !toggles.mockedTools &&
+      bindingResult.ok &&
+      bindingResult.providerConnection !== null;
 
     let responsePreview: string;
     let outputDurationMs = 18;
@@ -574,7 +592,9 @@ export async function runSimulation(input: {
       refusalBehavior: draft.refusalBehavior ?? null,
     };
 
-    if (useLiveRuntime && endpoint) {
+    if (useLiveRuntime && bindingResult.providerConnection) {
+      const pcid = bindingResult.providerConnection.providerConnectionId;
+      const modelRef = bindingResult.binding.modelRef;
       // Build the user message from the input payload
       const inputText =
         typeof (inputPayload as any).prompt === "string"
@@ -774,78 +794,162 @@ export async function runSimulation(input: {
         bridgeMcpServers = [];
       }
 
-      // Phase 19 follow-up: pick the runtime adapter based on the
-      // endpoint source + provider:
+      // Phase 29.0a: pick the Model Access surface based on what the
+      // run actually needs:
       //
-      //   - Direct OpenAI (no external process required):
-      //       provider === "openai" AND source === "default"
-      //       (meaning the user has NOT set a baseUrl or
-      //        OPENLLM_AGENT_URL, so they're not pointing at
-      //        openllm-agent2). This gives "it just works" simulation
-      //        for the common case — set OPENAI_API_KEY in env and Run.
+      //   - Bridge (`runViaOpenllmBridge`, direct-import):
+      //       when MCP servers OR permission rules are configured.
+      //       The agent loop runs against openllm-agent2's WebSocket
+      //       protocol — `configure_session` injects MCP, and
+      //       `permission_request` events flow through the resolver.
+      //       Requires the binding's Provider Connection to point at
+      //       an openllm-agent2 instance (a plain OpenAI Provider
+      //       Connection has no WebSocket endpoint).
       //
-      //   - openllm-agent2 WebSocket:
-      //       any other case — either provider is not openai, or the
-      //       user explicitly configured a baseUrl / env override
-      //       pointing at an openllm-agent2 instance. This path
-      //       supports the full agent loop (MCP tools, permission
-      //       requests, governance events, etc.).
+      //   - Execute (`openRouter.modelAccess.execute`, gateway-call):
+      //       when no permission/MCP features are needed. Lighter HTTP
+      //       path; works against any HTTP-based provider (OpenAI,
+      //       Anthropic, openllm-agent2 passthrough).
       //
-      // Both paths return the same OpenllmRuntimeResult shape so the
-      // downstream handling (usage rollup, output payload, timeline)
-      // is identical.
-      const useDirectOpenai =
-        endpoint.provider === "openai" &&
-        endpoint.source === "default" &&
-        typeof endpoint.apiKey === "string" &&
-        endpoint.apiKey.length > 0;
+      // Both branches map their result onto the unified shape that
+      // the downstream metadata-payload code expects (matches the
+      // legacy `OpenllmRuntimeResult` contract).
+      //
+      // Phase 3 timeout policy (6 minutes) preserved on the bridge
+      // path so a `permission_request` that goes to "ask" can wait
+      // the full 5-minute human-poll window plus 1 minute of slack.
 
-      // Phase 3: WS timeout must accommodate the worst case where the
-      // agent issues a permission_request that goes to "ask" and a human
-      // takes the full 5-minute permission poll window to respond. We use
-      // 6 minutes here to give 1 minute of slack for the rest of the run.
-      const liveResult = useDirectOpenai
-        ? await runViaOpenAIDirect({
-            apiKey: endpoint.apiKey!,
-            model: endpoint.model!,
-            systemPrompt:
-              [draft.systemInstructions, draft.roleInstructions]
-                .filter((s) => typeof s === "string" && s.length > 0)
-                .join("\n\n") || "You are a helpful assistant.",
-            userMessage: inputText,
+      const needsBridge =
+        bridgeMcpServers.length > 0 || permissionRules.length > 0;
+      const systemPrompt =
+        [draft.systemInstructions, draft.roleInstructions]
+          .filter((s) => typeof s === "string" && s.length > 0)
+          .join("\n\n") || "You are a helpful assistant.";
+
+      type UnifiedRuntimeResult = {
+        ok: boolean;
+        text: string;
+        tokenCount: number;
+        durationMs: number;
+        error?: string;
+        finalizedNormally: boolean;
+        usage?: {
+          inputTokens?: number;
+          outputTokens?: number;
+          totalTokens?: number;
+          costMicrocents?: number;
+        };
+        permissionEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
+        policyEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
+        sessionConfig:
+          | null
+          | "no_ack"
+          | { mcpServerCount: number; mcpToolCount: number; errors: Array<{ serverName: string; error: string }> };
+      };
+
+      let liveResult: UnifiedRuntimeResult;
+
+      if (needsBridge) {
+        const bridgeResult = await runViaOpenllmBridge({
+          providerConnectionId: pcid,
+          modelRef,
+          message: inputText,
+          timeoutMs: 6 * 60 * 1000,
+          permissionResolver: trackingResolver,
+          mcpServers: bridgeMcpServers,
+          mcpScope: "managed",
+          intent: "agent-test",
+          workspaceId: bindingResult.binding.workspaceId,
+          actorId: input.triggeredBy ?? 0,
+        });
+        liveResult = {
+          ok: bridgeResult.ok,
+          text: bridgeResult.text,
+          tokenCount: bridgeResult.tokenCount,
+          durationMs: bridgeResult.durationMs,
+          error: bridgeResult.error,
+          finalizedNormally: bridgeResult.finalizedNormally,
+          usage: bridgeResult.usage
+            ? {
+                inputTokens: bridgeResult.usage.inputTokens,
+                outputTokens: bridgeResult.usage.outputTokens,
+                totalTokens: bridgeResult.usage.totalTokens,
+                costMicrocents: bridgeResult.usage.costMicrocents,
+              }
+            : undefined,
+          permissionEvents: bridgeResult.permissionEvents,
+          policyEvents: bridgeResult.policyEvents,
+          sessionConfig: bridgeResult.sessionConfig,
+        };
+      } else {
+        const executeResult = (await gatewayCall({
+          ctx: {
+            sourceModule: "agentStudio",
+            targetModule: "openRouter",
+            actionKey: "openRouter.modelAccess.execute",
+            workspaceId: bindingResult.binding.workspaceId,
+            actorId: input.triggeredBy ?? 0,
+          },
+          input: {
+            providerConnectionId: pcid,
+            modelRef,
+            messages: [
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: inputText },
+            ],
+            intent: "agent-test" as const,
+            workspaceId: bindingResult.binding.workspaceId,
+            actorId: input.triggeredBy ?? 0,
             temperature:
               typeof (providerConfig as any).temperature === "number"
                 ? (providerConfig as any).temperature
                 : 0.2,
-            maxTokens:
+            tokenBudget:
               typeof (providerConfig as any).maxTokens === "number"
                 ? (providerConfig as any).maxTokens
                 : undefined,
-            timeoutMs: 6 * 60 * 1000,
-          })
-        : await runViaOpenllmAgent({
-            wsUrl: endpoint.wsUrl,
-            message: inputText,
-            provider: endpoint.provider,
-            model: endpoint.model,
-            apiKey: endpoint.apiKey,
-            timeoutMs: 6 * 60 * 1000,
-            permissionResolver: trackingResolver,
-            // Phase 18: inject MCP servers into the live runtime.
-            // When empty, the adapter sends no `configure_session`
-            // and behaves exactly as it did pre-Phase-18 (decision #8b).
-            mcpServers: bridgeMcpServers,
-            mcpScope: "managed",
-          });
+          },
+        })) as ModelAccessResult;
+        liveResult = {
+          ok: executeResult.status === "ok",
+          text: executeResult.output ?? "",
+          tokenCount: executeResult.usage?.outputTokens ?? 0,
+          durationMs: executeResult.latencyMs,
+          error: executeResult.error,
+          finalizedNormally: executeResult.status === "ok",
+          usage: executeResult.usage
+            ? {
+                inputTokens: executeResult.usage.inputTokens,
+                outputTokens: executeResult.usage.outputTokens,
+                totalTokens: executeResult.usage.totalTokens,
+                // Model Access doesn't track cost today — Phase 29 leaves
+                // costMicrocents undefined for the execute path. Bridge
+                // path still surfaces cost when the upstream done message
+                // carries it.
+                costMicrocents: undefined,
+              }
+            : undefined,
+          permissionEvents: [],
+          policyEvents: [],
+          sessionConfig: null,
+        };
+      }
 
       if (liveResult.ok) {
         responsePreview = liveResult.text || "(empty response)";
         outputDurationMs = liveResult.durationMs;
         outputPayload.live = true;
-        outputPayload.runtimeSource = endpoint.source;
-        outputPayload.wsUrl = endpoint.wsUrl;
-        outputPayload.provider = endpoint.provider ?? null;
-        outputPayload.model = endpoint.model ?? null;
+        // Phase 29.0a: was `endpoint.source`/`endpoint.wsUrl`/
+        // `endpoint.provider`/`endpoint.model`. The new shape surfaces
+        // the binding's Provider Connection refs so reviewers can join
+        // back to the catalog instead of seeing a raw WS URL.
+        outputPayload.runtimeSource = needsBridge ? "bridge" : "execute";
+        outputPayload.providerConnectionId = pcid;
+        outputPayload.providerCatalogEntryId =
+          bindingResult.binding.providerCatalogEntryId ?? null;
+        outputPayload.modelCatalogEntryId =
+          bindingResult.binding.modelCatalogEntryId ?? null;
+        outputPayload.model = modelRef || null;
         outputPayload.tokenCount = liveResult.tokenCount;
         outputPayload.permissionRequestCount = liveResult.permissionEvents.length;
         outputPayload.policyEventCount = liveResult.policyEvents.length;
@@ -904,8 +1008,8 @@ export async function runSimulation(input: {
         outputPayload.live = true;
         outputPayload.failed = true;
         outputPayload.error = liveResult.error;
-        outputPayload.runtimeSource = endpoint.source;
-        outputPayload.wsUrl = endpoint.wsUrl;
+        outputPayload.runtimeSource = needsBridge ? "bridge" : "execute";
+        outputPayload.providerConnectionId = pcid;
         // Don't abort the simulation — record the failure but let the rest finish
       }
 
@@ -969,7 +1073,7 @@ export async function runSimulation(input: {
       index: stepIdx++,
       type: "output",
       label: useLiveRuntime
-        ? "Live response from openllm-agent2"
+        ? "Live response via Model Access"
         : "Compose response per output contract",
       payload: outputPayload,
       verdict: draft.outputContract ? "pass" : "warning",

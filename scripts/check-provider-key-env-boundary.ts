@@ -85,27 +85,14 @@ const ALLOWED_OCCURRENCES: ReadonlyArray<AllowedOccurrence> = [
   // per Plan v3 D1) and is allowlisted by file-name match below.
   // The boot file no longer reads provider env keys; if you see this
   // entry restored, something has regressed and the lint should fail.
-  // LR-01 (Phase 27.7 narrowed): Agent Studio runtime adapter —
-  // `process.env[pc.apiKeyEnvVar]`. After Phase 27.3 (chat-stream)
-  // and Phase 27.5 (services/chat.ts) closed their callers,
-  // `resolveProviderApiKey` has exactly ONE remaining caller: the
-  // simulation engine's live-mode runtime branch
-  // (`services/simulation.ts:808, 826` via `runViaOpenAIDirect` /
-  // `runViaOpenllmAgent`). The deferral is a deliberate, deadline-bound
-  // exception documented in `PHASE_27_SIMULATION_ENGINE_DECISION.md`
-  // (Option C). Allowlist scope is intentionally retained at the
-  // adapter file because the resolver is shared infrastructure; the
-  // Phase 28 acceptance criterion is "Model Access exposes a streaming-
-  // with-tool-calls + MCP-bridge primitive that simulation can call
-  // via gatewayCall."
-  {
-    file: "server/agent-studio/adapters/openllm-runtime-adapter.ts",
-    envKey: "<dynamic>",
-    registerId: "LR-01",
-    deadlinePhase: "Phase 28",
-    reason:
-      "Simulation engine live-runtime branch only (sole remaining LR-01 caller after 27.3/27.5). See PHASE_27_SIMULATION_ENGINE_DECISION.md.",
-  },
+  // LR-01: CLOSED in Phase 29.0a. The simulation engine's live-runtime
+  // branch was migrated onto `openRouter.modelAccess.execute` +
+  // `runViaOpenllmBridge` (Phase 28.6b primitive). The
+  // `openllm-runtime-adapter.ts` and `openai-direct-adapter.ts` files
+  // were deleted entirely (no more `resolveProviderApiKey` /
+  // `runViaOpenAIDirect` / `runViaOpenllmAgent` / `resolveOpenllmEndpoint`
+  // in the codebase). If you see this entry restored, the adapter has
+  // returned and the lint should fail.
   // LR-02: Embeddings. Phase 27.4 decision: TEMPORARY_EXCEPTION_WITH_DEADLINE.
   // Deferred to Phase 28 alongside the Model Access embedding-execute
   // primitive (Model Access today is chat/stream/validateBinding only).
