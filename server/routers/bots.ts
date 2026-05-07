@@ -30,8 +30,9 @@
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createBot, getAllBots, getBotById, updateBot, isDeployable, getBlockingReasons } from "../db/bots";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/public-api";
+import { getCatalogEntries, getCatalogEntryById } from "../ai-types/public-api";
 import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
+import { gatewayCall } from "../platform/modules/module-gateway";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogState } from "@shared/catalog-state";
 
@@ -242,13 +243,13 @@ export const botsRouter = router({
         );
       }
 
-      // Duplicate prevention (structured FK first, then legacy config)
+      // Idempotency: if a catalog entry already exists for this bot, return
+      // it unchanged (Plan v3 Phase 32 preserves the legacy "no-op on
+      // duplicate" behavior).
       const existingEntries = await getCatalogEntries({ entryType: "bot" });
-      const duplicate = existingEntries.find((entry) => {
-        if (entry.sourceType === "bot" && entry.sourceId === input.id) return true;
-        const config = (entry.config as Record<string, any>) || {};
-        return config.sourceBotId === input.id;
-      });
+      const duplicate = existingEntries.find(
+        (e) => e.sourceType === "bot" && e.sourceId === input.id,
+      );
       if (duplicate) {
         return { success: true, entry: duplicate, imported: false };
       }
@@ -264,46 +265,40 @@ export const botsRouter = router({
         catalogEligible: true,
       };
 
-      const entry = await createCatalogEntry({
-        name: bot.name,
-        displayName: bot.displayName ?? bot.name,
-        description: bot.description ?? null,
-        entryType: "bot",
-        sourceType: "bot",
-        sourceId: bot.id,
-        scope: bot.scope,
-        status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        config,
-        tags: ["candidate", "bot", "catalog-import"],
-        category: "bot",
-        subCategory: null,
-        capabilities: bot.channels ?? null,
-        createdBy: ctx.user.id,
-      });
-
-      // Auto-classify
-      try {
-        const axisNodes = await getTaxonomyNodes({ entryType: "bot", level: "axis" });
-        if (axisNodes.length > 0) {
-          await setEntryClassifications(entry.id, [axisNodes[0].id]);
-        }
-      } catch (e: any) {
-        console.warn(`[Bots] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
-      }
-
-      await createCatalogAuditEvent({
-        eventType: "catalog.bot.submitted",
-        catalogEntryId: entry.id,
-        actor: ctx.user.id,
-        actorType: "user",
-        payload: {
-          sourceBotId: bot.id,
-          reviewState: "needs_review",
-          status: "draft",
+      // Plan v3 Phase 32: route through aiTypes.catalog.register.
+      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+        ctx: {
+          sourceModule: "bots",
+          targetModule: "aiTypes",
+          actionKey: "aiTypes.catalog.register",
+          governanceReceiptId: `bots-import-to-catalog-${bot.id}-${ctx.user.id}-${Date.now()}`,
+          actorId: ctx.user.id,
+        },
+        input: {
+          entryType: "bot",
+          sourceType: "bot",
+          sourceId: bot.id,
+          fields: {
+            name: bot.name,
+            displayName: bot.displayName ?? bot.name,
+            description: bot.description ?? null,
+            scope: bot.scope,
+            status: "draft",
+            origin: "admin",
+            reviewState: "needs_review",
+            config,
+            tags: ["candidate", "bot", "catalog-import"],
+            category: "bot",
+            subCategory: null,
+            capabilities: bot.channels ?? null,
+            createdBy: ctx.user.id,
+          },
+          registeredBy: ctx.user.id,
+          sourceModule: "bots",
         },
       });
+
+      const entry = await getCatalogEntryById(result.entryId);
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -311,9 +306,9 @@ export const botsRouter = router({
         target_type: "bot",
         target_id: String(bot.id),
         decision_result: "success",
-        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+        metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: true };
+      return { success: true, entry, imported: result.action === "created" };
     }),
 });

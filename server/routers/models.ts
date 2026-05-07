@@ -27,8 +27,9 @@
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createModel, getAllModels, getModelById, updateModel, isDeployable, getBlockingReasons } from "../db/models";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/public-api";
+import { getCatalogEntries, getCatalogEntryById } from "../ai-types/public-api";
 import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
+import { gatewayCall } from "../platform/modules/module-gateway";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogState } from "@shared/catalog-state";
 
@@ -236,13 +237,13 @@ export const modelsRouter = router({
         );
       }
 
-      // Check for existing catalog entry to prevent duplicates (structured FK first, then legacy)
+      // Idempotency: if a catalog entry already exists for this model, return
+      // it unchanged (Plan v3 Phase 32 preserves the legacy "no-op on
+      // duplicate" behavior).
       const existingEntries = await getCatalogEntries({ entryType: "model" });
-      const duplicate = existingEntries.find((entry) => {
-        if (entry.sourceType === "model" && entry.sourceId === input.id) return true;
-        const config = (entry.config as Record<string, any>) || {};
-        return config.sourceModelId === input.id;
-      });
+      const duplicate = existingEntries.find(
+        (e) => e.sourceType === "model" && e.sourceId === input.id,
+      );
       if (duplicate) {
         return { success: true, entry: duplicate, imported: false };
       }
@@ -257,47 +258,40 @@ export const modelsRouter = router({
         catalogEligible: true,
       };
 
-      const entry = await createCatalogEntry({
-        name: model.name,
-        displayName: model.displayName,
-        description: null,
-        entryType: "model",
-        sourceType: "model",
-        sourceId: model.id,
-        scope: "app",
-        status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        config,
-        tags: ["candidate", "model", "catalog-import"],
-        category: model.modelType,
-        subCategory: null,
-        capabilities: null,
-        createdBy: ctx.user.id,
-      });
-
-      // Auto-classify
-      try {
-        const axisNodes = await getTaxonomyNodes({ entryType: "model", level: "axis" });
-        if (axisNodes.length > 0) {
-          await setEntryClassifications(entry.id, [axisNodes[0].id]);
-        }
-      } catch (e: any) {
-        console.warn(`[Models] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
-      }
-
-      await createCatalogAuditEvent({
-        eventType: "catalog.model.submitted",
-        catalogEntryId: entry.id,
-        actor: ctx.user.id,
-        actorType: "user",
-        payload: {
-          sourceModelId: model.id,
-          sourceModelType: model.modelType,
-          reviewState: "needs_review",
-          status: "draft",
+      // Plan v3 Phase 32: route through aiTypes.catalog.register.
+      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+        ctx: {
+          sourceModule: "models",
+          targetModule: "aiTypes",
+          actionKey: "aiTypes.catalog.register",
+          governanceReceiptId: `models-import-to-catalog-${model.id}-${ctx.user.id}-${Date.now()}`,
+          actorId: ctx.user.id,
+        },
+        input: {
+          entryType: "model",
+          sourceType: "model",
+          sourceId: model.id,
+          fields: {
+            name: model.name,
+            displayName: model.displayName,
+            description: null,
+            scope: "app",
+            status: "draft",
+            origin: "admin",
+            reviewState: "needs_review",
+            config,
+            tags: ["candidate", "model", "catalog-import"],
+            category: model.modelType,
+            subCategory: null,
+            capabilities: null,
+            createdBy: ctx.user.id,
+          },
+          registeredBy: ctx.user.id,
+          sourceModule: "models",
         },
       });
+
+      const entry = await getCatalogEntryById(result.entryId);
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -305,9 +299,9 @@ export const modelsRouter = router({
         target_type: "model",
         target_id: String(model.id),
         decision_result: "success",
-        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+        metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: true };
+      return { success: true, entry, imported: result.action === "created" };
     }),
 });
