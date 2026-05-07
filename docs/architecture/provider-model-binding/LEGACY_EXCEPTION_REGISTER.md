@@ -24,6 +24,20 @@
 
 Columns: `ID | Path | Owner | Current violation | Reason retained | Risk | Target replacement | Deadline phase | Deadline PR | Status | Reviewer`
 
+### Phase 28 sub-phase mapping
+
+The six Phase-28-deadline LRs are batched under `PHASE_28_EXECUTION_PLAN.md`. Each row's `Deadline phase` cell still reads "Phase 28" for backwards compatibility; the sub-phase that owns the closure is:
+
+| LR | Phase 28 sub-phase | Decision |
+|---|---|---|
+| LR-01 (simulation) | 28.6 (primitive) + 28.7 (caller migration) | MIGRATE_TO_MODEL_ACCESS |
+| LR-02 (embeddings) | 28.4 (primitive) + 28.5a | MIGRATE_TO_MODEL_ACCESS |
+| LR-03 (documents) | 28.4 (primitive) + 28.5b | MIGRATE_TO_MODEL_ACCESS |
+| LR-04 (operators) | 28.4 (primitive) + 28.5c | MIGRATE_TO_MODEL_ACCESS |
+| LR-06 (autoProvisionProviders) | 28.2 | RETIRE → `seed-from-env.ts` |
+| LR-08 (chat-stream + executeInvokeAgent) | 28.3 | MIGRATE_TO_MODEL_ACCESS |
+| LR-09 (opencode subprocess env-write) | 28.1 (decision PR) | TBD — preferred PERMANENT_EXEMPTION |
+
 ### Runtime provider-key paths (D1 violations)
 
 | ID | Path | Owner | Current violation | Reason retained | Risk | Target replacement | Deadline phase | Deadline PR | Status | Reviewer |
