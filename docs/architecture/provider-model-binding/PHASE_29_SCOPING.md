@@ -1,7 +1,8 @@
-# Phase 29 — Scoping Note
+# Phase 29 — Scoping Note (SUPERSEDED)
 
-**Status:** Scoping; not yet a full execution plan.
-**Captured:** 2026-05-07 against `main@9a8d123` (post-Phase-28.2 merge).
+**Status:** **SUPERSEDED by `PHASE_29_EXECUTION_PLAN.md`** (29.0 plan freeze, 2026-05-07). This file is retained as a historical artifact of the Phase 28-deferral-era scoping work; do not edit. New decisions and scope updates land in the plan doc.
+
+**Captured (original):** 2026-05-07 against `main@9a8d123` (post-Phase-28.2 merge).
 **Owner:** Planner role per AGENTS.md (assigned during Phase 29 plan-freeze).
 
 ---
