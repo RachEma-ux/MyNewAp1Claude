@@ -145,14 +145,19 @@ There is no current consumer for a generic streaming-with-tool-calls primitive �
   - AS adapter unchanged in this PR — its `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveProviderApiKey` continue to exist alongside the new primitive. They die in 28.7 when simulation swaps over.
 - [x] **Acceptance — met:** 18/18 tests pass; `pnpm run check` clean; contract doc updated.
 
-### 28.7 — LR-01 simulation migration
+### 28.7 — LR-01 simulation migration — **DEFERRED → Phase 29**
 
-- [ ] **28.7a — Migrate `simulation.ts:808` `runViaOpenAIDirect` call.** Replace with `gatewayCall` to `openRouter.modelAccess.streamWithTools`.
-- [ ] **28.7b — Migrate `simulation.ts:826` `runViaOpenllmAgent` call.** Replace with the MCP-bridge primitive from 28.6c.
-- [ ] **28.7c — Adapter cleanup.** If both `runViaOpenAIDirect` and `runViaOpenllmAgent` have no other callers (they shouldn't), delete them along with `resolveProviderApiKey` (definition at `openllm-runtime-adapter.ts:311`). Acceptance check: `grep -r "resolveProviderApiKey\|runViaOpenAIDirect\|runViaOpenllmAgent"` returns nothing outside test fixtures.
-- [ ] **28.7d** — Boundary-lint allowlist purge for LR-01 simulation.
-- [ ] **Acceptance:** simulation tests green against the new primitives; LR-01 row flips to `migrated` (full closure, not "subset"); the dead `resolveProviderApiKey` definition is gone from the codebase.
-- [ ] **Authority:** full autonomous merge.
+The 28.6b primitive (`runViaOpenllmBridge`) is shipped and ready to consume. The caller-side migration on `simulation.ts` was scoped during 28.7 prep at ~300 LOC across 8+ files (binding lookup + 2 call-site rewrites + 6 metadata-payload reshapes + adapter dead-code purge + comment cleanups + boundary lint update). Combined with the absence of simulation runtime tests on this device, the regression risk on a critical agent-test path argued for grouping the migration with Phase 29's caller batch (LR-02/03/04/08) under one coordinated smoke-test rollout.
+
+**Decision: DEFER to Phase 29.** Deadline rolls forward; per the Phase 27.4 precedent, a deadline roll is not a new TEMPORARY_EXCEPTION. User authorized the deferral on 2026-05-07 after surfacing the migration scope.
+
+Closed by:
+
+- `docs/evidence/provider-model-binding/PHASE_28_LR_01_DEFERRAL_DECISION.md` — full rationale + Phase 28 lesson summary.
+- LR-01 row in register flipped to point at Phase 29; sub-phase mapping updated.
+- `PHASE_29_SCOPING.md` — caller list expanded to 5 (LR-01 added); LR-01 marked as the natural first sub-phase since it's independent of the workspace-default-binding decision (`simulation.ts` already has `draft.id` in scope).
+
+**Lesson reinforced (sixth time this Phase 28 batch):** the prescribed sub-phase shape doesn't always match what the call site actually needs. Five of the six discoveries came from re-grepping current code rather than static review of the docs.
 
 ### 28.8 — Plan-close audit + register reconciliation
 

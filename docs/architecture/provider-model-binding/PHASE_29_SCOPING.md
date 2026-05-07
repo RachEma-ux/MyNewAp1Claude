@@ -24,16 +24,19 @@ The Phase 28 decision was to **defer LR-08 to Phase 29** (`PHASE_28_LR_08_DEFERR
 
 ## Scope (in)
 
-The unifying theme of Phase 29 is: **migrate the workspace-scoped routing path onto Model Access**. After Phase 28.3 deferred LR-08 and Phase 28.4 deferred the LR-02/03/04 caller migrations (with LR-04 reclassified as a chat-completion caller, not embedding), the Phase 29 caller list is:
+The unifying theme of Phase 29 is: **migrate the caller-side wiring onto Model Access**. After Phase 28.3 deferred LR-08, Phase 28.4 deferred the LR-02/03/04 caller migrations (with LR-04 reclassified as a chat-completion caller, not embedding), and Phase 28.7 deferred LR-01 caller migration alongside (primitive shipped in 28.6b but the simulation rewrite was scoped at ~300 LOC and lacked test coverage), the Phase 29 caller list is **5 callers**:
 
-| LR | Caller | Primitive |
-|---|---|---|
-| LR-02 | `embeddings/service.ts` | `openRouter.modelAccess.embed` (built in 28.4) |
-| LR-03 | `documents/processor.ts:339` | Closes transitively with LR-02 |
-| LR-04 | `operators/provider-hub.ts:78` | `openRouter.modelAccess.execute` (existing) |
-| LR-08 | `chat/stream.ts` + `automation/block-executors.ts:executeInvokeAgent` | `execute`/`stream` (existing) + routing-layer migration |
+| LR | Caller | Primitive | Workspace context? |
+|---|---|---|---|
+| LR-01 | `agent-studio/services/simulation.ts:808, 826` | `runViaOpenllmBridge` (28.6b) + `execute` (existing) | Already has `draft.id` (workspace via binding) — independent of §29.1 |
+| LR-02 | `embeddings/service.ts` | `openRouter.modelAccess.embed` (28.4) | None — needs §29.1 default binding |
+| LR-03 | `documents/processor.ts:339` | Closes transitively with LR-02 | None — same as LR-02 |
+| LR-04 | `operators/provider-hub.ts:78` | `openRouter.modelAccess.execute` (existing) | None — needs §29.1 default binding |
+| LR-08 | `chat/stream.ts` + `automation/block-executors.ts:executeInvokeAgent` | `execute`/`stream` (existing) + routing-layer migration | None — needs §29.1 default binding |
 
-All four share the **workspace-default-binding** upstream dependency — the unifying decision Phase 29 owns.
+**LR-01 is independent of the workspace-default-binding decision** — simulation already passes through `draft.id` via the agent's binding row (Plan v3 Phase 11 fully migrated AS agents). It can ship as Phase 29's first sub-phase before §29.1 lands.
+
+The other four share the **workspace-default-binding** upstream dependency — the unifying decision Phase 29 owns.
 
 Concrete deliverables:
 
@@ -63,29 +66,33 @@ Concrete deliverables:
 | Sub-phase | Title | Notes |
 |---|---|---|
 | 29.0 | Plan freeze | Mirror the Phase 28 plan-freeze pattern. Captures decisions made in this scoping note. |
+| **29.0a** | **LR-01 simulation migration** | **First implementation sub-phase — independent of §29.1. Migrates `simulation.ts:808, 826` onto `execute` + `runViaOpenllmBridge`; reshapes the metadata payload; deletes `runViaOpenllmAgent` / `runViaOpenAIDirect` / `resolveProviderApiKey` / `resolveOpenllmEndpoint` from the AS adapter. ~300 LOC across 8+ files. Boundary-lint LR-01 allowlist purged. Live-smoke required (no unit tests on this path).** |
 | 29.1 | Workspace default binding ADR + migration | Decide between table/column vs. platform-agent pattern. Schema + read API + tests. |
 | 29.2 | `providerRouter` migration ADR | Decide: dissolve, or layer over Model Access? |
 | 29.3 | `providerRouter` implementation | Per ADR. |
-| 29.4 | `/api/chat/stream` migration | Now possible via 29.1 + 29.3. |
-| 29.5 | `executeInvokeAgent` migration | Per Path A/B/C decision in ADR (29.2 may include this). |
-| 29.6 | Boundary-lint allowlist purge for LR-08 | Final gate. |
-| 29.7 | Closure report + register reconciliation | LR-08 row → `migrated`. |
+| 29.4 | LR-02/03 (embeddings) — caller migration | Migrate `embeddings/service.ts` onto `modelAccess.embed`; LR-03 closes transitively. Needs §29.1. |
+| 29.5 | LR-04 (operators) — caller migration | Migrate `operators/provider-hub.ts` onto `modelAccess.execute`. Needs §29.1. |
+| 29.6 | LR-08 — `/api/chat/stream` + `executeInvokeAgent` | Per 29.2/29.3. |
+| 29.7 | Boundary-lint allowlist purge for LR-02/03/04/08 | Final gate (LR-01 allowlist purged in 29.0a). |
+| 29.8 | Closure report + register reconciliation | All 5 deferred LR rows → `migrated`. |
 
 ## Tentative sizing
 
 | Sub-phase | PRs | LOC estimate |
 |---|---|---|
 | 29.0 | 1 | ~250 docs |
+| **29.0a (LR-01 simulation)** | **1** | **~300** |
 | 29.1 | 1–2 | ~150 + tests |
 | 29.2 | 1 | ~100 ADR |
 | 29.3 | 2–3 | ~300–500 |
-| 29.4 | 1–2 | ~300 |
-| 29.5 | 1 | ~150 |
-| 29.6 | 1 | ~50 |
-| 29.7 | 1 | ~250 docs |
-| **Total** | **9–11** | **~1,500–2,200 LOC** |
+| 29.4 (LR-02/03 embeddings) | 1 | ~150 |
+| 29.5 (LR-04 operators) | 1 | ~150 |
+| 29.6 (LR-08 chat-stream + executeInvokeAgent) | 1–2 | ~300 |
+| 29.7 | 1 | ~50 |
+| 29.8 | 1 | ~300 docs |
+| **Total** | **11–14** | **~2,000–2,600 LOC** |
 
-Smaller than Phase 27 / Phase 28 because the surface is more focused (one routing layer + two callers, not seven-LR cleanup). The dominant cost is the workspace-default-binding decision and `providerRouter` migration, both of which need ADRs first.
+Phase 28 narrowed to "primitive layer + already-fixed/extract closures"; Phase 29 inherits the caller-migration batch (5 callers) plus the routing-layer rewrite. Total is comparable to Phase 27 / Phase 28 in scope. The dominant cost is the workspace-default-binding decision (§29.1) and `providerRouter` migration (§29.2/29.3) — LR-01 ships first and unblocks momentum.
 
 ---
 
