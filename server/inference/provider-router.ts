@@ -1,25 +1,30 @@
 /**
- * Provider Router
+ * Provider Router — selection-only.
  *
- * Unified routing system that integrates with the existing Providers infrastructure.
- * Enables:
- * - Local-first execution when possible
- * - Cloud fallback when allowed
- * - Policy-based constraint enforcement
- * - Workspace-level routing profiles
- * - Full audit trail for every routing decision
+ * Resolves a routing plan for a request: picks a primary provider plus an
+ * ordered fallback chain via the routing-rules engine, evaluated against
+ * the workspace's routing profile and the request's task hints.
+ *
+ * Execution is intentionally NOT this layer's concern. Callers feed
+ * `resolvePlan`'s output into the appropriate execution surface — for
+ * Phase 29+ that means `gatewayCall(modelAccess.stream|execute)` via the
+ * platform module gateway. PMB Phase 29.3 excised the previous
+ * `execute()` and `executeStream()` methods (zero live callers per the
+ * call-graph walk in `PROVIDER_ROUTER_MIGRATION_DECISION.md` D-PR-1)
+ * and removed the now-orphan `getProviderRegistry()` import.
+ *
+ * Surface:
+ *   - `resolvePlan(request)` — build a `RoutingPlan` with primary +
+ *     fallback chain + audit reasons; no upstream HTTP.
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { hybridRouter, type RoutingDecision } from "./hybrid-router";
-import { fallbackManager, type FallbackChain, type FallbackResult } from "./fallback-manager";
 import { routingRulesEngine, type TaskHints, type ProviderRoutingInfo, type RoutingEvaluation } from "./routing-rules";
-import { getProviderRegistry } from "../providers/registry";
-import type { Message, GenerationResponse, Token } from "../providers/types";
+import type { Message } from "../providers/types";
 import type { RoutingProfile, ProviderCapability } from "../../drizzle/schema";
 import * as providerDb from "../providers/db";
 import { getDb } from "../db";
-import { routingAuditLogs, workspaces } from "../../drizzle/schema";
+import { workspaces } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 // Request interface for routing
@@ -47,24 +52,9 @@ export interface RoutingPlan {
   evaluations: RoutingEvaluation[];
 }
 
-// Result of routing execution
-export interface RoutingResult {
-  response: GenerationResponse;
-  plan: RoutingPlan;
-  actualProviderId: number;
-  routeTaken: string;
-  latencyMs: number;
-}
-
-// Streaming result
-export interface StreamingRoutingResult {
-  stream: AsyncGenerator<Token, void, unknown>;
-  plan: RoutingPlan;
-  actualProviderId: number;
-}
-
 /**
- * Provider Router - Policy-aware request routing
+ * Provider Router — policy-aware selection. Execution is delegated to
+ * Model Access (Phase 29.3 excision; see file-level JSDoc).
  */
 class ProviderRouter {
   /**
@@ -127,215 +117,6 @@ class ProviderRouter {
   }
 
   /**
-   * Execute a request with routing and fallback
-   */
-  async execute(request: RoutingRequest): Promise<RoutingResult> {
-    const startTime = Date.now();
-    const plan = await this.resolvePlan(request);
-
-    // Build provider chain for fallback manager
-    const registry = getProviderRegistry();
-    const providerIds = [plan.primaryProviderId, ...plan.fallbackChain];
-    const providers = providerIds
-      .map(id => registry.getProvider(id))
-      .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
-
-    if (providers.length === 0) {
-      throw new Error("No registered providers available for execution");
-    }
-
-    // Create fallback chain
-    const chain: FallbackChain = {
-      primary: providers[0],
-      fallbacks: providers.slice(1),
-      config: {
-        maxRetries: plan.fallbackChain.length,
-        healthCheckBeforeRetry: true,
-      },
-    };
-
-    // Execute with fallback
-    const result: FallbackResult<GenerationResponse> = await fallbackManager.executeWithFallback(
-      chain,
-      (provider) => provider.generate({
-        messages: request.messages,
-        model: request.model,
-        temperature: request.temperature,
-        maxTokens: request.maxTokens,
-        workspaceId: request.workspaceId,
-      })
-    );
-
-    const latencyMs = Date.now() - startTime;
-
-    // Determine which provider was actually used
-    const actualProviderId = result.finalProvider.id;
-    const routeTaken = this.determineRouteTaken(plan, actualProviderId);
-
-    // Log audit record
-    await this.logAudit({
-      requestId: plan.requestId,
-      workspaceId: request.workspaceId,
-      primaryProviderId: plan.primaryProviderId,
-      actualProviderId,
-      routeTaken,
-      auditReasons: plan.auditReasons,
-      latencyMs,
-      tokensUsed: result.result.usage?.totalTokens,
-      estimatedCost: result.result.cost?.toString(),
-    });
-
-    return {
-      response: result.result,
-      plan,
-      actualProviderId,
-      routeTaken,
-      latencyMs,
-    };
-  }
-
-  /**
-   * Execute streaming request with routing
-   */
-  async *executeStream(request: RoutingRequest): AsyncGenerator<Token, RoutingResult, unknown> {
-    const startTime = Date.now();
-    const plan = await this.resolvePlan(request);
-
-    // Get the primary provider
-    const registry = getProviderRegistry();
-    const provider = registry.getProvider(plan.primaryProviderId);
-
-    if (!provider) {
-      throw new Error(`Primary provider ${plan.primaryProviderId} not found in registry`);
-    }
-
-    let tokenCount = 0;
-    let fullContent = '';
-
-    try {
-      // Stream from primary provider
-      for await (const token of provider.generateStream({
-        messages: request.messages,
-        model: request.model,
-        temperature: request.temperature,
-        maxTokens: request.maxTokens,
-        workspaceId: request.workspaceId,
-      })) {
-        if (!token.isComplete) {
-          tokenCount++;
-          fullContent += token.content;
-        }
-        yield token;
-      }
-
-      const latencyMs = Date.now() - startTime;
-
-      // Log audit record
-      await this.logAudit({
-        requestId: plan.requestId,
-        workspaceId: request.workspaceId,
-        primaryProviderId: plan.primaryProviderId,
-        actualProviderId: plan.primaryProviderId,
-        routeTaken: 'PRIMARY',
-        auditReasons: plan.auditReasons,
-        latencyMs,
-        tokensUsed: tokenCount,
-      });
-
-      // Return result info
-      return {
-        response: {
-          id: plan.requestId,
-          content: fullContent,
-          model: request.model || 'unknown',
-          usage: {
-            promptTokens: 0,
-            completionTokens: tokenCount,
-            totalTokens: tokenCount,
-          },
-          finishReason: 'stop',
-          latencyMs,
-        },
-        plan,
-        actualProviderId: plan.primaryProviderId,
-        routeTaken: 'PRIMARY',
-        latencyMs,
-      };
-    } catch (error) {
-      // Try fallback providers
-      for (let i = 0; i < plan.fallbackChain.length; i++) {
-        const fallbackId = plan.fallbackChain[i];
-        const fallbackProvider = registry.getProvider(fallbackId);
-
-        if (!fallbackProvider) continue;
-
-        try {
-          const health = await fallbackProvider.healthCheck();
-          if (!health.healthy) continue;
-
-          console.log(`[ProviderRouter] Falling back to provider ${fallbackId}`);
-
-          tokenCount = 0;
-          fullContent = '';
-
-          for await (const token of fallbackProvider.generateStream({
-            messages: request.messages,
-            model: request.model,
-            temperature: request.temperature,
-            maxTokens: request.maxTokens,
-            workspaceId: request.workspaceId,
-          })) {
-            if (!token.isComplete) {
-              tokenCount++;
-              fullContent += token.content;
-            }
-            yield token;
-          }
-
-          const latencyMs = Date.now() - startTime;
-          const routeTaken = `FALLBACK_${i + 1}`;
-
-          await this.logAudit({
-            requestId: plan.requestId,
-            workspaceId: request.workspaceId,
-            primaryProviderId: plan.primaryProviderId,
-            actualProviderId: fallbackId,
-            routeTaken,
-            auditReasons: [...plan.auditReasons, `Primary failed, used fallback ${i + 1}`],
-            latencyMs,
-            tokensUsed: tokenCount,
-          });
-
-          return {
-            response: {
-              id: plan.requestId,
-              content: fullContent,
-              model: request.model || 'unknown',
-              usage: {
-                promptTokens: 0,
-                completionTokens: tokenCount,
-                totalTokens: tokenCount,
-              },
-              finishReason: 'stop',
-              latencyMs,
-            },
-            plan,
-            actualProviderId: fallbackId,
-            routeTaken,
-            latencyMs,
-          };
-        } catch (fallbackError) {
-          console.warn(`[ProviderRouter] Fallback ${i + 1} failed:`, fallbackError);
-          continue;
-        }
-      }
-
-      // All providers failed
-      throw error;
-    }
-  }
-
-  /**
    * Get workspace routing profile from database
    */
   private async getWorkspaceProfile(workspaceId: number): Promise<RoutingProfile | null> {
@@ -390,56 +171,6 @@ class ProviderRouter {
     return capabilities;
   }
 
-  /**
-   * Determine the route taken based on actual vs planned provider
-   */
-  private determineRouteTaken(plan: RoutingPlan, actualProviderId: number): string {
-    if (actualProviderId === plan.primaryProviderId) {
-      return 'PRIMARY';
-    }
-
-    const fallbackIndex = plan.fallbackChain.indexOf(actualProviderId);
-    if (fallbackIndex >= 0) {
-      return `FALLBACK_${fallbackIndex + 1}`;
-    }
-
-    return 'UNKNOWN';
-  }
-
-  /**
-   * Log routing decision to audit table
-   */
-  private async logAudit(audit: {
-    requestId: string;
-    workspaceId: number;
-    primaryProviderId: number;
-    actualProviderId: number;
-    routeTaken: string;
-    auditReasons: string[];
-    latencyMs: number;
-    tokensUsed?: number;
-    estimatedCost?: string;
-  }): Promise<void> {
-    try {
-      const db = getDb();
-      if (!db) return;
-
-      await db.insert(routingAuditLogs).values({
-        workspaceId: audit.workspaceId,
-        requestId: audit.requestId,
-        primaryProviderId: audit.primaryProviderId,
-        actualProviderId: audit.actualProviderId,
-        routeTaken: audit.routeTaken,
-        auditReasons: audit.auditReasons,
-        latencyMs: audit.latencyMs,
-        tokensUsed: audit.tokensUsed,
-        estimatedCost: audit.estimatedCost,
-      });
-    } catch (error) {
-      // Don't fail the request if audit logging fails
-      console.error('[ProviderRouter] Failed to log audit:', error);
-    }
-  }
 }
 
 // Singleton instance

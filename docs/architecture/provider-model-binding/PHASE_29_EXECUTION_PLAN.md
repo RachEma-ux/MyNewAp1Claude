@@ -91,14 +91,16 @@ The central new decision Phase 29 owns. Four of five callers have no workspace-s
 - [x] **Estimate:** 1 PR, ~80 LOC ADR doc.
 - [ ] **Pause if:** ~~neither dissolve nor layer-over is obviously cheaper~~ — closed at 29.2a: D-PR-1's call-graph walk found `execute`/`executeStream` are dead code, collapsing the decision space.
 
-### 29.3 — `providerRouter` dead-code excision
+### 29.3 — `providerRouter` dead-code excision — **CLOSED**
 
-Per D-PR-1 / D-PR-6, §29.3 collapses from "2–3 PRs / 300–500 LOC implementation" to a **single-PR ~80-LOC excision**.
+Per D-PR-1 / D-PR-6, §29.3 collapsed from "2–3 PRs / 300–500 LOC implementation" to a single-PR excision. Net diff was even smaller than the ADR's ~80-LOC estimate: **-269 LOC** (one file, no new code).
 
-- [ ] **29.3a — Excise dead methods.** Delete `providerRouter.execute()` and `providerRouter.executeStream()` (lines 132–336 of `server/inference/provider-router.ts`). Drop the now-unused `getProviderRegistry` import (line 17). Update file-level JSDoc to reflect "selection-only" surface.
-- [ ] **29.3b — Tests.** Verify no test references the deleted methods (re-grep before commit). Existing `resolvePlan` tests stay unchanged.
-- [ ] **Acceptance:** `getProviderRegistry()` consumption inside `provider-router.ts` removed; CI green.
-- [ ] **Estimate:** 1 PR, ~80 LOC.
+Shipped:
+
+- [x] **29.3a — Excise dead methods.** Deleted `providerRouter.execute()` (66 lines) + `providerRouter.executeStream()` (140 lines) + the private `determineRouteTaken` helper (15 lines, only called from `execute`) + the private `logAudit` method (33 lines, only called from `execute`/`executeStream`). Dropped 3 dead imports: `getProviderRegistry` (the LR-08 routing-layer concern that originally framed §29.2/29.3); `fallbackManager` + `FallbackChain` + `FallbackResult` (only used by `execute`); `hybridRouter` + `RoutingDecision` (imported but never used since file inception). Trimmed `Message`/`GenerationResponse`/`Token` import to just `Message`. Removed `routingAuditLogs` from the schema import. Removed two now-orphan exported types: `RoutingResult`, `StreamingRoutingResult` (no external importers per pre-excision grep). Updated file-level JSDoc to "selection-only" surface with a pointer to the §29.2 ADR.
+- [x] **29.3b — Tests.** Re-grep before commit: zero test files reference `providerRouter.execute` / `executeStream` / `RoutingResult` / `StreamingRoutingResult` / `determineRouteTaken` / `logAudit`. Existing `resolvePlan` tests stay unchanged. The lone test file at `tests/contracts/domain-contracts.test.ts:135` references `server/providers/router` (the tRPC router, NOT this file) — verified via path inspection. 74/74 tests green across `tests/contracts/domain-contracts.test.ts` + `tests/pmb/`.
+- [x] **Acceptance:** `getProviderRegistry()` consumption inside `provider-router.ts` removed; `pnpm run check` clean; boundary lint clean (one pre-existing violation in untracked `scripts/dev/backfill-openai-binding.ts` is unrelated).
+- [x] **Net diff:** `1 file changed, 20 insertions(+), 289 deletions(-)`. Beats the ADR's ~80-LOC estimate by deleting more dead helpers than just the two top-level methods.
 
 ### 29.4 — LR-02/03 embeddings caller migration
 
