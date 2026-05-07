@@ -65,12 +65,10 @@ import {
   resolveCatalogLLMRuntimeAuthority,
 } from "../llm/authority";
 import {
-  createCatalogEntry,
   getCatalogEntries,
-  createCatalogAuditEvent,
-  getTaxonomyNodes,
-  setEntryClassifications,
+  getCatalogEntryById,
 } from "../ai-types/public-api";
+import { gatewayCall } from "../platform/modules/module-gateway";
 
 // ============================================================================
 // Input Validation Schemas
@@ -454,13 +452,13 @@ export const llmRouter = router({
         );
       }
 
-      // Check for existing catalog entry to prevent duplicates (structured FK first, then legacy)
+      // Idempotency: if a catalog entry already exists for this LLM, return
+      // it unchanged (Plan v3 Phase 32 preserves the legacy "no-op on
+      // duplicate" behavior).
       const existingEntries = await getCatalogEntries({ entryType: "llm" });
-      const duplicate = existingEntries.find((entry) => {
-        if (entry.sourceType === "llm" && entry.sourceId === input.id) return true;
-        const config = (entry.config as Record<string, any>) || {};
-        return config.sourceLLMId === input.id;
-      });
+      const duplicate = existingEntries.find(
+        (e) => e.sourceType === "llm" && e.sourceId === input.id,
+      );
       if (duplicate) {
         return { success: true, entry: duplicate, imported: false };
       }
@@ -480,47 +478,40 @@ export const llmRouter = router({
         llmRole: llm.role,
       };
 
-      const entry = await createCatalogEntry({
-        name: llm.name,
-        displayName: llm.name,
-        description: llm.description ?? null,
-        entryType: "llm",
-        sourceType: "llm",
-        sourceId: llm.id,
-        scope: "app",
-        status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        config,
-        tags: ["candidate", "llm", "catalog-import"],
-        category: llm.role,
-        subCategory: null,
-        capabilities: null,
-        createdBy: ctx.user.id,
-      });
-
-      // Auto-classify
-      try {
-        const axisNodes = await getTaxonomyNodes({ entryType: "llm", level: "axis" });
-        if (axisNodes.length > 0) {
-          await setEntryClassifications(entry.id, [axisNodes[0].id]);
-        }
-      } catch (e: any) {
-        console.warn(`[LLM] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
-      }
-
-      await createCatalogAuditEvent({
-        eventType: "catalog.llm.submitted",
-        catalogEntryId: entry.id,
-        actor: ctx.user.id,
-        actorType: "user",
-        payload: {
-          sourceLLMId: llm.id,
-          sourceLLMVersionId: bestVersion?.id ?? null,
-          reviewState: "needs_review",
-          status: "draft",
+      // Plan v3 Phase 32: route through aiTypes.catalog.register.
+      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+        ctx: {
+          sourceModule: "llm",
+          targetModule: "aiTypes",
+          actionKey: "aiTypes.catalog.register",
+          governanceReceiptId: `llm-import-to-catalog-${llm.id}-${ctx.user.id}-${Date.now()}`,
+          actorId: ctx.user.id,
+        },
+        input: {
+          entryType: "llm",
+          sourceType: "llm",
+          sourceId: llm.id,
+          fields: {
+            name: llm.name,
+            displayName: llm.name,
+            description: llm.description ?? null,
+            scope: "app",
+            status: "draft",
+            origin: "admin",
+            reviewState: "needs_review",
+            config,
+            tags: ["candidate", "llm", "catalog-import"],
+            category: llm.role,
+            subCategory: null,
+            capabilities: null,
+            createdBy: ctx.user.id,
+          },
+          registeredBy: ctx.user.id,
+          sourceModule: "llm",
         },
       });
+
+      const entry = await getCatalogEntryById(result.entryId);
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -528,10 +519,10 @@ export const llmRouter = router({
         target_type: "llm",
         target_id: String(llm.id),
         decision_result: "success",
-        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+        metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: true };
+      return { success: true, entry, imported: result.action === "created" };
     }),
 
   getCatalogRuntimeAuthority: protectedProcedure

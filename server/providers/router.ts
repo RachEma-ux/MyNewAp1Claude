@@ -18,7 +18,8 @@ import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 import { decrypt, isEncrypted } from "../_core/encryption";
 import { getAuditLogger } from "../services/auditLogger";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/public-api";
+import { getCatalogEntries, getCatalogEntryById } from "../ai-types/public-api";
+import { gatewayCall } from "../platform/modules/module-gateway";
 import { getCatalogState } from "@shared/catalog-state";
 import type { Provider } from "../../drizzle/schema";
 
@@ -1004,13 +1005,13 @@ export const providerRouter = router({
         );
       }
 
-      // Duplicate prevention (check structured FK first, then legacy config)
+      // Idempotency: if a catalog entry already exists for this provider,
+      // return it unchanged (Plan v3 Phase 32 preserves the legacy "no-op
+      // on duplicate" behavior).
       const existingEntries = await getCatalogEntries({ entryType: "provider" });
-      const duplicate = existingEntries.find((entry) => {
-        if (entry.sourceType === "provider" && entry.sourceId === input.id) return true;
-        const config = (entry.config as Record<string, any>) || {};
-        return config.sourceProviderId === input.id;
-      });
+      const duplicate = existingEntries.find(
+        (e) => e.sourceType === "provider" && e.sourceId === input.id,
+      );
       if (duplicate) {
         return { success: true, entry: duplicate, imported: false };
       }
@@ -1026,47 +1027,40 @@ export const providerRouter = router({
         catalogEligible: true,
       };
 
-      const entry = await createCatalogEntry({
-        name: provider.name,
-        displayName: provider.name,
-        description: null,
-        entryType: "provider",
-        sourceType: "provider",
-        sourceId: provider.id,
-        scope: "app",
-        status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        config,
-        tags: ["candidate", "provider", "catalog-import"],
-        category: provider.type,
-        subCategory: null,
-        capabilities: provider.capabilities ?? null,
-        createdBy: ctx.user.id,
-      });
-
-      // Auto-classify
-      try {
-        const axisNodes = await getTaxonomyNodes({ entryType: "provider", level: "axis" });
-        if (axisNodes.length > 0) {
-          await setEntryClassifications(entry.id, [axisNodes[0].id]);
-        }
-      } catch (e: any) {
-        console.warn(`[Providers] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
-      }
-
-      await createCatalogAuditEvent({
-        eventType: "catalog.provider.submitted",
-        catalogEntryId: entry.id,
-        actor: ctx.user.id,
-        actorType: "user",
-        payload: {
-          sourceProviderId: provider.id,
-          providerType: provider.type,
-          reviewState: "needs_review",
-          status: "draft",
+      // Plan v3 Phase 32: route through aiTypes.catalog.register.
+      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+        ctx: {
+          sourceModule: "providers",
+          targetModule: "aiTypes",
+          actionKey: "aiTypes.catalog.register",
+          governanceReceiptId: `providers-import-to-catalog-${provider.id}-${ctx.user.id}-${Date.now()}`,
+          actorId: ctx.user.id,
+        },
+        input: {
+          entryType: "provider",
+          sourceType: "provider",
+          sourceId: provider.id,
+          fields: {
+            name: provider.name,
+            displayName: provider.name,
+            description: null,
+            scope: "app",
+            status: "draft",
+            origin: "admin",
+            reviewState: "needs_review",
+            config,
+            tags: ["candidate", "provider", "catalog-import"],
+            category: provider.type,
+            subCategory: null,
+            capabilities: provider.capabilities ?? null,
+            createdBy: ctx.user.id,
+          },
+          registeredBy: ctx.user.id,
+          sourceModule: "providers",
         },
       });
+
+      const entry = await getCatalogEntryById(result.entryId);
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -1074,9 +1068,9 @@ export const providerRouter = router({
         target_type: "provider",
         target_id: String(provider.id),
         decision_result: "success",
-        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+        metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: true };
+      return { success: true, entry, imported: result.action === "created" };
     }),
 });

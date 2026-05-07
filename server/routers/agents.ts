@@ -31,8 +31,9 @@ import {
   isCatalogImportEligible,
   type AgentStatus,
 } from "@shared/agent-lifecycle";
-import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/public-api";
+import { getCatalogEntryById } from "../ai-types/public-api";
 import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
+import { gatewayCall } from "../platform/modules/module-gateway";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
 import { getAuditLogger } from "../services/auditLogger";
 
@@ -609,90 +610,62 @@ export const agentsRouter = router({
         }, "BAD_REQUEST");
       }
 
-      // Duplicate prevention (structured FK first, then legacy JSON path)
-      const [existingByFK] = await db
+      // Idempotency: if a catalog entry already exists for this agent, return it
+      // unchanged. Plan v3 Phase 32 preserves the legacy "no-op on duplicate"
+      // behavior — register would update fields, which differs from what
+      // existing callers expect.
+      const [existing] = await db
         .select()
         .from(catalogEntries)
         .where(
           and(
             eq(catalogEntries.sourceType, "agent"),
-            eq(catalogEntries.sourceId, agent.id)
-          )
+            eq(catalogEntries.sourceId, agent.id),
+          ),
         )
         .limit(1);
 
-      if (existingByFK) {
-        return {
-          success: true,
-          entry: existingByFK,
-          imported: false,
-        };
+      if (existing) {
+        return { success: true, entry: existing, imported: false };
       }
 
-      // Legacy fallback: check config JSON for older entries without structured FK
-      const [existingByLegacy] = await db
-        .select()
-        .from(catalogEntries)
-        .where(
-          and(
-            eq(catalogEntries.entryType, "agent"),
-            sql`${catalogEntries.config} ->> 'sourceAgentId' = ${String(agent.id)}`
-          )
-        )
-        .limit(1);
-
-      if (existingByLegacy) {
-        return {
-          success: true,
-          entry: existingByLegacy,
-          imported: false,
-        };
-      }
-
-      const entry = await createCatalogEntry({
-        name: agent.name,
-        displayName: agent.name,
-        description: agent.description ?? null,
-        entryType: "agent",
-        sourceType: "agent",
-        sourceId: agent.id,
-        scope: "app",
-        status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        config: buildCatalogAgentConfig(agent),
-        tags: ["candidate", "agent", "catalog-import", status],
-        category: null,
-        subCategory: null,
-        capabilities: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
-        createdBy: ctx.user.id,
-      });
-
-      try {
-        const axisNodes = await getTaxonomyNodes({ entryType: "agent", level: "axis" });
-        if (axisNodes.length > 0) {
-          await setEntryClassifications(entry.id, [axisNodes[0].id]);
-        }
-      } catch (error) {
-        console.warn(`[Agents] Auto-classify failed for imported agent catalog entry ${entry.id}:`, (error as Error).message);
-      }
-
-      await createCatalogAuditEvent({
-        eventType: "catalog.agent.submitted",
-        catalogEntryId: entry.id,
-        actor: ctx.user.id,
-        actorType: "user",
-        payload: {
-          sourceAgentId: agent.id,
-          sourceStatus: status,
-          reviewState: "needs_review",
-          status: "draft",
-          tags: ["candidate", "agent", "catalog-import", status],
-          // Plan v3 Phase 47 — legacy path marker so audit consumers
-          // can filter to spot calls that bypassed aiTypes.catalog.register.
-          deprecated: true,
+      // Plan v3 Phase 32: route through aiTypes.catalog.register so the
+      // Phase-25 duplicate guard, Phase-39 event, and canonical audit
+      // chain all run. Replaces the previous direct createCatalogEntry +
+      // setEntryClassifications + createCatalogAuditEvent pattern.
+      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+        ctx: {
+          sourceModule: "agents",
+          targetModule: "aiTypes",
+          actionKey: "aiTypes.catalog.register",
+          governanceReceiptId: `agents-import-to-catalog-${agent.id}-${ctx.user.id}-${Date.now()}`,
+          actorId: ctx.user.id,
+        },
+        input: {
+          entryType: "agent",
+          sourceType: "agent",
+          sourceId: agent.id,
+          fields: {
+            name: agent.name,
+            displayName: agent.name,
+            description: agent.description ?? null,
+            scope: "app",
+            status: "draft",
+            origin: "admin",
+            reviewState: "needs_review",
+            config: buildCatalogAgentConfig(agent),
+            tags: ["candidate", "agent", "catalog-import", status],
+            category: null,
+            subCategory: null,
+            capabilities: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
+            createdBy: ctx.user.id,
+          },
+          registeredBy: ctx.user.id,
+          sourceModule: "agents",
         },
       });
+
+      const entry = await getCatalogEntryById(result.entryId);
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -700,13 +673,13 @@ export const agentsRouter = router({
         target_type: "agent",
         target_id: String(agent.id),
         decision_result: "success",
-        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+        metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
       return {
         success: true,
         entry,
-        imported: true,
+        imported: result.action === "created",
       };
     }),
 
