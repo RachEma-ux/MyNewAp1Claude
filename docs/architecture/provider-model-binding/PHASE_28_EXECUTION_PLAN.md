@@ -95,24 +95,36 @@ Closed by:
 
 **Lesson reinforced (third time this Phase 28 batch):** when closing a register row, re-grep against current `main` AND walk the call graph one or two hops out. Same chain-of-trust drift caught in 28.1 (LR-09 already fixed) and 28.2 (LR-06 had downstream readers the register didn't name).
 
-### 28.4 — Model Access embedding-execute primitive
+### 28.4 — Model Access embedding-execute primitive — **CLOSED**
 
-LR-02/03/04 all need this. Build the primitive once, migrate all three callers in 28.5.
+Built the primitive even though all three of LR-02/03/04's caller migrations defer to Phase 29 (workspace-default-binding upstream dependency, same as LR-08). The primitive's shape is decoupled from the binding-resolution question; bundling its build with caller migration would re-create the conflation that drove the LR-08 deferral.
 
-- [ ] **28.4a — Decision record.** Author `docs/architecture/provider-model-binding/MODEL_ACCESS_EMBED_DECISION.md` (D-MA-EMBED-1..N): wire shape, governance/receipt policy, supported providers (OpenAI today; door open for others), failure modes, dimension contract.
-- [ ] **28.4b — Implementation.** New action `openRouter.modelAccess.embed` in `server/openrouter/model-access/embed.ts`. Mirror `execute.ts` shape: gateway-call, `enforceModelAccessReceipt(payload.intent, sealed, "embed")`, builds upstream client, returns `{ embedding: number[], model: string, usage: {...} }`. Hybrid receipt policy.
-- [ ] **28.4c — Boundary updates.** Add `embed` to the action key map; allowlist for the primitive itself; tests for happy path + boundary invariants.
-- [ ] **Acceptance:** primitive lands; `embed` action governed; `pnpm run check` + new unit tests pass.
-- [ ] **Authority:** full autonomous merge.
+**Reclassification surfaced during 28.4 prep:** **LR-04** (`operators/provider-hub.ts:78`) is a **chat-completion** caller (`/v1/chat/completions` with `gpt-4o-mini`), NOT an embedding caller. The Phase 27.4 matrix grouped it with LR-02/03 under "embedding-endpoint dependency" — that was wrong. LR-04 uses the existing `execute` primitive in Phase 29 (alongside LR-08); only LR-02/03 consume this new `embed` primitive.
 
-### 28.5 — LR-02/03/04 caller migrations `[bundle]`
+**Shipped:**
 
-- [ ] **28.5a — `embeddings/service.ts:54, 59` migration.** Replace `process.env.OPENAI_API_KEY` + `new OpenAI(...)` with a `gatewayCall` to `openRouter.modelAccess.embed`. Service signature stays compatible — call sites don't change.
-- [ ] **28.5b — `documents/processor.ts:339` migration.** Same shape.
-- [ ] **28.5c — `operators/provider-hub.ts:78` migration.** Same shape.
-- [ ] **28.5d** — Boundary-lint allowlist purge for LR-02/03/04.
-- [ ] **Acceptance:** integration tests for each caller pass against the new primitive; LR-02/03/04 rows flip to `migrated`.
-- [ ] **Authority:** full autonomous merge.
+- [x] `MODEL_ACCESS_EMBED_DECISION.md` — D-MA-EMBED-1..7 locked: input/output shape; OpenAI-compatible only (Anthropic refused with `unsupported_provider_type`); hybrid receipt policy; failure-mode taxonomy mirrored from `execute`; dimension contract is caller-side; single-call batch (no auto-split); test strategy.
+- [x] `server/openrouter/model-access/embed.ts` — implementation (~190 LOC) mirroring `execute.ts` shape. Targets `/v1/embeddings`. Returns `ModelAccessEmbedResult` with batch-shaped `embeddings: number[][]`.
+- [x] `types.ts` — added `ModelAccessEmbedInput` + `ModelAccessEmbedResult`.
+- [x] `index.ts` — re-exported `embed`.
+- [x] `manifest.ts` — registered `openRouter.modelAccess.embed` gateway action; widened `enforceModelAccessReceipt` action union to include `"embed"`.
+- [x] `MODEL_ACCESS_CONTRACT.md` — updated to 4 actions; embed test references added.
+- [x] `embed.test.ts` — 12 unit tests covering D-MA-EMBED-1..7. `manifest-receipt-policy.test.ts` extended with 3 embed-specific receipt tests (10 total, was 7).
+- [x] `pnpm run check` clean; 22/22 tests across embed + receipt-policy.
+
+**Acceptance — met.** No new TEMPORARY_EXCEPTION introduced; Phase 28 cap stays 0 / 1.
+
+### 28.5 — LR-02/03/04 caller migrations — **DEFERRED → Phase 29**
+
+All three callers share the workspace-default-binding upstream dependency that drove the LR-08 deferral:
+
+- `embeddings/service.ts` is a singleton (`getEmbeddingService()`); `generateEmbedding(text)` has no workspace context.
+- `documents/processor.ts:339` calls into `embeddings/service.ts`.
+- `operators/provider-hub.ts:78` is a `callProviderHub({operator, prompts, ...})` no-workspace caller — also reclassified during 28.4 prep as a chat-completion caller (not embedding); it uses the existing `execute` primitive, not this PR's new `embed`.
+
+`PHASE_29_SCOPING.md` already lists workspace-default binding in §29.1; LR-02/03/04 caller migrations land alongside LR-08 in Phase 29 sub-phases that consume that decision. Per the Phase 27.4 precedent, deadline rolls are not new exceptions.
+
+**Closed by:** scope deferral lands as part of 28.4 / 28.5 paired updates in the Phase 28 plan. No separate evidence doc needed beyond the embed decision record (which already captures the LR-04 reclassification).
 
 ### 28.6 — Model Access streaming-with-tool-calls + MCP-bridge primitive
 

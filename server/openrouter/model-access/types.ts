@@ -116,6 +116,38 @@ export interface ModelAccessStreamChunk {
   finishReason?: string;
 }
 
+/**
+ * Phase 28.4 (D-MA-EMBED-1): input for the embedding-execute primitive.
+ * Mirrors `ModelAccessExecuteInput` minus chat-specific fields. Inputs
+ * may be a single string (returned as a one-element batch) or an
+ * array — the upstream call shape is identical.
+ */
+export interface ModelAccessEmbedInput {
+  providerConnectionId: number;
+  modelRef: string;
+  inputs: string | string[];
+  intent: ModelAccessIntent;
+  workspaceId: number;
+  actorId: number;
+  correlationId?: string;
+}
+
+/**
+ * Phase 28.4 (D-MA-EMBED-1): result. `embeddings` is always batch-
+ * shaped — single-string inputs return a one-element array — so
+ * callers don't have to branch on input shape.
+ */
+export interface ModelAccessEmbedResult {
+  status: "ok" | "error";
+  providerConnectionId: number;
+  modelRef: string;
+  latencyMs: number;
+  embeddings: number[][];
+  usage?: ModelAccessUsage;
+  error?: string;
+  correlationId?: string;
+}
+
 export interface ValidateBindingInput {
   providerConnectionId: number;
   modelRef?: string;

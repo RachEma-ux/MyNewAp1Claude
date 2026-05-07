@@ -56,6 +56,13 @@ export const openRouterManifest: ModuleManifest = {
       risk: "low",
       receiptRequired: false,
     },
+    {
+      key: "openRouter.modelAccess.embed",
+      description:
+        "Generate embeddings via Model Access (Phase 28.4 — D-MA-EMBED-1)",
+      risk: "medium",
+      receiptRequired: false,
+    },
   ],
 
   routes: [{ path: "/openrouter", label: "OpenRouter" }],
@@ -130,7 +137,7 @@ export const openRouterManifest: ModuleManifest = {
     const enforceModelAccessReceipt = (
       intent: string,
       sealed: { governanceReceiptId?: string },
-      action: "execute" | "stream",
+      action: "execute" | "stream" | "embed",
     ): void => {
       if (intent === "agent-test") return;
       if (sealed?.governanceReceiptId) return;
@@ -208,6 +215,25 @@ export const openRouterManifest: ModuleManifest = {
         description:
           "Probe a Provider Connection + model ref for runtime readiness",
         risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    // Phase 28.4 — embedding-execute primitive (D-MA-EMBED-1..7).
+    registerPublicApi({
+      module: "openRouter",
+      action: "openRouter.modelAccess.embed",
+      handler: async (input, sealed) => {
+        const { embed } = await import("./model-access");
+        const payload = input as Parameters<typeof embed>[0];
+        enforceModelAccessReceipt(payload.intent, sealed ?? {}, "embed");
+        return embed(payload);
+      },
+      descriptor: {
+        key: "openRouter.modelAccess.embed",
+        description:
+          "Generate embeddings via Model Access (receipt required for non-test intents — see RECEIPT_POLICY.md, D-MA-EMBED-3)",
+        risk: "medium",
         receiptRequired: false,
       },
     });

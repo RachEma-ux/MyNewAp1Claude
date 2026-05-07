@@ -24,7 +24,18 @@ The Phase 28 decision was to **defer LR-08 to Phase 29** (`PHASE_28_LR_08_DEFERR
 
 ## Scope (in)
 
-The unifying theme of Phase 29 is: **migrate the workspace-scoped routing path onto Model Access**. Concrete deliverables:
+The unifying theme of Phase 29 is: **migrate the workspace-scoped routing path onto Model Access**. After Phase 28.3 deferred LR-08 and Phase 28.4 deferred the LR-02/03/04 caller migrations (with LR-04 reclassified as a chat-completion caller, not embedding), the Phase 29 caller list is:
+
+| LR | Caller | Primitive |
+|---|---|---|
+| LR-02 | `embeddings/service.ts` | `openRouter.modelAccess.embed` (built in 28.4) |
+| LR-03 | `documents/processor.ts:339` | Closes transitively with LR-02 |
+| LR-04 | `operators/provider-hub.ts:78` | `openRouter.modelAccess.execute` (existing) |
+| LR-08 | `chat/stream.ts` + `automation/block-executors.ts:executeInvokeAgent` | `execute`/`stream` (existing) + routing-layer migration |
+
+All four share the **workspace-default-binding** upstream dependency — the unifying decision Phase 29 owns.
+
+Concrete deliverables:
 
 - **`providerRouter` migration.** Replace `getProviderRegistry()` calls in `server/inference/provider-router.ts` with Model Access execute/stream invocations. Decide whether `providerRouter` survives as a routing+selection layer that *delegates* to Model Access for the actual upstream call, or whether it gets dissolved entirely and the existing callers (chat-stream, batch service, hybrid router) call Model Access directly.
 

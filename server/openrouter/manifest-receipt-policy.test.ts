@@ -26,6 +26,13 @@ vi.mock("./model-access", () => ({
     yield { delta: "ok", done: true };
   }),
   validateBinding: vi.fn(),
+  embed: vi.fn(async () => ({
+    status: "ok",
+    providerConnectionId: 42,
+    modelRef: "text-embedding-3-small",
+    latencyMs: 5,
+    embeddings: [[0.1, 0.2, 0.3]],
+  })),
 }));
 
 import { openRouterManifest } from "./manifest";
@@ -217,5 +224,73 @@ describe("openRouter.modelAccess.stream — per-intent receipt policy (Phase 20)
         },
       }),
     ).rejects.toThrow(/openRouter\.modelAccess\.stream.*agent-run.*governance receipt/);
+  });
+});
+
+describe("openRouter.modelAccess.embed — per-intent receipt policy (Phase 28.4 — D-MA-EMBED-3)", () => {
+  it("allows intent=agent-test without a receipt", async () => {
+    const r = (await gatewayCall({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.embed",
+        workspaceId: 1,
+        actorId: 1,
+      },
+      input: {
+        providerConnectionId: 42,
+        modelRef: "text-embedding-3-small",
+        inputs: "hello",
+        intent: "agent-test",
+        workspaceId: 1,
+        actorId: 1,
+      },
+    })) as { status: string; embeddings: number[][] };
+    expect(r.status).toBe("ok");
+    expect(r.embeddings).toEqual([[0.1, 0.2, 0.3]]);
+  });
+
+  it("refuses intent=evaluation without a receipt", async () => {
+    await expect(
+      gatewayCall({
+        ctx: {
+          sourceModule: "agentStudio",
+          targetModule: "openRouter",
+          actionKey: "openRouter.modelAccess.embed",
+          workspaceId: 1,
+          actorId: 1,
+        },
+        input: {
+          providerConnectionId: 42,
+          modelRef: "text-embedding-3-small",
+          inputs: "hello",
+          intent: "evaluation",
+          workspaceId: 1,
+          actorId: 1,
+        },
+      }),
+    ).rejects.toThrow(/openRouter\.modelAccess\.embed.*evaluation.*governance receipt/);
+  });
+
+  it("accepts intent=evaluation when a governance receipt is sealed", async () => {
+    const r = (await gatewayCall({
+      ctx: {
+        sourceModule: "agentStudio",
+        targetModule: "openRouter",
+        actionKey: "openRouter.modelAccess.embed",
+        workspaceId: 1,
+        actorId: 1,
+        governanceReceiptId: "rec-test",
+      },
+      input: {
+        providerConnectionId: 42,
+        modelRef: "text-embedding-3-small",
+        inputs: ["a", "b"],
+        intent: "evaluation",
+        workspaceId: 1,
+        actorId: 1,
+      },
+    })) as { status: string };
+    expect(r.status).toBe("ok");
   });
 });
