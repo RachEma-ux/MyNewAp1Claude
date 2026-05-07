@@ -6,6 +6,7 @@
  */
 
 export { execute, stream, validateBinding } from "./execute";
+export { embed } from "./embed";
 export type {
   ModelAccessIntent,
   ModelAccessMessage,
@@ -13,6 +14,8 @@ export type {
   ModelAccessUsage,
   ModelAccessResult,
   ModelAccessStreamChunk,
+  ModelAccessEmbedInput,
+  ModelAccessEmbedResult,
   ValidateBindingInput,
   ValidateBindingResult,
 } from "./types";

@@ -8,13 +8,14 @@ upstream HTTP calls combine.
 
 ## What Model Access is
 
-A facade over the upstream-provider runtime client. Three actions:
+A facade over the upstream-provider runtime client. Four actions:
 
 | Action | Purpose | Receipt |
 |---|---|---|
 | `openRouter.modelAccess.execute` | Non-streaming completion | hybrid |
 | `openRouter.modelAccess.stream` | Streaming completion | hybrid |
 | `openRouter.modelAccess.validateBinding` | Reference/policy check, no upstream HTTP | none |
+| `openRouter.modelAccess.embed` | Embedding generation (single + batch); OpenAI-compatible only — Phase 28.4, D-MA-EMBED-1..7 | hybrid |
 
 `config.update` is a separate non-runtime action for OpenRouter's
 own configuration plane.
@@ -23,11 +24,11 @@ own configuration plane.
 
 ## Hybrid receipt policy
 
-Descriptor flag is `receiptRequired: false` for `execute` + `stream`.
+Descriptor flag is `receiptRequired: false` for `execute` + `stream` + `embed`.
 The handler calls:
 
 ```ts
-enforceModelAccessReceipt(payload.intent, sealed, "execute" | "stream");
+enforceModelAccessReceipt(payload.intent, sealed, "execute" | "stream" | "embed");
 ```
 
 `payload.intent` is required and one of:
@@ -131,8 +132,11 @@ playground) do this.
 
 - `server/openrouter/model-access/execute.test.ts` — happy path,
   error paths, intent enforcement, credential boundary.
+- `server/openrouter/model-access/embed.test.ts` — happy path
+  (single + batch), Anthropic refusal, failure modes, dimension
+  pass-through, correlation-id echo (Phase 28.4 D-MA-EMBED-1..7).
 - `server/openrouter/manifest-receipt-policy.test.ts` — hybrid receipt
-  policy for execute/stream.
+  policy for execute / stream / embed.
 - `tests/pmb/boundary.test.ts` invariant 5 — `process.env` read scan.
 - `tests/check-provider-credential-resolver-boundary.test.ts` —
   resolver-boundary script declarations.
