@@ -50,6 +50,7 @@ import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { getRunTree, invokeSubagent } from "../services/subagent-runner";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import { providerBindingsRouter } from "./provider-bindings-router";
+import { workspaceDefaultBindingsRouter } from "./workspace-default-bindings-router";
 import { cagRouter } from "./cag-router";
 import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
@@ -2123,6 +2124,8 @@ export const agentStudioRouter = router({
   chat: chatRouter,
   // Plan v3 Phase 14: provider/model binding picker
   providerBindings: providerBindingsRouter,
+  // PMB Phase 30.1: workspace-default-binding admin surface
+  workspaceDefaultBindings: workspaceDefaultBindingsRouter,
   // RAC Phase 1D: Capability Pack preview/refresh APIs
   cag: cagRouter,
   // RAC Phase 2: Source registry CRUD (profiles / sources / policies / ws-embedding-default)

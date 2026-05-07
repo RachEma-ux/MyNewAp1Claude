@@ -100,6 +100,28 @@ export const agentStudioManifest: ModuleManifest = {
       risk: "low",
       receiptRequired: false,
     },
+    // PMB Phase 30.1 — workspace-default-binding admin surface
+    // (D-WDB-7: writes require receipts; reads do not).
+    {
+      key: "agentStudio.workspaceDefaultBindings.list",
+      description: "List workspace default provider bindings (all roles)",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "agentStudio.workspaceDefaultBindings.upsert",
+      description:
+        "Set or update the workspace default provider binding for a role (chat / embedding / tool / classifier); calls Phase 8 eligibility gate",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "agentStudio.workspaceDefaultBindings.delete",
+      description:
+        "Clear the workspace default provider binding for a role (idempotent)",
+      risk: "medium",
+      receiptRequired: true,
+    },
     // Plan v3 Phase 30 — Agent Studio Export Catalog backend.
     {
       key: "agentStudio.exportCatalog.listCandidates",

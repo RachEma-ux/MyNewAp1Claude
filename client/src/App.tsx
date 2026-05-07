@@ -149,6 +149,7 @@ const CatalogManagePage = lazy(() => import("@/pages/CatalogManagePage"));
 const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
 const ASCandidatePage = lazy(() => import("@/pages/ASCandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
+const WorkspaceDefaultBindingsPage = lazy(() => import("@/pages/WorkspaceDefaultBindingsPage"));
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
 // AI Types — migrated to capsule (PR #71). Mounted by <ModuleRoutes />
@@ -393,6 +394,7 @@ function Router() {
       <Route path="/providers/wizard" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
       <Route path="/providers/list" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
       <Route path="/providers/connections" component={() => <ProtectedRoute component={ProviderConnectionsPage} />} />
+      <Route path="/workspace/default-bindings" component={() => <ProtectedRoute component={WorkspaceDefaultBindingsPage} />} />
       <Route path="/providers" component={() => <ProtectedRoute component={Providers} />} />
       <Route path="/providers/:id" component={() => <ProtectedRoute component={ProviderDetail} />} />
       <Route path="/providers-analytics" component={() => <ProtectedRoute component={ProviderAnalytics} />} />
