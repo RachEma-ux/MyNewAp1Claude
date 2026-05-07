@@ -199,6 +199,35 @@ function makeInsert(table: any) {
 function makeUpdate(table: any) {
   let _set: any = null;
   let _wheres: any[] = [];
+  let _returning: Record<string, any> | null = null;
+  const matched: any[] = [];
+  function applyUpdates(): any[] {
+    matched.length = 0;
+    if (table?.__name !== "ags_cag_capability_packs") return matched;
+    for (const p of _packs) {
+      if (_wheres.every((w) => w(p))) {
+        // Resolve `sql` sentinels in the set. Only one shape is
+        // exercised today (`useCount + 1`); any new shape needs an
+        // explicit branch here.
+        const resolved: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(_set)) {
+          if (v && typeof v === "object" && (v as any).__sql) {
+            const expr = ((v as any).strings as string[]).join("?");
+            if (k === "useCount" && /\+\s*1\s*$/.test(expr)) {
+              resolved[k] = (p.useCount ?? 0) + 1;
+            } else {
+              throw new Error(`fake-DB: unsupported sql sentinel for ${k}: ${expr}`);
+            }
+          } else {
+            resolved[k] = v;
+          }
+        }
+        Object.assign(p, resolved);
+        matched.push(p);
+      }
+    }
+    return matched;
+  }
   return {
     set(v: any) {
       _set = v;
@@ -208,14 +237,22 @@ function makeUpdate(table: any) {
       _wheres.push(p);
       return this;
     },
+    returning(spec: Record<string, any>) {
+      _returning = spec;
+      return {
+        then(resolve: any) {
+          const rows = applyUpdates();
+          const projected = rows.map((row) => {
+            const out: Record<string, unknown> = {};
+            for (const k of Object.keys(_returning!)) out[k] = row[k];
+            return out;
+          });
+          resolve(projected);
+        },
+      };
+    },
     then(resolve: any) {
-      if (table?.__name === "ags_cag_capability_packs") {
-        for (const p of _packs) {
-          if (_wheres.every((w) => w(p))) {
-            Object.assign(p, _set);
-          }
-        }
-      }
+      applyUpdates();
       resolve(undefined);
     },
   };
@@ -239,6 +276,13 @@ vi.mock("drizzle-orm", () => ({
   eq: (col: any, val: any) => (row: any) => row[col.__field] === val,
   and: (...preds: any[]) => (row: any) => preds.every((p) => p(row)),
   desc: (col: any) => ({ key: col.__field, dir: "desc" as const }),
+  // Sentinel for `sql` template helper. The fake-DB executor below
+  // recognizes this shape and applies the increment manually.
+  sql: (strings: TemplateStringsArray, ...values: any[]) => ({
+    __sql: true,
+    strings: Array.from(strings),
+    values,
+  }),
 }));
 
 // ── Schema mock — minimal: just the column references ─────────────────
@@ -280,7 +324,7 @@ import {
   listPacks,
   getPackById,
   markPackStale,
-  touchPackLastUsed,
+  markPackUsed,
   listPacksForAgent,
 } from "./store";
 import { listPackEvents, listEventsByPack } from "./events";
@@ -431,15 +475,24 @@ describe("CAG store — Phase 1A", () => {
     await expect(markPackStale(r.pack.id, "x", 1)).rejects.toThrow(/pack_archived/);
   });
 
-  it("touchPackLastUsed updates lastUsedAt without affecting status", async () => {
+  it("markPackUsed atomically increments useCount + bumps lastUsedAt", async () => {
+    // D-CAG-RECON-2: counter must advance on every resolve. The
+    // resolver previously called the lastUsedAt-only `touchPackLastUsed`
+    // helper, leaving the counter pinned at 0; that wiring was fixed
+    // and the helper removed.
     const r = await createPack(baseInput);
     expect(r.pack.lastUsedAt).toBeNull();
+    expect(r.pack.useCount).toBe(0);
 
-    await touchPackLastUsed(r.pack.id);
+    const after1 = await markPackUsed(r.pack.id);
+    expect(after1).toBe(1);
+    const after2 = await markPackUsed(r.pack.id);
+    expect(after2).toBe(2);
 
-    const after = await getLatestPack(1);
-    expect(after!.lastUsedAt).toBeInstanceOf(Date);
-    expect(after!.status).toBe("fresh");
+    const refreshed = await getLatestPack(1);
+    expect(refreshed!.lastUsedAt).toBeInstanceOf(Date);
+    expect(refreshed!.useCount).toBe(2);
+    expect(refreshed!.status).toBe("fresh");
   });
 
   it("listEventsByPack scopes by both workspace and pack id", async () => {

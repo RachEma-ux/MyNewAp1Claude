@@ -251,20 +251,6 @@ export async function markPackStale(
 }
 
 /**
- * Stamp `lastUsedAt` on a pack. Used by P1C resolver to track which
- * packs are actually injected into runtime calls (vs orphaned).
- */
-export async function touchPackLastUsed(packId: number): Promise<void> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
-
-  await db
-    .update(agsCagCapabilityPacks)
-    .set({ lastUsedAt: new Date() })
-    .where(eq(agsCagCapabilityPacks.id, packId));
-}
-
-/**
  * List packs in a workspace + agent. Used by `agentStudio.cag.listPacks`
  * preview API in P1D. Workspace-scoped — never returns cross-workspace data.
  */

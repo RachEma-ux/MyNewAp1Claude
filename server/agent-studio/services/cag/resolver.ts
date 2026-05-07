@@ -31,7 +31,7 @@ import {
 import {
   createPack,
   getLatestPack,
-  touchPackLastUsed,
+  markPackUsed,
 } from "./store";
 import { appendPackEvent } from "./events";
 import { renderCapabilityPack } from "./renderer";
@@ -173,9 +173,15 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
 
     for (const w of compileWarnings) warnings.push(w);
 
-    await touchPackLastUsed(pack.id).catch((err) => {
+    // D-CAG-RECON-2: atomic increment of useCount + lastUsedAt. Smoke
+    // testing surfaced that the previous `touchPackLastUsed` call only
+    // updated the timestamp, leaving the counter pinned at 0 even
+    // though `pack_used` events fired on every resolve. `markPackUsed`
+    // returns the new count so we can thread it into the event payload.
+    const useCount = await markPackUsed(pack.id).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[ags-cag] touchPackLastUsed failed (pack=${pack.id}): ${msg}`);
+      console.warn(`[ags-cag] markPackUsed failed (pack=${pack.id}): ${msg}`);
+      return null;
     });
     await appendPackEvent({
       workspaceId: input.workspaceId,
@@ -186,7 +192,7 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       actorType: "runtime",
       packVersion: pack.packVersion,
       createdBy: input.actorId,
-      metadata: { reused },
+      metadata: { reused, useCount },
     }).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[ags-cag] pack_used event log failed: ${msg}`);

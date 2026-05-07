@@ -38,7 +38,6 @@ export {
   listPacks,
   getPackById,
   markPackStale,
-  touchPackLastUsed,
   listPacksForAgent,
   // Retrofit P5 (D-CAG-RECON-2)
   markPackUsed,
