@@ -387,6 +387,56 @@ describe("Phase 27.7 + 29.0a invariant 5b — Agent Studio raw provider-key surf
 });
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 29.4b invariant — embeddings/documents callers do not read
+// provider env vars
+// ────────────────────────────────────────────────────────────────────
+
+describe("Phase 29.4b invariant — LR-02/LR-03 closure", () => {
+  it("`server/embeddings/service.ts` does not read process.env.<X>_API_KEY", () => {
+    const src = readFileSync("server/embeddings/service.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    const re =
+      /process\.env(?:\.([A-Z0-9_]+)|\[\s*["']([A-Z0-9_]+)["']\s*\])/g;
+    const offenders: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(stripped))) {
+      const key = m[1] ?? m[2];
+      if (key && key.endsWith("_API_KEY")) {
+        offenders.push(`process.env.${key}`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("`server/documents/processor.ts` does not gate on process.env.<X>_API_KEY", () => {
+    const src = readFileSync("server/documents/processor.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    const re =
+      /process\.env(?:\.([A-Z0-9_]+)|\[\s*["']([A-Z0-9_]+)["']\s*\])/g;
+    const offenders: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(stripped))) {
+      const key = m[1] ?? m[2];
+      if (key && key.endsWith("_API_KEY")) {
+        offenders.push(`process.env.${key}`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("`server/embeddings/service.ts` calls `gatewayCall` against `openRouter.modelAccess.embed`", () => {
+    const src = readFileSync("server/embeddings/service.ts", "utf8");
+    expect(src).toMatch(/gatewayCall\s*</);
+    expect(src).toMatch(/openRouter\.modelAccess\.embed/);
+    expect(src).toMatch(/intent:\s*"system-internal"/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
 // Invariant 6 — Provider Connections public API returns no secrets
 // ────────────────────────────────────────────────────────────────────
 
