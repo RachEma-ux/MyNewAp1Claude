@@ -18,9 +18,14 @@ import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
 import { isExecutableEntryType } from "@shared/catalog-execution";
-import { createModel as createDomainModel, createLlm as createDomainLlm } from "../ai-types/service";
-import { normalizeToModel, normalizeToLlm, resolveProviderId as resolveProviderIdFromSlug } from "../ai-types/import-normalizer";
-import { linkCatalogToDomain } from "../ai-types/projection";
+import {
+  createModel as createDomainModel,
+  createLlm as createDomainLlm,
+  normalizeToModel,
+  normalizeToLlm,
+  resolveProviderId as resolveProviderIdFromSlug,
+  linkCatalogToDomain,
+} from "../ai-types/public-api";
 
 export const catalogImportRouter = router({
   /**

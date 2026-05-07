@@ -69,6 +69,58 @@ export {
   updateExecutionRun,
 } from "./db";
 
+// Service-runtime helpers — resolve a service-based agent target from the
+// catalog and probe its health. Reads only (no DB writes).
+export {
+  resolveServiceAgentByName,
+  resolveServiceAgent,
+  checkServiceHealth,
+  checkServiceHealthByName,
+  isServiceBasedAgent,
+} from "./service-runtime";
+export type {
+  ServiceRuntimeConfig,
+  ServiceRuntimeTarget,
+  ServiceHealthResult,
+} from "./service-runtime";
+
+// Domain-projection writers (intra-platform). Same caveat as the catalog
+// write helpers above — new cross-module callers should prefer the
+// gateway register action; these are surfaced for the legacy
+// catalog-import + catalog-manage flows that build domain rows + their
+// catalog projections in one transaction.
+export {
+  createModel,
+  updateModel,
+  getModelById,
+  createLlm,
+  updateLlm,
+  getLlmById,
+  createProviderWithProjection,
+  resolveDomainEntity,
+  resolveProviderFromCatalogEntry,
+} from "./service";
+
+// Catalog-projection helpers (link / find). Used by catalog-import and
+// admin paths that need to bind a domain row to a catalog entry.
+export {
+  buildCatalogFields,
+  projectToCatalog,
+  refreshCatalogProjection,
+  findCatalogEntryBySource,
+  linkCatalogToDomain,
+} from "./projection";
+
+// Import normalization — pure transforms (no DB writes), used by
+// catalog-import to turn a CSV row into a domain payload.
+export {
+  resolveProviderId,
+  normalizeToModel,
+  normalizeToLlm,
+  getDomainTarget,
+} from "./import-normalizer";
+export type { ImportRowLike } from "./import-normalizer";
+
 // Re-export the drizzle-schema row + insert types for callers using the
 // helpers above. Keeps caller imports tight (single `from "../ai-types/public-api"`)
 // instead of forcing a parallel `from "../../drizzle/schema"` import.
