@@ -478,6 +478,49 @@ describe("Phase 29.5 invariant — LR-04 closure", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 29.6 invariant — chat-stream + executeInvokeAgent no longer
+// consume `getProviderRegistry()`
+// ────────────────────────────────────────────────────────────────────
+
+describe("Phase 29.6 invariant — LR-08 closure", () => {
+  it("`server/chat/stream.ts` does not import getProviderRegistry", () => {
+    const src = readFileSync("server/chat/stream.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    expect(stripped).not.toMatch(/\bgetProviderRegistry\b/);
+  });
+
+  it("`server/chat/stream.ts` direct-imports `stream` from `../openrouter/model-access`", () => {
+    const src = readFileSync("server/chat/stream.ts", "utf8");
+    expect(src).toMatch(
+      /import\s*\{[^}]*stream[^}]*\}\s*from\s*['"]\.\.\/openrouter\/model-access['"]/,
+    );
+    expect(src).toMatch(/intent:\s*"chat"/);
+  });
+
+  it("`server/chat/stream.ts` uses the workspace-default-binding fallback", () => {
+    const src = readFileSync("server/chat/stream.ts", "utf8");
+    expect(src).toMatch(/resolveWorkspaceDefaultBinding/);
+    expect(src).toMatch(/listActiveForProvider/);
+  });
+
+  it("`server/automation/block-executors.ts:executeInvokeAgent` does not import getProviderRegistry (Path B)", () => {
+    const src = readFileSync("server/automation/block-executors.ts", "utf8");
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    expect(stripped).not.toMatch(/\bgetProviderRegistry\b/);
+  });
+
+  it("`executeInvokeAgent` returns the legacy_agents_table_unsupported refusal shape", () => {
+    const src = readFileSync("server/automation/block-executors.ts", "utf8");
+    expect(src).toMatch(/legacy_agents_table_unsupported/);
+    expect(src).toMatch(/Path B/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
 // Invariant 6 — Provider Connections public API returns no secrets
 // ────────────────────────────────────────────────────────────────────
 

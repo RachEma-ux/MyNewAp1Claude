@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { getProviderRegistry } from '../providers/registry';
-import type { Message } from '../providers/types';
 import { trackProviderUsage } from '../providers/usage';
 import { sdk } from '../_core/sdk';
 import { ENV } from '../_core/env';
 import { providerRouter } from '../inference/provider-router';
 import { sanitizeErrorForLogging } from '../_core/log-utils';
+import { listActiveForProvider } from '../provider-connections/public-api';
+import { resolveWorkspaceDefaultBinding } from '../agent-studio/workspace-default-bindings';
+import { stream as modelAccessStream } from '../openrouter/model-access';
 
 // Zod schema for chat stream request body
 const chatStreamSchema = z.object({
@@ -23,6 +24,69 @@ const chatStreamSchema = z.object({
   useUnifiedRouting: z.boolean().optional(),
   taskHints: z.record(z.string(), z.unknown()).optional(),
 });
+
+// PMB Phase 29.6a — chat-stream binding resolver
+//
+// Two-step lookup, mirroring D-PR-4 in PROVIDER_ROUTER_MIGRATION_DECISION.md:
+//   (I)  Map `providerId` (legacy `providers` table) → `providerConnectionId`
+//        via `listActiveForProvider({workspaceId, providerCatalogEntryId: providerId})`.
+//        Picks the first ACTIVE row.
+//   (II) If (I) returns no row, fall back to the workspace `chat` default
+//        via `resolveWorkspaceDefaultBinding({workspaceId, role: "chat"})`.
+//
+// Returns null when both (I) and (II) miss; the caller refuses with
+// `binding_required` (D-WDB-3 contract — no automatic system-default
+// fallback inside the primitives).
+async function resolveChatBinding(args: {
+  workspaceId: number;
+  providerId?: number;
+  modelOverride?: string;
+}): Promise<{
+  providerConnectionId: number;
+  modelRef: string;
+  source: "active-for-provider" | "workspace-default";
+} | null> {
+  // Path (I): legacy providerId → providerConnectionId
+  if (args.providerId) {
+    const active = await listActiveForProvider({
+      workspaceId: args.workspaceId,
+      providerCatalogEntryId: args.providerId,
+    });
+    if (active.length > 0) {
+      // Prefer an explicit `model` override on the request; otherwise use
+      // the workspace's `chat` default modelRef, falling back to a
+      // sensible default so the upstream call has a model.
+      let modelRef = args.modelOverride;
+      if (!modelRef) {
+        const wsDefault = await resolveWorkspaceDefaultBinding({
+          workspaceId: args.workspaceId,
+          role: "chat",
+        });
+        modelRef = wsDefault?.modelRef ?? "gpt-4o-mini";
+      }
+      return {
+        providerConnectionId: active[0].providerConnectionId,
+        modelRef,
+        source: "active-for-provider",
+      };
+    }
+  }
+
+  // Path (II): workspace `chat` default
+  const wsDefault = await resolveWorkspaceDefaultBinding({
+    workspaceId: args.workspaceId,
+    role: "chat",
+  });
+  if (wsDefault?.ok) {
+    return {
+      providerConnectionId: wsDefault.providerConnectionId,
+      modelRef: args.modelOverride ?? wsDefault.modelRef,
+      source: "workspace-default",
+    };
+  }
+
+  return null;
+}
 
 export async function handleChatStream(req: Request, res: Response) {
   try {
@@ -66,13 +130,25 @@ export async function handleChatStream(req: Request, res: Response) {
       return;
     }
 
-    // Get provider - either directly or via unified routing
-    const registry = getProviderRegistry();
-    let provider;
-    let routingPlan = null;
+    // PMB Phase 29.6a — resolve workspace context. For the post-LR-08
+    // path we need a workspaceId; if the request omits one, fall back
+    // to the user's first workspace (preserves the previous code's
+    // resolution shape for the cost-tracking step).
+    let wsId = workspaceId;
+    if (!wsId) {
+      const { getUserWorkspaces } = await import('../db');
+      const userWorkspaces = await getUserWorkspaces(user.id);
+      wsId = userWorkspaces[0]?.id;
+    }
+    if (!wsId) {
+      res.status(400).json({ error: 'workspaceId required (no fallback workspace found for user)' });
+      return;
+    }
 
+    // Step 1 — selection (unified routing if requested + workspaceId in scope)
+    let selectedProviderId: number | undefined = providerId;
+    let routingPlan = null;
     if (useUnifiedRouting && workspaceId) {
-      // Use unified provider routing
       try {
         routingPlan = await providerRouter.resolvePlan({
           messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
@@ -81,22 +157,32 @@ export async function handleChatStream(req: Request, res: Response) {
           maxTokens,
           taskHints,
         });
-        provider = registry.getProvider(routingPlan.primaryProviderId);
+        selectedProviderId = routingPlan.primaryProviderId;
         console.log(`[ChatStream] Unified routing selected provider: ${routingPlan.primaryProviderName}`);
       } catch (routingError: any) {
         console.error('[ChatStream] Unified routing failed:', routingError);
         res.status(500).json({ error: `Routing failed: ${routingError.message}` });
         return;
       }
-    } else {
-      // Legacy direct provider selection
-      provider = registry.getProvider(providerId);
     }
 
-    if (!provider) {
-      res.status(404).json({ error: `Provider not found` });
+    // Step 2 — resolve binding (D-PR-4: providerId → providerConnectionId
+    // with workspace-default fallback)
+    const binding = await resolveChatBinding({
+      workspaceId: wsId,
+      providerId: selectedProviderId,
+      modelOverride: model,
+    });
+    if (!binding) {
+      res.status(400).json({
+        error: 'binding_required',
+        detail: `No usable provider binding found for workspace ${wsId} (providerId=${selectedProviderId ?? "n/a"}, role="chat" default not set or unhealthy)`,
+      });
       return;
     }
+    console.log(
+      `[ChatStream] Resolved binding via ${binding.source}: pcid=${binding.providerConnectionId}, modelRef=${binding.modelRef}`,
+    );
 
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -105,17 +191,18 @@ export async function handleChatStream(req: Request, res: Response) {
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 
     // Convert messages to provider format
-    let providerMessages: Message[] = messages.map((m: any) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    let providerMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> =
+      messages.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
     // Inject RAG context if enabled
     let ragSources: any[] = [];
-    if (useRAG && workspaceId) {
+    if (useRAG && wsId) {
       try {
         const { retrieveRelevantChunks } = await import('../documents/rag-pipeline');
-        
+
         // Get the last user message as the query
         const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
         if (lastUserMessage) {
@@ -123,10 +210,10 @@ export async function handleChatStream(req: Request, res: Response) {
           const relevantChunks = await retrieveRelevantChunks(
             lastUserMessage.content,
             'documents', // Default collection name
-            workspaceId,
+            wsId,
             5 // Top 5 most relevant chunks
           );
-          
+
           if (relevantChunks.length > 0) {
             // Store sources for citation
             ragSources = relevantChunks.map((chunk: any, idx: number) => ({
@@ -135,18 +222,18 @@ export async function handleChatStream(req: Request, res: Response) {
               score: chunk.score,
               metadata: chunk.metadata,
             }));
-            
+
             // Build context from retrieved chunks
             const context = relevantChunks
               .map((chunk: any, idx: number) => `[Source ${idx + 1}] ${chunk.text || chunk.content}`)
               .join('\n\n');
-            
+
             // Inject context as a system message before the conversation
-            const contextMessage: Message = {
-              role: 'system',
+            const contextMessage = {
+              role: 'system' as const,
               content: `You are a helpful assistant. Use the following context from the knowledge base to answer the user's question. Cite sources using [Source N] notation when referencing information. If the context doesn't contain relevant information, say so and answer based on your general knowledge.\n\nContext:\n${context}`,
             };
-            
+
             // Insert context message at the beginning (after any existing system message)
             const systemMsgIndex = providerMessages.findIndex(m => m.role === 'system');
             if (systemMsgIndex >= 0) {
@@ -159,7 +246,7 @@ export async function handleChatStream(req: Request, res: Response) {
               // Add new system message at the beginning
               providerMessages = [contextMessage, ...providerMessages];
             }
-            
+
             console.log(`[ChatStream] Injected RAG context: ${relevantChunks.length} chunks`);
           }
         }
@@ -172,44 +259,51 @@ export async function handleChatStream(req: Request, res: Response) {
     const startTime = Date.now();
     let fullContent = '';
     let tokenCount = 0;
+    let finalUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
 
     try {
-      // Stream tokens from provider
-      for await (const token of provider.generateStream({
-        messages: providerMessages,
-        model,
+      // PMB Phase 29.6a — direct-import the Model Access streaming
+      // primitive. The gateway-call form of `openRouter.modelAccess.stream`
+      // collapses streams to a single result; for SSE we need real
+      // streaming and therefore call the function directly. The
+      // receipt policy is enforced at the gateway boundary; the direct-
+      // import path is reserved for streaming consumers (as noted in
+      // `manifest.ts:124` and used by simulation.ts via the bridge).
+      for await (const chunk of modelAccessStream({
+        providerConnectionId: binding.providerConnectionId,
+        modelRef: binding.modelRef,
+        messages: providerMessages.map((m) => ({ role: m.role, content: m.content })),
+        intent: "chat",
+        workspaceId: wsId,
+        actorId: user.id,
         temperature,
-        maxTokens,
+        tokenBudget: maxTokens,
       })) {
-        if (token.isComplete) {
-          // Final token - calculate usage and track
+        if (chunk.usage) finalUsage = chunk.usage;
+        if (chunk.done) {
+          // Final chunk — finalize usage + send completion event
           const latencyMs = Date.now() - startTime;
-          
-          // Estimate token usage (rough approximation)
-          const promptTokens = Math.ceil(messages.reduce((sum: number, m: any) => sum + m.content.length, 0) / 4);
-          const completionTokens = tokenCount;
-          const totalTokens = promptTokens + completionTokens;
+          const promptTokens =
+            finalUsage?.inputTokens ??
+            Math.ceil(messages.reduce((sum: number, m: any) => sum + m.content.length, 0) / 4);
+          const completionTokens = finalUsage?.outputTokens ?? tokenCount;
+          const totalTokens = finalUsage?.totalTokens ?? promptTokens + completionTokens;
 
-          // Get cost from provider
-          const costProfile = provider.getCostPerToken();
-          const cost = (
-            (promptTokens / 1000) * costProfile.inputCostPer1kTokens +
-            (completionTokens / 1000) * costProfile.outputCostPer1kTokens
-          );
+          // Cost tracking: per-model pricing lives at the workspace
+          // settings layer post-29.6a; we record token counts only.
+          // The previous `provider.getCostPerToken()` registry hook is
+          // gone with the registry usage; cost calculation moves to
+          // a Phase-30 follow-up alongside the admin-UI for workspace
+          // defaults (29.1c).
+          const cost = 0;
 
-          // Resolve workspace from request body or user's first workspace
-          let wsId = workspaceId;
-          if (!wsId) {
-            const { getUserWorkspaces } = await import('../db');
-            const userWorkspaces = await getUserWorkspaces(user.id);
-            wsId = userWorkspaces[0]?.id ?? 1;
-          }
-
-          // Track usage
+          // Track usage (workspace context only — per-provider id no
+          // longer applies cleanly post-LR-08; we track providerConnectionId
+          // when the legacy field is unavailable).
           await trackProviderUsage({
             workspaceId: wsId,
-            providerId,
-            modelName: provider.name || "streaming-model",
+            providerId: providerId ?? 0,
+            modelName: binding.modelRef,
             tokensUsed: totalTokens,
             cost,
             latencyMs,
@@ -233,17 +327,23 @@ export async function handleChatStream(req: Request, res: Response) {
               fallbackChain: routingPlan.fallbackChain,
               auditReasons: routingPlan.auditReasons,
             } : undefined,
+            binding: {
+              providerConnectionId: binding.providerConnectionId,
+              modelRef: binding.modelRef,
+              source: binding.source,
+            },
           })}\n\n`);
-          
+
           res.end();
+          break;
         } else {
           // Stream token to client
-          fullContent += token.content;
+          fullContent += chunk.delta;
           tokenCount++;
-          
+
           res.write(`data: ${JSON.stringify({
             type: 'token',
-            content: token.content,
+            content: chunk.delta,
           })}\n\n`);
         }
       }
