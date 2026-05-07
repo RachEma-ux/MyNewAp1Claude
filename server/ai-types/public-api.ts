@@ -25,13 +25,11 @@ export type {
   ProviderModelRestrictions,
 } from "./provider-models-availability";
 
-// Plan v3 Phase 31 (Phase 26.1) — read-only catalog helpers exposed
-// through public-api so callers don't need to reach into
-// `ai-types/db.ts` directly. Writes are NOT re-exported: any code that
-// needs to mutate catalog state must go through a gateway action
-// (`aiTypes.catalog.register`, `aiTypes.catalog.publish`, etc.) so the
-// receipt + audit chain is consistent. The boundary lint
-// (`scripts/check-ai-types-public-api-boundary.ts`) enforces this.
+// Plan v3 Phase 31 (Phase 26.1) — catalog helpers exposed through
+// public-api so callers don't need to reach into `ai-types/db.ts`
+// directly.
+//
+// Reads (always safe to re-export):
 export {
   getCatalogEntries,
   getCatalogEntryById,
@@ -47,6 +45,28 @@ export {
   getTaxonomyTree,
   getTaxonomyChildren,
   getEntryClassifications,
+} from "./db";
+
+// Intra-platform write helpers. New cross-module callers should prefer
+// `gatewayCall("aiTypes.catalog.register", ...)` (see
+// `LEGACY_PATH_DEPRECATION.md`) so the receipt + canonical audit chain
+// is preserved. These are exposed here for the in-process writers that
+// predate the gateway pattern and would require a behavior-preserving
+// refactor to migrate (e.g., the `<domain>.importToCatalog` mutations
+// emit custom audit event shapes that downstream consumers filter on).
+// The Phase-47 deprecation markers + first-call console.warn already
+// steer NEW callers to the gateway path; cleaning up the in-process
+// callers is a follow-up phase explicitly scoped as behavior preservation.
+export {
+  createCatalogEntry,
+  updateCatalogEntry,
+  approveCatalogEntry,
+  setEntryClassifications,
+  createCatalogAuditEvent,
+  createPublishBundle,
+  recallPublishBundle,
+  createExecutionRun,
+  updateExecutionRun,
 } from "./db";
 
 // Re-export the drizzle-schema row + insert types for callers using the
