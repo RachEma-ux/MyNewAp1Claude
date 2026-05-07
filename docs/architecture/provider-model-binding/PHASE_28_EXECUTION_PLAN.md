@@ -54,15 +54,13 @@ The cheap-dependency-first ordering. Sub-phases are PR-sized; sub-phases marked 
 - [ ] **Acceptance:** doc lands on main; `pnpm run check` clean; CI green.
 - [ ] **Authority:** plan-only; no code changes.
 
-### 28.1 — LR-09 decision PR (opencode subprocess env-write)
+### 28.1 — LR-09 decision PR (opencode subprocess env-write) — **CLOSED**
 
-The opencode CLI subprocess at `code-studio/opencode/provider-sync.ts:96` writes provider env vars onto a spawned subprocess. This is a **handoff**, not a runtime read — the binding-of-truth is still the encrypted secret in `provider_connections`. The opencode CLI has no alternative ingestion path today.
+**Decision: ALREADY_FIXED.** The surface LR-09 describes was eliminated by **PR #100** (`f824d8c`, 2026-05-04) **before the register was created** in PR #104 (2026-05-04, seven hours later). The register row was a documentation gap — line 96 of `provider-sync.ts` is now inside a comment block explaining the historical bug, not a code mutation. Boundary lint Rule 2 (`scripts/check-provider-key-env-boundary.ts:166-283`) carries the regression guard going forward; its error message even names PR #100.
 
-- [ ] Document decision in `docs/evidence/provider-model-binding/PHASE_28_OPENCODE_SUBPROCESS_DECISION.md`. Three options: (A) migrate the CLI invocation to receive credentials another way; (B) classify as permanent exemption (subprocess env-write to a non-LLM-runtime process is a different threat model than LR-01..06); (C) keep TEMPORARY_EXCEPTION_WITH_DEADLINE pointing at Phase 29 or beyond.
-- [ ] Update `LEGACY_EXCEPTION_REGISTER.md` LR-09 row to reflect the chosen option.
-- [ ] If (A) is chosen, file a follow-up sub-phase (28.1a). Otherwise this sub-phase closes the entry.
-- [ ] **Acceptance:** decision doc landed; LR-09 has a non-deferral final state OR a re-pointed deadline.
-- [ ] **Authority:** decision call is owned under the authority grant — pick whichever option is most defensible from existing evidence. Lock-in: prefer **(B) permanent exemption** unless I find concrete evidence that the opencode CLI accepts credentials via another channel today.
+Closed by `PHASE_28_OPENCODE_SUBPROCESS_DECISION.md`. LR-09 row in register flipped to `migrated`.
+
+**Lesson:** when closing a register row, re-grep the file against current `main` rather than trusting the prior doc's snapshot. Same chain-of-trust drift that PR #223 (migration 0042) and PR #224 (`useCount` field) surfaced.
 
 ### 28.2 — LR-06 extract: `seed-from-env.ts` `[bundle]`
 
