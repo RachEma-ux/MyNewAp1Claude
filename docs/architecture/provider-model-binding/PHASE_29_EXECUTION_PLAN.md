@@ -86,16 +86,19 @@ The central new decision Phase 29 owns. Four of five callers have no workspace-s
 
 ### 29.2 — `providerRouter` migration ADR
 
-- [ ] **29.2a — Decision record.** Author `PROVIDER_ROUTER_MIGRATION_DECISION.md` (D-PR-1..N): does `providerRouter` survive as a routing+selection layer that delegates to Model Access for the actual upstream call, or does it dissolve entirely with callers calling Model Access directly? Plus: what to do about the legacy `agents` table in `executeInvokeAgent` (Path A backfill / Path B refuse / Path C dual-table support).
-- [ ] **Estimate:** 1 PR, ~100 LOC ADR.
-- [ ] **Pause if:** neither dissolve nor layer-over is obviously cheaper.
+- [x] **29.2a — Decision record.** `PROVIDER_ROUTER_MIGRATION_DECISION.md` shipped, locking **D-PR-1..8**. Verdict: **layer-over with dead-code excision** — `resolvePlan` survives unchanged; `execute()` and `executeStream()` methods are deleted entirely (zero live callers found via call-graph walk against `main@1f5628a`). The chat-stream and `executeInvokeAgent` caller migrations move to §29.6. D-PR-5 picks **Path B (refuse)** for legacy `agents`-table flows in `executeInvokeAgent`, gated on a 29.6b pre-condition check (zero active legacy-agent workflows in ASDB / main DB).
+- [x] **Acceptance:** ADR locked.
+- [x] **Estimate:** 1 PR, ~80 LOC ADR doc.
+- [ ] **Pause if:** ~~neither dissolve nor layer-over is obviously cheaper~~ — closed at 29.2a: D-PR-1's call-graph walk found `execute`/`executeStream` are dead code, collapsing the decision space.
 
-### 29.3 — `providerRouter` implementation
+### 29.3 — `providerRouter` dead-code excision
 
-- [ ] **29.3a — Implement per 29.2 ADR.** If "layer over": rewire `resolvePlan` to invoke Model Access internally. If "dissolve": migrate the 3 callers (chat-stream, batch service, hybrid router — verify list during 29.3 prep).
-- [ ] **29.3b — Tests.** Unit tests for the routing path's new shape.
-- [ ] **Acceptance:** `getProviderRegistry()` consumption inside `provider-router.ts` removed (or the file is deleted); CI green.
-- [ ] **Estimate:** 2–3 PRs, ~300–500 LOC.
+Per D-PR-1 / D-PR-6, §29.3 collapses from "2–3 PRs / 300–500 LOC implementation" to a **single-PR ~80-LOC excision**.
+
+- [ ] **29.3a — Excise dead methods.** Delete `providerRouter.execute()` and `providerRouter.executeStream()` (lines 132–336 of `server/inference/provider-router.ts`). Drop the now-unused `getProviderRegistry` import (line 17). Update file-level JSDoc to reflect "selection-only" surface.
+- [ ] **29.3b — Tests.** Verify no test references the deleted methods (re-grep before commit). Existing `resolvePlan` tests stay unchanged.
+- [ ] **Acceptance:** `getProviderRegistry()` consumption inside `provider-router.ts` removed; CI green.
+- [ ] **Estimate:** 1 PR, ~80 LOC.
 
 ### 29.4 — LR-02/03 embeddings caller migration
 
