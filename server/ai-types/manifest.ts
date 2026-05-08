@@ -70,9 +70,12 @@ export const aiTypesManifest: ModuleManifest = {
 
     // Public-API: aiTypes.catalog.publish — produces a new immutable
     // publish bundle for a catalog entry, supersedes the prior
-    // active bundle, flips entry status to "published", and writes
-    // a catalog audit event. High-risk + receipt-required per
-    // manifest; gateway enforces the receipt before invoking.
+    // active bundle, and writes a catalog audit event. Does NOT
+    // mutate entry status — caller-side concern (Phase 36 contract
+    // redesign; see ADR docs/architecture/ai-types/
+    // PUBLISH_CANONICAL_CONTRACT_REDESIGN.md). High-risk + receipt-
+    // required per manifest; gateway enforces the receipt before
+    // invoking.
     registerPublicApi({
       module: "aiTypes",
       action: "aiTypes.catalog.publish",

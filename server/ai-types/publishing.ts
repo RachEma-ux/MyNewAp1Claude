@@ -3,8 +3,10 @@
  *
  * Module-owned business logic for `aiTypes.catalog.publish`. Builds
  * an immutable snapshot of a catalog entry, supersedes any prior
- * active publish bundle, inserts the new bundle, flips the entry's
- * status to "published", and records a catalog audit event.
+ * active publish bundle, inserts the new bundle, and records a
+ * catalog audit event. Does NOT mutate `catalog_entries.status` —
+ * entry state machine transitions are caller-side concerns. See
+ * ADR `docs/architecture/ai-types/PUBLISH_CANONICAL_CONTRACT_REDESIGN.md`.
  *
  * Used both by the gateway public-API (`aiTypes.catalog.publish`,
  * receipt-required) and by future internal callers that need the
@@ -18,7 +20,6 @@ import {
   getPublishBundles,
   createPublishBundle,
   createCatalogAuditEvent,
-  updateCatalogEntry,
 } from "./db";
 import { deriveSourceModule } from "./register";
 import {
@@ -46,6 +47,11 @@ export interface PublishCatalogEntryResult {
  *
  * If `versionLabel` is omitted, generates `v{N}` where N is one
  * greater than the count of existing bundles for the entry.
+ *
+ * Phase 36 contract: never mutates `catalog_entries.status`. Callers
+ * own entry state machine transitions (e.g. catalog-manage flips to
+ * "active" post-publish; sandbox-wf seed leaves entry at "active"
+ * for execution-gate compliance).
  */
 export async function publishCatalogEntry(
   input: PublishCatalogEntryInput,
@@ -90,14 +96,6 @@ export async function publishCatalogEntry(
     publishedBy: input.publishedBy,
     policyDecision: input.policyDecision,
   });
-
-  if (entry.status !== "published") {
-    await updateCatalogEntry(
-      input.catalogEntryId,
-      { status: "published" },
-      input.publishedBy,
-    );
-  }
 
   await createCatalogAuditEvent({
     eventType: "catalog.publish",
