@@ -450,10 +450,10 @@ describe("RETROFIT trace assembly — validator rejection drops downstream metad
   });
 });
 
-// ── D-UI-5 + §D4 — 11 MVP parser keys (review-polish PR) ──────────────
+// ── D-UI-5 + §D4 + R5 — 12 MVP parser keys ────────────────────────────
 
-describe("RETROFIT D-UI-5 + §D4 — 11 MVP parsers ship and resolve", () => {
-  it("registry resolves the canonical content-type for each of the 11 parsers", async () => {
+describe("RETROFIT D-UI-5 + §D4 + R5 — 12 MVP parsers ship and resolve", () => {
+  it("registry resolves the canonical content-type for each of the 12 parsers", async () => {
     const {
       registerDefaultParsers,
       resetParsersToDefaults,
@@ -480,6 +480,12 @@ describe("RETROFIT D-UI-5 + §D4 — 11 MVP parsers ship and resolve", () => {
     expect(selectParserForContentType("image/png").key).toBe("ocr");
     expect(selectParserForContentType("audio/mpeg").key).toBe("audio");
     expect(selectParserForContentType("video/mp4").key).toBe("video");
+    // R5 (post-2026-05-08 RAC audit): DOCX via mammoth (D-PARSE-DOCX-1).
+    expect(
+      selectParserForContentType(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ).key,
+    ).toBe("docx");
   });
 });
 
