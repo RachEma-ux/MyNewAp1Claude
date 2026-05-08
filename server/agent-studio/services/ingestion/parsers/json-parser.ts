@@ -11,6 +11,7 @@
  */
 
 import type { Parser, ParsedDocument, ParsedPart, RawArtifact } from "../types";
+import { extractLicenseFromJson } from "../license-extractor";
 
 export const jsonParser: Parser = {
   key: "json",
@@ -51,10 +52,15 @@ export const jsonParser: Parser = {
       });
     }
 
+    // U5-b.2: top-level `license` (string or {type: "..."} per npm
+    // package.json convention) is propagated as document-level metadata.
+    const license = extractLicenseFromJson(parsed);
+
     return {
       parserKey: "json",
       fullText: text,
       parts,
+      metadata: license != null ? { license } : undefined,
     };
   },
 };

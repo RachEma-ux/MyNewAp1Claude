@@ -14,6 +14,7 @@
  */
 
 import type { Parser, ParsedDocument, ParsedPart, RawArtifact } from "../types";
+import { extractLicenseFromCode } from "../license-extractor";
 
 const ANCHOR_RE =
   /^[ \t]*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function|class|def|fn|func|public|private|protected|interface|type)\s+(\w+)/;
@@ -119,10 +120,14 @@ export const basicCodeFileParser: Parser = {
       });
     }
 
+    // U5-b.2: SPDX-License-Identifier comment in the first 20 lines.
+    const license = extractLicenseFromCode(text);
+
     return {
       parserKey: "basic_code_file",
       fullText: text,
       parts,
+      metadata: license != null ? { license } : undefined,
     };
   },
 };

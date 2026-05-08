@@ -95,6 +95,14 @@ export interface NormalizedKnowledgeUnitInput {
   };
   /** D-UI-2: freshness state. */
   freshnessState?: "fresh" | "stale" | "expired";
+  /**
+   * U5-b.1/2: SPDX-or-site-label license tag for the unit. Populated
+   * by the parser via document-level extraction (HTML/JSON/code) and
+   * propagated by the normalizer. Operators can override per-unit
+   * via the U5-b.4 mutation (`agentStudio.kb.setLicense`).
+   * NULL = unknown.
+   */
+  license?: string | null;
 }
 
 // ── Registry types ─────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ import type {
   DataValidationResult,
   NormalizedKnowledgeUnitInput,
 } from "./types";
+import { createPiiValidationRule } from "./pii-detector";
 
 export const VALIDATOR_VERSION = "v1-mvp";
 
@@ -38,6 +39,35 @@ export function registerValidationRule(rule: ValidationRule): void {
 
 export function clearValidationRules(): void {
   customRules.length = 0;
+}
+
+let defaultsRegistered = false;
+
+/**
+ * U5-b.2: registers the canonical default validation rules. Called
+ * by `universal-ingestion-service.ts` `ensureBootstrapped()`. Tests
+ * use `clearValidationRules()` + selective re-registration to avoid
+ * accidental coupling.
+ *
+ * Default rule set:
+ *   - PII detector (`pii_*` rules) — regex-based detection per
+ *     `RAC_PII_LICENSE_ENFORCEMENT.md` DD1.
+ *
+ * License extraction is NOT a validation rule — it lives on the
+ * parser side (`license-extractor.ts`) and propagates via the
+ * normalizer to `NormalizedKnowledgeUnitInput.license`.
+ */
+export function registerDefaultValidationRules(): void {
+  if (defaultsRegistered) return;
+  registerValidationRule(createPiiValidationRule());
+  defaultsRegistered = true;
+}
+
+/** Test helper — pairs with `clearValidationRules` for clean reset. */
+export function resetValidationRulesToDefaults(): void {
+  clearValidationRules();
+  defaultsRegistered = false;
+  registerDefaultValidationRules();
 }
 
 export function validateUnit(
