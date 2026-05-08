@@ -140,6 +140,9 @@ export const aiTypesManifest: ModuleManifest = {
     // (new row) or updateCatalogEntry (existing modern row at the same
     // sourceType+sourceId). Throws RegisterDuplicateError on legacy
     // collisions — those callers must use reconcileLegacyImport instead.
+    // Phase 37: accepts either `sourceId` (numeric, domain-backed
+    // entries) or `sourceName` (string, self-registered system agents).
+    // ADR: docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md.
     registerPublicApi({
       module: "aiTypes",
       action: "aiTypes.catalog.register",
@@ -150,8 +153,14 @@ export const aiTypesManifest: ModuleManifest = {
         if (!db) throw new Error("Database not available");
         const payload = input as Parameters<typeof registerCatalogEntry>[1];
         if (!payload?.sourceType) throw new Error("sourceType is required");
-        if (typeof payload?.sourceId !== "number")
-          throw new Error("sourceId is required");
+        const hasSourceId = typeof payload?.sourceId === "number";
+        const hasSourceName =
+          typeof payload?.sourceName === "string" && payload.sourceName.length > 0;
+        if (hasSourceId === hasSourceName) {
+          throw new Error(
+            "exactly one of sourceId (numeric) or sourceName (string) is required",
+          );
+        }
         if (!payload?.entryType) throw new Error("entryType is required");
         if (typeof payload?.registeredBy !== "number")
           throw new Error("registeredBy is required");

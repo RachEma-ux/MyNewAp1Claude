@@ -206,6 +206,52 @@ describe("checkDuplicateLegacyImport — Phase 24 duplicate prevention", () => {
     expect(r.ok).toBe(true);
     expect(r.reason).toBe("reconciling_unresolved_row");
   });
+
+  // ── Phase 37 — name-path tests ──────────────────────────────────────
+  // ADR: docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md
+
+  it("name-path: no existing row → ok=true", async () => {
+    const r = await checkDuplicateLegacyImport(makeFakeDb([]), {
+      sourceType: "self_registered_agent",
+      sourceName: "ps.agent.context_translator",
+    });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBe("no_existing_row");
+    expect(r.existingEntryId).toBeNull();
+  });
+
+  it("name-path: existing row → ok=true with modern_row_update_path (legacy classification skipped)", async () => {
+    // Even if the row had a legacyImportState set, the name-path treats
+    // it as a modern row (self-registered agents have no legacy concept).
+    const r = await checkDuplicateLegacyImport(
+      makeFakeDb([{ id: 700, legacyImportState: null }]),
+      {
+        sourceType: "self_registered_agent",
+        sourceName: "ps.agent.context_translator",
+      },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.existingEntryId).toBe(700);
+    expect(r.reason).toBe("modern_row_update_path");
+  });
+
+  it("rejects when both sourceId and sourceName are provided", async () => {
+    await expect(
+      checkDuplicateLegacyImport(makeFakeDb([]), {
+        sourceType: "agent",
+        sourceId: 42,
+        sourceName: "ps.agent.context_translator",
+      }),
+    ).rejects.toThrow("exactly one of sourceId or sourceName");
+  });
+
+  it("rejects when neither sourceId nor sourceName is provided", async () => {
+    await expect(
+      checkDuplicateLegacyImport(makeFakeDb([]), {
+        sourceType: "agent",
+      } as any),
+    ).rejects.toThrow("exactly one of sourceId or sourceName");
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────

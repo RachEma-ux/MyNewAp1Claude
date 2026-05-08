@@ -42,8 +42,21 @@ export interface RegisterCatalogEntryInput {
   entryType: string;
   /** Source-of-record kind. Required — the register path is for source-linked entries only. */
   sourceType: string;
-  /** Source-of-record row id. Required. */
-  sourceId: number;
+  /**
+   * Numeric source-of-record id. Required for domain-backed entries
+   * (Phase 25 contract). Mutually exclusive with `sourceName` —
+   * exactly one must be set.
+   */
+  sourceId?: number;
+  /**
+   * String source-of-record key. Required for Phase 37 self-registered
+   * system agents (e.g. `AGENT_CATALOG_ID = "ps.agent.context_translator"`).
+   * Mutually exclusive with `sourceId` — exactly one must be set. The
+   * canonical row's `name` column is set to this value; the duplicate
+   * guard looks up modern rows by `(sourceType, name === sourceName)`.
+   * ADR: `docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md`.
+   */
+  sourceName?: string;
   /** All other catalog fields (name, displayName, description, config, tags, etc.). */
   fields: Omit<InsertCatalogEntry, "entryType" | "sourceType" | "sourceId">;
   /** User id (or system actor) who initiated the register call. */
@@ -104,9 +117,22 @@ export async function registerCatalogEntry(
   db: any,
   input: RegisterCatalogEntryInput,
 ): Promise<RegisterCatalogEntryResult> {
+  // Phase 37 — "exactly one of sourceId or sourceName" validation.
+  // Domain-backed entries pass numeric sourceId (Phase 25 contract);
+  // self-registered system agents pass string sourceName.
+  const hasSourceId = input.sourceId !== undefined && input.sourceId !== null;
+  const hasSourceName =
+    input.sourceName !== undefined && input.sourceName !== null;
+  if (hasSourceId === hasSourceName) {
+    throw new Error(
+      "registerCatalogEntry requires exactly one of sourceId (numeric, domain-backed) or sourceName (string, self-registered system agent)",
+    );
+  }
+
   const guard = await checkDuplicateLegacyImport(db, {
     sourceType: input.sourceType,
     sourceId: input.sourceId,
+    sourceName: input.sourceName,
   });
 
   if (!guard.ok) {
@@ -148,12 +174,16 @@ export async function registerCatalogEntry(
     };
   }
 
-  // No existing row → create.
+  // No existing row → create. For sourceName-path callers, sourceId
+  // is left null on the row; the catalog row's `name` (set via
+  // input.fields.name === input.sourceName) carries the source-of-
+  // record key. The canonical (sourceType, name) lookup is what the
+  // duplicate guard's name-path uses.
   const created = await createCatalogEntry({
     ...input.fields,
     entryType: input.entryType,
     sourceType: input.sourceType,
-    sourceId: input.sourceId,
+    sourceId: input.sourceId ?? null,
     createdBy: input.registeredBy,
   } as InsertCatalogEntry);
 
@@ -196,7 +226,11 @@ async function emitRegisterAudit(
       actorType: "user",
       payload: {
         sourceType: input.sourceType,
-        sourceId: input.sourceId,
+        // Phase 37 — payload includes whichever identity path the
+        // caller used. Numeric path: sourceId set, sourceName null.
+        // Name path: sourceName set, sourceId null.
+        sourceId: input.sourceId ?? null,
+        sourceName: input.sourceName ?? null,
         entryType: input.entryType,
         guardReason: guard.reason,
       },
@@ -226,6 +260,8 @@ export function deriveSourceModule(sourceType: string): string {
     case "llm":
     case "model":
       return "providerConnections";
+    case "self_registered_agent":
+      return "pmt";
     default:
       return "unknown";
   }
@@ -254,11 +290,20 @@ async function emitCatalogRegisteredEvent(args: {
   const workspaceId = input.workspaceId ?? null;
   const registeredAt = new Date().toISOString();
 
+  // Phase 37 — `sourceRefId` carries either the numeric sourceId
+  // (domain-backed entries) or the string sourceName (self-registered
+  // system agents). The "exactly one of" validation at the top of
+  // registerCatalogEntry guarantees one is present.
+  const sourceRefId: number | string =
+    input.sourceId !== undefined && input.sourceId !== null
+      ? input.sourceId
+      : input.sourceName!;
+
   const payload: CatalogRegisteredPayload = {
     catalogEntryId,
     entryType: input.entryType,
     sourceModule,
-    sourceRefId: input.sourceId,
+    sourceRefId,
     activeSourceVersionId,
     initiatedByUserId,
     performedByActorId: input.registeredBy,

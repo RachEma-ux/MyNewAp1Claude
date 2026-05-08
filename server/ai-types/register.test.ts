@@ -319,4 +319,91 @@ describe("registerCatalogEntry — Phase 25", () => {
     ).rejects.toBeInstanceOf(RegisterDuplicateError);
     expect(publishEventMock).not.toHaveBeenCalled();
   });
+
+  // ── Phase 37 — name-path (self-registered system agents) ────────────
+  // ADR: docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md
+  describe("Phase 37 — sourceName path (self-registered system agents)", () => {
+    const nameInput = {
+      entryType: "agent",
+      sourceType: "self_registered_agent",
+      sourceName: "ps.agent.context_translator",
+      fields: {
+        name: "ps.agent.context_translator",
+        displayName: "Project Context Translator",
+        description: "self-registered system agent fixture",
+        scope: "app",
+        status: "active",
+        origin: "system",
+        reviewState: "approved",
+        config: {},
+        tags: [],
+        createdBy: 0,
+      },
+      registeredBy: 0,
+    };
+
+    it("creates a new self-registered agent when no row exists (name-path)", async () => {
+      createCatalogEntryMock.mockResolvedValue({ id: 700 });
+      const r = await registerCatalogEntry(makeFakeDb([]), nameInput);
+
+      expect(r.action).toBe("created");
+      expect(r.entryId).toBe(700);
+      expect(r.guardReason).toBe("no_existing_row");
+      expect(createCatalogEntryMock).toHaveBeenCalledTimes(1);
+      const passed = createCatalogEntryMock.mock.calls[0][0];
+      expect(passed.sourceType).toBe("self_registered_agent");
+      expect(passed.sourceId).toBeNull(); // sourceId left null on the row
+      expect(passed.name).toBe("ps.agent.context_translator");
+    });
+
+    it("updates existing self-registered agent on second call (name-path → modern_row_update_path)", async () => {
+      getCatalogEntryByIdMock.mockResolvedValue({ id: 700, legacyImportState: null });
+      const r = await registerCatalogEntry(
+        makeFakeDb([{ id: 700, legacyImportState: null }]),
+        nameInput,
+      );
+
+      expect(r.action).toBe("updated");
+      expect(r.entryId).toBe(700);
+      expect(r.guardReason).toBe("modern_row_update_path");
+      expect(updateCatalogEntryMock).toHaveBeenCalledTimes(1);
+      expect(createCatalogEntryMock).not.toHaveBeenCalled();
+    });
+
+    it("name-path event payload: sourceRefId carries the sourceName string", async () => {
+      createCatalogEntryMock.mockResolvedValue({ id: 700 });
+      await registerCatalogEntry(makeFakeDb([]), nameInput);
+
+      expect(publishEventMock).toHaveBeenCalledTimes(1);
+      const p = publishEventMock.mock.calls[0][0].payload;
+      expect(p.sourceRefId).toBe("ps.agent.context_translator");
+      expect(p.sourceModule).toBe("pmt"); // derived from self_registered_agent
+    });
+
+    it("name-path audit event payload includes sourceName, sourceId is null", async () => {
+      createCatalogEntryMock.mockResolvedValue({ id: 700 });
+      await registerCatalogEntry(makeFakeDb([]), nameInput);
+
+      const auditArgs = createCatalogAuditEventMock.mock.calls[0][0];
+      expect(auditArgs.payload.sourceName).toBe("ps.agent.context_translator");
+      expect(auditArgs.payload.sourceId).toBeNull();
+      expect(auditArgs.payload.sourceType).toBe("self_registered_agent");
+    });
+
+    it("rejects when both sourceId and sourceName are provided", async () => {
+      await expect(
+        registerCatalogEntry(makeFakeDb([]), {
+          ...nameInput,
+          sourceId: 42,
+        } as any),
+      ).rejects.toThrow("exactly one of sourceId");
+    });
+
+    it("rejects when neither sourceId nor sourceName is provided", async () => {
+      const { sourceName: _drop, ...withoutName } = nameInput;
+      await expect(
+        registerCatalogEntry(makeFakeDb([]), withoutName as any),
+      ).rejects.toThrow("exactly one of sourceId");
+    });
+  });
 });

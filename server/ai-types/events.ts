@@ -48,8 +48,12 @@ export const AI_TYPES_EVENT_NAMES: AiTypesEventType[] = [
  *     the write, distinct from `sourceType` which is the source-of-record
  *     row kind. Falls back to a derived value when the caller does not
  *     pass one explicitly (see `deriveSourceModule` in register.ts).
- *   - sourceRefId: same as the row's `sourceId`. Named differently here
- *     to match the cross-module event vocabulary.
+ *   - sourceRefId: source-of-record reference. For domain-backed entries,
+ *     this is the row's numeric `sourceId` (mirrors the legacy contract).
+ *     For self-registered system agents (Phase 37 — `sourceType:
+ *     "self_registered_agent"`), this is the `sourceName` string (the
+ *     `AGENT_CATALOG_ID` constant). Named differently from `sourceId`
+ *     here to match the cross-module event vocabulary.
  *   - activeSourceVersionId: pinned source version id (Phase 23 column),
  *     null when the source has no versioning concept yet.
  *   - initiatedByUserId: the user who started the upstream flow. For
@@ -71,7 +75,12 @@ export interface CatalogRegisteredPayload {
   catalogEntryId: number;
   entryType: string;
   sourceModule: string;
-  sourceRefId: number;
+  /**
+   * Source-of-record reference. Numeric for domain-backed entries
+   * (sourceId); string for Phase 37 self-registered system agents
+   * (sourceName). See ADR `docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md`.
+   */
+  sourceRefId: number | string;
   activeSourceVersionId: number | null;
   initiatedByUserId: number | null;
   performedByActorId: number | null;
