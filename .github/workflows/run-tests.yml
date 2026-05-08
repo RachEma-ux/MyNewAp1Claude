@@ -139,6 +139,19 @@ jobs:
       - name: Static governance invariant scan
         run: npx tsx scripts/governance/check-invariants.ts
 
+      # ── Plan v3 Provider/Model Binding boundary scans (R4) ─────────
+      # D1 (env-key) + D2 (credential-resolver import) static enforcement.
+      # The PMB cleanup arc (§28-§41) closed every D1/D2 violation on
+      # main; these scripts are the regression guard. Wired here per
+      # the 2026-05-08 RAC audit finding G4: scripts existed and had
+      # `npm run check:*` shortcuts, but were not invoked by any CI
+      # workflow, leaving the boundary unenforced on PR merges.
+      - name: Provider credential resolver boundary (D2)
+        run: npx tsx scripts/check-provider-credential-resolver-boundary.ts
+
+      - name: Provider env-key boundary (D1)
+        run: npx tsx scripts/check-provider-key-env-boundary.ts
+
       # ── Additional Tests (manual trigger) ───────────────────────────
       - name: Run additional tests
         if: ${{ github.event.inputs.test_path != '' }}
