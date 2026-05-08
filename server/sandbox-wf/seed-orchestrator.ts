@@ -18,7 +18,7 @@
 
 import { eq, like } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { getCatalogEntryById } from "../ai-types/public-api";
+import type { RegisterCatalogEntryResult } from "../ai-types/public-api";
 import { gatewayCall } from "../platform/modules/module-gateway";
 import { agents } from "../../drizzle/tables/agents";
 import { providers } from "../../drizzle/tables/providers";
@@ -189,7 +189,7 @@ export async function seedWfOrchestrators(): Promise<{ seeded: boolean; count: n
     // Step C (below) also routes through aiTypes.catalog.publish
     // after the §36.1 contract redesign removed the canonical's
     // flip-to-published auto-behavior (gate 5 wants status="active").
-    const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+    const result = await gatewayCall<unknown, RegisterCatalogEntryResult>({
       ctx: {
         sourceModule: "sandbox-wf",
         targetModule: "aiTypes",
@@ -223,12 +223,8 @@ export async function seedWfOrchestrators(): Promise<{ seeded: boolean; count: n
         sourceModule: "sandbox-wf",
       },
     });
-    const entry = await getCatalogEntryById(result.entryId);
-    if (!entry) {
-      throw new Error(
-        `[sandbox-wf] register returned entryId=${result.entryId} but getCatalogEntryById was null`,
-      );
-    }
+    // Phase 38 — `result.entry` carries the full row; no round-trip.
+    const entry = result.entry;
 
     // ── Step C: Create publish bundle (passes gate 6) ──────────────
     // Canonical builds the snapshot + snapshotHash internally; entry

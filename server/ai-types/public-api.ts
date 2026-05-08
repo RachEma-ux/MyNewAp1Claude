@@ -71,6 +71,15 @@ export {
   seedTaxonomy,
 } from "./db";
 
+// Phase 38 — `aiTypes.catalog.register` action result shape, surfaced
+// so gateway callers can tighten their `gatewayCall<unknown, T>` type
+// param. The result includes the full `entry: CatalogEntry`, eliminating
+// the post-register `getCatalogEntryById(result.entryId)` round-trip.
+export type {
+  RegisterCatalogEntryInput,
+  RegisterCatalogEntryResult,
+} from "./register";
+
 // Service-runtime helpers — resolve a service-based agent target from the
 // catalog and probe its health. Reads only (no DB writes).
 export {

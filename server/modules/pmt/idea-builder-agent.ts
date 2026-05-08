@@ -16,7 +16,8 @@
 import { getProviderRegistry } from "../../providers/registry";
 import type { ILLMProvider } from "../../providers/base";
 import type { GenerationRequest, GenerationResponse, Message } from "../../providers/types";
-import { getCatalogEntries, getTaxonomyNodes, setEntryClassifications, getEntryClassifications, getCatalogEntryById } from "../../ai-types/public-api";
+import { getCatalogEntries, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/public-api";
+import type { RegisterCatalogEntryResult } from "../../ai-types/public-api";
 import { gatewayCall } from "../../platform/modules/module-gateway";
 import type { IdeaBuilderInput } from "@shared/pm-artifact-schemas";
 
@@ -629,7 +630,7 @@ export async function ensureAgentRegistered(): Promise<number | null> {
     // `aiTypes.catalog.registered` event. Self-registered system agents
     // use the sourceName path (string identity) — see ADR
     // docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md.
-    const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+    const result = await gatewayCall<unknown, RegisterCatalogEntryResult>({
       ctx: {
         sourceModule: "pmt",
         targetModule: "aiTypes",
@@ -691,10 +692,8 @@ export async function ensureAgentRegistered(): Promise<number | null> {
       },
     });
 
-    const entry = await getCatalogEntryById(result.entryId);
-    if (!entry) {
-      throw new Error(`[PM Agent] register returned entryId=${result.entryId} but getCatalogEntryById was null`);
-    }
+    // Phase 38 — `result.entry` carries the full row; no round-trip.
+    const entry = result.entry;
 
     // Assign taxonomy classifications (real-taxonomy classifications,
     // intra-platform write — public-api permits this).
