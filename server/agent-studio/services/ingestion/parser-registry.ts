@@ -23,6 +23,7 @@ import { xlsxParser } from "./parsers/xlsx-parser";
 import { ocrParser } from "./parsers/ocr-parser";
 import { audioParser } from "./parsers/audio-parser";
 import { videoParser } from "./parsers/video-parser";
+import { docxParser } from "./parsers/docx-parser";
 import { UnsupportedContentTypeError, type Parser } from "./types";
 
 const parsers = new Map<string, Parser>();
@@ -76,6 +77,7 @@ export function registerDefaultParsers(): void {
   registerParser(ocrParser);
   registerParser(audioParser);
   registerParser(videoParser);
+  registerParser(docxParser);
   defaultsRegistered = true;
 }
 
