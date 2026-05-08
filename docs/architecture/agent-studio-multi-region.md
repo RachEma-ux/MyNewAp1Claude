@@ -22,7 +22,7 @@ Future engineers reading this should see "we considered it, we didn't do it, her
 ### 2.1 Single-region is intentional
 
 - `CLAUDE.md` `## Deferred Scope` § lists "Multi-region deployment guidance — single-region remains the operational baseline."
-- `docs/architecture/agent-studio/RAC_ROLLOUT_PLAN.md` §7 calls cross-region replication "a Stage 9 concern."
+- `docs/architecture/agent-studio/RAC_ROLLOUT_PLAN.md` line 159 (the original §7 "Stage 9 concern" entry; updated to back-reference this ADR as the authoritative deferral document).
 - No row in any retrofit-scope table carries a `region` column.
 - No service in `server/agent-studio/` calls a region resolver.
 - `multi_region` exists in `shared/catalog-taxonomy.ts` as a **provider-capability tag** (e.g., "this provider connection supports multi-region calls") — unrelated to deployment topology.
@@ -190,3 +190,70 @@ This ADR is forward-looking. The retrofit (Phases 0–14 + §D follow-ups) does 
 - `docs/architecture/agent-studio-pgvector-future-migration.md` — sibling ADR with the same forward-looking shape; D1 closure shows the amendment pattern when a trigger fires.
 - `docs/architecture/agent-studio/RAC_ROLLOUT_PLAN.md` §7 — the original "Stage 9 concern" reference that this ADR replaces with concrete trigger conditions.
 - `CLAUDE.md` `## Deferred Scope` — references this ADR as the authoritative deferral document.
+
+---
+
+## 9. Verification snapshot — 2026-05-08 (R7 of post-RAC audit closure)
+
+The audit closure at `main@0258892` re-verified §2 / §4.3 invariants
+against current main and locked the deferred state with CI gates.
+This is **not** a §11 amendment — none of §3.1–§3.4 has fired, the
+ADR's authority is unchanged. This is a closure snapshot recording
+that "what the ADR says is deferred" actually still is.
+
+### 9.1 Verified invariants (read against `main@0258892`)
+
+| ADR § | Claim | Verified |
+|---|---|---|
+| §2.1 | No retrofit-scope table carries a `region` column | ✅ Direct grep across `drizzle/tables/agent-studio.ts` and `drizzle/tables/workspaces.ts` returned zero matches |
+| §2.1 | No service in `server/agent-studio/` calls a region resolver | ✅ Zero matches for `getCurrentRegion` / `getWorkspaceRegion` / `isLocalRegion` function declarations in `server/` |
+| §2.1 | `multi_region` is provider-capability tag only | ✅ `shared/catalog-taxonomy.ts:1145` declares `appliesTo: ["provider"]`, group `"operational"`. No deployment-topology coupling |
+| §2.2 | Retrofit tables key on `workspaceId` | ✅ 19 `workspaceId.notNull()` rows in `drizzle/tables/agent-studio.ts` covering all canonical retrofit tables |
+| §2.3 | `BUILT_IN_FORGE_API_URL` is a single global URL | ✅ `server/_core/env.ts:11` reads `process.env.BUILT_IN_FORGE_API_URL` with no per-region suffix branching |
+| §2.3 | `DATA_ACQUISITION_WORKER_URL` is a single global URL | ✅ `server/data-analysis/data-acquisition/dataAcquisition.constants.ts:11` declares `DATA_ACQUISITION_WORKER_ENV = "DATA_ACQUISITION_WORKER_URL"`, single env name |
+| §4.3 | No `BUILT_IN_FORGE_API_URL_{REGION}` / `DATA_ACQUISITION_WORKER_URL_{REGION}` / `AGENT_STUDIO_REGION` env-key references | ✅ Grep across `server/` and `shared/` for `_(US|EU|AU|REGION)` variants and `AGENT_STUDIO_REGION` returned zero matches |
+
+### 9.2 CI lock
+
+The above invariants moved from "verified once" to "enforced every CI
+run" via 5 new tests in
+`tests/agent-studio/retrofit-acceptance.test.ts` under the describe
+block **"RETROFIT R7 — multi-region deferral lock (ADR §6)"**:
+
+1. No `region` column on the 8 canonical retrofit-scope tables (§4.1
+   list).
+2. No region-resolver function declarations (`getCurrentRegion` /
+   `getWorkspaceRegion` / `isLocalRegion`) anywhere in `server/`.
+3. No per-region engine env-var references (`BUILT_IN_FORGE_API_URL_*`,
+   `DATA_ACQUISITION_WORKER_URL_*`, `AGENT_STUDIO_REGION`).
+4. `multi_region` taxonomy tag's `appliesTo` is exactly
+   `["provider"]` — anything else (workspace, deployment) is a
+   topology coupling that the ADR forbids.
+5. No service in `server/agent-studio/` imports from a `*/region` or
+   `*/region-resolver` module.
+
+Layer 6 in `.github/workflows/run-tests.yml` runs the
+retrofit-acceptance suite on every PR; these 5 tests fail loudly the
+moment retrofit code starts adopting any §4 foundation without a
+preceding §11 amendment. This converts the ADR's prose lock (§6
+"What this ADR does NOT authorize") into an enforced gate, mirroring
+audit-closure lesson #3 (CI-gates-are-the-real-contract).
+
+### 9.3 What this snapshot does NOT do
+
+- It does NOT amend the deferral. None of §3 has fired; §7's
+  "Re-evaluate when any §3 trigger fires" remains unchecked.
+- It does NOT pre-build any §4 foundation. No `region` column added,
+  no resolver written, no per-region env vars wired.
+- It does NOT change the trigger conditions (§3) or the swap surface
+  (§4). §3.1–§3.4 + §4.1–§4.7 are unchanged from the original ADR.
+
+When a §3 trigger eventually fires, the §11 amendment will (per the
+ADR's original framing) authorize the migration arc, the 5 CI lock
+tests will be relaxed in lockstep with the foundations being built,
+and the swap surface (§4) drives the implementation.
+
+### 9.4 Cross-reference to the audit closure summary
+
+`/sdcard/Download/RAC_AUDIT_CLOSURE_2026-05-08.md` §1.6 — R7 closure
+shape (verification snapshot + CI lock).
