@@ -758,3 +758,137 @@ describe("RETROFIT U5-b — PII / license enforcement (post-2026-05-08)", () => 
     ).toBe(true);
   });
 });
+
+// ── R7 — Multi-region deferral lock (CI-enforces-the-ADR) ─────────────
+//
+// `docs/architecture/agent-studio-multi-region.md` §6 lists what the
+// retrofit explicitly does NOT authorize. Audit-closure lesson #3
+// (CI-gates-are-the-real-contract) says forbidden states need an
+// enforced gate, not just prose. These tests fail loudly the moment
+// retrofit code starts adopting any multi-region foundation without
+// the ADR's §3 trigger having fired + the ADR being amended.
+
+describe("RETROFIT R7 — multi-region deferral lock (ADR §6)", () => {
+  it("no retrofit-scope table carries a `region` column (ADR §2.1, §4.1)", async () => {
+    const tables = await import("../../drizzle/tables/agent-studio");
+    // The 8 canonical retrofit-scope tables ADR §4.1 names.
+    const canonical = [
+      tables.agsKnowledgeUnits,
+      tables.agsKnowledgeChunks,
+      tables.agsRacSources,
+      tables.agsRacProfiles,
+      tables.agsToolCallTraces,
+      tables.agsRacRuntimeTraces,
+      tables.agsApprovalSteps,
+      tables.agsPendingPermissionRequests,
+    ];
+    for (const t of canonical) {
+      const colKeys = Object.keys((t as Record<string, unknown>) ?? {});
+      expect(colKeys).not.toContain("region");
+    }
+  });
+
+  it("no region resolver functions exist in the agent-studio surface (ADR §4.2)", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const root = path.resolve(__dirname, "../../server");
+    async function* walk(dir: string): AsyncGenerator<string> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) yield* walk(p);
+        else if (entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) yield p;
+      }
+    }
+    const offenders: string[] = [];
+    for await (const file of walk(root)) {
+      const src = await fs.readFile(file, "utf8");
+      if (/\bfunction\s+(getCurrentRegion|getWorkspaceRegion|isLocalRegion)\b/.test(src)) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("no per-region engine env vars are referenced in server/ (ADR §4.3)", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const root = path.resolve(__dirname, "../../server");
+    async function* walk(dir: string): AsyncGenerator<string> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) yield* walk(p);
+        else if (entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) yield p;
+      }
+    }
+    // Enumerated patterns mirror ADR §4.3's example list. New per-region
+    // env vars need an ADR amendment per §6, not a silent addition.
+    const forbidden = [
+      /\bBUILT_IN_FORGE_API_URL_(?:US|EU|AU|REGION)\b/,
+      /\bDATA_ACQUISITION_WORKER_URL_(?:US|EU|AU|REGION)\b/,
+      /\bAGENT_STUDIO_REGION\b/,
+    ];
+    const offenders: Array<{ file: string; pattern: string }> = [];
+    for await (const file of walk(root)) {
+      const src = await fs.readFile(file, "utf8");
+      for (const re of forbidden) {
+        if (re.test(src)) offenders.push({ file, pattern: re.source });
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("`multi_region` taxonomy tag remains a provider-capability marker, not a deployment-topology marker (ADR §2.1)", async () => {
+    const taxonomy = await import("../../shared/catalog-taxonomy");
+    // The ADR's claim is that `multi_region` is *only* a provider
+    // capability tag (group="operational", appliesTo=["provider"]).
+    // If that ever changes — say, appliesTo grows "workspace" or
+    // "deployment" — that is a topology coupling that needs ADR
+    // amendment, not a silent change.
+    const tag = (taxonomy as { providerCapabilityTags?: Record<string, { appliesTo: string[] }> })
+      .providerCapabilityTags?.multi_region;
+    if (tag) {
+      expect(tag.appliesTo).toEqual(["provider"]);
+    } else {
+      // Older shape exposed catalog-taxonomy as a flat object; guard by
+      // string-scanning the source so the test isn't shape-fragile.
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const src = await fs.readFile(
+        path.resolve(__dirname, "../../shared/catalog-taxonomy.ts"),
+        "utf8",
+      );
+      // The line declaring multi_region must reference appliesTo:
+      // ["provider"] — any other appliesTo target is a topology change.
+      const matches = src.match(/multi_region:[^}]*appliesTo:\s*\[([^\]]*)\]/);
+      expect(matches).not.toBeNull();
+      const targets = matches?.[1] ?? "";
+      expect(targets).toContain("\"provider\"");
+      expect(targets).not.toContain("\"workspace\"");
+      expect(targets).not.toContain("\"deployment\"");
+    }
+  });
+
+  it("no service in server/agent-studio/ imports a region-resolver module (ADR §6)", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const root = path.resolve(__dirname, "../../server/agent-studio");
+    async function* walk(dir: string): AsyncGenerator<string> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) yield* walk(p);
+        else if (entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) yield p;
+      }
+    }
+    const offenders: string[] = [];
+    for await (const file of walk(root)) {
+      const src = await fs.readFile(file, "utf8");
+      if (/from\s+["'][^"']*\/region(?:-resolver)?["']/.test(src)) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
