@@ -1658,7 +1658,14 @@ export const agsRacRuntimeTraces = pgTable(
     tokenBudgetUsed: integer("token_budget_used"),
     tokenBudgetTruncated: integer("token_budget_truncated").notNull().default(0),
     citationCoverage: real("citation_coverage"),
-    /** P8 evaluation may overwrite this asynchronously. */
+    /**
+     * Set synchronously by the operator-driven evaluator via tRPC
+     * `agentStudio.racEvaluation.{evaluate,runGroundednessCheck}`,
+     * which call `updateTraceScores` in
+     * `services/rac/trace/store.ts`. Initial trace insert from
+     * `writeTrace` leaves this null because chat-stream does not
+     * have the model output at trace-write time.
+     */
     groundednessScore: real("groundedness_score"),
     fallbackReason: varchar("fallback_reason", { length: 64 }),
     warningsJson: jsonb("warnings_json").$type<string[] | null>(),
