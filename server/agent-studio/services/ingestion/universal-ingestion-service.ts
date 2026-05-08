@@ -35,6 +35,7 @@ import {
 import { getExtractor } from "./extractor-registry";
 import { recordProvenance } from "./provenance-service";
 import { insertUnit } from "./knowledge-unit-service";
+import { registerDefaultValidationRules } from "./data-validation-service";
 import { startJob, completeJob } from "./ingestion-job-service";
 import {
   KnowledgeUnitContractError,
@@ -49,6 +50,7 @@ function ensureBootstrapped() {
   registerDefaultSourceConnectors();
   registerDefaultParsers();
   registerDefaultNormalizers();
+  registerDefaultValidationRules();
   bootstrapped = true;
 }
 

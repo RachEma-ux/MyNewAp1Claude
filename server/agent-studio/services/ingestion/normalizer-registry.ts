@@ -22,6 +22,14 @@ const normalizers = new Map<string, Normalizer>();
 export const identityNormalizer: Normalizer = {
   key: "identity",
   normalize(input: NormalizerInput): NormalizedKnowledgeUnitInput[] {
+    // U5-b.2: document-level license (set by parsers HTML/JSON/code)
+    // propagates to every unit. Per ADR DD2 license is per-unit on
+    // ags_knowledge_units; the normalizer is the natural propagation
+    // point since every part inherits the document's signal.
+    const docLicense =
+      typeof input.document.metadata?.license === "string"
+        ? (input.document.metadata.license as string)
+        : null;
     return input.document.parts.map((part) => ({
       workspaceId: input.workspaceId,
       sourceId: input.sourceId,
@@ -36,6 +44,7 @@ export const identityNormalizer: Normalizer = {
       },
       permissionContext: input.permissionContext,
       freshnessState: "fresh",
+      license: docLicense,
     }));
   },
 };

@@ -113,6 +113,25 @@ export async function insertUnit(
   // ── Validate (D-UI-4) ──
   const verdict = validateUnit({ ...input, freshnessState });
 
+  // U5-b.2: project block-severity PII findings to the hot-path
+  // column (ADR DD4). The full finding set including warn-severity
+  // entries lives in agsDataValidationResults (audit trail); the
+  // unit-row projection holds the subset the retrieval filter
+  // (U5-b.3) needs to make a O(1) reject decision per chunk.
+  const piiFindingsProjection = verdict.findings
+    .filter(
+      (f) =>
+        f.severity === "block" &&
+        typeof f.rule === "string" &&
+        f.rule.startsWith("pii_"),
+    )
+    .map((f) => ({
+      entity: typeof f.detail?.entity === "string" ? f.detail.entity : f.rule.slice(4),
+      start: typeof f.detail?.start === "number" ? f.detail.start : 0,
+      end: typeof f.detail?.end === "number" ? f.detail.end : 0,
+      severity: "block" as const,
+    }));
+
   // ── Insert validation row first; FK from the unit row ──
   const [validationRow] = await db
     .insert(agsDataValidationResults)
@@ -146,6 +165,8 @@ export async function insertUnit(
       lastValidatedAt: new Date(),
       validationStatus: verdict.status,
       validationResultId: validationRow.id,
+      license: input.license ?? null,
+      piiFindings: piiFindingsProjection.length > 0 ? piiFindingsProjection : null,
     })
     .returning({ id: agsKnowledgeUnits.id });
 

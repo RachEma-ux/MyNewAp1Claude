@@ -11,6 +11,7 @@
 
 import { load } from "cheerio";
 import type { Parser, ParsedDocument, ParsedPart, RawArtifact } from "../types";
+import { extractLicenseFromHtml } from "../license-extractor";
 
 const BLOCK_SELECTOR = "article, section, main, div";
 
@@ -20,6 +21,10 @@ export const htmlSnapshotParser: Parser = {
 
   async parse(artifact: RawArtifact): Promise<ParsedDocument> {
     const html = artifact.bytes.toString("utf-8");
+    // U5-b.2: read license BEFORE cheerio strips scripts/styles, since
+    // <link rel="license"> lives in <head> and is unaffected, but doing
+    // it on the raw bytes keeps the extractor source-agnostic.
+    const license = extractLicenseFromHtml(html);
     const $ = load(html);
 
     // D-UI-3 / security: scripts and styles are not knowledge.
@@ -61,6 +66,7 @@ export const htmlSnapshotParser: Parser = {
       parserKey: "html_snapshot",
       fullText,
       parts,
+      metadata: license != null ? { license } : undefined,
     };
   },
 };
