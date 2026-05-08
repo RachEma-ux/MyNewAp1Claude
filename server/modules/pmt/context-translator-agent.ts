@@ -20,7 +20,8 @@
 
 import { getAvailableProvider, callLLM, parseLLMJson } from "./idea-builder-agent";
 import type { Message } from "../../providers/types";
-import { createCatalogEntry, updateCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/public-api";
+import { updateCatalogEntry, getCatalogEntries, getTaxonomyNodes, setEntryClassifications, getEntryClassifications, getCatalogEntryById } from "../../ai-types/public-api";
+import { gatewayCall } from "../../platform/modules/module-gateway";
 import type { TranslateResponse, QuestionTableRow, AnsweredQuestionRow, QuestionTableResponse, ClarificationPayload, ClarificationChoiceGroup, ClarificationOption, ClarificationSubmission } from "@shared/ps-context-translator-types";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
@@ -1191,68 +1192,94 @@ export async function ensureContextTranslatorRegistered(): Promise<number | null
       return found.id;
     }
 
-    // Register new catalog entry
-    const entry = await createCatalogEntry({
-      name: AGENT_CATALOG_ID,
-      displayName: AGENT_DISPLAY_NAME,
-      description: "An AI-powered agent that transforms unstructured project ideas into structured context analysis and PS Wizard-ready scenarios. Applies the formula: Project Context = External Drivers + Internal Drivers + Trigger. Produces decision gates, core signals, ideation workflow drafts, and scenario packages.",
-      entryType: "agent",
-      category: "specialist",
-      subCategory: "ideation",
-      capabilities: [...AGENT_CAPABILITIES],
-      scope: "app",
-      status: "active",
-      origin: "system",
-      reviewState: "approved",
-      config: {
-        version: AGENT_VERSION,
-        agentType: "context_translator",
-        systemPrompt: CONTEXT_TRANSLATOR_SYSTEM_PROMPT,
-        outputSections: [
-          "decisionGate", "extractedFacts", "problem", "opportunity",
-          "coreSignals", "projectContextFormula", "projectContextResult",
-          "whatIfQuestion", "ideationWorkflowDraft", "psWizardScenarioPackage",
-          "missingInformation", "framingNotes",
-        ],
-        // ── Runtime metadata (service-based agent) ────────────────────────
-        runtime: {
-          kind: "service",
-          serviceKind: "python",
-          serviceName: "project-context-translator",
-          serviceUrlEnv: "PROJECT_CONTEXT_TRANSLATOR_URL",
-          serviceUrlDefault: "http://localhost:8585",
-          healthEndpoint: "/health",
-          statusEndpoint: "/status",
-          translateEndpoint: "/translate",
-          inputSchemaRef: "shared/ps-context-translator-types#TranslateRequest",
-          outputSchemaRef: "shared/ps-context-translator-types#TranslateResponse",
-          capabilityTags: ["ps-ideation", "wizard-handoff", "context-framing"],
-          bounded: true,
-        },
-        taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
-        enforcementOverlay: {
-          deny: [
-            "gate_submit", "gate_approve", "gate_reject", "gate_waive",
-            "state_transition", "baseline_lock", "baseline_unlock",
-            "freeze", "unfreeze", "artifact_write_canonical",
-          ],
-          requireHumanReview: true,
-        },
-        cognitiveLoop: {
-          sense: "Receives raw unstructured project text from user",
-          think: "LLM-powered extraction of facts, drivers, signals, and opportunities",
-          act: "Generates structured context analysis + PS Wizard scenario package",
-          learn: "Incorporates clarification answers and iterates on analysis",
-        },
-        memoryType: "session",
-        toolAccess: ["context_extraction", "scenario_framing", "feasibility_assessment"],
-        phasesAllowed: ["draft_shell", "initiating", "planning"],
+    // Plan v3 Phase 37: route through aiTypes.catalog.register so the
+    // canonical write path runs the duplicate guard, audit chain, and
+    // `aiTypes.catalog.registered` event. Self-registered system agents
+    // use the sourceName path (string identity) — see ADR
+    // docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md.
+    const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      ctx: {
+        sourceModule: "pmt",
+        targetModule: "aiTypes",
+        actionKey: "aiTypes.catalog.register",
+        governanceReceiptId: `pmt-context-translator-bootstrap-${AGENT_CATALOG_ID}-${Date.now()}`,
+        actorId: 0,
       },
-      tags: ["ps", "ideation", "context-translator", "wizard", "scenario", "llm-powered"],
-      createdBy: 1, // system user
+      input: {
+        entryType: "agent",
+        sourceType: "self_registered_agent",
+        sourceName: AGENT_CATALOG_ID,
+        fields: {
+          name: AGENT_CATALOG_ID,
+          displayName: AGENT_DISPLAY_NAME,
+          description: "An AI-powered agent that transforms unstructured project ideas into structured context analysis and PS Wizard-ready scenarios. Applies the formula: Project Context = External Drivers + Internal Drivers + Trigger. Produces decision gates, core signals, ideation workflow drafts, and scenario packages.",
+          category: "specialist",
+          subCategory: "ideation",
+          capabilities: [...AGENT_CAPABILITIES],
+          scope: "app",
+          status: "active",
+          origin: "system",
+          reviewState: "approved",
+          config: {
+            version: AGENT_VERSION,
+            agentType: "context_translator",
+            systemPrompt: CONTEXT_TRANSLATOR_SYSTEM_PROMPT,
+            outputSections: [
+              "decisionGate", "extractedFacts", "problem", "opportunity",
+              "coreSignals", "projectContextFormula", "projectContextResult",
+              "whatIfQuestion", "ideationWorkflowDraft", "psWizardScenarioPackage",
+              "missingInformation", "framingNotes",
+            ],
+            runtime: {
+              kind: "service",
+              serviceKind: "python",
+              serviceName: "project-context-translator",
+              serviceUrlEnv: "PROJECT_CONTEXT_TRANSLATOR_URL",
+              serviceUrlDefault: "http://localhost:8585",
+              healthEndpoint: "/health",
+              statusEndpoint: "/status",
+              translateEndpoint: "/translate",
+              inputSchemaRef: "shared/ps-context-translator-types#TranslateRequest",
+              outputSchemaRef: "shared/ps-context-translator-types#TranslateResponse",
+              capabilityTags: ["ps-ideation", "wizard-handoff", "context-framing"],
+              bounded: true,
+            },
+            taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
+            enforcementOverlay: {
+              deny: [
+                "gate_submit", "gate_approve", "gate_reject", "gate_waive",
+                "state_transition", "baseline_lock", "baseline_unlock",
+                "freeze", "unfreeze", "artifact_write_canonical",
+              ],
+              requireHumanReview: true,
+            },
+            cognitiveLoop: {
+              sense: "Receives raw unstructured project text from user",
+              think: "LLM-powered extraction of facts, drivers, signals, and opportunities",
+              act: "Generates structured context analysis + PS Wizard scenario package",
+              learn: "Incorporates clarification answers and iterates on analysis",
+            },
+            memoryType: "session",
+            toolAccess: ["context_extraction", "scenario_framing", "feasibility_assessment"],
+            phasesAllowed: ["draft_shell", "initiating", "planning"],
+          },
+          tags: ["ps", "ideation", "context-translator", "wizard", "scenario", "llm-powered"],
+          createdBy: 1,
+        },
+        registeredBy: 0,
+        sourceModule: "pmt",
+        actorType: "system",
+        initiatedByUserId: null,
+      },
     });
 
-    // Assign taxonomy classifications
+    const entry = await getCatalogEntryById(result.entryId);
+    if (!entry) {
+      throw new Error(`[ContextTranslator] register returned entryId=${result.entryId} but getCatalogEntryById was null`);
+    }
+
+    // Assign taxonomy classifications (real-taxonomy classifications,
+    // intra-platform write — public-api permits this).
     try {
       const nodeIds = await resolveTaxonomyNodeIds();
       if (nodeIds.length > 0) {
@@ -1263,20 +1290,11 @@ export async function ensureContextTranslatorRegistered(): Promise<number | null
       console.warn(`[ContextTranslator] Failed to assign taxonomy classifications:`, classErr.message);
     }
 
-    // Audit the registration
-    await createCatalogAuditEvent({
-      eventType: "agent_registered",
-      catalogEntryId: entry.id,
-      actor: 0,
-      actorType: "system",
-      payload: {
-        agentId: AGENT_CATALOG_ID,
-        version: AGENT_VERSION,
-        classification: AGENT_TAXONOMY_CLASSIFICATION,
-      },
-    });
+    // Phase 37: dropped redundant `agent_registered` audit event call —
+    // canonical's `aiTypes.catalog.registered` event replaces it (zero
+    // downstream consumers per §34 audit).
 
-    console.log(`[ContextTranslator] Registered AI agent in catalog: ${AGENT_DISPLAY_NAME} (id=${entry.id})`);
+    console.log(`[ContextTranslator] Registered AI agent in catalog: ${AGENT_DISPLAY_NAME} (id=${entry.id}, action=${result.action})`);
     return entry.id;
   } catch (err: any) {
     console.error(`[ContextTranslator] Failed to register agent in catalog:`, err.message);
