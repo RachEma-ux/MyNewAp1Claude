@@ -16,7 +16,8 @@
 import { getProviderRegistry } from "../../providers/registry";
 import type { ILLMProvider } from "../../providers/base";
 import type { GenerationRequest, GenerationResponse, Message } from "../../providers/types";
-import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/public-api";
+import { getCatalogEntries, getTaxonomyNodes, setEntryClassifications, getEntryClassifications, getCatalogEntryById } from "../../ai-types/public-api";
+import { gatewayCall } from "../../platform/modules/module-gateway";
 import type { IdeaBuilderInput } from "@shared/pm-artifact-schemas";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
@@ -623,53 +624,80 @@ export async function ensureAgentRegistered(): Promise<number | null> {
       return found.id;
     }
 
-    // Register new catalog entry
-    const entry = await createCatalogEntry({
-      name: AGENT_CATALOG_ID,
-      displayName: AGENT_DISPLAY_NAME,
-      description: "An AI-powered Project Management expert that transforms raw project ideas into complete PMI artifacts. Uses LLM reasoning to analyze projects, ask clarifying questions, and generate 11 standard PMI documents including Charter, Scope, WBS, Schedule, Cost Baseline, Risk Register, and more.",
-      entryType: "agent",
-      category: "specialist",
-      subCategory: "compliance",
-      capabilities: [...AGENT_CAPABILITIES],
-      scope: "app",
-      status: "active",
-      origin: "system",
-      reviewState: "approved",
-      config: {
-        version: AGENT_VERSION,
-        agentType: "idea_to_pmi_builder",
-        systemPrompt: PM_EXPERT_SYSTEM_PROMPT,
-        artifactTypes: [
-          "scope_statement", "project_charter", "stakeholder_register",
-          "wbs", "schedule_baseline", "cost_baseline", "risk_register",
-          "communications_plan", "quality_plan", "change_control_plan",
-          "gate_readiness_report",
-        ],
-        taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
-        enforcementOverlay: {
-          deny: [
-            "gate_submit", "gate_approve", "gate_reject", "gate_waive",
-            "state_transition", "baseline_lock", "baseline_unlock",
-            "freeze", "unfreeze", "artifact_write_canonical",
-          ],
-          requireHumanReview: true,
-        },
-        cognitiveLoop: {
-          sense: "Receives project idea text + constraints",
-          think: "LLM-powered analysis: identifies type, risks, stakeholders, missing info",
-          act: "Generates 11 PMI artifacts via structured prompts",
-          learn: "Incorporates user feedback via clarifying Q&A",
-        },
-        memoryType: "session",
-        toolAccess: ["artifact_generation", "cross_artifact_validation"],
-        phasesAllowed: ["draft_shell", "initiating", "planning"],
+    // Plan v3 Phase 37: route through aiTypes.catalog.register so the
+    // canonical write path runs the duplicate guard, audit chain, and
+    // `aiTypes.catalog.registered` event. Self-registered system agents
+    // use the sourceName path (string identity) — see ADR
+    // docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md.
+    const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      ctx: {
+        sourceModule: "pmt",
+        targetModule: "aiTypes",
+        actionKey: "aiTypes.catalog.register",
+        governanceReceiptId: `pmt-idea-builder-bootstrap-${AGENT_CATALOG_ID}-${Date.now()}`,
+        actorId: 0,
       },
-      tags: ["pm", "pmi", "pmbok", "project-management", "artifact-generation", "llm-powered"],
-      createdBy: 1, // system user
+      input: {
+        entryType: "agent",
+        sourceType: "self_registered_agent",
+        sourceName: AGENT_CATALOG_ID,
+        fields: {
+          name: AGENT_CATALOG_ID,
+          displayName: AGENT_DISPLAY_NAME,
+          description: "An AI-powered Project Management expert that transforms raw project ideas into complete PMI artifacts. Uses LLM reasoning to analyze projects, ask clarifying questions, and generate 11 standard PMI documents including Charter, Scope, WBS, Schedule, Cost Baseline, Risk Register, and more.",
+          category: "specialist",
+          subCategory: "compliance",
+          capabilities: [...AGENT_CAPABILITIES],
+          scope: "app",
+          status: "active",
+          origin: "system",
+          reviewState: "approved",
+          config: {
+            version: AGENT_VERSION,
+            agentType: "idea_to_pmi_builder",
+            systemPrompt: PM_EXPERT_SYSTEM_PROMPT,
+            artifactTypes: [
+              "scope_statement", "project_charter", "stakeholder_register",
+              "wbs", "schedule_baseline", "cost_baseline", "risk_register",
+              "communications_plan", "quality_plan", "change_control_plan",
+              "gate_readiness_report",
+            ],
+            taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
+            enforcementOverlay: {
+              deny: [
+                "gate_submit", "gate_approve", "gate_reject", "gate_waive",
+                "state_transition", "baseline_lock", "baseline_unlock",
+                "freeze", "unfreeze", "artifact_write_canonical",
+              ],
+              requireHumanReview: true,
+            },
+            cognitiveLoop: {
+              sense: "Receives project idea text + constraints",
+              think: "LLM-powered analysis: identifies type, risks, stakeholders, missing info",
+              act: "Generates 11 PMI artifacts via structured prompts",
+              learn: "Incorporates user feedback via clarifying Q&A",
+            },
+            memoryType: "session",
+            toolAccess: ["artifact_generation", "cross_artifact_validation"],
+            phasesAllowed: ["draft_shell", "initiating", "planning"],
+          },
+          tags: ["pm", "pmi", "pmbok", "project-management", "artifact-generation", "llm-powered"],
+          createdBy: 1,
+        },
+        registeredBy: 0,
+        sourceModule: "pmt",
+        actorType: "system",
+        initiatedByUserId: null,
+      },
     });
 
-    // Assign taxonomy classifications (resolve keys → node IDs)
+    const entry = await getCatalogEntryById(result.entryId);
+    if (!entry) {
+      throw new Error(`[PM Agent] register returned entryId=${result.entryId} but getCatalogEntryById was null`);
+    }
+
+    // Assign taxonomy classifications (real-taxonomy classifications,
+    // intra-platform write — public-api permits this).
     try {
       const nodeIds = await resolveTaxonomyNodeIds();
       if (nodeIds.length > 0) {
@@ -680,20 +708,11 @@ export async function ensureAgentRegistered(): Promise<number | null> {
       console.warn(`[PM Agent] Failed to assign taxonomy classifications:`, classErr.message);
     }
 
-    // Audit the registration
-    await createCatalogAuditEvent({
-      eventType: "agent_registered",
-      catalogEntryId: entry.id,
-      actor: 0,
-      actorType: "system",
-      payload: {
-        agentId: AGENT_CATALOG_ID,
-        version: AGENT_VERSION,
-        classification: AGENT_TAXONOMY_CLASSIFICATION,
-      },
-    });
+    // Phase 37: dropped redundant `agent_registered` audit event call —
+    // canonical's `aiTypes.catalog.registered` event replaces it (zero
+    // downstream consumers per §34 audit).
 
-    console.log(`[PM Agent] Registered AI agent in catalog: ${AGENT_DISPLAY_NAME} (id=${entry.id})`);
+    console.log(`[PM Agent] Registered AI agent in catalog: ${AGENT_DISPLAY_NAME} (id=${entry.id}, action=${result.action})`);
     return entry.id;
   } catch (err: any) {
     console.error(`[PM Agent] Failed to register agent in catalog:`, err.message);
