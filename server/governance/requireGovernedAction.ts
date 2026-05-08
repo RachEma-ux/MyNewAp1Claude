@@ -98,6 +98,19 @@ export async function requireGovernedAction(
   // ── 2. Membership scope validation ──────────────────────────────────────
   // Actor must have a principal ID
   if (!input.actorPrincipalId) {
+    // R5-c3: emit audit log before denial so missing-principal attempts
+    // don't disappear from the audit trail (cycle-3 silent-denial fix).
+    await audit.log({
+      actor_id: null,
+      action_type: "RBAC_DENIAL",
+      target_type: input.subject.subjectType,
+      target_id: input.subject.subjectId,
+      decision_result: "denied",
+      metadata: {
+        actionKey: input.actionKey,
+        reason: "missing_principal",
+      },
+    });
     return buildDenial(input, actionDef.risk, now, "Actor principal ID is required");
   }
 
@@ -130,9 +143,26 @@ export async function requireGovernedAction(
   }
 
   // ── 4. Freeze check (system-wide + workspace + subject) ────────────────
+  // R5-c3: each freeze branch now emits an audit-log entry before denial
+  // so freeze blocks are visible in the platform audit trail (previously
+  // these paths returned buildDenial silently, leaving operators no record
+  // of which calls were blocked).
+
   // System-wide freeze
   if (isFrozen(0)) {
     const details = getFreezeDetails(0);
+    await audit.log({
+      actor_id: input.actorPrincipalId,
+      action_type: "FREEZE_BLOCK",
+      target_type: input.subject.subjectType,
+      target_id: input.subject.subjectId,
+      decision_result: "denied",
+      metadata: {
+        actionKey: input.actionKey,
+        freezeScope: "system",
+        reason: details?.reason,
+      },
+    });
     return buildDenial(
       input,
       actionDef.risk,
@@ -146,6 +176,20 @@ export async function requireGovernedAction(
     const wsId = parseInt(input.workspaceId, 10);
     if (!isNaN(wsId) && isFrozen(wsId)) {
       const details = getFreezeDetails(wsId);
+      await audit.log({
+        actor_id: input.actorPrincipalId,
+        action_type: "FREEZE_BLOCK",
+        target_type: input.subject.subjectType,
+        target_id: input.subject.subjectId,
+        workspace_id: input.workspaceId,
+        decision_result: "denied",
+        metadata: {
+          actionKey: input.actionKey,
+          freezeScope: "workspace",
+          frozenWorkspaceId: wsId,
+          reason: details?.reason,
+        },
+      });
       return buildDenial(
         input,
         actionDef.risk,
@@ -155,10 +199,35 @@ export async function requireGovernedAction(
     }
   }
 
-  // Subject freeze
+  // Subject freeze.
+  //
+  // R4-c3: drops the `subjectId > 0` guard so explicit freezes on subject 0
+  // also fire here (redundant with system freeze at line 134 but harmless
+  // and more transparent in the audit log). NOTE the residual limitation:
+  // input.subject.subjectId is resolved by the trpc middleware (trpc.ts:85)
+  // from the first matching field among {subjectId, id, entryId}, defaulting
+  // to "0" if none match. Procedures whose input uses other identifier
+  // names (unitId, agentId, workspaceId-as-target, etc.) resolve to
+  // subjectId="0" here, so per-subject freezes on subjects > 0 cannot be
+  // enforced via this path for those procedures. A complete fix requires
+  // a procedure-level subject convention (e.g., a `_subjectId` input
+  // field or per-procedure metadata) — out of scope for cycle-3 closure.
   const subjectId = parseInt(input.subject.subjectId, 10);
-  if (!isNaN(subjectId) && subjectId > 0 && isFrozen(subjectId)) {
+  if (!isNaN(subjectId) && isFrozen(subjectId)) {
     const details = getFreezeDetails(subjectId);
+    await audit.log({
+      actor_id: input.actorPrincipalId,
+      action_type: "FREEZE_BLOCK",
+      target_type: input.subject.subjectType,
+      target_id: input.subject.subjectId,
+      decision_result: "denied",
+      metadata: {
+        actionKey: input.actionKey,
+        freezeScope: "subject",
+        frozenSubjectId: subjectId,
+        reason: details?.reason,
+      },
+    });
     return buildDenial(
       input,
       actionDef.risk,
@@ -255,6 +324,25 @@ export async function requireGovernedAction(
     );
 
     if (missingTypes.length > 0) {
+      // R5-c3: emit audit log before evidence denial. Previously returned
+      // buildDenial silently, breaking compliance — actions like
+      // catalog.publish (R5, evidence required: [reason, diff, tests_passed])
+      // could 403 without leaving an audit row.
+      await audit.log({
+        actor_id: input.actorPrincipalId,
+        action_type: "GATE_CHECK",
+        target_type: input.subject.subjectType,
+        target_id: input.subject.subjectId,
+        workspace_id: input.workspaceId ?? null,
+        decision_result: "denied",
+        metadata: {
+          actionKey: input.actionKey,
+          reason: "evidence_missing",
+          requiredTypes,
+          missingTypes,
+          providedTypes,
+        },
+      });
       return buildDenial(
         input,
         actionDef.risk,
