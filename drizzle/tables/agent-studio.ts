@@ -1614,6 +1614,15 @@ export const agsRacPolicies = pgTable(
      * signal source + chunk-rejection wiring).
      */
     licensePolicy: varchar("license_policy", { length: 16 }),
+    /**
+     * U5-b.1: per-policy license blocklist consumed by the
+     * retrieval filter (U5-b.3) when `licensePolicy === "block"`.
+     * Shape: `string[]` — license values that match a chunk's
+     * parent unit's `ags_knowledge_units.license` column trigger
+     * rejection. NULL or empty = no blocking even when policy is
+     * "block" (operator misconfiguration warning per ADR DD3).
+     */
+    licenseBlocklist: jsonb("license_blocklist"),
     timeoutMs: integer("timeout_ms"),
     createdBy: integer("created_by").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1929,6 +1938,28 @@ export const agsKnowledgeUnits = pgTable(
       .notNull()
       .default("ok"),
     validationResultId: integer("validation_result_id"),
+    /**
+     * U5-b.1: SPDX-or-site-label license tag. NULL = unknown.
+     * Free-form VARCHAR(64) per ADR DD2 to allow site-specific
+     * labels alongside SPDX identifiers. Populated by ingestion-time
+     * extraction (HTML/JSON/code parsers in U5-b.2) or operator
+     * override (`agentStudio.kb.setLicense` in U5-b.4). When
+     * `licensePolicy === "block"` AND the parent profile's
+     * `license_blocklist` contains this value, retrieval excludes
+     * chunks of this unit (U5-b.3).
+     */
+    license: varchar("license", { length: 64 }),
+    /**
+     * U5-b.1: denormalized projection of PII findings produced by
+     * the ingestion-time data-validation rule (U5-b.2). The
+     * canonical audit trail lives in `ags_data_validation_results`;
+     * this column is the hot-path projection consumed by the
+     * retrieval filter (U5-b.3) so chunk-rejection avoids a JOIN.
+     * Shape locks in U5-b.2: `Array<{entity, start, end, severity}>`
+     * — the matched substring is NEVER persisted (D-NKU-3 keeps
+     * contentText canonical). NULL = no PII detected.
+     */
+    piiFindings: jsonb("pii_findings"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     archivedAt: timestamp("archived_at"),
