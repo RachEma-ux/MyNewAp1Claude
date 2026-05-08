@@ -3051,3 +3051,523 @@ actions:
     stage: mutate
     approval: role_any
     evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # R3-c3 — close 61 dead mappings in server/governance/action-key-map.ts.
+  # Each of the entries below was identity-mapped in action-key-map.ts but
+  # missing from this YAML registry; getActionDef() threw "DENY-BY-DEFAULT"
+  # on every call → HTTP 403 from the requireGovernance middleware.
+  #
+  # Conservative shape (matches the agentStudio.cag.refreshPack precedent):
+  # R2 risk, no approval, no evidence. Per-action risk-tiering can be
+  # tightened later via separate follow-ups if any specific procedure
+  # warrants stricter governance (e.g., openRouter.config.update may
+  # warrant R3, exportCatalog.exportCandidate likewise — flagged for
+  # cycle-3 R2-c3 closure cycle).
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # ── agentStudio.* (14) ─────────────────────────────────────────────────────
+  agentStudio.agent.publish:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.run.execute:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.listCandidates:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.getCandidate:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.exportCandidate:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.markImported:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.reconcileImports:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.exportCatalog.reconcileSync:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.list:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.create:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.update:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.remove:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.validate:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.providerBindings.resolveForRun:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── aiTypes.* (3) ──────────────────────────────────────────────────────────
+  aiTypes.catalog.publish:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  aiTypes.catalog.register:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  aiTypes.providerModels.listAvailable:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── codeStudio.* (2) ───────────────────────────────────────────────────────
+  codeStudio.run.execute:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  codeStudio.template.publish:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── communication.* (9) ────────────────────────────────────────────────────
+  communication.chat.send:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.conversation.create:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.conversation.delete:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.message.add:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.message.delete:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.meeting.create:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.meeting.cancel:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.notification.create:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  communication.export:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── cv.* (1, culture-values) ───────────────────────────────────────────────
+  cv.value.publish:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── hr.* (1) ───────────────────────────────────────────────────────────────
+  # Note: this is the only currently-mapped hr.* entry; the cycle-3 R2-c3
+  # closure cycle will register the other ~117 hr.* governedProcedures.
+  hr.employee.create:
+    domain: hr
+    risk: R2
+    capability: hr.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── kgra.* (1, knowledge graph runtime agent) ──────────────────────────────
+  kgra.run.execute:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── om.* (2, organization-management) ──────────────────────────────────────
+  om.entity.create:
+    domain: organization
+    risk: R2
+    capability: organization.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  om.position.assign:
+    domain: organization
+    risk: R2
+    capability: organization.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── openRouter.* (4) ───────────────────────────────────────────────────────
+  openRouter.config.update:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.modelAccess.execute:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.modelAccess.stream:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.modelAccess.validateBinding:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── pmCentral.* (14) ───────────────────────────────────────────────────────
+  pmCentral.project.create:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.project.update:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.project.archive:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.project.status.update:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.task.create:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.task.assign:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.task.status.update:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.decision.record:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.handoff.accept:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.handoff.convert:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.handoff.reject:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.issue.create:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.plan.approve:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmCentral.risk.create:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── prm.* (2, project resource methods) ────────────────────────────────────
+  prm.method.publish:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  prm.method.deprecate:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── providerConnections.* (1) ──────────────────────────────────────────────
+  providerConnections.getBindingEligibility:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── ps.* (3) ───────────────────────────────────────────────────────────────
+  ps.handoff.pmCentral:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.publish:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.contextTranslator.translateFallback:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── psm.* (1, ps method) ───────────────────────────────────────────────────
+  psm.method.publish:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── rag.* (1) ──────────────────────────────────────────────────────────────
+  rag.index.run:
+    domain: knowledge
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ── sandboxWf.* (2, sandbox workflow) ──────────────────────────────────────
+  sandboxWf.workflow.publish:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  sandboxWf.execute:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
