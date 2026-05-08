@@ -21,6 +21,7 @@ import { basicCodeFileParser } from "./parsers/basic-code-parser";
 import { csvParser } from "./parsers/csv-parser";
 import { xlsxParser } from "./parsers/xlsx-parser";
 import { ocrParser } from "./parsers/ocr-parser";
+import { ocrPdfParser } from "./parsers/ocr-pdf-parser";
 import { audioParser } from "./parsers/audio-parser";
 import { videoParser } from "./parsers/video-parser";
 import { docxParser } from "./parsers/docx-parser";
@@ -78,6 +79,10 @@ export function registerDefaultParsers(): void {
   registerParser(audioParser);
   registerParser(videoParser);
   registerParser(docxParser);
+  // R6 — OCR-PDF: registered after `basic_pdf_text` so the default
+  // `application/pdf` dispatch still hits text extraction. Reachable
+  // via `IngestionJobRequest.parserKey="ocr_pdf"` operator override.
+  registerParser(ocrPdfParser);
   defaultsRegistered = true;
 }
 
