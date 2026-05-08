@@ -1598,8 +1598,21 @@ export const agsRacPolicies = pgTable(
     freshnessMaxAgeDays: integer("freshness_max_age_days"),
     citationRequired: boolean("citation_required"),
     sourcePermissionFilter: varchar("source_permission_filter", { length: 64 }),
-    /** 'warn' | 'block' | 'none' */
+    /**
+     * 'warn' | 'block' | 'none'. **Enforcement NOT IMPLEMENTED on
+     * current main**: setting "block" emits a trace warning only;
+     * chunks are not rejected. Closing this gap needs its own ADR
+     * (PII detection + chunk-rejection wiring). See U5 of the
+     * 2026-05-08 RAC audit; consumer comment block at
+     * `server/agent-studio/services/rac/retrieval-filter.ts`.
+     */
     piiPolicy: varchar("pii_policy", { length: 16 }),
+    /**
+     * 'warn' | 'block' | 'none'. Same enforcement-gap as
+     * `piiPolicy`: configurable today, no runtime effect beyond a
+     * trace warning. Closing this gap needs its own ADR (license
+     * signal source + chunk-rejection wiring).
+     */
     licensePolicy: varchar("license_policy", { length: 16 }),
     timeoutMs: integer("timeout_ms"),
     createdBy: integer("created_by").notNull(),
