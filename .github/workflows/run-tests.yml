@@ -119,6 +119,21 @@ jobs:
             server/providers/pricing.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
 
+      # ── Layer 6: Retrofit Acceptance Suite ─────────────────────────
+      # Locked contract for the Agent Studio retrofit per
+      # `docs/implementation/agent-studio-retrofit-acceptance.md` §3.2.
+      # Covers D-NKU-3/4, D-RAC-PLANNER (full 8-mode lattice),
+      # D-PTC-2 (every gate), D-APP-EXT-2/4/5, D-PTC-4, trace
+      # assembly, D-UI-5 + §D4 (11 parsers), D-RET-1 (7 source
+      # types), D-CAG-RECON-2/3/4/5, D-TOOL-1 (8 classes), §D2
+      # single-region.
+      #
+      # Pure-surface tests (no DB, no mocks, no DATABASE_URL).
+      # singleFork per CLAUDE.md OOM-safe pattern. A failure here
+      # points directly at which decision-rule lattice broke.
+      - name: Retrofit acceptance suite (Layer 6)
+        run: npx vitest run tests/agent-studio/retrofit-acceptance.test.ts --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+
       # ── Static Governance Guard ─────────────────────────────────────
       # Scans source code for forbidden patterns that violate governance invariants.
       - name: Static governance invariant scan
