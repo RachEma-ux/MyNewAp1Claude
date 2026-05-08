@@ -143,12 +143,22 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
     kept = kept.slice(0, cfg.maxChunks);
   }
 
-  // pii/license verdicts are surfaced as trace warnings; P8 evaluation
-  // computes the actual flags and may overwrite. P10 readiness can
-  // promote `warn` to `block` — this filter doesn't.
+  // piiPolicy / licensePolicy are operator-configurable on
+  // `ags_rac_policies`. **Enforcement is NOT IMPLEMENTED on
+  // current main.** The P8 evaluation scorers (groundedness /
+  // relevance / recall-mrr) do not detect PII or license signals,
+  // and P10 readiness does not consume these columns either.
+  // Setting either to "block" emits the warning below and nothing
+  // else — chunks are not rejected.
+  //
+  // The previous comment ("P8 evaluation enforces") was aspirational
+  // and the follow-up never landed. Closing this gap requires its
+  // own ADR (PII detection library + license signal source + chunk-
+  // rejection wiring); flagged as the U5 finding of the 2026-05-08
+  // RAC audit.
   if (cfg.piiPolicy === "block" || cfg.licensePolicy === "block") {
     warnings.push(
-      `policy_blockmode_set: pii=${cfg.piiPolicy} license=${cfg.licensePolicy}; P8 evaluation enforces`,
+      `policy_blockmode_set: pii=${cfg.piiPolicy} license=${cfg.licensePolicy}; warning only — enforcement not implemented (see U5 of 2026-05-08 RAC audit)`,
     );
   }
 
