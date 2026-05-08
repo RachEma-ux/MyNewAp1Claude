@@ -316,6 +316,93 @@ describe.skipIf(!hasDb())(
       });
     });
 
+    /**
+     * R1-c2 — governed-procedure registry coverage for U5-b.4 mutations.
+     *
+     * Cycle-2 audit found that `kb.setLicense` and `kb.clearPiiFindings`
+     * shipped as `governedProcedure` without entries in
+     * `server/governance/action-key-map.ts` or
+     * `config/governance/platform_action_registry.yaml`. The deny path
+     * was unconditional (`getActionDef` throws on unknown keys →
+     * middleware re-throws as HTTP 403). These tests exercise the
+     * governance middleware end-to-end so the bug cannot recur.
+     *
+     * Each test owns its unit (seed in the test, cleanup at end) — the
+     * insertedUnitIds array carries the IDs into the global afterAll.
+     */
+    describe("U5-b.4 governed mutations (R1-c2)", () => {
+      it("setLicense succeeds end-to-end through governance middleware", async () => {
+        const asdb = getAsDb()!;
+        const [unit] = await asdb
+          .insert(agsKnowledgeUnits)
+          .values({
+            workspaceId: WORKSPACE_ID,
+            sourceId: SOURCE_ID_A,
+            unitType: "text",
+            contentText: "r1-c2 setLicense test",
+            contentHash: "2".repeat(64),
+            provenanceId,
+            permissionContext: { inheritFromSource: true },
+            freshnessState: "fresh",
+            license: "GPL-3.0-or-later",
+          })
+          .returning({ id: agsKnowledgeUnits.id });
+        insertedUnitIds.push(unit.id);
+
+        const updated = await memberCaller().setLicense({
+          workspaceId: WORKSPACE_ID,
+          unitId: unit.id,
+          license: "MIT",
+        });
+
+        expect(updated.license).toBe("MIT");
+        expect(updated.id).toBe(unit.id);
+        expect(updated.workspaceId).toBe(WORKSPACE_ID);
+      });
+
+      it("clearPiiFindings succeeds end-to-end and recomputes validationStatus", async () => {
+        const asdb = getAsDb()!;
+        const [unit] = await asdb
+          .insert(agsKnowledgeUnits)
+          .values({
+            workspaceId: WORKSPACE_ID,
+            sourceId: SOURCE_ID_A,
+            unitType: "text",
+            contentText: "r1-c2 clearPii test",
+            contentHash: "3".repeat(64),
+            provenanceId,
+            permissionContext: { inheritFromSource: true },
+            freshnessState: "fresh",
+            piiFindings: { phone_us_ca: 1 },
+            validationStatus: "blocked",
+          })
+          .returning({ id: agsKnowledgeUnits.id });
+        insertedUnitIds.push(unit.id);
+
+        const result = await memberCaller().clearPiiFindings({
+          workspaceId: WORKSPACE_ID,
+          unitId: unit.id,
+        });
+
+        // No validationResultId on this unit, so recomputed status defaults to "ok".
+        expect(result.recomputedStatus).toBe("ok");
+        expect(result.unit.piiFindings).toBeNull();
+        expect(result.unit.validationStatus).toBe("ok");
+      });
+
+      it("workspace-membership gate denies non-member callers on setLicense (FORBIDDEN)", async () => {
+        // The non-member caller's first hurdle is the workspace gate,
+        // not governance — both work, but this test pins the gate.
+        await expect(
+          nonmemberCaller().setLicense({
+            workspaceId: WORKSPACE_ID,
+            unitId: insertedUnitIds[0],
+            license: "MIT",
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" } as Partial<TRPCError>);
+      });
+    });
+
     describe("kb listing composite index (idx_ags_knowledge_units_active_listing)", () => {
       // The Drizzle seed creates this index without a WHERE clause
       // (the index() API cannot express it); the optional manual

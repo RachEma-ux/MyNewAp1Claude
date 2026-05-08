@@ -646,6 +646,35 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # U5-b.4 — operator override of a knowledge unit's license tag.
+  # Affects retrieval-time license enforcement: re-tagging a unit from
+  # `GPL-3.0-or-later` to `MIT` would unblock retrieval under a profile
+  # whose `licenseBlocklist` carries `GPL-3.0-or-later`. R2 because the
+  # blast radius is one unit per call and the change is reversible by
+  # re-running the mutation. Same shape as `knowledge.document.delete`
+  # — operator override on a single knowledge row.
+  agentStudio.kb.setLicense:
+    domain: knowledge
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # U5-b.4 — operator false-positive override for PII findings on a
+  # knowledge unit. Per ADR DD7 the validation audit trail
+  # (`ags_data_validation_results`) stays immutable; only the unit-row
+  # projection is cleared, and `validationStatus` is recomputed from
+  # the remaining non-PII findings. R2 because clearing PII can unblock
+  # retrieval of content that was previously gated.
+  agentStudio.kb.clearPiiFindings:
+    domain: knowledge
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   model.importToCatalog:
     domain: model
     risk: R2
