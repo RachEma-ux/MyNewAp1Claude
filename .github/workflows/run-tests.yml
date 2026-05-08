@@ -134,6 +134,17 @@ jobs:
       - name: Retrofit acceptance suite (Layer 6)
         run: npx vitest run tests/agent-studio/retrofit-acceptance.test.ts --pool=forks --poolOptions.forks.singleFork --reporter=verbose
 
+      # ── Layer 7: PMB invariant suites ──────────────────────────────
+      # Plan v3 Phase 42 (boundary), Phase 43 (gateway-action wiring),
+      # Phase 44 (runtime-coverage attestation). Pure source-string
+      # static scans — no DB, no network. Companion to the D1/D2
+      # boundary scripts below: scripts catch raw `process.env` /
+      # credential-resolver-import violations; these tests catch the
+      # higher-level Plan v3 invariants (action keys wired, coverage
+      # files present, AS does not write catalog_entries, etc.).
+      - name: PMB invariant suites (Layer 7)
+        run: npx vitest run tests/pmb/ --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+
       # ── Static Governance Guard ─────────────────────────────────────
       # Scans source code for forbidden patterns that violate governance invariants.
       - name: Static governance invariant scan
