@@ -124,6 +124,11 @@ function KnowledgeUnitsPanel({ workspaceId }: { workspaceId: number }) {
     sourceId: sourceId ?? undefined,
     limit: 50,
   });
+  const utils = trpc.useUtils();
+
+  function refetchList() {
+    utils.agentStudio.kb.listUnits.invalidate();
+  }
 
   return (
     <Card>
@@ -150,7 +155,12 @@ function KnowledgeUnitsPanel({ workspaceId }: { workspaceId: number }) {
         ) : (
           <div className="space-y-2">
             {(list.data ?? []).map((u) => (
-              <UnitRow key={u.id} unit={u} />
+              <UnitRow
+                key={u.id}
+                unit={u}
+                workspaceId={workspaceId}
+                onChanged={refetchList}
+              />
             ))}
           </div>
         )}
@@ -159,10 +169,50 @@ function KnowledgeUnitsPanel({ workspaceId }: { workspaceId: number }) {
   );
 }
 
-function UnitRow({ unit }: { unit: { id: number; unitType: string; contentText: string; freshnessState: string; validationStatus: string } }) {
+interface UnitRowShape {
+  id: number;
+  unitType: string;
+  contentText: string;
+  freshnessState: string;
+  validationStatus: string;
+  /** U5-b.1 + U5-b.4: nullable per-unit license tag. */
+  license?: string | null;
+  /** U5-b.1: denormalized PII finding projection. */
+  piiFindings?: unknown;
+}
+
+function UnitRow({
+  unit,
+  workspaceId,
+  onChanged,
+}: {
+  unit: UnitRowShape;
+  workspaceId: number;
+  onChanged: () => void;
+}) {
+  const [licenseInput, setLicenseInput] = useState<string>(unit.license ?? "");
+  const setLicense = trpc.agentStudio.kb.setLicense.useMutation({
+    onSuccess: () => {
+      toast.success(`Unit #${unit.id} license updated`);
+      onChanged();
+    },
+    onError: (err) => toast.error(`setLicense failed: ${err.message}`),
+  });
+  const clearPii = trpc.agentStudio.kb.clearPiiFindings.useMutation({
+    onSuccess: (res) => {
+      toast.success(
+        `Unit #${unit.id} PII findings cleared; status → ${res.recomputedStatus}`,
+      );
+      onChanged();
+    },
+    onError: (err) => toast.error(`clearPiiFindings failed: ${err.message}`),
+  });
+
+  const piiCount = Array.isArray(unit.piiFindings) ? unit.piiFindings.length : 0;
+
   return (
-    <div className="rounded border border-zinc-800 p-2 text-xs">
-      <div className="flex items-center gap-2">
+    <div className="rounded border border-zinc-800 p-2 text-xs space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="font-mono text-zinc-500">#{unit.id}</span>
         <Badge variant="outline">{unit.unitType}</Badge>
         <Badge variant={unit.freshnessState === "fresh" ? "secondary" : "destructive"}>
@@ -171,10 +221,52 @@ function UnitRow({ unit }: { unit: { id: number; unitType: string; contentText: 
         <Badge variant={unit.validationStatus === "ok" ? "outline" : "destructive"}>
           {unit.validationStatus}
         </Badge>
+        {unit.license ? (
+          <Badge variant="secondary" className="font-mono">license: {unit.license}</Badge>
+        ) : null}
+        {piiCount > 0 ? (
+          <Badge variant="destructive">PII: {piiCount}</Badge>
+        ) : null}
       </div>
-      <div className="mt-1 text-zinc-400 line-clamp-2">
+      <div className="text-zinc-400 line-clamp-2">
         {unit.contentText.slice(0, 240)}
         {unit.contentText.length > 240 ? "…" : ""}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <Input
+          value={licenseInput}
+          onChange={(e) => setLicenseInput(e.target.value)}
+          placeholder="SPDX or label (e.g. MIT)"
+          className="h-7 text-xs flex-1 max-w-xs"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7"
+          disabled={setLicense.isPending}
+          onClick={() =>
+            setLicense.mutate({
+              workspaceId,
+              unitId: unit.id,
+              license: licenseInput.trim().length > 0 ? licenseInput.trim() : null,
+            })
+          }
+        >
+          {setLicense.isPending ? "…" : "Set license"}
+        </Button>
+        {piiCount > 0 ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-7"
+            disabled={clearPii.isPending}
+            onClick={() =>
+              clearPii.mutate({ workspaceId, unitId: unit.id })
+            }
+          >
+            {clearPii.isPending ? "…" : "Clear PII"}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
