@@ -320,6 +320,49 @@ describe("registerCatalogEntry — Phase 25", () => {
     expect(publishEventMock).not.toHaveBeenCalled();
   });
 
+  // ── Phase 38 — RegisterCatalogEntryResult.entry contract ───────────
+  // The result includes the full row on both create and update paths,
+  // eliminating the post-register `getCatalogEntryById(result.entryId)`
+  // round-trip that callers were doing across §32 + §34 + §37.
+  describe("Phase 38 — result.entry contract", () => {
+    it("create path: result.entry mirrors the inserted row", async () => {
+      createCatalogEntryMock.mockResolvedValue({
+        id: 999,
+        name: "test-agent",
+        entryType: "agent",
+      });
+      const r = await registerCatalogEntry(makeFakeDb([]), baseInput);
+      expect(r.entry).toBeDefined();
+      expect(r.entry.id).toBe(r.entryId);
+      expect(r.entry.id).toBe(999);
+    });
+
+    it("update path: result.entry mirrors the post-update row", async () => {
+      getCatalogEntryByIdMock.mockResolvedValue({
+        id: 100,
+        legacyImportState: null,
+        name: "existing-agent",
+      });
+      const r = await registerCatalogEntry(
+        makeFakeDb([{ id: 100, legacyImportState: null }]),
+        baseInput,
+      );
+      expect(r.entry).toBeDefined();
+      expect(r.entry.id).toBe(r.entryId);
+      expect(r.entry.id).toBe(100);
+    });
+
+    it("update path throws if getCatalogEntryById returns null after update", async () => {
+      getCatalogEntryByIdMock.mockResolvedValue(null);
+      await expect(
+        registerCatalogEntry(
+          makeFakeDb([{ id: 100, legacyImportState: null }]),
+          baseInput,
+        ),
+      ).rejects.toThrow("returned null after update");
+    });
+  });
+
   // ── Phase 37 — name-path (self-registered system agents) ────────────
   // ADR: docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md
   describe("Phase 37 — sourceName path (self-registered system agents)", () => {
