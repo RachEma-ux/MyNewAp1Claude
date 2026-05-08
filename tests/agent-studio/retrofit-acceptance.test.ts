@@ -450,14 +450,15 @@ describe("RETROFIT trace assembly — validator rejection drops downstream metad
   });
 });
 
-// ── D-UI-5 + §D4 + R5 — 12 MVP parser keys ────────────────────────────
+// ── D-UI-5 + §D4 + R5 + R6 — 13 MVP parser keys ───────────────────────
 
-describe("RETROFIT D-UI-5 + §D4 + R5 — 12 MVP parsers ship and resolve", () => {
-  it("registry resolves the canonical content-type for each of the 12 parsers", async () => {
+describe("RETROFIT D-UI-5 + §D4 + R5 + R6 — 13 MVP parsers ship and resolve", () => {
+  it("registry resolves the canonical content-type for each of the 13 parsers", async () => {
     const {
       registerDefaultParsers,
       resetParsersToDefaults,
       selectParserForContentType,
+      getParser,
     } = await import("../../server/agent-studio/services/ingestion");
     resetParsersToDefaults();
     registerDefaultParsers();
@@ -486,6 +487,12 @@ describe("RETROFIT D-UI-5 + §D4 + R5 — 12 MVP parsers ship and resolve", () =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ).key,
     ).toBe("docx");
+    // R6 (post-2026-05-08 RAC audit): OCR-PDF parser is registered but
+    // application/pdf still dispatches to basic_pdf_text by default;
+    // OCR-PDF is reached via `parserKey="ocr_pdf"` operator override
+    // (D-PARSE-OCRPDF-4 §"Operator workflow").
+    expect(getParser("ocr_pdf")?.key).toBe("ocr_pdf");
+    expect(getParser("ocr_pdf")?.acceptsContentTypes).toContain("application/pdf");
   });
 });
 
