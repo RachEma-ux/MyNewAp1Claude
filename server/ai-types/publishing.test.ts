@@ -4,6 +4,10 @@
  * Decision doc: docs/architecture/ai-types/CATALOG_LIFECYCLE_EVENT_DECISION.md
  *   D-LC-1: emits post-write, best-effort
  *   D-LC-2: payload populates every CatalogPublishedPayload field
+ *
+ * Phase 36 contract: canonical never mutates entry status — see
+ * `PUBLISH_CANONICAL_CONTRACT_REDESIGN.md`. The `updateCatalogEntry`
+ * mock is retained so the contract test can assert it is not called.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -150,7 +154,6 @@ describe("publishCatalogEntry — Direction B B2b emitter", () => {
 
     expect(publishEventMock).toHaveBeenCalledTimes(1);
     expect(publishEventMock.mock.calls[0][0].payload.versionLabel).toBe("v2");
-    expect(updateCatalogEntryMock).not.toHaveBeenCalled(); // status already published
   });
 
   it("workspaceId is null on the envelope and payload (catalog rows are app-scoped)", async () => {
@@ -159,5 +162,16 @@ describe("publishCatalogEntry — Direction B B2b emitter", () => {
     const env = publishEventMock.mock.calls[0][0];
     expect(env.workspaceId).toBeNull();
     expect(env.payload.workspaceId).toBeNull();
+  });
+
+  // Phase 36 contract: canonical never mutates `catalog_entries.status`.
+  // See `docs/architecture/ai-types/PUBLISH_CANONICAL_CONTRACT_REDESIGN.md`.
+  it("contract: never mutates entry status, regardless of starting state", async () => {
+    for (const startingStatus of ["draft", "active", "published", "deprecated"]) {
+      updateCatalogEntryMock.mockReset();
+      getCatalogEntryByIdMock.mockResolvedValue({ ...baseEntry, status: startingStatus });
+      await publishCatalogEntry({ catalogEntryId: 100, publishedBy: 7 });
+      expect(updateCatalogEntryMock).not.toHaveBeenCalled();
+    }
   });
 });
