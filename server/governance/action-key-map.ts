@@ -470,6 +470,19 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "agentStudio.exportCatalog.reconcileSync": "agentStudio.exportCatalog.reconcileSync",
   "agentStudio.kb.setLicense": "agentStudio.kb.setLicense",
   "agentStudio.kb.clearPiiFindings": "agentStudio.kb.clearPiiFindings",
+  // R2-c2 — pre-existing damage discovered during the systemic governance
+  // coverage audit. The 9 entries below were declared as governedProcedure
+  // in their routers but never registered, so every call returned 403.
+  // Conservative registration: same shape as agentStudio.cag.refreshPack.
+  "agentStudio.mcpSchemaSync.sync": "agentStudio.mcpSchemaSync.sync",
+  "agentStudio.toolApprovals.decide": "agentStudio.toolApprovals.decide",
+  "agentStudio.workspaceDefaultBindings.upsert": "agentStudio.workspaceDefaultBindings.upsert",
+  "agentStudio.workspaceDefaultBindings.delete": "agentStudio.workspaceDefaultBindings.delete",
+  "agentStudio.plugins.validate": "agentStudio.plugins.validate",
+  "agentStudio.catalogTools.create": "agentStudio.catalogTools.create",
+  "agentStudio.catalogTools.update": "agentStudio.catalogTools.update",
+  "agentStudio.catalogTools.remove": "agentStudio.catalogTools.remove",
+  "agentStudio.marketplace.refresh": "agentStudio.marketplace.refresh",
   "sandboxWf.workflow.publish": "sandboxWf.workflow.publish",
   "sandboxWf.execute": "sandboxWf.execute",
   "rag.index.run": "rag.index.run",
