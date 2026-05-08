@@ -27,7 +27,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createModel, getAllModels, getModelById, updateModel, isDeployable, getBlockingReasons } from "../db/models";
-import { getCatalogEntries, getCatalogEntryById } from "../ai-types/public-api";
+import { getCatalogEntries } from "../ai-types/public-api";
+import type { RegisterCatalogEntryResult } from "../ai-types/public-api";
 import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import { gatewayCall } from "../platform/modules/module-gateway";
 import { getAuditLogger } from "../services/auditLogger";
@@ -260,7 +261,7 @@ export const modelsRouter = router({
       };
 
       // Plan v3 Phase 32: route through aiTypes.catalog.register.
-      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      const result = await gatewayCall<unknown, RegisterCatalogEntryResult>({
         ctx: {
           sourceModule: "models",
           targetModule: "aiTypes",
@@ -292,8 +293,7 @@ export const modelsRouter = router({
         },
       });
 
-      const entry = await getCatalogEntryById(result.entryId);
-
+      // Phase 38 — `result.entry` carries the full row; no round-trip.
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
         action_type: "LIFECYCLE_TRANSITION",
@@ -303,6 +303,6 @@ export const modelsRouter = router({
         metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: result.action === "created" };
+      return { success: true, entry: result.entry, imported: result.action === "created" };
     }),
 });

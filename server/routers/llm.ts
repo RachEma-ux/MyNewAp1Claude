@@ -66,8 +66,8 @@ import {
 } from "../llm/authority";
 import {
   getCatalogEntries,
-  getCatalogEntryById,
 } from "../ai-types/public-api";
+import type { RegisterCatalogEntryResult } from "../ai-types/public-api";
 import { gatewayCall } from "../platform/modules/module-gateway";
 
 // ============================================================================
@@ -480,7 +480,7 @@ export const llmRouter = router({
       };
 
       // Plan v3 Phase 32: route through aiTypes.catalog.register.
-      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      const result = await gatewayCall<unknown, RegisterCatalogEntryResult>({
         ctx: {
           sourceModule: "llm",
           targetModule: "aiTypes",
@@ -512,8 +512,7 @@ export const llmRouter = router({
         },
       });
 
-      const entry = await getCatalogEntryById(result.entryId);
-
+      // Phase 38 — `result.entry` carries the full row; no round-trip.
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
         action_type: "LIFECYCLE_TRANSITION",
@@ -523,7 +522,7 @@ export const llmRouter = router({
         metadata: { action: "importToCatalog", catalogEntryId: result.entryId },
       });
 
-      return { success: true, entry, imported: result.action === "created" };
+      return { success: true, entry: result.entry, imported: result.action === "created" };
     }),
 
   getCatalogRuntimeAuthority: protectedProcedure

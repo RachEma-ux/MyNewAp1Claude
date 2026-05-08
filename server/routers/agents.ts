@@ -31,7 +31,7 @@ import {
   isCatalogImportEligible,
   type AgentStatus,
 } from "@shared/agent-lifecycle";
-import { getCatalogEntryById } from "../ai-types/public-api";
+import type { RegisterCatalogEntryResult } from "../ai-types/public-api";
 import { warnLegacyImportToCatalog } from "../governance/legacy-import-to-catalog-deprecation";
 import { gatewayCall } from "../platform/modules/module-gateway";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
@@ -634,7 +634,7 @@ export const agentsRouter = router({
       // Phase-25 duplicate guard, Phase-39 event, and canonical audit
       // chain all run. Replaces the previous direct createCatalogEntry +
       // setEntryClassifications + createCatalogAuditEvent pattern.
-      const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
+      const result = await gatewayCall<unknown, RegisterCatalogEntryResult>({
         ctx: {
           sourceModule: "agents",
           targetModule: "aiTypes",
@@ -666,8 +666,7 @@ export const agentsRouter = router({
         },
       });
 
-      const entry = await getCatalogEntryById(result.entryId);
-
+      // Phase 38 — `result.entry` carries the full row; no round-trip.
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
         action_type: "LIFECYCLE_TRANSITION",
@@ -679,7 +678,7 @@ export const agentsRouter = router({
 
       return {
         success: true,
-        entry,
+        entry: result.entry,
         imported: result.action === "created",
       };
     }),
