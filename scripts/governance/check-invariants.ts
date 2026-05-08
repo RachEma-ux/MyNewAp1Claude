@@ -36,6 +36,24 @@ function readLines(filePath: string): string[] {
 }
 
 // ── Domain router files that must NOT create catalog entries ──────────
+//
+// Permanent architectural exceptions (NOT in this list, by design):
+//   - server/routers/catalog-manage.ts — `catalog-manage-bespoke-publish-
+//     machinery` ADR (§36): bespoke pre-publish gates, transient
+//     `publishing` status, snapshot extras, separate audit channel.
+//     Stays on direct `createPublishBundle`; uses createCatalogEntry in
+//     the syncProviders procedure for admin-driven catalog seeding.
+//   - server/catalog-import/router.ts — `catalog-import-bulk-admin-write`
+//     ADR (§39): bulk operator-driven import; bespoke pre-write dedup at
+//     preview time; no source-of-record linkage by data-model design.
+//     Stays on direct `createCatalogEntry`. ADR:
+//     docs/architecture/ai-types/CATALOG_IMPORT_BULK_ADMIN_WRITE_EXCEPTION.md
+//
+// Future direct-caller audits (cf. §39 closure carry-forward): when a new
+// direct `createCatalogEntry` caller surfaces, decide via the audit tree
+// in the §39 ADR — migrate, pause-and-surface, or document as new
+// permanent exception. Don't expand DOMAIN_ROUTERS to include the
+// permanent exceptions above.
 
 const DOMAIN_ROUTERS = [
   "server/routers/agents.ts",

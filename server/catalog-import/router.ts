@@ -405,7 +405,13 @@ export const catalogImportRouter = router({
               subCategory,
             } as any, ctx.user?.id ?? 1);
           } else {
-            // Provider, agent, bot — direct catalog write (existing behavior)
+            // Provider, agent, bot — direct catalog write. catalog-import
+            // is a permanent architectural exception
+            // (`catalog-import-bulk-admin-write`) — bespoke pre-write
+            // dedup at preview time + no source-of-record linkage by
+            // data-model design. Don't migrate to
+            // `gatewayCall("aiTypes.catalog.register", ...)`. See ADR
+            // `docs/architecture/ai-types/CATALOG_IMPORT_BULK_ADMIN_WRITE_EXCEPTION.md`.
             const catalogEntry = await createCatalogEntry({
               name: row.name,
               displayName,
