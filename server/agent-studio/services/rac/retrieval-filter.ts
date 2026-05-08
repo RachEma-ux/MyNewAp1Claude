@@ -34,6 +34,13 @@ export interface RetrievalFilterConfig {
   sourcePermissionFilter: "workspace_id_match";
   piiPolicy: "warn" | "block" | "none";
   licensePolicy: "warn" | "block" | "none";
+  /**
+   * U5-b.3: license values that, when matched against a chunk's
+   * `metadata.unitLicense`, cause rejection (only when
+   * `licensePolicy === "block"`). Empty/undefined + "block" =
+   * misconfiguration warning, no chunks rejected.
+   */
+  licenseBlocklist: string[];
 }
 
 export const DEFAULT_RETRIEVAL_FILTER_CONFIG: Readonly<RetrievalFilterConfig> =
@@ -46,6 +53,7 @@ export const DEFAULT_RETRIEVAL_FILTER_CONFIG: Readonly<RetrievalFilterConfig> =
     sourcePermissionFilter: "workspace_id_match" as const,
     piiPolicy: "warn",
     licensePolicy: "warn",
+    licenseBlocklist: Object.freeze([]) as ReadonlyArray<string> as string[],
   });
 
 export interface FilterRejectionCounts {
@@ -54,6 +62,10 @@ export interface FilterRejectionCounts {
   freshness: number;
   duplicate: number;
   capacity: number;
+  /** U5-b.3: chunks dropped because their unit carries a block-severity PII finding. */
+  piiBlocked: number;
+  /** U5-b.3: chunks dropped because their unit's license is in policy.licenseBlocklist. */
+  licenseBlocked: number;
 }
 
 export interface FilteredRetrieval {
@@ -79,6 +91,8 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
     freshness: 0,
     duplicate: 0,
     capacity: 0,
+    piiBlocked: 0,
+    licenseBlocked: 0,
   };
   const warnings: string[] = [];
 
@@ -91,14 +105,61 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
       })
     : input.chunks.slice();
 
-  // ── 2. minScore ────────────────────────────────────────────────────
+  // ── 2. piiPolicy = "block" → drop chunks whose unit has block-severity PII (U5-b.3) ──
+  // The chunk-side projection (`unitPiiBlockSeverityCount`) is set
+  // by `knowledge-unit-adapter.ts`. Chunks from sources that don't
+  // project this metadata (e.g., GraphRAG) are passed through — no
+  // false-positive rejection on adapters that can't surface PII signal.
+  if (cfg.piiPolicy === "block") {
+    kept = kept.filter((c) => {
+      const count =
+        typeof c.metadata?.unitPiiBlockSeverityCount === "number"
+          ? (c.metadata.unitPiiBlockSeverityCount as number)
+          : 0;
+      if (count > 0) {
+        counts.piiBlocked += 1;
+        warnings.push(
+          `pii_blocked: chunkId=${c.sourceChunkId} count=${count}`,
+        );
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // ── 3. licensePolicy = "block" + license_blocklist → drop matching chunks (U5-b.3) ──
+  if (cfg.licensePolicy === "block") {
+    if (cfg.licenseBlocklist.length === 0) {
+      warnings.push(
+        "license_block_misconfigured: licensePolicy=block but licenseBlocklist is empty; no chunks rejected",
+      );
+    } else {
+      const blocklist = new Set(cfg.licenseBlocklist);
+      kept = kept.filter((c) => {
+        const license =
+          typeof c.metadata?.unitLicense === "string"
+            ? (c.metadata.unitLicense as string)
+            : null;
+        if (license != null && blocklist.has(license)) {
+          counts.licenseBlocked += 1;
+          warnings.push(
+            `license_blocked: chunkId=${c.sourceChunkId} license=${license}`,
+          );
+          return false;
+        }
+        return true;
+      });
+    }
+  }
+
+  // ── 4. minScore ────────────────────────────────────────────────────
   kept = kept.filter((c) => {
     const ok = typeof c.score === "number" && c.score >= cfg.minScore;
     if (!ok) counts.belowMinScore += 1;
     return ok;
   });
 
-  // ── 3. freshnessMaxAgeDays ────────────────────────────────────────
+  // ── 5. freshnessMaxAgeDays ────────────────────────────────────────
   if (cfg.freshnessMaxAgeDays != null) {
     const limitMs = cfg.freshnessMaxAgeDays * 86_400_000;
     const nowMs = now();
@@ -111,7 +172,7 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
     });
   }
 
-  // ── 4. dedupeBy=hash ──────────────────────────────────────────────
+  // ── 6. dedupeBy=hash ──────────────────────────────────────────────
   if (cfg.dedupeBy === "hash") {
     const seen = new Set<string>();
     const deduped: RacRetrievalChunk[] = [];
@@ -131,34 +192,25 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
     );
   }
 
-  // ── 5. sort by score DESC, stable on sourceChunkId ────────────────
+  // ── 7. sort by score DESC, stable on sourceChunkId ────────────────
   kept.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     return a.sourceChunkId.localeCompare(b.sourceChunkId);
   });
 
-  // ── 6. maxChunks head-cap ─────────────────────────────────────────
+  // ── 8. maxChunks head-cap ─────────────────────────────────────────
   if (kept.length > cfg.maxChunks) {
     counts.capacity = kept.length - cfg.maxChunks;
     kept = kept.slice(0, cfg.maxChunks);
   }
 
-  // piiPolicy / licensePolicy are operator-configurable on
-  // `ags_rac_policies`. **Enforcement is NOT IMPLEMENTED on
-  // current main.** The P8 evaluation scorers (groundedness /
-  // relevance / recall-mrr) do not detect PII or license signals,
-  // and P10 readiness does not consume these columns either.
-  // Setting either to "block" emits the warning below and nothing
-  // else — chunks are not rejected.
-  //
-  // The previous comment ("P8 evaluation enforces") was aspirational
-  // and the follow-up never landed. Closing this gap requires its
-  // own ADR (PII detection library + license signal source + chunk-
-  // rejection wiring); flagged as the U5 finding of the 2026-05-08
-  // RAC audit.
-  if (cfg.piiPolicy === "block" || cfg.licensePolicy === "block") {
+  // U5-b.3: piiPolicy / licensePolicy enforcement is now wired at
+  // steps 2 + 3 above. `warn` mode still emits an info-only trace
+  // breadcrumb here so operators see the policy was active even
+  // when no chunks tripped block-mode.
+  if (cfg.piiPolicy === "warn" || cfg.licensePolicy === "warn") {
     warnings.push(
-      `policy_blockmode_set: pii=${cfg.piiPolicy} license=${cfg.licensePolicy}; warning only — enforcement not implemented (see U5 of 2026-05-08 RAC audit)`,
+      `policy_warnmode_active: pii=${cfg.piiPolicy} license=${cfg.licensePolicy}`,
     );
   }
 
@@ -179,6 +231,7 @@ function mergeConfig(policy: RacPolicy | null): RetrievalFilterConfig {
       d.sourcePermissionFilter) as "workspace_id_match",
     piiPolicy: (policy.piiPolicy ?? d.piiPolicy) as "warn" | "block" | "none",
     licensePolicy: (policy.licensePolicy ?? d.licensePolicy) as "warn" | "block" | "none",
+    licenseBlocklist: policy.licenseBlocklist ?? [...d.licenseBlocklist],
   };
 }
 

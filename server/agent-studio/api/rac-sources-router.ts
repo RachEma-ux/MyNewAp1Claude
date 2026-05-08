@@ -219,6 +219,15 @@ export const racSourcesRouter = router({
           sourcePermissionFilter: z.string().max(64).nullable().optional(),
           piiPolicy: policyVerdictSchema.nullable().optional(),
           licensePolicy: policyVerdictSchema.nullable().optional(),
+          // U5-b.3: per-policy license blocklist consumed by the
+          // retrieval filter when licensePolicy="block". Bounded to
+          // 32 entries × 64 chars to match the column shape; longer
+          // lists indicate a policy-design mismatch.
+          licenseBlocklist: z
+            .array(z.string().min(1).max(64))
+            .max(32)
+            .nullable()
+            .optional(),
           timeoutMs: z.number().int().positive().nullable().optional(),
         }),
       )
