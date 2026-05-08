@@ -91,6 +91,14 @@ export interface RegisterCatalogEntryResult {
   legacyImportState: string | null;
   /** Echo of the duplicate-guard's outcome for logging/audit. */
   guardReason: string;
+  /**
+   * Phase 38 — full row, populated on both create and update paths.
+   * Eliminates the post-register `getCatalogEntryById(result.entryId)`
+   * round-trip that callers were doing across §32 + §34 + §37.
+   * Both canonical paths already produce the entry — exposing it
+   * here costs zero extra DB reads.
+   */
+  entry: CatalogEntry;
 }
 
 export class RegisterDuplicateError extends Error {
@@ -149,6 +157,11 @@ export async function registerCatalogEntry(
       input.registeredBy,
     );
     const updated = await getCatalogEntryById(guard.existingEntryId);
+    if (!updated) {
+      throw new Error(
+        `registerCatalogEntry: getCatalogEntryById(${guard.existingEntryId}) returned null after update`,
+      );
+    }
     // Plan v3 Phase 38 — audit event for the register/update action.
     // Best-effort: a failed audit insert must NOT roll back the catalog
     // write (the catalog state is the source of truth; audit is forensics).
@@ -163,14 +176,15 @@ export async function registerCatalogEntry(
       catalogEntryId: guard.existingEntryId,
       action: "updated",
       activeSourceVersionId:
-        ((updated as any)?.activeSourceVersionId as number | null) ?? null,
+        ((updated as any).activeSourceVersionId as number | null) ?? null,
       input,
     });
     return {
       entryId: guard.existingEntryId,
       action: "updated",
-      legacyImportState: (updated?.legacyImportState as string | null) ?? null,
+      legacyImportState: (updated.legacyImportState as string | null) ?? null,
       guardReason: guard.reason,
+      entry: updated,
     };
   }
 
@@ -209,6 +223,7 @@ export async function registerCatalogEntry(
     action: "created",
     legacyImportState: null,
     guardReason: guard.reason,
+    entry: created as CatalogEntry,
   };
 }
 
