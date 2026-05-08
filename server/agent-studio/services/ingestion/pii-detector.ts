@@ -187,17 +187,3 @@ export function createPiiValidationRule(): (
   };
 }
 
-/**
- * Strip the un-persistable `match` field for storage. The caller
- * passes `detectPii` output; the result is what lands in
- * `ags_knowledge_units.pii_findings` (block-severity findings only,
- * per ADR DD4 — `warn` findings stay in `ags_data_validation_results`
- * but don't enter the hot-path projection).
- */
-export function projectPiiFindingsForStorage(
-  findings: PiiFinding[],
-): Array<Omit<PiiFinding, "match">> {
-  return findings
-    .filter((f) => f.severity === "block")
-    .map(({ entity, start, end, severity }) => ({ entity, start, end, severity }));
-}
