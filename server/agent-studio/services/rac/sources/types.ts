@@ -157,6 +157,13 @@ export interface RacPolicy {
   sourcePermissionFilter: string | null;
   piiPolicy: "warn" | "block" | "none" | null;
   licensePolicy: "warn" | "block" | "none" | null;
+  /**
+   * U5-b.3: per-policy `string[]` of blocklisted license values.
+   * Consumed by the retrieval filter when `licensePolicy === "block"`.
+   * NULL or empty = no blocking even when policy is "block"
+   * (operator misconfiguration warning).
+   */
+  licenseBlocklist: string[] | null;
   timeoutMs: number | null;
   createdBy: number;
   createdAt: Date;
@@ -174,6 +181,7 @@ export interface UpsertPolicyInput {
   sourcePermissionFilter?: string | null;
   piiPolicy?: "warn" | "block" | "none" | null;
   licensePolicy?: "warn" | "block" | "none" | null;
+  licenseBlocklist?: string[] | null;
   timeoutMs?: number | null;
   createdBy: number;
 }

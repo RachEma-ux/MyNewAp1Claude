@@ -912,6 +912,8 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         fallbackReason: t.fallbackReason,
         warnings: racBuilt.context.warnings,
         perSourceLatencyMs: t.perSourceLatencyMs,
+        piiBlockedCount: t.piiBlockedCount,
+        licenseBlockedCount: t.licenseBlockedCount,
       })
         .then(async (traceId) => {
           if (st.includedChunks.length === 0) return;

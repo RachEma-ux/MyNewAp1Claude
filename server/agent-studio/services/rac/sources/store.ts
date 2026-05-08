@@ -95,6 +95,9 @@ function rowToPolicy(row: typeof agsRacPolicies.$inferSelect): RacPolicy {
     sourcePermissionFilter: row.sourcePermissionFilter,
     piiPolicy: row.piiPolicy as RacPolicy["piiPolicy"],
     licensePolicy: row.licensePolicy as RacPolicy["licensePolicy"],
+    licenseBlocklist: Array.isArray(row.licenseBlocklist)
+      ? (row.licenseBlocklist as string[]).filter((v): v is string => typeof v === "string")
+      : null,
     timeoutMs: row.timeoutMs,
     createdBy: row.createdBy,
     createdAt: row.createdAt,
@@ -342,6 +345,7 @@ export async function upsertPolicy(input: UpsertPolicyInput): Promise<RacPolicy>
         sourcePermissionFilter: input.sourcePermissionFilter ?? null,
         piiPolicy: input.piiPolicy ?? null,
         licensePolicy: input.licensePolicy ?? null,
+        licenseBlocklist: input.licenseBlocklist ?? null,
         timeoutMs: input.timeoutMs ?? null,
         updatedAt: new Date(),
       })
@@ -363,6 +367,7 @@ export async function upsertPolicy(input: UpsertPolicyInput): Promise<RacPolicy>
       sourcePermissionFilter: input.sourcePermissionFilter ?? null,
       piiPolicy: input.piiPolicy ?? null,
       licensePolicy: input.licensePolicy ?? null,
+      licenseBlocklist: input.licenseBlocklist ?? null,
       timeoutMs: input.timeoutMs ?? null,
       createdBy: input.createdBy,
     })

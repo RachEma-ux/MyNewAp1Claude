@@ -55,6 +55,10 @@ export interface WriteTraceInput {
   fallbackReason: string | null;
   warnings?: string[];
   perSourceLatencyMs?: Record<number, number>;
+  /** U5-b.3: per-trace counter of PII-blocked chunks. Defaults to 0. */
+  piiBlockedCount?: number;
+  /** U5-b.3: per-trace counter of license-blocked chunks. Defaults to 0. */
+  licenseBlockedCount?: number;
 }
 
 export interface WriteContextBlockInput {
@@ -165,6 +169,8 @@ export async function writeTrace(input: WriteTraceInput): Promise<number> {
       warningsJson: input.warnings && input.warnings.length > 0 ? input.warnings : null,
       perSourceLatencyJson:
         Object.keys(perSourceJson).length > 0 ? perSourceJson : null,
+      piiBlockedCount: input.piiBlockedCount ?? 0,
+      licenseBlockedCount: input.licenseBlockedCount ?? 0,
     })
     .returning({ id: agsRacRuntimeTraces.id });
   return row.id;

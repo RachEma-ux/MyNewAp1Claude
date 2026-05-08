@@ -1708,6 +1708,19 @@ export const agsRacRuntimeTraces = pgTable(
     // Retrofit P5 (D-CAG-RECON-4): hash captured at compose time
     /** SHA-256 of the rendered prompt section text (D-CAG-RECON-4). */
     cagCompiledHash: varchar("cag_compiled_hash", { length: 64 }),
+    /**
+     * U5-b.3 (ADR DD7): per-trace counter of chunks rejected by the
+     * retrieval filter because their unit carried a block-severity
+     * PII finding. Defaults to 0 — non-null since "no PII rejected"
+     * is a valid observation.
+     */
+    piiBlockedCount: integer("pii_blocked_count").notNull().default(0),
+    /**
+     * U5-b.3 (ADR DD7): per-trace counter of chunks rejected by the
+     * retrieval filter because their unit's license was in the
+     * profile's `license_blocklist`.
+     */
+    licenseBlockedCount: integer("license_blocked_count").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

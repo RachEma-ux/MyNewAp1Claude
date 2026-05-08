@@ -619,3 +619,129 @@ describe("RETROFIT §D2 — single-region invariant (no region-scoped state toda
     expect(true).toBe(true);
   });
 });
+
+// ── U5-b — PII / license enforcement at retrieval time ───────────────
+
+describe("RETROFIT U5-b — PII / license enforcement (post-2026-05-08)", () => {
+  function basePolicy(overrides: Record<string, unknown>) {
+    return {
+      id: 1,
+      workspaceId: 1,
+      profileId: 1,
+      minScore: null,
+      maxChunks: null,
+      dedupeBy: null,
+      freshnessMaxAgeDays: null,
+      citationRequired: null,
+      sourcePermissionFilter: null,
+      piiPolicy: null,
+      licensePolicy: null,
+      licenseBlocklist: null,
+      timeoutMs: null,
+      createdBy: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    };
+  }
+
+  it("piiPolicy=block drops chunks with block-severity PII findings", async () => {
+    const { filterRetrieval } = await import(
+      "../../server/agent-studio/services/rac/retrieval-filter"
+    );
+    const result = filterRetrieval({
+      chunks: [
+        {
+          content: "clean chunk", score: 0.9, citation: "[u:1]",
+          sourceChunkId: "ku-1",
+          metadata: { unitPiiBlockSeverityCount: 0, unitLicense: null },
+        },
+        {
+          content: "PII chunk", score: 0.95, citation: "[u:2]",
+          sourceChunkId: "ku-2",
+          metadata: { unitPiiBlockSeverityCount: 2, unitLicense: null },
+        },
+      ],
+      policy: basePolicy({ piiPolicy: "block" }) as any,
+    });
+    expect(result.chunks.map((c) => c.sourceChunkId)).toEqual(["ku-1"]);
+    expect(result.rejectionCounts.piiBlocked).toBe(1);
+  });
+
+  it("licensePolicy=block drops chunks whose license is in licenseBlocklist", async () => {
+    const { filterRetrieval } = await import(
+      "../../server/agent-studio/services/rac/retrieval-filter"
+    );
+    const result = filterRetrieval({
+      chunks: [
+        {
+          content: "MIT chunk", score: 0.9, citation: "[u:1]",
+          sourceChunkId: "ku-1",
+          metadata: { unitPiiBlockSeverityCount: 0, unitLicense: "MIT" },
+        },
+        {
+          content: "GPL chunk", score: 0.95, citation: "[u:2]",
+          sourceChunkId: "ku-2",
+          metadata: {
+            unitPiiBlockSeverityCount: 0,
+            unitLicense: "GPL-3.0-or-later",
+          },
+        },
+      ],
+      policy: basePolicy({
+        licensePolicy: "block",
+        licenseBlocklist: ["GPL-3.0-or-later"],
+      }) as any,
+    });
+    expect(result.chunks.map((c) => c.sourceChunkId)).toEqual(["ku-1"]);
+    expect(result.rejectionCounts.licenseBlocked).toBe(1);
+  });
+
+  it("piiPolicy=warn keeps chunks but emits a warn-mode trace breadcrumb", async () => {
+    const { filterRetrieval } = await import(
+      "../../server/agent-studio/services/rac/retrieval-filter"
+    );
+    const result = filterRetrieval({
+      chunks: [
+        {
+          content: "PII chunk", score: 0.95, citation: "[u:1]",
+          sourceChunkId: "ku-1",
+          metadata: { unitPiiBlockSeverityCount: 1, unitLicense: null },
+        },
+      ],
+      policy: basePolicy({ piiPolicy: "warn" }) as any,
+    });
+    expect(result.chunks).toHaveLength(1);
+    expect(result.rejectionCounts.piiBlocked).toBe(0);
+    expect(
+      result.warnings.some((w) => w.includes("policy_warnmode_active")),
+    ).toBe(true);
+  });
+
+  it("licensePolicy=block with empty blocklist is no-op + misconfiguration warning", async () => {
+    const { filterRetrieval } = await import(
+      "../../server/agent-studio/services/rac/retrieval-filter"
+    );
+    const result = filterRetrieval({
+      chunks: [
+        {
+          content: "GPL chunk", score: 0.95, citation: "[u:1]",
+          sourceChunkId: "ku-1",
+          metadata: {
+            unitPiiBlockSeverityCount: 0,
+            unitLicense: "GPL-3.0-or-later",
+          },
+        },
+      ],
+      policy: basePolicy({
+        licensePolicy: "block",
+        licenseBlocklist: null,
+      }) as any,
+    });
+    expect(result.chunks).toHaveLength(1);
+    expect(result.rejectionCounts.licenseBlocked).toBe(0);
+    expect(
+      result.warnings.some((w) => w.includes("license_block_misconfigured")),
+    ).toBe(true);
+  });
+});

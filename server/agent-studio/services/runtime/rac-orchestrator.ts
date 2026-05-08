@@ -90,6 +90,10 @@ export interface RuntimeTraceMetrics {
   chunksIncluded: number;
   truncatedByBudget: number;
   fallbackReason: string | null;
+  /** U5-b.3: per-trace counter of PII-blocked chunks (subset of chunksFiltered). */
+  piiBlockedCount: number;
+  /** U5-b.3: per-trace counter of license-blocked chunks (subset of chunksFiltered). */
+  licenseBlockedCount: number;
 }
 
 /**
@@ -139,6 +143,8 @@ export async function resolveAndAssembleContext(
     chunksIncluded: 0,
     truncatedByBudget: 0,
     fallbackReason: null,
+    piiBlockedCount: 0,
+    licenseBlockedCount: 0,
   };
   const sourceTrace: RuntimeSourceTrace = {
     perSource: [],
@@ -235,8 +241,12 @@ export async function resolveAndAssembleContext(
       filtered.rejectionCounts.belowMinScore +
       filtered.rejectionCounts.freshness +
       filtered.rejectionCounts.duplicate +
-      filtered.rejectionCounts.capacity;
+      filtered.rejectionCounts.capacity +
+      filtered.rejectionCounts.piiBlocked +
+      filtered.rejectionCounts.licenseBlocked;
     trace.chunksFiltered = filteredOut;
+    trace.piiBlockedCount = filtered.rejectionCounts.piiBlocked;
+    trace.licenseBlockedCount = filtered.rejectionCounts.licenseBlocked;
     for (const w of filtered.warnings) warnings.push(`filter: ${w}`);
 
     const assembled = assembleRetrievalEvidence({

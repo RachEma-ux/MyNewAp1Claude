@@ -134,20 +134,33 @@ export const knowledgeUnitAdapter: RacIngestionAdapter = {
       warnings.push("partial_result");
     }
 
-    const chunks: RacRetrievalChunk[] = scored.map(({ unit, score }) => ({
-      content: unit.contentText,
-      score,
-      citation: buildCitation(unit),
-      sourceChunkId: `ku-${unit.id}`,
-      metadata: {
-        unitId: unit.id,
-        unitType: unit.unitType,
-        sourceLocation: unit.sourceLocation ?? null,
-        permissionContext: unit.permissionContext,
-        freshnessState: unit.freshnessState,
-        provenanceId: unit.provenanceId,
-      },
-    }));
+    const chunks: RacRetrievalChunk[] = scored.map(({ unit, score }) => {
+      // U5-b.3 chunk metadata projection (ADR DD6): the retrieval
+      // filter consumes `unitPiiBlockSeverityCount` (number) and
+      // `unitLicense` (string | null) to decide PII / license
+      // rejections without joining back to the unit table. Adapters
+      // that don't surface these signals (graphrag stub) leave them
+      // undefined; the filter passes those chunks through.
+      const piiBlockCount = Array.isArray(unit.piiFindings)
+        ? unit.piiFindings.length
+        : 0;
+      return {
+        content: unit.contentText,
+        score,
+        citation: buildCitation(unit),
+        sourceChunkId: `ku-${unit.id}`,
+        metadata: {
+          unitId: unit.id,
+          unitType: unit.unitType,
+          sourceLocation: unit.sourceLocation ?? null,
+          permissionContext: unit.permissionContext,
+          freshnessState: unit.freshnessState,
+          provenanceId: unit.provenanceId,
+          unitPiiBlockSeverityCount: piiBlockCount,
+          unitLicense: unit.license ?? null,
+        },
+      };
+    });
 
     return {
       chunks,
