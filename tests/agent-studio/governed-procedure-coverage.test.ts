@@ -1,59 +1,62 @@
 /**
- * R2-c2 — systemic invariant: every `governedProcedure` declaration
- * across `server/agent-studio/api/*.ts` must resolve through
- * `resolveActionKey` + `getActionDef` cleanly.
+ * R2-c2 + R1-c3 — repo-wide `governedProcedure` registry coverage invariant.
  *
- * Cycle-2 audit (`/sdcard/Download/RAC_AUDIT_2026-05-08-cycle2.md`)
- * found a recurring pattern: routers declare `<name>: governedProcedure`
- * but never register the action key in `server/governance/action-key-map.ts`
- * or `config/governance/platform_action_registry.yaml`. The deny path
- * is unconditional — `getActionDef` throws for unknown keys
- * (`server/governance/action-registry.ts:142-153`,
- * comment: \"DENY-BY-DEFAULT\"), the trpc middleware catches and
- * rethrows as HTTP 403, and the procedure is silently broken in
- * production.
+ * Cycle-2 (R2-c2) walked `server/agent-studio/api/` only (12 procedures).
+ * Cycle-3 audit (`/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md` §2.1)
+ * found that the same footgun shape — `<name>: governedProcedure` declared
+ * without a corresponding `action-key-map.ts` mapping or YAML registry
+ * entry — recurs across **656 declarations in 99 files repo-wide**, of
+ * which only ~12 are registered. R1-c3 expands this test from
+ * agent-studio scope to repo-wide scope.
  *
- * R1-c2 closed the U5-b.4 instance (kb.setLicense + kb.clearPiiFindings).
- * R2-c2 closes 9 more pre-existing instances surfaced by this test
- * (mcpSchemaSync.sync, toolApprovals.decide, workspaceDefaultBindings
- * upsert/delete, plugins.validate, catalogTools create/update/remove,
- * marketplace.refresh) and locks the invariant going forward.
+ * Two complementary invariants:
  *
- * Two complementary checks:
+ *   1. **Per-file declaration count** (drift detection across all of
+ *      `server/`). The map below is the cycle-3 baseline (656 across 99
+ *      files). Adding or removing any `<name>: governedProcedure` line
+ *      forces an EXPECTED_PER_FILE update — and forces a decision: the
+ *      new procedure must either be registered (entry added to
+ *      EXPECTED_REGISTERED + action-key-map + YAML), explicitly
+ *      acknowledged as a known cycle-3 backlog item (the count update
+ *      lands without a registration), or downgraded to
+ *      `protectedProcedure` (the count decrements).
  *
- *   1. **Drift detection** — source-string scan over the API directory
- *      counts every `<name>: governedProcedure` declaration. The count
- *      must equal `EXPECTED_GOVERNED_PROCEDURES.length`. Adding a new
- *      governedProcedure without updating EXPECTED fails this test
- *      with a pointer to the unaccounted-for declarations.
+ *   2. **Registry coverage for the curated "known-registered" set.**
+ *      The 12 procedures cycle-2 closed remain strictly verified
+ *      end-to-end (resolveActionKey + getActionDef). Adding a procedure
+ *      to EXPECTED_REGISTERED implies you also added the action-key-map
+ *      entry + YAML def — if you didn't, this assertion fires
+ *      immediately on the unregistered key.
  *
- *   2. **Registry coverage** — for each entry in EXPECTED, run the
- *      full middleware resolution chain and assert no throw. Removing
- *      a registry entry (in action-key-map.ts or YAML) fails this
- *      test for the affected entry directly.
+ * The test runs in default CI Layer 6 (no DB, no module boot) so the
+ * invariant fires on every PR.
  *
- * Source-string scans match the project pattern (see
- * `tests/pmb/wiring.test.ts` header) — booting `agentStudioRouter`
- * triggers ASDB connection probes and Phase-10 schedulers that aren't
- * needed to verify governance wiring.
+ * Cycle-3 R2-c3 closure pattern: as each follow-up PR registers (or
+ * downgrades) one or more unregistered procedures, the per-file count
+ * stays the same (or decrements on downgrades) AND the closing PR adds
+ * the corresponding entry to EXPECTED_REGISTERED. The count and the
+ * registered list move in lockstep.
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "fs";
-import { join } from "path";
+import { readFileSync, readdirSync, statSync } from "fs";
+import { join, relative } from "path";
 import { resolveActionKey } from "../../server/governance/action-key-map";
 import { getActionDef } from "../../server/governance/action-registry";
 
 const REPO_ROOT = process.cwd();
-const API_DIR = join(REPO_ROOT, "server/agent-studio/api");
+const SERVER_DIR = join(REPO_ROOT, "server");
 
 /**
- * Every `<name>: governedProcedure` declaration in
- * `server/agent-studio/api/*.ts` must appear in this list with its
- * resolved trpc path. Order doesn't matter; counts and contents must
- * match the source.
+ * Curated list of `governedProcedure` declarations whose action-keys
+ * MUST resolve through `resolveActionKey` + `getActionDef` cleanly.
+ *
+ * Cycle-2's R2-c2 list is the seed. Each PR that closes a cycle-3
+ * R2-c3 backlog item should add the newly-registered entry here AND
+ * ensure the corresponding `action-key-map.ts` + YAML registration is
+ * in place.
  */
-const EXPECTED_GOVERNED_PROCEDURES: ReadonlyArray<{
+const EXPECTED_REGISTERED: ReadonlyArray<{
   trpcPath: string;
   source: string;
 }> = [
@@ -85,9 +88,6 @@ const EXPECTED_GOVERNED_PROCEDURES: ReadonlyArray<{
     trpcPath: "agentStudio.workspaceDefaultBindings.delete",
     source: "server/agent-studio/api/workspace-default-bindings-router.ts",
   },
-  // Sub-routers defined inline in router.ts — pluginsRouter,
-  // catalogToolsRouter, marketplaceRouter — each contributes governed
-  // procedures from a single file but distinct mount paths.
   {
     trpcPath: "agentStudio.plugins.validate",
     source: "server/agent-studio/api/router.ts",
@@ -111,87 +111,244 @@ const EXPECTED_GOVERNED_PROCEDURES: ReadonlyArray<{
 ];
 
 /**
- * Scan all `*.ts` files under `server/agent-studio/api/` and count
- * every `<name>: governedProcedure` declaration. Returns a count plus
- * the file:line:procedureName triples for diagnostics on failure.
+ * Per-file declaration count of `<name>: governedProcedure` lines under
+ * `server/`. Cycle-3 baseline: 656 across 99 files. Of these, 12 are
+ * in EXPECTED_REGISTERED above; the remaining 644 are pre-existing
+ * cycle-3 backlog (R2-c3) — see `/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md`
+ * §2.1 for the per-domain breakdown.
+ *
+ * **Maintenance:** adding or removing a `governedProcedure` declaration
+ * anywhere under `server/` requires updating the entry below for the
+ * affected file. The test will fail with a diff showing exactly which
+ * file's count changed.
  */
-function findGovernedDeclarations(): Array<{
-  file: string;
-  line: number;
-  procedureName: string;
-}> {
-  const declarations: Array<{ file: string; line: number; procedureName: string }> = [];
-  const tsFiles = readdirSync(API_DIR).filter(
-    (f) => f.endsWith(".ts") && !f.endsWith(".test.ts"),
-  );
-  for (const file of tsFiles) {
-    const path = join(API_DIR, file);
-    const lines = readFileSync(path, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      // Match `<name>: governedProcedure` at the start of a line
-      // (allowing for indentation). Excludes comments and string
-      // literals via the leading-whitespace anchor.
-      const match = /^\s+([a-zA-Z][a-zA-Z0-9_]*)\s*:\s*governedProcedure\b/.exec(
-        lines[i],
-      );
-      if (match) {
-        declarations.push({
-          file: `server/agent-studio/api/${file}`,
-          line: i + 1,
-          procedureName: match[1],
-        });
-      }
+const EXPECTED_PER_FILE: Record<string, number> = {
+  "server/agent-studio/api/cag-router.ts": 1,
+  "server/agent-studio/api/kb-router.ts": 2,
+  "server/agent-studio/api/mcp-schema-sync-router.ts": 1,
+  "server/agent-studio/api/router.ts": 5,
+  "server/agent-studio/api/tool-approvals-router.ts": 1,
+  "server/agent-studio/api/workspace-default-bindings-router.ts": 2,
+  "server/agents/router.ts": 8,
+  "server/ai-types/taxonomy/router.ts": 1,
+  "server/automation/automation-router.ts": 7,
+  "server/catalog-import/router.ts": 6,
+  "server/chat/router.ts": 6,
+  "server/communication/router.ts": 15,
+  "server/culture-values/router.ts": 11,
+  "server/data-analysis/data-acquisition/dataAcquisition.router.ts": 14,
+  "server/data-analysis/graphrag/router.ts": 3,
+  "server/documents/documents-crud-router.ts": 5,
+  "server/documents/documents-router.ts": 2,
+  "server/embeddings/embeddings-router.ts": 2,
+  "server/governance/router.ts": 1,
+  "server/hardware/hardware-router.ts": 1,
+  "server/hr/analytics/router.ts": 5,
+  "server/hr/compensation/router.ts": 10,
+  "server/hr/compliance/router.ts": 9,
+  "server/hr/directory/router.ts": 4,
+  "server/hr/engagement/router.ts": 9,
+  "server/hr/learning/router.ts": 8,
+  "server/hr/lifecycle/router.ts": 10,
+  "server/hr/organization/router.ts": 7,
+  "server/hr/performance/router.ts": 8,
+  "server/hr/recruiting/router.ts": 8,
+  "server/hr/relations/router.ts": 9,
+  "server/hr/role-definitions/router.ts": 10,
+  "server/hr/staffing/router.ts": 3,
+  "server/hr/talent/router.ts": 7,
+  "server/hr/time/router.ts": 11,
+  "server/inference/inference-router.ts": 3,
+  "server/models/benchmark-router.ts": 1,
+  "server/models/download-router.ts": 9,
+  "server/models/version-router.ts": 5,
+  "server/modules/agents/router.ts": 6,
+  "server/modules/collaboration/router.ts": 6,
+  "server/modules/hr/router.ts": 2,
+  "server/modules/kgia/router.ts": 7,
+  "server/modules/knowledge/router.ts": 5,
+  "server/modules/pmt/activity-types-router.ts": 3,
+  "server/modules/pmt/ai-router.ts": 1,
+  "server/modules/pmt/attachments-router.ts": 2,
+  "server/modules/pmt/baselines-router.ts": 1,
+  "server/modules/pmt/budgets-router.ts": 3,
+  "server/modules/pmt/comments-router.ts": 3,
+  "server/modules/pmt/config-router.ts": 8,
+  "server/modules/pmt/cost-entries-router.ts": 3,
+  "server/modules/pmt/custom-actions-router.ts": 4,
+  "server/modules/pmt/custom-fields-router.ts": 4,
+  "server/modules/pmt/discussions-router.ts": 6,
+  "server/modules/pmt/git-router.ts": 2,
+  "server/modules/pmt/meetings-router.ts": 6,
+  "server/modules/pmt/news-router.ts": 3,
+  "server/modules/pmt/router.ts": 12,
+  "server/modules/pmt/sprints-router.ts": 6,
+  "server/modules/pmt/templates-router.ts": 10,
+  "server/modules/pmt/time-entries-router.ts": 3,
+  "server/modules/pmt/versions-router.ts": 3,
+  "server/modules/pmt/views-router.ts": 3,
+  "server/modules/pmt/watchers-router.ts": 2,
+  "server/modules/pmt/webhooks-router.ts": 4,
+  "server/modules/router.ts": 2,
+  "server/openrouter/router.ts": 10,
+  "server/organization-management/router.ts": 20,
+  "server/pm-central/router.ts": 28,
+  "server/provider-connections/router.ts": 8,
+  "server/providers/router.ts": 13,
+  "server/ps/context-translator-router.ts": 2,
+  "server/ps/ps.ideation-router.ts": 16,
+  "server/ps/ps.router.ts": 64,
+  "server/routers/actions.ts": 1,
+  "server/routers/agents-control-plane.ts": 6,
+  "server/routers/agents-diff.ts": 1,
+  "server/routers/agents-promotions.ts": 4,
+  "server/routers/agents.ts": 8,
+  "server/routers/bots.ts": 3,
+  "server/routers/catalog-manage.ts": 7,
+  "server/routers/conversations.ts": 3,
+  "server/routers/deploy.ts": 3,
+  "server/routers/keyRotation.ts": 13,
+  "server/routers/llm-creation.ts": 13,
+  "server/routers/llm-providers.ts": 4,
+  "server/routers/llm.ts": 12,
+  "server/routers/models.ts": 3,
+  "server/routers/policies.ts": 5,
+  "server/routers/protocols.ts": 4,
+  "server/routers/templates.ts": 4,
+  "server/routers/triggers.ts": 1,
+  "server/routers/wcpWorkflows.ts": 3,
+  "server/routers/wiki.ts": 6,
+  "server/secrets/secrets-router.ts": 3,
+  "server/vectordb/vectordb-router.ts": 3,
+  "server/workforce-assignment/router.ts": 14,
+  "server/workspace/workspace-router.ts": 21,
+};
+
+const GOVERNED_PROCEDURE_RE = /^\s+[a-zA-Z][a-zA-Z0-9_]*\s*:\s*governedProcedure\b/m;
+const GOVERNED_PROCEDURE_RE_GLOBAL = /^\s+[a-zA-Z][a-zA-Z0-9_]*\s*:\s*governedProcedure\b/gm;
+
+/**
+ * Recursively walk a directory and yield every `*.ts` file path that
+ * is NOT a test file. Returns paths relative to REPO_ROOT.
+ */
+function* walkTsFiles(dir: string): Generator<string> {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      // Skip broken symlinks (some repos have stale symlinks under
+      // server/ that throw ENOENT on stat — e.g. server/_core/public
+      // pointing at a generated dist directory that may not exist).
+      continue;
+    }
+    if (stat.isDirectory()) {
+      yield* walkTsFiles(full);
+    } else if (
+      stat.isFile() &&
+      entry.endsWith(".ts") &&
+      !entry.endsWith(".test.ts")
+    ) {
+      yield relative(REPO_ROOT, full);
     }
   }
-  return declarations;
 }
 
-describe("RETROFIT R2-c2 — every governedProcedure has registry coverage", () => {
-  describe("drift detection — source declarations match EXPECTED list", () => {
-    it("counts the right number of <name>: governedProcedure declarations", () => {
-      const decls = findGovernedDeclarations();
-      // Failure shape gives the operator the file:line of any new
-      // governedProcedure that was added without an EXPECTED entry.
-      const summary = decls.map((d) => `${d.file}:${d.line} → ${d.procedureName}`);
+/**
+ * Count `<name>: governedProcedure` declarations in a single file.
+ */
+function countGovernedProcedureDeclarations(relPath: string): number {
+  const src = readFileSync(join(REPO_ROOT, relPath), "utf8");
+  const matches = src.match(GOVERNED_PROCEDURE_RE_GLOBAL);
+  return matches?.length ?? 0;
+}
+
+/**
+ * Compute the discovered per-file count map across all of server/.
+ */
+function discoverGovernedProcedureCounts(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const relPath of walkTsFiles(SERVER_DIR)) {
+    const n = countGovernedProcedureDeclarations(relPath);
+    if (n > 0) counts[relPath] = n;
+  }
+  return counts;
+}
+
+describe("RETROFIT R1-c3 — every governedProcedure is accounted for repo-wide", () => {
+  describe("drift detection — per-file declaration counts match EXPECTED_PER_FILE", () => {
+    const discovered = discoverGovernedProcedureCounts();
+
+    it("total declaration count matches the cycle-3 baseline (656)", () => {
+      const total = Object.values(discovered).reduce((a, b) => a + b, 0);
+      const expected = Object.values(EXPECTED_PER_FILE).reduce((a, b) => a + b, 0);
       expect(
-        decls.length,
-        `governedProcedure declarations found:\n  ${summary.join("\n  ")}\n` +
-          `EXPECTED list has ${EXPECTED_GOVERNED_PROCEDURES.length} entries; if you added a new ` +
-          `governedProcedure, also add it to EXPECTED_GOVERNED_PROCEDURES in this test AND register ` +
-          `the action in server/governance/action-key-map.ts and config/governance/platform_action_registry.yaml.`,
-      ).toBe(EXPECTED_GOVERNED_PROCEDURES.length);
+        total,
+        `governedProcedure repo-wide total drifted. Expected ${expected}, found ${total}. ` +
+          `Update EXPECTED_PER_FILE in this test to match.`,
+      ).toBe(expected);
     });
 
-    it("every EXPECTED entry has a corresponding source declaration", () => {
-      const decls = findGovernedDeclarations();
-      const declSources = new Set(decls.map((d) => d.file));
-      const missing: string[] = [];
-      for (const expected of EXPECTED_GOVERNED_PROCEDURES) {
-        // Each expected procedure must have at least one
-        // governedProcedure declaration in its claimed source file.
-        if (!declSources.has(expected.source)) {
-          missing.push(`${expected.trpcPath} → ${expected.source}`);
+    it("file count matches the cycle-3 baseline (99 files)", () => {
+      const expectedKeys = new Set(Object.keys(EXPECTED_PER_FILE));
+      const discoveredKeys = new Set(Object.keys(discovered));
+
+      const newFiles = [...discoveredKeys].filter((k) => !expectedKeys.has(k));
+      const removedFiles = [...expectedKeys].filter((k) => !discoveredKeys.has(k));
+
+      expect(
+        newFiles,
+        `New files declaring governedProcedure detected. Add to EXPECTED_PER_FILE:\n  ${newFiles.join("\n  ")}`,
+      ).toEqual([]);
+      expect(
+        removedFiles,
+        `Files in EXPECTED_PER_FILE no longer declare governedProcedure. Remove from EXPECTED_PER_FILE:\n  ${removedFiles.join("\n  ")}`,
+      ).toEqual([]);
+    });
+
+    it("per-file declaration counts match expected", () => {
+      const mismatches: string[] = [];
+      for (const [file, expectedCount] of Object.entries(EXPECTED_PER_FILE)) {
+        const actualCount = discovered[file] ?? 0;
+        if (actualCount !== expectedCount) {
+          mismatches.push(`${file}: expected ${expectedCount}, found ${actualCount}`);
         }
       }
-      expect(missing).toEqual([]);
+      expect(
+        mismatches,
+        `Per-file governedProcedure counts drifted:\n  ${mismatches.join("\n  ")}\n` +
+          `Update EXPECTED_PER_FILE entries above. If you added a new procedure, also decide ` +
+          `whether to register it (add to EXPECTED_REGISTERED + action-key-map + YAML), ` +
+          `acknowledge it as cycle-3 backlog (count update only), or downgrade to ` +
+          `protectedProcedure (count decrements).`,
+      ).toEqual([]);
     });
   });
 
-  describe("registry coverage — every EXPECTED procedure resolves cleanly", () => {
-    for (const { trpcPath } of EXPECTED_GOVERNED_PROCEDURES) {
-      it(`${trpcPath} resolves through resolveActionKey + getActionDef`, () => {
+  describe("registry coverage — every EXPECTED_REGISTERED procedure resolves cleanly", () => {
+    for (const { trpcPath, source } of EXPECTED_REGISTERED) {
+      it(`${trpcPath} (${source}) resolves through resolveActionKey + getActionDef`, () => {
         const actionKey = resolveActionKey(trpcPath);
-        // resolveActionKey falls back to the trpc path on miss; that's
-        // fine — the actual gate is getActionDef, which throws for
-        // unknown keys.
         expect(actionKey).toBeTruthy();
         const def = getActionDef(actionKey);
         expect(def).toBeDefined();
         expect(def.stage).toBe("mutate");
-        // Every governed procedure must have a non-empty domain +
-        // capability so RBAC checks can fire.
         expect(def.domain.length).toBeGreaterThan(0);
         expect(def.capability.length).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  describe("source consistency — every EXPECTED_REGISTERED source file declares governedProcedure", () => {
+    const discovered = discoverGovernedProcedureCounts();
+
+    for (const { trpcPath, source } of EXPECTED_REGISTERED) {
+      it(`${source} declares at least one governedProcedure (for ${trpcPath})`, () => {
+        expect(
+          discovered[source],
+          `${source} is referenced by EXPECTED_REGISTERED but no governedProcedure declarations found there.`,
+        ).toBeGreaterThanOrEqual(1);
       });
     }
   });
