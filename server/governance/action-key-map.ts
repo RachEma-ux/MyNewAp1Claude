@@ -468,6 +468,8 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "agentStudio.exportCatalog.markImported": "agentStudio.exportCatalog.markImported",
   "agentStudio.exportCatalog.reconcileImports": "agentStudio.exportCatalog.reconcileImports",
   "agentStudio.exportCatalog.reconcileSync": "agentStudio.exportCatalog.reconcileSync",
+  "agentStudio.kb.setLicense": "agentStudio.kb.setLicense",
+  "agentStudio.kb.clearPiiFindings": "agentStudio.kb.clearPiiFindings",
   "sandboxWf.workflow.publish": "sandboxWf.workflow.publish",
   "sandboxWf.execute": "sandboxWf.execute",
   "rag.index.run": "rag.index.run",
