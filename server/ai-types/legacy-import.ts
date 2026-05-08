@@ -197,14 +197,28 @@ export async function classifyLegacyImport(
 export interface DuplicateGuardOptions {
   /** sourceType the new register call is targeting. */
   sourceType: string;
-  /** sourceId the new register call is targeting. */
-  sourceId: number;
+  /**
+   * Numeric source-of-record id. Required for domain-backed entries.
+   * Mutually exclusive with `sourceName` — exactly one must be set.
+   */
+  sourceId?: number;
+  /**
+   * String source-of-record key. Required for Phase 37 self-registered
+   * system agents (e.g. `AGENT_CATALOG_ID = "ps.agent.context_translator"`).
+   * Mutually exclusive with `sourceId` — exactly one must be set. When
+   * present, the guard skips the legacy-import classification and looks
+   * up modern rows by `(sourceType, name === sourceName)`. ADR:
+   * `docs/architecture/ai-types/PMT_NAME_BASED_IDENTITY.md`.
+   */
+  sourceName?: string;
   /**
    * If true, the guard will allow proceeding when the existing row is
    * `legacy_imported_unresolved` and the caller asserts they want to
    * **reconcile** rather than re-import. Used by the Reconcile Legacy
    * Import action; default false (i.e., normal `aiTypes.catalog.register`
    * calls are blocked from re-importing on top of an unresolved row).
+   * Only meaningful for the `sourceId` path; ignored on the `sourceName`
+   * path (self-registered agents have no legacy concept).
    */
   reconcileMode?: boolean;
 }
@@ -220,7 +234,13 @@ export interface DuplicateGuardResult {
  * Asserts no `legacy_imported*` row already covers `(sourceType, sourceId)`.
  * Phase 25's `aiTypes.catalog.register` calls this before INSERT.
  *
- * Behavior:
+ * Phase 37 — name-path: when `sourceName` is provided instead of
+ * `sourceId`, the guard looks up modern rows by `(sourceType, name ===
+ * sourceName)` and skips the legacy-import classification (self-
+ * registered system agents have no legacy concept). Two outcomes:
+ * `modern_row_update_path` or `no_existing_row`.
+ *
+ * Behavior (numeric path):
  *   - No existing row at `(sourceType, sourceId)` → ok=true.
  *   - Existing row with `legacy_import_state IS NULL` (modern Plan v3
  *     row) → ok=true (caller is updating, not re-importing).
@@ -229,12 +249,52 @@ export interface DuplicateGuardResult {
  *   - Existing row with `legacy_import_state="legacy_imported_unresolved"`
  *     → ok=false unless `reconcileMode=true`.
  *
+ * Behavior (name path, Phase 37):
+ *   - No existing row at `(sourceType, name === sourceName)` → ok=true.
+ *   - Existing row → ok=true with `modern_row_update_path` (legacy
+ *     classification not applicable to self-registered agents).
+ *
  * The DB read is parameterized via `db` so the test can pass a fake.
  */
 export async function checkDuplicateLegacyImport(
   db: any,
   opts: DuplicateGuardOptions,
 ): Promise<DuplicateGuardResult> {
+  const hasSourceId = opts.sourceId !== undefined && opts.sourceId !== null;
+  const hasSourceName = opts.sourceName !== undefined && opts.sourceName !== null;
+
+  if (hasSourceId === hasSourceName) {
+    throw new Error(
+      "checkDuplicateLegacyImport requires exactly one of sourceId or sourceName",
+    );
+  }
+
+  // ── Phase 37 name-path: self-registered system agents ──────────────
+  if (hasSourceName) {
+    const rows = await db
+      .select({
+        id: catalogEntries.id,
+        legacyImportState: catalogEntries.legacyImportState,
+      })
+      .from(catalogEntries)
+      .where(
+        and(
+          eq(catalogEntries.sourceType, opts.sourceType),
+          eq(catalogEntries.name, opts.sourceName!),
+        ),
+      );
+
+    if (rows.length === 0) {
+      return { ok: true, existingEntryId: null, reason: "no_existing_row" };
+    }
+    return {
+      ok: true,
+      existingEntryId: rows[0].id,
+      reason: "modern_row_update_path",
+    };
+  }
+
+  // ── Numeric path (Phase 25 contract) ────────────────────────────────
   const rows = await db
     .select({
       id: catalogEntries.id,
@@ -244,7 +304,7 @@ export async function checkDuplicateLegacyImport(
     .where(
       and(
         eq(catalogEntries.sourceType, opts.sourceType),
-        eq(catalogEntries.sourceId, opts.sourceId),
+        eq(catalogEntries.sourceId, opts.sourceId!),
       ),
     );
 
