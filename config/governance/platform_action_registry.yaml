@@ -675,6 +675,104 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # ─────────────────────────────────────────────────────────────────
+  # R2-c2 — pre-existing damage discovered by the systemic
+  # governance-coverage audit. The 9 entries below were all declared as
+  # `governedProcedure` in their routers but never registered, so every
+  # call returned HTTP 403 (deny-by-default). Same conservative shape
+  # as `agentStudio.cag.refreshPack` — registers them at R2 / agent.manage /
+  # approval:none / no evidence so the deny path no longer fires.
+  # Risk-tiering can be tightened per-action via separate follow-ups if
+  # any specific procedure warrants stricter approval/evidence policy.
+  # ─────────────────────────────────────────────────────────────────
+
+  # MCP schema drift sync — operator-triggered re-fetch of MCP server
+  # tool schemas to detect schemaHash drift (Phase 7).
+  agentStudio.mcpSchemaSync.sync:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Operator's approve/deny decision on a pending tool-call approval
+  # request. The decision is the gate itself — requiring approval to
+  # decide an approval would be circular. R2 because the action is
+  # logged (the gate's audit trail is the evidence path); blast radius
+  # is one pending request per call.
+  agentStudio.toolApprovals.decide:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Workspace-scoped default provider/model binding — set or update
+  # the default binding used when no per-agent binding is present.
+  agentStudio.workspaceDefaultBindings.upsert:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Workspace-scoped default binding deletion.
+  agentStudio.workspaceDefaultBindings.delete:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Plugin pre-flight validation — checks plugin shape before mount.
+  agentStudio.plugins.validate:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Catalog tool registry — create a new entry.
+  agentStudio.catalogTools.create:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Catalog tool registry — update an existing entry.
+  agentStudio.catalogTools.update:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Catalog tool registry — remove an entry.
+  agentStudio.catalogTools.remove:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Marketplace registry refresh — fetches the upstream catalog.
+  agentStudio.marketplace.refresh:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   model.importToCatalog:
     domain: model
     risk: R2
