@@ -16,10 +16,9 @@
  * Idempotent: skips if catalog entries with name LIKE 'wf.orchestrator.%' exist.
  */
 
-import { createHash } from "crypto";
 import { eq, like } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { createPublishBundle, getCatalogEntryById } from "../ai-types/public-api";
+import { getCatalogEntryById } from "../ai-types/public-api";
 import { gatewayCall } from "../platform/modules/module-gateway";
 import { agents } from "../../drizzle/tables/agents";
 import { providers } from "../../drizzle/tables/providers";
@@ -186,9 +185,10 @@ export async function seedWfOrchestrators(): Promise<{ seeded: boolean; count: n
 
     // Plan v3 Phase 34: route through aiTypes.catalog.register so the
     // Phase-25 duplicate guard, Phase-39 event, and canonical audit
-    // chain run on seed-orchestrator's catalog write. The publish step
-    // (Step C below) keeps its direct createPublishBundle call —
-    // gateway publish migration is out of scope for this phase.
+    // chain run on seed-orchestrator's catalog write. Phase 36.2:
+    // Step C (below) also routes through aiTypes.catalog.publish
+    // after the §36.1 contract redesign removed the canonical's
+    // flip-to-published auto-behavior (gate 5 wants status="active").
     const result = await gatewayCall<unknown, { entryId: number; action: "created" | "updated" }>({
       ctx: {
         sourceModule: "sandbox-wf",
@@ -231,31 +231,23 @@ export async function seedWfOrchestrators(): Promise<{ seeded: boolean; count: n
     }
 
     // ── Step C: Create publish bundle (passes gate 6) ──────────────
-    const snapshot = {
-      entryId: entry.id,
-      name: entry.name,
-      displayName: entry.displayName,
-      description: entry.description,
-      entryType: "agent",
-      scope: "app",
-      providerId,
-      config,
-      tags: ["published", "agent", "wf-orchestrator", "maestro"],
-      publishedAt: new Date().toISOString(),
-      versionLabel: "v1.0.0",
-    };
-
-    const snapshotHash = createHash("sha256")
-      .update(JSON.stringify(snapshot))
-      .digest("hex");
-
-    await createPublishBundle({
-      catalogEntryId: entry.id,
-      versionLabel: "v1.0.0",
-      snapshot,
-      snapshotHash,
-      publishedBy: 1,
-      policyDecision: "approved",
+    // Canonical builds the snapshot + snapshotHash internally; entry
+    // status stays at "active" post-publish per §36.1 contract
+    // (gate 5 invariant).
+    await gatewayCall<unknown, { bundle: { id: number }; versionLabel: string }>({
+      ctx: {
+        sourceModule: "sandbox-wf",
+        targetModule: "aiTypes",
+        actionKey: "aiTypes.catalog.publish",
+        governanceReceiptId: `sandbox-wf-publish-${entry.name}-${Date.now()}`,
+        actorId: 1,
+      },
+      input: {
+        catalogEntryId: entry.id,
+        publishedBy: 1,
+        versionLabel: "v1.0.0",
+        policyDecision: "approved",
+      },
     });
 
     // ── Step D: Auto-import into wf_catalog_imports ────────────────
