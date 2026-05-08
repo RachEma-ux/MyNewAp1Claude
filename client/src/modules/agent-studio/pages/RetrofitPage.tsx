@@ -244,13 +244,21 @@ function UnitRow({
           variant="outline"
           className="h-7"
           disabled={setLicense.isPending}
-          onClick={() =>
-            setLicense.mutate({
-              workspaceId,
-              unitId: unit.id,
-              license: licenseInput.trim().length > 0 ? licenseInput.trim() : null,
-            })
-          }
+          onClick={() => {
+            const trimmed = licenseInput.trim();
+            const target = trimmed.length > 0 ? trimmed : null;
+            const wasLicense = unit.license ?? "(unset)";
+            const willBe = target ?? "(unset)";
+            if (
+              !window.confirm(
+                `Change unit ${unit.id} license from "${wasLicense}" to "${willBe}"? ` +
+                  `This affects retrieval-time license enforcement under any profile that blocklists either value.`,
+              )
+            ) {
+              return;
+            }
+            setLicense.mutate({ workspaceId, unitId: unit.id, license: target });
+          }}
         >
           {setLicense.isPending ? "…" : "Set license"}
         </Button>
@@ -260,9 +268,17 @@ function UnitRow({
             variant="destructive"
             className="h-7"
             disabled={clearPii.isPending}
-            onClick={() =>
-              clearPii.mutate({ workspaceId, unitId: unit.id })
-            }
+            onClick={() => {
+              if (
+                !window.confirm(
+                  `Clear ${piiCount} PII finding${piiCount === 1 ? "" : "s"} on unit ${unit.id}? ` +
+                    `This unblocks retrieval of content that was previously gated and recomputes validationStatus from the audit trail.`,
+                )
+              ) {
+                return;
+              }
+              clearPii.mutate({ workspaceId, unitId: unit.id });
+            }}
           >
             {clearPii.isPending ? "…" : "Clear PII"}
           </Button>

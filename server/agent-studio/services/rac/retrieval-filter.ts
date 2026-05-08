@@ -8,11 +8,15 @@
  *
  * Rule order (every chunk passes through, in this exact sequence):
  *   1. citationRequired      — drop if no citation metadata
- *   2. minScore              — drop below threshold
- *   3. freshnessMaxAgeDays   — drop chunks older than limit (NULL = no cap)
- *   4. dedupeBy="hash"       — SHA-256 of content; first occurrence wins
- *   5. sort by score DESC, stable on sourceChunkId
- *   6. maxChunks             — head-cap at the configured limit
+ *   2. piiPolicy="block"     — drop chunks where unit has block-severity PII
+ *                              findings (U5-b.3 / RAC PII enforcement ADR)
+ *   3. licensePolicy="block" — drop chunks whose unit license is in
+ *                              licenseBlocklist (case-insensitive; U5-b.3)
+ *   4. minScore              — drop below threshold
+ *   5. freshnessMaxAgeDays   — drop chunks older than limit (NULL = no cap)
+ *   6. dedupeBy="hash"       — SHA-256 of content; first occurrence wins
+ *   7. sort by score DESC, stable on sourceChunkId
+ *   8. maxChunks             — head-cap at the configured limit
  *
  * The filter is deterministic and side-effect-free. Per-rule rejection
  * counts are returned for trace metrics (P7); the caller forwards
@@ -134,13 +138,17 @@ export function filterRetrieval(input: FilterRetrievalInput): FilteredRetrieval 
         "license_block_misconfigured: licensePolicy=block but licenseBlocklist is empty; no chunks rejected",
       );
     } else {
-      const blocklist = new Set(cfg.licenseBlocklist);
+      // G6-c2: case-insensitive comparison so blocklisting "MIT" also
+      // matches a unit tagged "mit" / "Mit" / etc. Canonical SPDX
+      // casing isn't enforced at extraction time, so the comparison
+      // must absorb the variance.
+      const blocklist = new Set(cfg.licenseBlocklist.map((l) => l.toLowerCase()));
       kept = kept.filter((c) => {
         const license =
           typeof c.metadata?.unitLicense === "string"
             ? (c.metadata.unitLicense as string)
             : null;
-        if (license != null && blocklist.has(license)) {
+        if (license != null && blocklist.has(license.toLowerCase())) {
           counts.licenseBlocked += 1;
           warnings.push(
             `license_blocked: chunkId=${c.sourceChunkId} license=${license}`,

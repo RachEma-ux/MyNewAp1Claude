@@ -731,6 +731,40 @@ describe("RETROFIT U5-b — PII / license enforcement (post-2026-05-08)", () => 
     ).toBe(true);
   });
 
+  it("licensePolicy=block matching is case-insensitive (G6-c2)", async () => {
+    const { filterRetrieval } = await import(
+      "../../server/agent-studio/services/rac/retrieval-filter"
+    );
+    const result = filterRetrieval({
+      chunks: [
+        {
+          content: "lower mit chunk", score: 0.9, citation: "[u:1]",
+          sourceChunkId: "ku-1",
+          metadata: { unitPiiBlockSeverityCount: 0, unitLicense: "mit" },
+        },
+        {
+          content: "canonical MIT chunk", score: 0.91, citation: "[u:2]",
+          sourceChunkId: "ku-2",
+          metadata: { unitPiiBlockSeverityCount: 0, unitLicense: "MIT" },
+        },
+        {
+          content: "Apache canonical", score: 0.92, citation: "[u:3]",
+          sourceChunkId: "ku-3",
+          metadata: { unitPiiBlockSeverityCount: 0, unitLicense: "Apache-2.0" },
+        },
+      ],
+      // Blocklist entry uses canonical SPDX casing; both "mit" and
+      // "MIT" units must drop. "Apache-2.0" is not in the blocklist and
+      // must survive.
+      policy: basePolicy({
+        licensePolicy: "block",
+        licenseBlocklist: ["MIT"],
+      }) as any,
+    });
+    expect(result.chunks.map((c) => c.sourceChunkId)).toEqual(["ku-3"]);
+    expect(result.rejectionCounts.licenseBlocked).toBe(2);
+  });
+
   it("licensePolicy=block with empty blocklist is no-op + misconfiguration warning", async () => {
     const { filterRetrieval } = await import(
       "../../server/agent-studio/services/rac/retrieval-filter"

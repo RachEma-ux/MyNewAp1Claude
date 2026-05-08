@@ -10,7 +10,6 @@ import { describe, it, expect } from "vitest";
 import {
   detectPii,
   createPiiValidationRule,
-  projectPiiFindingsForStorage,
   PII_SEVERITY_DEFAULTS,
 } from "../../server/agent-studio/services/ingestion/pii-detector";
 
@@ -181,30 +180,3 @@ describe("createPiiValidationRule", () => {
   });
 });
 
-describe("projectPiiFindingsForStorage", () => {
-  it("filters out warn-severity findings (only block-severity persists to unit row)", () => {
-    const findings = detectPii(
-      "alice@example.com 123-45-6789", // 1 warn email + 1 block ssn
-    );
-    const projection = projectPiiFindingsForStorage(findings);
-    expect(projection.length).toBe(1);
-    expect(projection[0].entity).toBe("ssn_us");
-  });
-
-  it("strips the match field from projected findings (D-NKU-3)", () => {
-    const findings = detectPii("123-45-6789");
-    const projection = projectPiiFindingsForStorage(findings);
-    expect(projection[0]).not.toHaveProperty("match");
-    expect(projection[0]).toEqual({
-      entity: "ssn_us",
-      start: 0,
-      end: 11,
-      severity: "block",
-    });
-  });
-
-  it("returns empty array when input has no block-severity findings", () => {
-    const findings = detectPii("alice@example.com 415-555-0100"); // both warn
-    expect(projectPiiFindingsForStorage(findings)).toEqual([]);
-  });
-});

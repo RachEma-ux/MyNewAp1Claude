@@ -223,11 +223,17 @@ export const racSourcesRouter = router({
           // retrieval filter when licensePolicy="block". Bounded to
           // 32 entries × 64 chars to match the column shape; longer
           // lists indicate a policy-design mismatch.
+          //
+          // G6-c2: dedup at upsert time so accidental duplicates don't
+          // bloat storage. The retrieval filter does its own
+          // case-insensitive comparison, so canonical SPDX casing
+          // (e.g. "MIT", "Apache-2.0") is preserved here for display.
           licenseBlocklist: z
             .array(z.string().min(1).max(64))
             .max(32)
             .nullable()
-            .optional(),
+            .optional()
+            .transform((arr) => (arr ? Array.from(new Set(arr)) : arr)),
           timeoutMs: z.number().int().positive().nullable().optional(),
         }),
       )

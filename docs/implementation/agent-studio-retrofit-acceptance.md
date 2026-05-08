@@ -59,9 +59,9 @@ Each row links to the merged PR; the SHA is the squash-merge SHA on `main`.
 
 ### 3.2 Tests
 
-- [x] **94 retrofit unit tests green** across 7 test files: `ingestion-parsers` (16), `kb-retrieval-adapter` (8), `cag-compile-metadata` (4), `rac-planner-mode` (12), `mcp-tool-knowledge-sync` (8), `proposed-tool-call` (21), `approval-gate` (13), `runtime-trace-writer` (12). Plus `retrofit-acceptance` (35) as the consolidated CI blocker.
+- [x] **Retrofit unit tests green.** Domain-specific suites under `tests/agent-studio/` cover each P3–P10 surface (parsers, kb-retrieval-adapter, cag-compile-metadata, rac-planner-mode, mcp-tool-knowledge-sync, proposed-tool-call, approval-gate, runtime-trace-writer). The consolidated CI blocker is `tests/agent-studio/retrofit-acceptance.test.ts` — see that file directly for the canonical scenario list (it grows as new RETROFIT decisions ship; specific counts in this doc would drift). Layer 6 of `.github/workflows/run-tests.yml` runs the acceptance suite on every PR.
 - [x] **`pnpm run check` clean** — typecheck + CAG-boundary check pass on every PR.
-- [x] **CI fingerprint stable.** Every retrofit PR landed with the documented 4/5 green + 10 pre-existing `ai-types/integration` failures (orthogonal — tracked separately as a long-standing red).
+- [x] **CI fingerprint stable.** As of D5 (2026-05-06, `e645713`) the baseline is **5/5 green** — the long-standing 10 ai-types/integration failures were closed by the `vi.mock` repair. Any new red shard on a retrofit PR should halt and diagnose; there is no longer a known-flaky shard to absorb noise.
 
 ### 3.3 Operator surface
 
