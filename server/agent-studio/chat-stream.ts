@@ -61,7 +61,12 @@ import {
   type RuntimeDispatchVerdict,
   type RuntimeValidationResult,
 } from "./services/runtime/proposed-tool-call-runtime";
-import { getApprovalEventBus } from "./services/runtime/approval-event-bus";
+// C1-c6 (cycle-6 audit closure §C1-c6): shared D-RESUME loop —
+// chat-stream + chat.ts both delegate so an asymmetry-bug between
+// the two parallel implementations cannot recur (cycle-5 lesson #1).
+// The helper internally consults `getApprovalEventBus()`; the inline
+// import from approval-event-bus is no longer needed in this file.
+import { awaitApprovalDecision } from "./services/runtime/approval-resume-loop";
 import {
   CagRequiredError,
   type ComposerMode,
@@ -453,13 +458,14 @@ async function runStreamingToolLoop(args: {
             description: `chat session ${sessionId} · tool ${openaiName}`,
           });
 
-          // C2-c4 PR-3 (D-RESUME-2 + D-RESUME-3) — when the gate returns
-          // approval_required/approval_pending and we have an
-          // approvalRequestId to subscribe on, hold the chat-stream open
-          // for a bounded window instead of surfacing failure to the LLM
-          // immediately. The LLM only ever sees the FINAL outcome; the
-          // operator's decision (or timeout) determines what gets
-          // appended to chat history.
+          // C1-c6 (cycle-6 audit closure §C1-c6): D-RESUME loop now
+          // delegates to the shared `awaitApprovalDecision` helper.
+          // Pre-cycle-6 the loop was inlined here AND missing entirely
+          // from `services/chat.ts` — same parallel-flow asymmetry
+          // shape as cycle-5 C1-c5 (runtimeRunId omission), one layer
+          // deeper. The helper also closes C4-c6 (subscribes with an
+          // AbortSignal so the early-return path releases the bus
+          // listener synchronously instead of leaking until timeout).
           if (
             !runtimeVerdict.ok &&
             (runtimeVerdict.reason === "approval_required" ||
@@ -468,71 +474,35 @@ async function runStreamingToolLoop(args: {
           ) {
             const reqId = runtimeVerdict.approvalRequestId;
             const timeoutMs = approvalResumeTimeoutMs();
+            const initialVerdict = runtimeVerdict;
 
-            // Surface "awaiting" state to the SSE client (distinct from
-            // error). UI can render a "waiting for approval" badge here.
-            sendEvent({
-              type: "tool_end",
-              toolName: openaiName,
-              ok: false,
-              status: "awaiting_approval",
+            const resume = await awaitApprovalDecision({
               approvalRequestId: reqId,
-              timeoutSec: Math.floor(timeoutMs / 1000),
-            });
-
-            // D-RESUME-2 step 4 — race bus event vs timeout. Subscribe
-            // BEFORE the DB re-eval so an event that fires between
-            // re-eval and subscribe is not lost.
-            const waitPromise = getApprovalEventBus().waitFor(reqId, timeoutMs);
-
-            // D-RESUME-3 — DB-poll fallback for the approve-before-
-            // subscribe race: re-eval the gate once. If the row is
-            // already permit, skip the wait entirely.
-            const recheck = await gateRuntimeDispatch({
-              validation: runtimeValidation,
-              agentDraftId: draftId,
-              runtimeRunId: sessionId,
-              description: `chat session ${sessionId} · tool ${openaiName} · resume re-eval`,
-            });
-            if (recheck.ok) {
-              runtimeVerdict = recheck;
-            } else {
-              const event = await waitPromise;
-              if (event === "timeout") {
-                runtimeVerdict = {
-                  ok: false,
-                  reason: "approval_timeout",
-                  message: `approval did not resolve within ${Math.floor(timeoutMs / 1000)}s`,
-                  code: null,
-                  call: runtimeVerdict.call,
-                  approvalRequestId: reqId,
-                };
-              } else if (event.status === "allowed") {
-                // Defensive re-eval per D-RESUME-2 step 5 — confirm DB
-                // matches the bus event (handles rare race where row
-                // was decided then re-decided between events).
-                const final = await gateRuntimeDispatch({
+              timeoutMs,
+              initialVerdict,
+              revalidate: () =>
+                gateRuntimeDispatch({
                   validation: runtimeValidation,
                   agentDraftId: draftId,
                   runtimeRunId: sessionId,
-                  description: `chat session ${sessionId} · tool ${openaiName} · resume confirm`,
-                });
-                runtimeVerdict = final;
-              } else {
-                // event.status is "denied" or "timed_out"
-                runtimeVerdict = {
+                  description: `chat session ${sessionId} · tool ${openaiName} · resume`,
+                }),
+              // Streaming surface — emit `awaiting_approval` to the
+              // SSE client so UI can render a "waiting for approval"
+              // badge. Non-streaming `services/chat.ts` passes no
+              // `onAwaiting` (or a no-op).
+              onAwaiting: (rid, tms) => {
+                sendEvent({
+                  type: "tool_end",
+                  toolName: openaiName,
                   ok: false,
-                  reason:
-                    event.status === "denied"
-                      ? "approval_denied"
-                      : "approval_expired",
-                  message: `approval ${event.status}`,
-                  code: null,
-                  call: runtimeVerdict.call,
-                  approvalRequestId: reqId,
-                };
-              }
-            }
+                  status: "awaiting_approval",
+                  approvalRequestId: rid,
+                  timeoutSec: Math.floor(tms / 1000),
+                });
+              },
+            });
+            runtimeVerdict = resume.verdict;
           }
 
           if (!runtimeVerdict.ok) {
@@ -596,6 +566,12 @@ async function runStreamingToolLoop(args: {
           // "which approval permitted this dispatch" without joining
           // through agsToolCallTraces.
           approvalRequestId: runtimeVerdict?.approvalRequestId ?? undefined,
+          // M4-c6: thread caller attribution (operator userId +
+          // chat sessionId) so the audit row records WHO triggered
+          // the dispatch, not just WHICH approval permitted it.
+          // Without this, the audit ledger has caller=null for every
+          // live-chat tool dispatch.
+          caller: { userId: actorId, sessionId: String(sessionId) },
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {

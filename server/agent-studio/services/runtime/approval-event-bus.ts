@@ -30,7 +30,16 @@ export interface ApprovalDecidedEvent {
   expiresAt: Date | null;
 }
 
-export type WaitForResult = ApprovalDecidedEvent | "timeout";
+/**
+ * C4-c6 (cycle-6 audit closure §C4-c6): `"cancelled"` outcome
+ * surfaces when the caller aborted via the optional AbortSignal.
+ * Pre-cycle-6 the only outcomes were `event` and `"timeout"` —
+ * callers had no way to release a listener early when an
+ * out-of-band path (e.g., D-RESUME-3 DB-poll fallback succeeding)
+ * made the wait unnecessary. Bounded leak (300s default timeout)
+ * but accumulated under load.
+ */
+export type WaitForResult = ApprovalDecidedEvent | "timeout" | "cancelled";
 
 export interface ApprovalEventBus {
   /**
@@ -41,17 +50,22 @@ export interface ApprovalEventBus {
 
   /**
    * Subscribe to the next event for `approvalRequestId` with a bounded
-   * timeout. Returns the event when one arrives, or the literal
-   * `"timeout"` if `timeoutMs` elapses first. Multiple subscribers
-   * on the same `approvalRequestId` all receive the event when it
-   * fires (per D-RESUME-2 step 4: race between bus event and timeout).
+   * timeout. Returns the event when one arrives, the literal
+   * `"timeout"` if `timeoutMs` elapses first, or the literal
+   * `"cancelled"` if the optional `signal` is aborted first. Multiple
+   * subscribers on the same `approvalRequestId` all receive the event
+   * when it fires (per D-RESUME-2 step 4: race between bus event and
+   * timeout).
    *
-   * Cleans up its listener on both resolve paths — no listener leak
-   * even if the caller drops the promise.
+   * Cleans up its listener on every resolve path (event / timeout /
+   * abort) — no listener leak even if the caller drops the promise.
+   * The C4-c6 closure path is: caller passes a signal, calls abort
+   * when D-RESUME-3 re-eval succeeds, listener releases synchronously.
    */
   waitFor(
     approvalRequestId: number,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<WaitForResult>;
 }
 
@@ -77,18 +91,36 @@ export function createApprovalEventBus(): ApprovalEventBus {
     waitFor(
       approvalRequestId: number,
       timeoutMs: number,
+      signal?: AbortSignal,
     ): Promise<WaitForResult> {
       return new Promise<WaitForResult>((resolve) => {
         const evt = eventName(approvalRequestId);
-        const timer = setTimeout(() => {
+        // Pre-aborted signals must resolve immediately without
+        // attaching the listener (avoids the no-op listener path).
+        if (signal?.aborted) {
+          resolve("cancelled");
+          return;
+        }
+        const cleanup = () => {
+          clearTimeout(timer);
           emitter.off(evt, onEvent);
+          if (signal && abortHandler) signal.removeEventListener("abort", abortHandler);
+        };
+        const timer = setTimeout(() => {
+          cleanup();
           resolve("timeout");
         }, timeoutMs);
         const onEvent = (event: ApprovalDecidedEvent) => {
-          clearTimeout(timer);
-          emitter.off(evt, onEvent);
+          cleanup();
           resolve(event);
         };
+        const abortHandler = signal
+          ? () => {
+              cleanup();
+              resolve("cancelled");
+            }
+          : null;
+        if (signal && abortHandler) signal.addEventListener("abort", abortHandler);
         emitter.once(evt, onEvent);
       });
     },

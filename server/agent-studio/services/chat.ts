@@ -46,6 +46,21 @@ import {
   type RuntimeDispatchVerdict,
   type RuntimeValidationResult,
 } from "./runtime/proposed-tool-call-runtime";
+// C1-c6 (cycle-6 audit closure §C1-c6): chat.ts had NO D-RESUME loop
+// pre-cycle-6 — the chat session never resumed when the operator
+// approved out-of-band. Both call sites (chat-stream + chat.ts)
+// delegate to the same shared helper post-cycle-6.
+import { awaitApprovalDecision } from "./runtime/approval-resume-loop";
+
+function approvalResumeTimeoutMs(): number {
+  // C1-c6: same env var as chat-stream.ts uses (APPROVAL_RESUME_TIMEOUT_SEC,
+  // default 300s). Inlined here rather than imported so chat.ts has
+  // no dependency on the chat-stream module.
+  const raw = process.env.APPROVAL_RESUME_TIMEOUT_SEC;
+  const seconds = raw ? Number.parseInt(raw, 10) : NaN;
+  const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
+  return Math.max(1, safe) * 1000;
+}
 import { getSnapshot } from "./mcp/registry";
 import { getAgentProviderBinding } from "../bindings";
 import { gatewayCall } from "../../platform/modules/module-gateway";
@@ -435,6 +450,40 @@ async function runChatWithToolsViaBinding(input: {
             runtimeRunId: input.sessionId,
             description: `chat session ${input.sessionId} · tool ${call.name}`,
           });
+
+          // C1-c6 (cycle-6 audit closure §C1-c6): D-RESUME loop. Pre-
+          // cycle-6 chat.ts had NO resume loop — the chat session
+          // never resumed when the operator approved out-of-band, so
+          // every approval-gated tool call appeared as a permanent
+          // denial. Now: same shared helper as chat-stream.ts. The
+          // blocking RPC client receives the FINAL verdict (approved
+          // → tool result; denied → denial; timeout → timeout) within
+          // the bounded wait window.
+          if (
+            !runtimeVerdict.ok &&
+            (runtimeVerdict.reason === "approval_required" ||
+              runtimeVerdict.reason === "approval_pending") &&
+            runtimeVerdict.approvalRequestId !== null
+          ) {
+            const reqId = runtimeVerdict.approvalRequestId;
+            const timeoutMs = approvalResumeTimeoutMs();
+            const initialVerdict = runtimeVerdict;
+            const resume = await awaitApprovalDecision({
+              approvalRequestId: reqId,
+              timeoutMs,
+              initialVerdict,
+              revalidate: () =>
+                gateRuntimeDispatch({
+                  validation: runtimeValidation,
+                  agentDraftId: input.draftId,
+                  runtimeRunId: input.sessionId,
+                  description: `chat session ${input.sessionId} · tool ${call.name} · resume`,
+                }),
+              // Non-streaming path: no SSE event surface, no onAwaiting.
+            });
+            runtimeVerdict = resume.verdict;
+          }
+
           if (!runtimeVerdict.ok) {
             // Follow-up A3: persist a trace row even on rejection.
             await persistRuntimeToolCallTrace({
@@ -486,6 +535,11 @@ async function runChatWithToolsViaBinding(input: {
           // call site. Forensics resolve "which approval permitted
           // this dispatch" without joining through agsToolCallTraces.
           approvalRequestId: runtimeVerdict?.approvalRequestId ?? undefined,
+          // M4-c6: thread caller attribution (operator userId +
+          // chat sessionId) so the audit row records WHO triggered
+          // the dispatch, not just WHICH approval permitted it.
+          // Same shape as chat-stream.ts.
+          caller: { userId: input.actorId, sessionId: String(input.sessionId) },
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {

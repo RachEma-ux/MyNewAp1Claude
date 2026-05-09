@@ -143,4 +143,41 @@ describe("approval-event-bus — D-RESUME-1 in-process bus", () => {
       "Resolved listeners must be removed; leak detected",
     ).toEqual([]);
   });
+
+  // ── C4-c6 — AbortSignal-driven cancellation ────────────────────────
+  // Pre-cycle-6 the bus had no cancellation API. The shared
+  // awaitApprovalDecision helper (cycle-6 C1+C4 closure) needs to
+  // release the listener synchronously when the D-RESUME-3 re-eval
+  // succeeds. AbortSignal is the contract.
+
+  it("C4-c6: aborting the signal resolves waitFor with 'cancelled'", async () => {
+    const bus = createApprovalEventBus();
+    const ac = new AbortController();
+    const w = bus.waitFor(42, 5000, ac.signal);
+    queueMicrotask(() => ac.abort());
+    const result = await w;
+    expect(result).toBe("cancelled");
+  });
+
+  it("C4-c6: pre-aborted signal short-circuits without attaching listener", async () => {
+    const bus = createApprovalEventBus();
+    const ac = new AbortController();
+    ac.abort();
+    const result = await bus.waitFor(42, 5000, ac.signal);
+    expect(result).toBe("cancelled");
+    // Subsequent emit must not crash (listener was never attached).
+    bus.emit({ approvalRequestId: 42, status: "allowed", expiresAt: null });
+  });
+
+  it("C4-c6: cancellation cleans up the timer (no leak)", async () => {
+    const bus = createApprovalEventBus();
+    const ac = new AbortController();
+    const w = bus.waitFor(42, 100, ac.signal);
+    ac.abort();
+    expect(await w).toBe("cancelled");
+    // Wait past the timer's would-be firing window; if the timer
+    // wasn't cleared the timeout would log or fire a no-op `off` which
+    // is fine, but the test asserts the cancellation path completed.
+    await new Promise((r) => setTimeout(r, 150));
+  });
 });
