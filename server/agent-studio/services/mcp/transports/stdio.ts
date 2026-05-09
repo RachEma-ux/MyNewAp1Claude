@@ -25,6 +25,9 @@ import type {
   McpTool,
 } from "../types";
 import { McpError } from "../types";
+// L2-c5 (cycle-5 audit closure §L2-c5): graceful → forced child
+// shutdown so a hung child doesn't strand orphaned processes.
+import { gracefulCloseChild } from "./graceful-child-close";
 
 const PROTOCOL_VERSION = "2024-11-05";
 // Phase 19 follow-up: bumped from 10s → 30s. The most common stdio
@@ -324,11 +327,12 @@ export async function connectStdio(
     resources,
     close: async () => {
       closed = true;
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        /* ignore */
-      }
+      // L2-c5: was `child.kill("SIGTERM")` + return immediately. If
+      // the child ignored SIGTERM (broken cleanup, signal-blocking
+      // syscall) the orphan stayed around indefinitely. Now: SIGTERM
+      // → wait 2s → SIGKILL → wait 500ms. Always resolves; never
+      // throws.
+      await gracefulCloseChild(child);
     },
     callTool: async (name: string, args: Record<string, unknown>) => {
       return sendRpc(
