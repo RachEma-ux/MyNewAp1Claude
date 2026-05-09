@@ -427,6 +427,18 @@ async function runChatWithToolsViaBinding(input: {
           messages.push({ role: "assistant", content: m.content });
         }
       } else if (m.role === "tool") {
+        // M9-c7 (cycle-7 audit closure §M9-c7): the persisted
+        // shape contract for tool-role rows is documented in
+        // `runtime/chat-history-shape.ts`. The strict
+        // reconstruction (`reconstructToolHistoryMessage`) returns
+        // null when toolCallId is missing/empty — but live sessions
+        // pre-dating the contract may still carry rows without the
+        // field, so we keep the legacy `?? ""` fallback here for
+        // in-flight compatibility. New writes go through the
+        // canonical `{ toolCallId, name }` shape (see write sites
+        // ~lines 542/570/589/687/755). The lockstep test pins both
+        // sides; future drift on EITHER fails the test before this
+        // empty-string fallback can hide it.
         const tp = (m.toolPayload ?? null) as any;
         messages.push({
           role: "tool",
