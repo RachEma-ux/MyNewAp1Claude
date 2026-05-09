@@ -212,7 +212,7 @@ describe.skipIf(!hasDb())(
       expect(gate2.decision).toBe("denied");
     });
 
-    it("decide on already-decided row → returns terminal state, no second audit row", async () => {
+    it("decide on already-decided row → returns terminal state + emits rejected_already_decided audit row (M5-c4)", async () => {
       const db = getAsDb()!;
       // Pick the already-allowed row from earlier.
       const existing = await db
@@ -236,15 +236,32 @@ describe.skipIf(!hasDb())(
       const decision = await decideApprovalRequest({
         approvalRequestId: requestId,
         status: "denied",
+        decidedBy: 999_555,
       });
       expect(decision.ok).toBe(false);
       expect(decision.reason).toBe("already_decided");
+      // Status is unchanged (idempotency preserved — row stays "allowed").
+      expect(decision.status).toBe("allowed");
 
+      // M5-c4 (cycle-4 audit §M5): pre-cycle-4 the rejected second
+      // decide was silent. Now it emits a forensic-audit row so a
+      // reader can reconstruct the concurrent-decide attempt.
       const after = await db
         .select()
         .from(agsRuntimePolicyEvents)
         .where(eq(agsRuntimePolicyEvents.runId, RUNTIME_RUN_ID));
-      expect(after.length).toBe(beforeCount);
+      expect(after.length).toBe(beforeCount + 1);
+
+      const rejection = after.find(
+        (e) => e.decision === "rejected_already_decided",
+      );
+      expect(rejection).toBeDefined();
+      expect(rejection?.policyKey).toBe("approval_gate");
+      const payload = (rejection?.payload ?? {}) as Record<string, unknown>;
+      expect(payload.attemptedBy).toBe(999_555);
+      expect(payload.attemptedStatus).toBe("denied");
+      expect(payload.currentStatus).toBe("allowed");
+      expect(payload.approvalRequestId).toBe(requestId);
     });
 
     // C2-c4 PR-3 (D-RESUME-1, D-RESUME-2) — resume bus end-to-end:
@@ -321,6 +338,147 @@ describe.skipIf(!hasDb())(
           .delete(agsPendingPermissionRequests)
           .where(eq(agsPendingPermissionRequests.runtimeRunId, RESUME_RUN_ID));
       }
+    });
+
+    // L2-c4 — toolApprovals.{list, listByDraft, getByHash} read queries
+    // had zero direct tests. Cycle-4 audit
+    // (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §L2-c4) called
+    // these the only operator-facing tRPC surface for discovering
+    // pending requests. These 3 tests exercise each query against a
+    // seeded fixture via the tRPC caller.
+    describe("L2-c4 — toolApprovals read-query coverage", () => {
+      const L2_RUN_A = 999_004;
+      const L2_RUN_B = 999_005;
+      const L2_DRAFT_A = 999_004;
+      const L2_DRAFT_B = 999_005;
+      const L2_TOOL_A: ProposedToolCall = {
+        mcpServerId: "test-srv-l2a",
+        toolName: "delete_user",
+        arguments: { id: 1 },
+        rationale: "L2 test A",
+        evidenceChunkIds: [],
+        riskLevel: "high",
+        requiresApproval: true,
+      };
+      const L2_TOOL_B: ProposedToolCall = {
+        mcpServerId: "test-srv-l2b",
+        toolName: "send_email",
+        arguments: { to: "x@y.z" },
+        rationale: "L2 test B",
+        evidenceChunkIds: [],
+        riskLevel: "high",
+        requiresApproval: true,
+      };
+
+      const callerCtx = {
+        user: {
+          id: 999_104,
+          openId: "l2-tester",
+          name: "L2 tester",
+          role: "admin",
+        },
+      } as any;
+
+      let createdA = 0;
+      let createdB = 0;
+
+      beforeAll(async () => {
+        const a = await createApprovalRequest({
+          runtimeRunId: L2_RUN_A,
+          agentDraftId: L2_DRAFT_A,
+          proposedToolCall: L2_TOOL_A,
+          description: "L2 row A",
+        });
+        const b = await createApprovalRequest({
+          runtimeRunId: L2_RUN_B,
+          agentDraftId: L2_DRAFT_B,
+          proposedToolCall: L2_TOOL_B,
+          description: "L2 row B",
+        });
+        createdA = a.approvalRequestId;
+        createdB = b.approvalRequestId;
+      });
+
+      afterAll(async () => {
+        const db = getAsDb();
+        if (!db) return;
+        await db
+          .delete(agsRuntimePolicyEvents)
+          .where(eq(agsRuntimePolicyEvents.runId, L2_RUN_A));
+        await db
+          .delete(agsRuntimePolicyEvents)
+          .where(eq(agsRuntimePolicyEvents.runId, L2_RUN_B));
+        await db
+          .delete(agsPendingPermissionRequests)
+          .where(eq(agsPendingPermissionRequests.runtimeRunId, L2_RUN_A));
+        await db
+          .delete(agsPendingPermissionRequests)
+          .where(eq(agsPendingPermissionRequests.runtimeRunId, L2_RUN_B));
+      });
+
+      it("toolApprovals.list returns rows for the requested runtimeRunId only", async () => {
+        const { toolApprovalsRouter } = await import(
+          "../../../server/agent-studio/api/tool-approvals-router"
+        );
+        const caller = toolApprovalsRouter.createCaller(callerCtx);
+        const rows = await caller.list({
+          runtimeRunId: L2_RUN_A,
+          limit: 50,
+        });
+        expect(rows.length).toBeGreaterThanOrEqual(1);
+        for (const r of rows) {
+          expect(r.runtimeRunId).toBe(L2_RUN_A);
+        }
+        expect(rows.find((r) => r.id === createdA)).toBeDefined();
+        // Cross-isolation: row B must not appear.
+        expect(rows.find((r) => r.id === createdB)).toBeUndefined();
+      });
+
+      it("toolApprovals.listByDraft returns rows for the requested draft only, optionally filtered by status", async () => {
+        const { toolApprovalsRouter } = await import(
+          "../../../server/agent-studio/api/tool-approvals-router"
+        );
+        const caller = toolApprovalsRouter.createCaller(callerCtx);
+        const all = await caller.listByDraft({
+          agentDraftId: L2_DRAFT_A,
+          limit: 50,
+        });
+        expect(all.length).toBeGreaterThanOrEqual(1);
+        for (const r of all) {
+          expect(r.agentDraftId).toBe(L2_DRAFT_A);
+        }
+        const pendingOnly = await caller.listByDraft({
+          agentDraftId: L2_DRAFT_A,
+          status: "pending",
+          limit: 50,
+        });
+        for (const r of pendingOnly) {
+          expect(r.status).toBe("pending");
+        }
+      });
+
+      it("toolApprovals.getByHash returns the row for (agentDraftId, hash) or null", async () => {
+        const { toolApprovalsRouter } = await import(
+          "../../../server/agent-studio/api/tool-approvals-router"
+        );
+        const caller = toolApprovalsRouter.createCaller(callerCtx);
+        const hash = hashProposedToolCall(L2_TOOL_A);
+        const row = await caller.getByHash({
+          agentDraftId: L2_DRAFT_A,
+          proposedToolCallHash: hash,
+        });
+        expect(row).not.toBeNull();
+        expect(row?.id).toBe(createdA);
+        expect(row?.proposedToolCallHash).toBe(hash);
+
+        // Wrong-hash → null (matches the .limit(1) + index lookup contract).
+        const noRow = await caller.getByHash({
+          agentDraftId: L2_DRAFT_A,
+          proposedToolCallHash:
+            "0".repeat(64) /* valid-shape but unmapped hash */,
+        });
+        expect(noRow).toBeNull();
+      });
     });
   },
 );

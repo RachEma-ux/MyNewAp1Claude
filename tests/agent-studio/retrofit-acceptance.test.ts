@@ -392,6 +392,91 @@ describe("RETROFIT D-APP-EXT-4 — risk + approval mapping locked", () => {
   });
 });
 
+describe("RETROFIT D-APP-EXT-1 — reuse agsPendingPermissionRequests; no parallel approval table (H3-c4 lockstep)", () => {
+  // Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §H3-c4)
+  // flagged that D-APP-EXT-1 had no test guarding it. The decision says
+  // "Reuse agsPendingPermissionRequests; add no new approval table".
+  // This test scans the agent-studio drizzle schema for any pgTable
+  // declaration that looks like a parallel approval surface (matching
+  // /approval/i). The only allowed approval-shaped table is the pre-
+  // existing `ags_approval_steps` (publish-workflow approval, NOT MCP
+  // tool-call approval — different surface, different lifecycle, not
+  // a violation of D-APP-EXT-1).
+  it("no new approval table beyond agsPendingPermissionRequests + agsApprovalSteps", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const src = readFileSync(
+      join(process.cwd(), "drizzle/tables/agent-studio.ts"),
+      "utf8",
+    );
+
+    // Capture every pgTable declaration's TS variable name.
+    const declared: string[] = [];
+    for (const m of src.matchAll(
+      /export const (\w+)\s*=\s*pgTable\(\s*"(\w+)"/g,
+    )) {
+      declared.push(m[1]);
+    }
+
+    const ALLOWED_APPROVAL_TABLES = new Set([
+      "agsPendingPermissionRequests", // D-APP-EXT-1 reuse target
+      "agsApprovalSteps", // pre-existing publish-workflow surface
+    ]);
+
+    // Match approval-shaped names only — D-APP-EXT-1 is specifically
+    // about parallel APPROVAL tables. Pre-existing permission-RULE
+    // tables (e.g., `agsDraftPermissionRules`, declarative rules
+    // attached to a draft) are a different concern and not in scope.
+    const approvalShaped = declared.filter(
+      (name) =>
+        /approval/i.test(name) || /PendingPermission/.test(name),
+    );
+    const unexpected = approvalShaped.filter(
+      (n) => !ALLOWED_APPROVAL_TABLES.has(n),
+    );
+
+    expect(
+      unexpected,
+      `D-APP-EXT-1 violation: new approval/permission-shaped table(s) detected. ` +
+        `Reuse agsPendingPermissionRequests for tool-call approval, OR add to ` +
+        `ALLOWED_APPROVAL_TABLES with a documented justification:\n  ${unexpected.join("\n  ")}`,
+    ).toEqual([]);
+  });
+});
+
+describe("RETROFIT D-APP-EXT-3 — approval permits validation; does NOT execute (H3-c4 lockstep)", () => {
+  // Cycle-4 audit §H3-c4: D-APP-EXT-3 says "approval is a permission to
+  // attempt, not a promise to succeed" — the gate must NOT call the
+  // dispatcher directly. This test source-scans approval-gate.ts for
+  // any import or call to `dispatchMcpToolCall`. If a future PR routes
+  // dispatch through the gate, this test fails with a direct pointer.
+  it("approval-gate.ts does not import or call the MCP dispatcher", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const src = readFileSync(
+      join(
+        process.cwd(),
+        "server/agent-studio/services/approval/approval-gate.ts",
+      ),
+      "utf8",
+    );
+    // Strip block + line comments so the doc-block "approval permits
+    // dispatch; does NOT execute" doesn't trigger a false positive.
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(
+      stripped,
+      "D-APP-EXT-3 violation: approval-gate.ts must not reference dispatchMcpToolCall. " +
+        "Approval is a pre-dispatch gate, not a dispatch path.",
+    ).not.toMatch(/dispatchMcpToolCall/);
+    expect(
+      stripped,
+      "D-APP-EXT-3 violation: approval-gate.ts must not import from the dispatcher module.",
+    ).not.toMatch(/from ["'].*services\/mcp\/dispatcher/);
+  });
+});
+
 describe("RETROFIT D-PTC-4 — proposal hash includes rationale", () => {
   it("identical rationale → identical hash regardless of arg order", () => {
     const a = baseCall({ arguments: { q: "x", limit: 1 } });

@@ -40,6 +40,25 @@
  * the only currently-MCP-bound key (`agentStudio.toolApprovals.decide`,
  * which is `approval: none`) to dual_control. Either change requires
  * adding dual_control logic to this file FIRST.
+ *
+ * H2-c4 — `GOVERNANCE_ENFORCE_APPROVALS` env-flag NON-applicability
+ * -----------------------------------------------------------------
+ * Cycle-3 R6-c3 (PR #319) introduced `GOVERNANCE_ENFORCE_APPROVALS=true|1`
+ * to flip the platform-governance layer (`requireGovernedAction.checkApproval`,
+ * server/governance/requireGovernedAction.ts) from placeholder-audit-and-
+ * proceed to fail-closed. **That env flag does NOT and SHOULD NOT apply
+ * to this gate.** The MCP approval gate is always-enforcing by
+ * construction: it consults the actual DB state of
+ * `agsPendingPermissionRequests.status` and returns the appropriate
+ * verdict. There is no "for now, don't block" placeholder at this
+ * layer to flip.
+ *
+ * Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §H2-c4)
+ * surfaced the asymmetry as a HIGH-tier finding because R6-c3's tests
+ * lived only at the platform layer. Today the asymmetry is intentional;
+ * `tests/governance/require-governed-action.test.ts` H2-c4 describe
+ * block locks the invariant by asserting this file does NOT reference
+ * the env-flag string.
  */
 import { and, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection";
@@ -344,7 +363,12 @@ export async function decideApprovalRequest(
     .returning();
 
   if (!updated) {
-    // Row already terminal — return current state without re-auditing.
+    // Row already terminal — DO NOT flip the row state, but DO emit a
+    // rejection-audit row so a forensic reader can reconstruct that an
+    // operator attempted a (now-rejected) second decide. M5-c4 closure
+    // (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M5-c4):
+    // pre-cycle-4 the second-operator's attempt was silent, leaving no
+    // trail of concurrent-decide races.
     const existing = await db
       .select()
       .from(agsPendingPermissionRequests)
@@ -354,6 +378,21 @@ export async function decideApprovalRequest(
     if (!row) {
       return { ok: false, status: "missing", expiresAt: null, reason: "row_not_found" };
     }
+    await db.insert(agsRuntimePolicyEvents).values({
+      runId: row.runtimeRunId,
+      policyKey: "approval_gate",
+      decision: "rejected_already_decided",
+      reason:
+        input.reason ?? `attempted_redecide_to_${input.status}`,
+      payload: {
+        approvalRequestId: row.id,
+        attemptedBy: input.decidedBy ?? null,
+        attemptedStatus: input.status,
+        currentStatus: row.status,
+        proposedToolCallHash: row.proposedToolCallHash,
+        toolName: row.toolName,
+      },
+    });
     return {
       ok: false,
       status: row.status,
