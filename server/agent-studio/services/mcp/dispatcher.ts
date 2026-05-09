@@ -92,6 +92,15 @@ import type {
 // error for forensics — operators with audit-row read access need
 // the unredacted message to debug security incidents.
 import { sanitizeMcpErrorMessage } from "./sanitize-error-message";
+// M8-c7 (cycle-7 audit closure §M8-c7): map transport-level
+// `McpError.code` (TransportErrorCode) → richer `DispatchErrorCode`.
+// Pre-cycle-7 every transport failure flattened into
+// `tool_execution_failed`. Mirrors `mapSandboxCodeToDispatchCode`
+// (H3-c7) — same closed-enum + fall-through-to-tool_execution_failed
+// shape so observability never breaks on a future code added without
+// a mapping.
+import { mapTransportCodeToDispatchCode } from "./transports/transport-error-codes";
+import { McpError } from "./types";
 // H2-c7 (cycle-7 audit closure §H2-c7): MCP response output-schema
 // validator. Runs at dispatcher post-invoke (before the success-path
 // audit-row write); no-ops when the tool has no outputSchema.
@@ -639,7 +648,17 @@ export async function dispatchMcpToolCall(
   // of truth across CAG, dispatcher, and export readiness).
   const riskClass = readRiskClass(tool as Parameters<typeof readRiskClass>[0]);
   let result: unknown;
-  let invokeError: { message: string; original: unknown; sandboxCode?: string; timedOut?: boolean } | null = null;
+  // M8-c7: `transportCode` carries the typed `TransportErrorCode`
+  // when the failure originated from one of the four transports
+  // (http/sse/stdio/websocket via `McpError`). Empty for sandbox /
+  // generic throws.
+  let invokeError: {
+    message: string;
+    original: unknown;
+    sandboxCode?: string;
+    transportCode?: string;
+    timedOut?: boolean;
+  } | null = null;
   const invokeStartMs = Date.now();
   if (riskClass === "code_execution") {
     try {
@@ -689,6 +708,10 @@ export async function dispatchMcpToolCall(
       invokeError = {
         message: e instanceof Error ? e.message : String(e),
         original: e,
+        // M8-c7: capture transport-level code so the failure-mapping
+        // branch can route through `mapTransportCodeToDispatchCode`
+        // instead of flattening to `tool_execution_failed`.
+        transportCode: e instanceof McpError ? e.code : undefined,
         timedOut: isTimeoutError(e),
       };
     }
@@ -722,11 +745,19 @@ export async function dispatchMcpToolCall(
     // on failure). Null on non-sandbox failures.
     auditPayload.sandboxErrorCode = invokeError.sandboxCode ?? null;
 
-    // H1-c7 + H3-c7: distinguish timeout / sandbox-specific / generic
-    // failures so audit + trace + operator UI can tell "server didn't
-    // respond within ceiling" from "sandbox policy denied this code"
-    // from "server returned an error". Operationally distinct
-    // (retryable vs not, indicates infra vs config vs tool semantics).
+    // H1-c7 + H3-c7 + M8-c7: distinguish timeout / sandbox-specific /
+    // transport-specific / generic failures so audit + trace +
+    // operator UI can tell "server didn't respond within ceiling"
+    // from "sandbox policy denied this code" from "transport closed
+    // mid-call" from "server returned an error". Operationally
+    // distinct (retryable vs not, indicates infra vs config vs tool
+    // semantics vs network).
+    //
+    // Resolution order (most specific first):
+    //   1. dispatcher's outer `withTimeout` rejection → tool_call_timeout
+    //   2. sandbox-specific code (when riskClass=code_execution)
+    //   3. transport-specific code (when McpError from http/sse/stdio/ws)
+    //   4. fall-through → tool_execution_failed
     let code: DispatchErrorCode;
     if (invokeError.timedOut) {
       code = "tool_call_timeout";
@@ -734,7 +765,10 @@ export async function dispatchMcpToolCall(
       const sandboxMapped = mapSandboxCodeToDispatchCode(
         invokeError.sandboxCode,
       );
-      code = sandboxMapped ?? "tool_execution_failed";
+      const transportMapped = mapTransportCodeToDispatchCode(
+        invokeError.transportCode,
+      );
+      code = sandboxMapped ?? transportMapped ?? "tool_execution_failed";
     }
     return fail(code, invokeError.message, {
       original: String(invokeError.original),

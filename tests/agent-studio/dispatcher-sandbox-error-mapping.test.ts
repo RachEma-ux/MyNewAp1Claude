@@ -203,7 +203,7 @@ describe("H3-c7 — failure-mapping integration", () => {
         "to tool_execution_failed when mapSandboxCodeToDispatchCode " +
         "returns null (defensive — non-sandbox failures and unknown " +
         "sandbox codes both end up here).",
-    ).toMatch(/sandboxMapped\s*\?\?\s*"tool_execution_failed"/);
+    ).toMatch(/sandboxMapped\s*\?\?[\s\S]{0,200}"tool_execution_failed"/);
   });
 
   it("timeout branch is checked BEFORE sandbox mapping (precedence)", () => {

@@ -43,6 +43,20 @@ export type DispatchErrorCode =
   | "sandbox_policy_denied"
   | "sandbox_unavailable"
   | "sandbox_thrown"
+  // M8-c7 (cycle-7 audit closure §M8-c7): transport-level failure
+  // taxonomy. Pre-cycle-7 every `McpError` from the four transports
+  // (http/sse/stdio/websocket) flattened into `tool_execution_failed`.
+  // Operator forensics couldn't tell a network blip (retryable) from
+  // a server-rejected call from a wire-format violation. The new
+  // variants are emitted from `mapTransportCodeToDispatchCode` —
+  // grouping by "what does the operator do next?" rather than 1:1
+  // mirroring transport codes.
+  | "transport_unreachable"
+  | "transport_closed"
+  | "transport_protocol_error"
+  | "transport_http_error"
+  | "transport_send_failed"
+  | "transport_config_error"
   | "internal_error";
 
 export interface DispatchMcpToolCallInput {
