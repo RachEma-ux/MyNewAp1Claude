@@ -32,6 +32,36 @@
  * "ask" rules → treated as deny (decision #3a). The async pending-
  * request flow only exists in the simulation engine; the dispatcher
  * is sync. TODO: revisit if/when async dispatch is needed.
+ *
+ * L5-c5 (cycle-5 audit `/sdcard/Download/MCP_DISPATCHER_AUDIT_2026-05-09.md`
+ * §L5-c5) — INTENTIONAL ABSENCES at this layer (lockstep-tested by
+ * `tests/agent-studio/dispatcher-layering-coverage.test.ts`):
+ *
+ *   1. Dispatcher does NOT import from `services/approval/` — approval
+ *      gating happens BEFORE dispatch (in `gateRuntimeDispatch` per the
+ *      C2-c4 sub-arc). Dispatcher consumes the verdict's permit; it
+ *      does not call `evaluateApprovalGate` / `decideApprovalRequest`
+ *      itself.
+ *   2. Dispatcher does NOT call `approval-gate.decide*` — same boundary.
+ *   3. Dispatcher does NOT bypass governance — every non-system path
+ *      runs `evaluateMcpPreInvoke` (line ~440); system calls
+ *      (agentDraftId=-1) STILL run pre-invoke (it returns "allow" for
+ *      -1 by design; the bypass is allowedTools, not governance).
+ *   4. Dispatcher does NOT route `code_execution` through `conn.callTool`
+ *      — `if (riskClass === "code_execution") → sandbox.execute()`
+ *      (line ~468). Mirror invariant locks no false-bypass to direct
+ *      transport.
+ *   5. Dispatcher does NOT silently skip the audit row when
+ *      `runtimeRunId` is provided — `writeAuditRow()` only returns
+ *      `undefined` when `runtimeRunId == null` (ad-hoc operator-test
+ *      path). C1-c5 closure threaded `runtimeRunId` into all production
+ *      paths; the lockstep test in `tests/agent-studio/dispatcher-audit-coverage.test.ts`
+ *      pairs with this absence.
+ *
+ * If a future PR violates any absence, the matching lockstep test
+ * fires with explicit remediation guidance. Mirrors the cycle-4
+ * `approval-gate.ts` 5-absence doc-block + tests pattern (H1-c4 +
+ * H2-c4 + H3-c4 + L1-c4 + M4-c4).
  */
 
 import * as repo from "../../repository";

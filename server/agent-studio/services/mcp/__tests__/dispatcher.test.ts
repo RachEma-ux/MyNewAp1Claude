@@ -52,12 +52,32 @@ vi.mock("../../governance-adapter", () => ({
   evaluateMcpPostInvoke: vi.fn(),
 }));
 
+// H2-c5 — mock the riskClass classifier + the sandbox surface so the
+// `if (riskClass === "code_execution")` routing branch in dispatcher.ts
+// can be exercised without a live sandbox.
+vi.mock("../../cag", () => ({
+  readRiskClass: vi.fn(),
+}));
+
+vi.mock("../../sandbox", () => ({
+  getToolSandbox: vi.fn(),
+  DEFAULT_SANDBOX_POLICY: { timeoutMs: 5000, memoryMb: 64 },
+  SandboxUnavailableError: class SandboxUnavailableError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "SandboxUnavailableError";
+    }
+  },
+}));
+
 import * as repo from "../../../repository";
 import { getMcpConnection } from "../mcp-manager";
 import {
   evaluateMcpPreInvoke,
   evaluateMcpPostInvoke,
 } from "../../governance-adapter";
+import { readRiskClass } from "../../cag";
+import { getToolSandbox } from "../../sandbox";
 
 // ── Test fixtures ──────────────────────────────────────────────────────────
 
@@ -129,6 +149,13 @@ beforeEach(() => {
   publishConnSnapshot(1, defaultConn);
   (evaluateMcpPreInvoke as any).mockResolvedValue({ verdict: "allow" });
   (evaluateMcpPostInvoke as any).mockResolvedValue({ verdict: "allow" });
+  // H2-c5 default: non-code_execution → routes to direct transport.
+  // Individual tests override `readRiskClass` to exercise the sandbox
+  // branch.
+  (readRiskClass as any).mockReturnValue("read_only");
+  (getToolSandbox as any).mockReturnValue({
+    execute: vi.fn().mockResolvedValue({ ok: true, result: "sandbox-result" }),
+  });
 });
 
 // ── parseToolName (unit helper, no mocks needed) ──────────────────────────
@@ -395,5 +422,140 @@ describe("dispatchMcpToolCall", () => {
     expectAuditCalled("allow");
     // System calls also bypass governance
     expect(evaluateMcpPreInvoke).toHaveBeenCalled(); // called, but returns allow for -1
+  });
+
+  // ── H2-c5 ── 13. Sandbox routing branch (D-SBX-3 contract) ──
+  // Cycle-5 audit (`/sdcard/Download/MCP_DISPATCHER_AUDIT_2026-05-09.md` §H2-c5)
+  // flagged that the dispatcher's `if (riskClass === "code_execution") →
+  // sandbox` branch had ZERO unit tests. The sandbox itself is tested
+  // separately (sandbox-gate.test.ts, 14 cases real impl); the
+  // dispatcher's BRANCHING was dark. A regression that flipped the
+  // conditional or broke readRiskClass would silently route
+  // code_execution tools to direct transport — bypassing the sandbox.
+  it("riskClass=code_execution routes to sandbox.execute() and NOT to conn.callTool() (H2-c5)", async () => {
+    (readRiskClass as any).mockReturnValue("code_execution");
+    const sandbox = {
+      execute: vi
+        .fn()
+        .mockResolvedValue({ ok: true, result: "sandbox-output" }),
+    };
+    (getToolSandbox as any).mockReturnValue(sandbox);
+    const conn = makeConn();
+    (getMcpConnection as any).mockReturnValue(conn);
+    publishConnSnapshot(1, conn);
+
+    const result = await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: { script: "print(1)" },
+      source: "live_runtime",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(sandbox.execute).toHaveBeenCalledTimes(1);
+    expect(conn.callTool).not.toHaveBeenCalled();
+  });
+
+  it("non-code_execution riskClass routes to conn.callTool() and NOT to sandbox (H2-c5)", async () => {
+    // Cycle-5 §H2-c5: "for all 7 non-code_execution classes, dispatcher
+    // invokes conn.callTool() and does NOT call sandbox". Spot-check
+    // 3 representative classes (read_only, write, governance_sensitive)
+    // — full taxonomy is locked by retrofit-acceptance D-TOOL-1 (8-class
+    // round-trip).
+    for (const klass of ["read_only", "write", "governance_sensitive"] as const) {
+      vi.clearAllMocks();
+      (repo.listMcpServers as any).mockResolvedValue([makeServerRow()]);
+      (repo.listPermissionRules as any).mockResolvedValue([
+        { toolPattern: "mcp__*", ruleBehavior: "allow", enabled: true },
+      ]);
+      (repo.appendRuntimePolicyEvent as any).mockResolvedValue({ id: 999 });
+      (repo.getDraftById as any).mockResolvedValue({
+        id: 100,
+        governancePolicy: {},
+      });
+      const conn = makeConn();
+      (getMcpConnection as any).mockReturnValue(conn);
+      publishConnSnapshot(1, conn);
+      (evaluateMcpPreInvoke as any).mockResolvedValue({ verdict: "allow" });
+      (evaluateMcpPostInvoke as any).mockResolvedValue({ verdict: "allow" });
+      (readRiskClass as any).mockReturnValue(klass);
+      const sandbox = { execute: vi.fn() };
+      (getToolSandbox as any).mockReturnValue(sandbox);
+
+      const result = await dispatchMcpToolCall({
+        agentDraftId: 100,
+        runtimeRunId: 5,
+        toolName: "mcp__github__create_issue",
+        args: {},
+        source: "live_runtime",
+      });
+
+      expect(result.ok, `riskClass=${klass} dispatch failed`).toBe(true);
+      expect(
+        conn.callTool,
+        `riskClass=${klass} should call conn.callTool`,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        sandbox.execute,
+        `riskClass=${klass} must NOT route to sandbox`,
+      ).not.toHaveBeenCalled();
+    }
+  });
+
+  // ── H2-c5 ── 14. Pre/post-invoke symmetry (locks "intentional absence") ──
+  // Cycle-5 §M5-c5: pre-invoke deny short-circuits at dispatcher.ts:451-456;
+  // post-invoke at line 516 never runs in that path. Correct but undocumented
+  // in tests. A regression that adds post-invoke to the pre-deny path (or
+  // removes the early return) would not fire any test.
+  it("pre-invoke denied → evaluateMcpPostInvoke is NOT called (M5-c5 lockstep)", async () => {
+    (evaluateMcpPreInvoke as any).mockResolvedValue({
+      verdict: "deny",
+      reason: "blocked-action-test",
+    });
+
+    const result = await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: {},
+      source: "live_runtime",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.code).toBe("governance_blocked");
+    expect(evaluateMcpPreInvoke).toHaveBeenCalledTimes(1);
+    // The invariant under test: post-invoke is intentionally skipped on
+    // pre-deny. The dispatcher's audit row covers the deny event; no
+    // post-invoke verdict exists because the tool never invoked.
+    expect(evaluateMcpPostInvoke).not.toHaveBeenCalled();
+  });
+
+  // ── H2-c5 ── 15. Idempotency: repeated dispatch produces distinct audit rows ──
+  // Cycle-5 §L3-c5: dispatcher comment at line 249-251 doesn't address
+  // re-dispatch. The contract IS "one audit row per invocation"; this
+  // test locks it.
+  it("repeated dispatch with identical input produces distinct audit rows (L3-c5)", async () => {
+    const result1 = await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: { title: "A" },
+      source: "live_runtime",
+    });
+    const result2 = await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: { title: "A" },
+      source: "live_runtime",
+    });
+
+    expect(result1.ok).toBe(true);
+    expect(result2.ok).toBe(true);
+    expect(repo.appendRuntimePolicyEvent).toHaveBeenCalledTimes(2);
+    // Each invocation produces a distinct row id (mock returns id=999
+    // for both, but the spy records two separate calls — that's the
+    // invariant: dispatcher emits one row per call, never deduplicates).
   });
 });
