@@ -56,9 +56,18 @@ function approvalResumeTimeoutMs(): number {
   // C1-c6: same env var as chat-stream.ts uses (APPROVAL_RESUME_TIMEOUT_SEC,
   // default 300s). Inlined here rather than imported so chat.ts has
   // no dependency on the chat-stream module.
+  // L5-c6: recommended 10-3600s — see chat-stream.ts L5-c6 doc-block.
+  // The `Math.max(1, ...)` floor is a defensive guard against
+  // pathological config; not the recommended range.
   const raw = process.env.APPROVAL_RESUME_TIMEOUT_SEC;
   const seconds = raw ? Number.parseInt(raw, 10) : NaN;
   const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
+  if (Number.isFinite(seconds) && (seconds < 10 || seconds > 3600)) {
+    console.warn(
+      `[ags-runtime] APPROVAL_RESUME_TIMEOUT_SEC=${seconds} is outside ` +
+        `the recommended 10-3600s range — see L5-c6 doc-block.`,
+    );
+  }
   return Math.max(1, safe) * 1000;
 }
 import { getSnapshot } from "./mcp/registry";
