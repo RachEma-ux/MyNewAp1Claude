@@ -102,6 +102,80 @@ const SYSTEM_DRAFT_ID = -1;
 const RESULT_PREVIEW_MAX_BYTES = 4096;
 
 /**
+ * H1-c7 (cycle-7 audit closure §H1-c7) — per-call timeout ceiling for
+ * `conn.callTool()`. Pre-cycle-7 the dispatcher had no per-call
+ * timeout: a slow or hung MCP server could block the model loop
+ * indefinitely. Sandbox tools have `DEFAULT_SANDBOX_POLICY.timeoutMs`
+ * (1s) and SSE transport has `POST_TIMEOUT_MS=5s` buried at the
+ * transport layer, but neither was exposed to the dispatcher and
+ * neither covered the non-sandbox / non-SSE paths.
+ *
+ * 30s default is generous for MCP servers (covers common HTTP/RPC
+ * round-trips + 1-2 retries at the transport layer) but bounded.
+ * Operator override via `MCP_TOOL_CALL_TIMEOUT_MS` env var — useful
+ * for tools known to take longer (e.g. long-running search /
+ * generation MCP servers); operator must understand the trade-off
+ * (longer timeout = longer wait for hung servers).
+ *
+ * On timeout the dispatcher returns `DispatchErrorCode.tool_call_timeout`
+ * (distinct from `tool_execution_failed`) so audit + trace can
+ * distinguish "server returned an error" from "server didn't respond
+ * within ceiling."
+ */
+const MCP_TOOL_CALL_TIMEOUT_MS = (() => {
+  const raw = process.env.MCP_TOOL_CALL_TIMEOUT_MS;
+  if (!raw) return 30_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[mcp-dispatcher] MCP_TOOL_CALL_TIMEOUT_MS=${raw} is not a positive integer; using default 30000ms`,
+    );
+    return 30_000;
+  }
+  return n;
+})();
+
+/** Sentinel marker on invokeError to identify timeout vs other failures. */
+const TIMEOUT_SENTINEL = Symbol("mcp-tool-call-timeout");
+
+/**
+ * H1-c7: race conn.callTool() against a timeout. Returns the result
+ * or throws a tagged error the caller can distinguish from MCP
+ * server errors.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          const err = new Error(
+            `MCP tool call exceeded ${timeoutMs}ms timeout`,
+          ) as Error & { [TIMEOUT_SENTINEL]?: true };
+          err[TIMEOUT_SENTINEL] = true;
+          reject(err);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Type guard for the timeout sentinel — used by the invoke-error mapping. */
+function isTimeoutError(e: unknown): boolean {
+  return (
+    e != null &&
+    typeof e === "object" &&
+    (e as Record<symbol, unknown>)[TIMEOUT_SENTINEL] === true
+  );
+}
+
+/**
  * Field names whose values get redacted in the audit payload's
  * argsPreview. Anything matching these (case-insensitive substring)
  * is replaced with `"[REDACTED]"`. Compliance + security baseline.
@@ -516,7 +590,7 @@ export async function dispatchMcpToolCall(
   // of truth across CAG, dispatcher, and export readiness).
   const riskClass = readRiskClass(tool as Parameters<typeof readRiskClass>[0]);
   let result: unknown;
-  let invokeError: { message: string; original: unknown; sandboxCode?: string } | null = null;
+  let invokeError: { message: string; original: unknown; sandboxCode?: string; timedOut?: boolean } | null = null;
   const invokeStartMs = Date.now();
   if (riskClass === "code_execution") {
     try {
@@ -553,11 +627,20 @@ export async function dispatchMcpToolCall(
     }
   } else {
     try {
-      result = await conn.callTool(parsed.remoteToolName!, input.args ?? {});
+      // H1-c7: bounded wait — if the MCP server doesn't respond
+      // within MCP_TOOL_CALL_TIMEOUT_MS, the race rejects with a
+      // sentinel-tagged error that the failure-mapping path
+      // surfaces as `tool_call_timeout` (distinct from
+      // `tool_execution_failed`).
+      result = await withTimeout(
+        conn.callTool(parsed.remoteToolName!, input.args ?? {}),
+        MCP_TOOL_CALL_TIMEOUT_MS,
+      );
     } catch (e) {
       invokeError = {
         message: e instanceof Error ? e.message : String(e),
         original: e,
+        timedOut: isTimeoutError(e),
       };
     }
   }
@@ -585,7 +668,15 @@ export async function dispatchMcpToolCall(
 
   // ── 9. Handle invoke failure ──
   if (invokeError) {
-    return fail("tool_execution_failed", invokeError.message, {
+    // H1-c7: distinguish timeout from other invoke failures so audit
+    // + trace + operator UI can tell "server didn't respond within
+    // ceiling" from "server returned an error". Timeouts are
+    // operationally distinct (retryable vs not, indicates server
+    // health vs tool semantics).
+    const code: DispatchErrorCode = invokeError.timedOut
+      ? "tool_call_timeout"
+      : "tool_execution_failed";
+    return fail(code, invokeError.message, {
       original: String(invokeError.original),
     });
   }

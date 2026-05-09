@@ -23,6 +23,7 @@ export type DispatchErrorCode =
   | "not_authorized"
   | "governance_blocked"
   | "tool_execution_failed"
+  | "tool_call_timeout"
   | "internal_error";
 
 export interface DispatchMcpToolCallInput {
