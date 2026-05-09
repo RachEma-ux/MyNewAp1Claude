@@ -83,6 +83,43 @@ import {
 
 type SseSend = (data: unknown) => void;
 
+/**
+ * H4-c6 (cycle-6 audit closure §H4-c6) — exported SSE event contract
+ * for the `awaiting_approval` event.
+ *
+ * Pre-cycle-6 the file header declared SSE event types as
+ * `token | tool_start | tool_end | done | error`. The
+ * `awaiting_approval` event introduced by cycle-4 C2-c4 PR-3 was
+ * shoehorned in as a `status` variant of `tool_end` with two
+ * undocumented sibling fields (`approvalRequestId`, `timeoutSec`).
+ * The UI inferred the shape; no TypeScript interface or test pinned
+ * it. A future refactor renaming `timeoutSec` → `timeout_seconds`
+ * (or dropping `approvalRequestId`) would silently break the UI.
+ *
+ * Post-cycle-6: this exported interface IS the contract. Callers
+ * that need to decode the event in tests or external consumers
+ * import from this module. The shape is locked by
+ * `tests/agent-studio/chat-stream-sse-contract.test.ts`.
+ *
+ * The event piggybacks on `tool_end` (with `ok=false`) because the
+ * SSE consumer's reducer already routes on `type`. A breaking
+ * change (new top-level `type: "awaiting_approval"`) would force
+ * every UI consumer to update — keep the variant shape until/unless
+ * a future cycle decides to migrate the contract.
+ */
+export interface AwaitingApprovalEvent {
+  type: "tool_end";
+  toolName: string;
+  ok: false;
+  status: "awaiting_approval";
+  /** `agsPendingPermissionRequests.id` — UI uses to deep-link to the
+   *  approval row in RetrofitPage. */
+  approvalRequestId: number;
+  /** Seconds remaining in the bounded wait window. UI shows a
+   *  countdown badge. */
+  timeoutSec: number;
+}
+
 const MAX_TOOL_TURNS = 6;
 const INPUT_COST_PER_1M = 5; // USD, gpt-4o mid-tier estimate
 const OUTPUT_COST_PER_1M = 15;
@@ -92,10 +129,26 @@ const OUTPUT_COST_PER_1M = 15;
 // 300s = 5 min. Configurable via env so ops can tune per environment
 // (browser/proxy SSE timeouts vary). Lower bound 1s to avoid pathological
 // negative values; upper bound left unbounded — operator policy.
+//
+// L5-c6 (cycle-6 audit closure §L5-c6) — recommended range 10-3600
+// seconds. Below 10s: most operators can't react fast enough; the
+// approval pipeline collapses to "always timeout." Above 3600s:
+// browser/proxy SSE keep-alive limits routinely close the
+// connection before the wait completes, leading to user-visible
+// stalls. The `Math.max(1, ...)` floor stays as a defensive guard
+// against pathological config but is NOT the recommended range.
 function approvalResumeTimeoutMs(): number {
   const raw = process.env.APPROVAL_RESUME_TIMEOUT_SEC;
   const parsed = raw ? parseInt(raw, 10) : NaN;
   const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+  // L5-c6: warn on out-of-range configurations so ops notice before
+  // the next user-visible incident.
+  if (Number.isFinite(parsed) && (parsed < 10 || parsed > 3600)) {
+    console.warn(
+      `[ags-runtime] APPROVAL_RESUME_TIMEOUT_SEC=${parsed} is outside ` +
+        `the recommended 10-3600s range — see L5-c6 doc-block.`,
+    );
+  }
   return Math.max(1, seconds) * 1000;
 }
 
@@ -490,16 +543,19 @@ async function runStreamingToolLoop(args: {
               // Streaming surface — emit `awaiting_approval` to the
               // SSE client so UI can render a "waiting for approval"
               // badge. Non-streaming `services/chat.ts` passes no
-              // `onAwaiting` (or a no-op).
+              // `onAwaiting` (or a no-op). H4-c6: typed via exported
+              // `AwaitingApprovalEvent` interface so the SSE shape is
+              // a contract, not inference.
               onAwaiting: (rid, tms) => {
-                sendEvent({
+                const event: AwaitingApprovalEvent = {
                   type: "tool_end",
                   toolName: openaiName,
                   ok: false,
                   status: "awaiting_approval",
                   approvalRequestId: rid,
                   timeoutSec: Math.floor(tms / 1000),
-                });
+                };
+                sendEvent(event);
               },
             });
             runtimeVerdict = resume.verdict;
