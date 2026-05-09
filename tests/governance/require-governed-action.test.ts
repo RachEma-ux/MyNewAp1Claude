@@ -186,6 +186,99 @@ describe("requireGovernedAction — R5-c3 audit-log emission on silent denials",
   });
 });
 
+describe("requireGovernedAction — R6-c3 approval enforcement (env-flag-gated)", () => {
+  const APPROVAL_ACTION_KEY = "workspace.approve"; // R3 / role_any / evidence required [reason]
+
+  beforeEach(() => {
+    getAuditLogger().clear();
+    delete process.env.GOVERNANCE_ENFORCE_APPROVALS;
+  });
+
+  afterEach(() => {
+    delete process.env.GOVERNANCE_ENFORCE_APPROVALS;
+  });
+
+  function approvalInput(overrides: Partial<Parameters<typeof requireGovernedAction>[0]> = {}) {
+    return {
+      actionKey: APPROVAL_ACTION_KEY,
+      actorPrincipalId: "999100",
+      actorRole: "admin",
+      orgId: "default",
+      subject: { subjectType: "workspace", subjectId: "999901" },
+      context: {},
+      // workspace.approve has evidence required [reason] AND approval role_any.
+      // Provide evidence so the evidence check passes; approval is what we're testing.
+      evidence: { types: ["reason"], refs: ["test-reason-ref"] },
+      ...overrides,
+    };
+  }
+
+  it("default mode (flag unset) — missing approval logs placeholder=true and proceeds", async () => {
+    // Flag unset → preserves cycle-3 baseline behavior (placeholder).
+    const receipt = await requireGovernedAction(approvalInput());
+    // No approval provided AND flag unset → audit emits placeholder=true,
+    // function proceeds. The receipt's allowed flag depends on requireGate
+    // (which may deny first); the assertion is on the audit log shape.
+    expect(receipt).toBeDefined();
+
+    const events = getAuditLogger().getRecent(20);
+    const placeholderEvent = events.find(
+      (e) =>
+        e.action_type === "GATE_CHECK" &&
+        e.target_type === "approval_required" &&
+        e.metadata?.placeholder === true,
+    );
+    expect(placeholderEvent).toBeDefined();
+    expect(placeholderEvent?.decision_result).toBe("success");
+    expect(placeholderEvent?.metadata?.enforced).toBe(false);
+  });
+
+  it("enforce mode (flag=true) — missing approval emits denied audit + 403 receipt", async () => {
+    process.env.GOVERNANCE_ENFORCE_APPROVALS = "true";
+    const receipt = await requireGovernedAction(approvalInput());
+    expect(receipt.allowed).toBe(false);
+    expect(receipt.denialReason).toMatch(/Approval required/);
+
+    const events = getAuditLogger().getRecent(20);
+    const denialEvent = events.find(
+      (e) =>
+        e.action_type === "GATE_CHECK" &&
+        e.target_type === "approval_required" &&
+        e.metadata?.placeholder === false,
+    );
+    expect(denialEvent).toBeDefined();
+    expect(denialEvent?.decision_result).toBe("denied");
+    expect(denialEvent?.metadata?.enforced).toBe(true);
+    expect(denialEvent?.metadata?.reason).toBe("approval_required");
+  });
+
+  it("enforce mode (flag=1) — same enforcement (numeric truthy form)", async () => {
+    process.env.GOVERNANCE_ENFORCE_APPROVALS = "1";
+    const receipt = await requireGovernedAction(approvalInput());
+    expect(receipt.allowed).toBe(false);
+  });
+
+  it("enforce mode (flag=true) + valid approval — proceeds (no denial from approval check)", async () => {
+    process.env.GOVERNANCE_ENFORCE_APPROVALS = "true";
+    const receipt = await requireGovernedAction(
+      approvalInput({
+        approvals: [{ approverPrincipalId: "999102", approvedAt: "2026-05-09T00:00:00Z" }],
+      }),
+    );
+    // The approval check passes, so the function doesn't deny here.
+    // (requireGate or other downstream checks may still deny — what we're
+    // asserting is that the approval-denial branch did NOT fire.)
+    const events = getAuditLogger().getRecent(20);
+    const approvalDenial = events.find(
+      (e) =>
+        e.action_type === "GATE_CHECK" &&
+        e.target_type === "approval_required" &&
+        e.decision_result === "denied",
+    );
+    expect(approvalDenial).toBeUndefined();
+  });
+});
+
 describe("requireGovernedAction — R4-c3 subject-id-0 freeze bypass closure", () => {
   beforeEach(() => {
     getAuditLogger().clear();
