@@ -481,6 +481,11 @@ async function runChatWithToolsViaBinding(input: {
           args,
           source: "live_runtime",
           runtimeRunId: input.sessionId,
+          // M4-c5: thread approval-row id (when present) into the
+          // dispatcher's audit payload — same shape as the chat-stream
+          // call site. Forensics resolve "which approval permitted
+          // this dispatch" without joining through agsToolCallTraces.
+          approvalRequestId: runtimeVerdict?.approvalRequestId ?? undefined,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {

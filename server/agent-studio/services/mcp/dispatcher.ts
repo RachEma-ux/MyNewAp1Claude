@@ -336,6 +336,10 @@ export async function dispatchMcpToolCall(
     durationMs: 0,
     cost: null,
     caller: input.caller ?? null,
+    // M4-c5: thread approval-request id from caller into the audit
+    // row so forensics doesn't need the dispatcher → trace → approval
+    // two-hop join.
+    approvalRequestId: input.approvalRequestId ?? null,
   };
 
   /** Helper to build a structured failure result + write the audit row */
