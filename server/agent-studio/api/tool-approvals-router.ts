@@ -40,6 +40,53 @@ function asdb() {
 }
 
 /**
+ * H2-c6 (cycle-6 audit closure §H2-c6) — safe column projection for
+ * API-exposed list endpoints.
+ *
+ * Pre-cycle-6 `list` / `listByDraft` / `getByHash` used bare
+ * `.select()`, returning every column on `agsPendingPermissionRequests`
+ * — including:
+ *
+ *   - `rawPayload` — full request payload from openllm-agent2
+ *     (contains tool arguments verbatim, which may include API keys,
+ *     credentials, secrets that the LLM emitted)
+ *   - `proposedToolCallJson` — full Phase 8 envelope (also contains
+ *     unredacted arguments)
+ *
+ * Either column can leak credentials to anyone with read access to a
+ * draft's approvals. The dispatcher's audit payload sanitizes args
+ * via `sanitizeArgsForAudit`; these list endpoints did not.
+ *
+ * Post-cycle-6 — explicit projection. The PUBLIC_APPROVAL_COLUMNS
+ * map names every column the operator UI consumes: id, runtimeRunId,
+ * toolName, description, status, decidedBy, decidedAt, reason,
+ * createdAt, expiresAt, lastUsedAt, agentDraftId,
+ * proposedToolCallHash. Notably absent: `rawPayload`,
+ * `proposedToolCallJson`. The hash IS exposed (operator UI displays
+ * a short prefix; can't be used to reconstruct the args).
+ *
+ * If a future endpoint legitimately needs the raw payload (e.g.
+ * dedicated detail-view with sanitization), it can call a separate
+ * helper that explicitly projects the unsafe columns + sanitizes.
+ * The default-deny posture: never project unsafe columns by default.
+ */
+const PUBLIC_APPROVAL_COLUMNS = {
+  id: agsPendingPermissionRequests.id,
+  runtimeRunId: agsPendingPermissionRequests.runtimeRunId,
+  toolName: agsPendingPermissionRequests.toolName,
+  description: agsPendingPermissionRequests.description,
+  status: agsPendingPermissionRequests.status,
+  decidedBy: agsPendingPermissionRequests.decidedBy,
+  decidedAt: agsPendingPermissionRequests.decidedAt,
+  reason: agsPendingPermissionRequests.reason,
+  createdAt: agsPendingPermissionRequests.createdAt,
+  proposedToolCallHash: agsPendingPermissionRequests.proposedToolCallHash,
+  expiresAt: agsPendingPermissionRequests.expiresAt,
+  lastUsedAt: agsPendingPermissionRequests.lastUsedAt,
+  agentDraftId: agsPendingPermissionRequests.agentDraftId,
+} as const;
+
+/**
  * C2-c6 (cycle-6 audit closure §C2-c6) — per-row authorization for the
  * `decide` mutation.
  *
@@ -87,8 +134,9 @@ export const toolApprovalsRouter = router({
     )
     .query(async ({ input }) => {
       const db = asdb();
+      // H2-c6: explicit projection (no rawPayload / proposedToolCallJson).
       return db
-        .select()
+        .select(PUBLIC_APPROVAL_COLUMNS)
         .from(agsPendingPermissionRequests)
         .where(eq(agsPendingPermissionRequests.runtimeRunId, input.runtimeRunId))
         .orderBy(desc(agsPendingPermissionRequests.createdAt))
@@ -113,8 +161,9 @@ export const toolApprovalsRouter = router({
       if (input.status) {
         conds.push(eq(agsPendingPermissionRequests.status, input.status));
       }
+      // H2-c6: explicit projection (no rawPayload / proposedToolCallJson).
       return db
-        .select()
+        .select(PUBLIC_APPROVAL_COLUMNS)
         .from(agsPendingPermissionRequests)
         .where(and(...conds))
         .orderBy(desc(agsPendingPermissionRequests.createdAt))
@@ -130,8 +179,9 @@ export const toolApprovalsRouter = router({
     )
     .query(async ({ input }) => {
       const db = asdb();
+      // H2-c6: explicit projection (no rawPayload / proposedToolCallJson).
       const rows = await db
-        .select()
+        .select(PUBLIC_APPROVAL_COLUMNS)
         .from(agsPendingPermissionRequests)
         .where(
           and(

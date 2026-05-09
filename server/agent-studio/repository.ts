@@ -2261,9 +2261,39 @@ export async function createPendingPermissionRequest(input: {
   return created;
 }
 
+/**
+ * H2-c6 (cycle-6 audit closure §H2-c6) — safe-projection columns for
+ * approval rows. Mirrors the API-layer `PUBLIC_APPROVAL_COLUMNS` in
+ * `api/tool-approvals-router.ts` so any path returning rows that
+ * eventually reach a client never leaks `rawPayload` /
+ * `proposedToolCallJson` (both can carry unredacted credentials).
+ *
+ * If a callsite legitimately needs the unsafe columns (e.g. forensic
+ * server-internal use), add a separate `*Raw` helper that explicitly
+ * projects them.
+ */
+const PUBLIC_APPROVAL_COLUMNS = {
+  id: agsPendingPermissionRequests.id,
+  runtimeRunId: agsPendingPermissionRequests.runtimeRunId,
+  toolName: agsPendingPermissionRequests.toolName,
+  description: agsPendingPermissionRequests.description,
+  status: agsPendingPermissionRequests.status,
+  decidedBy: agsPendingPermissionRequests.decidedBy,
+  decidedAt: agsPendingPermissionRequests.decidedAt,
+  reason: agsPendingPermissionRequests.reason,
+  createdAt: agsPendingPermissionRequests.createdAt,
+  proposedToolCallHash: agsPendingPermissionRequests.proposedToolCallHash,
+  expiresAt: agsPendingPermissionRequests.expiresAt,
+  lastUsedAt: agsPendingPermissionRequests.lastUsedAt,
+  agentDraftId: agsPendingPermissionRequests.agentDraftId,
+} as const;
+
 export async function getPendingPermissionRequestById(requestId: number) {
+  // H2-c6: safe projection — no rawPayload / proposedToolCallJson.
+  // Both API callers and the simulation poll loop only need the
+  // status / lifecycle columns; neither reads the leaky fields.
   const rows = await db()
-    .select()
+    .select(PUBLIC_APPROVAL_COLUMNS)
     .from(agsPendingPermissionRequests)
     .where(eq(agsPendingPermissionRequests.id, requestId))
     .limit(1);
@@ -2276,8 +2306,9 @@ export async function getPendingPermissionRequestById(requestId: number) {
  * loop (only the rows it created itself).
  */
 export async function listPendingPermissionRequests(runtimeRunId: number) {
+  // H2-c6: safe projection — no rawPayload / proposedToolCallJson.
   return db()
-    .select()
+    .select(PUBLIC_APPROVAL_COLUMNS)
     .from(agsPendingPermissionRequests)
     .where(eq(agsPendingPermissionRequests.runtimeRunId, runtimeRunId))
     .orderBy(desc(agsPendingPermissionRequests.createdAt));
