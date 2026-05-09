@@ -301,9 +301,18 @@ export interface CreateApprovalRequestInput {
 
 /**
  * Persist a new pending approval row keyed on the canonical hash. Idempotency
- * means the unique-ish lookup is `(agentDraftId, proposedToolCallHash)`;
+ * means the unique lookup is `(agentDraftId, proposedToolCallHash)`;
  * if a row already exists this returns the existing id rather than
  * inserting a duplicate.
+ *
+ * Race coverage (M2-c6): the DB-level `idx_ags_pending_perm_draft_hash`
+ * UNIQUE INDEX in drizzle/tables/agent-studio.ts is the backstop for
+ * the SELECT-then-INSERT window. Two concurrent calls on the same
+ * (draft, hash) where the row didn't exist at SELECT time will see
+ * one INSERT win and the other raise a unique-violation, which the
+ * caller-side retry treats as the existing-row case. Pre-cycle-6
+ * the constraint was non-unique and this doc-block said "unique-ish"
+ * — the unique-ness lived in intent only.
  *
  * Writes a `null → pending` row to `agsRuntimePolicyEvents`.
  */
@@ -329,19 +338,46 @@ export async function createApprovalRequest(
     return { approvalRequestId: existing[0].id, created: false };
   }
 
-  const [created] = await db
-    .insert(agsPendingPermissionRequests)
-    .values({
-      runtimeRunId: input.runtimeRunId,
-      agentDraftId: input.agentDraftId,
-      toolName: input.proposedToolCall.toolName,
-      description: input.description ?? null,
-      rawPayload: { proposedToolCall: input.proposedToolCall as unknown as Record<string, unknown> },
-      proposedToolCallJson: input.proposedToolCall as unknown as Record<string, unknown>,
-      proposedToolCallHash: hash,
-      status: "pending",
-    })
-    .returning();
+  let created: typeof agsPendingPermissionRequests.$inferSelect;
+  try {
+    const inserted = await db
+      .insert(agsPendingPermissionRequests)
+      .values({
+        runtimeRunId: input.runtimeRunId,
+        agentDraftId: input.agentDraftId,
+        toolName: input.proposedToolCall.toolName,
+        description: input.description ?? null,
+        rawPayload: { proposedToolCall: input.proposedToolCall as unknown as Record<string, unknown> },
+        proposedToolCallJson: input.proposedToolCall as unknown as Record<string, unknown>,
+        proposedToolCallHash: hash,
+        status: "pending",
+      })
+      .returning();
+    created = inserted[0];
+  } catch (e) {
+    // M2-c6: a parallel call won the race between our SELECT and our
+    // INSERT and inserted a row first. PG raises unique_violation
+    // (SQLSTATE 23505) on the (agentDraftId, proposedToolCallHash)
+    // UNIQUE INDEX. Re-SELECT and return the existing row so the
+    // caller-visible behavior matches the pre-cycle-6 silent-dedup
+    // path.
+    const code = (e as { code?: string } | null)?.code;
+    if (code !== "23505") throw e;
+    const reselect = await db
+      .select()
+      .from(agsPendingPermissionRequests)
+      .where(
+        and(
+          eq(agsPendingPermissionRequests.agentDraftId, input.agentDraftId),
+          eq(agsPendingPermissionRequests.proposedToolCallHash, hash),
+        ),
+      )
+      .limit(1);
+    if (reselect[0]) {
+      return { approvalRequestId: reselect[0].id, created: false };
+    }
+    throw e;
+  }
 
   await db.insert(agsRuntimePolicyEvents).values({
     runId: input.runtimeRunId,

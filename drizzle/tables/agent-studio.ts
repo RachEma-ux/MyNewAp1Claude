@@ -897,8 +897,28 @@ export const agsPendingPermissionRequests = pgTable(
   (t) => ({
     runIdx: index("idx_ags_pending_perm_run").on(t.runtimeRunId),
     statusIdx: index("idx_ags_pending_perm_status").on(t.status),
-    // D-APP-EXT-2: idempotent lookup by (draft, hash)
-    draftHashIdx: index("idx_ags_pending_perm_draft_hash").on(
+    // M2-c6 (cycle-6 audit `/sdcard/Download/RUNTIME_GATE_AUDIT_2026-05-09.md`
+    // §M2-c6) — promote the (agentDraftId, proposedToolCallHash) lookup
+    // index to UNIQUE so the database itself rejects the
+    // double-create race in `createApprovalRequest` instead of
+    // relying on the application-level `existing[0]` check (which
+    // sees no row twice if two requests interleave between SELECT
+    // and INSERT). Pre-cycle-6 the doc-block on createApprovalRequest
+    // literally said "unique-ish" — the unique-ness lived in
+    // intent only.
+    //
+    // Fresh ASDB instances pick this up via the seed.ts reconciler
+    // which emits `CREATE UNIQUE INDEX IF NOT EXISTS` from this
+    // declaration. Existing instances still carry the legacy
+    // non-unique index under the same name; M2-c6 PR-B ships
+    // `scripts/migrations/manual/ags-pending-perm-draft-hash-unique.sql`
+    // for the operator-applied dedup-then-promote path. Mirrors the
+    // M2-c5 sub-arc (drizzle decl + manual SQL) for the same reason
+    // — IF NOT EXISTS is a no-op when an index of the same name
+    // already exists, so non-unique → unique on legacy DBs requires
+    // a DROP + CREATE step that is too dangerous to run from the
+    // boot-time reconciler.
+    draftHashIdx: uniqueIndex("idx_ags_pending_perm_draft_hash").on(
       t.agentDraftId,
       t.proposedToolCallHash,
     ),
