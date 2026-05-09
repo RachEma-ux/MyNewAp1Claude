@@ -361,6 +361,55 @@ export interface PersistRuntimeTraceInput {
  * audit row in `agsRuntimePolicyEvents` remains the source of truth
  * for security-relevant events; this row is the per-ProposedToolCall
  * forensic surface (D-PTC-5).
+ *
+ * ── L4-c5 (cycle-5 audit closure §L4-c5) — trace-vs-audit asymmetry ─
+ *
+ * The trace writer is BEST-EFFORT (catch + console.warn + `id: null`).
+ * The dispatcher's `writeAuditRow` (`services/mcp/dispatcher.ts`) is
+ * FATAL (re-throws to the dispatcher's outer try/catch, which turns
+ * the failure into `internal_error`). This asymmetry is INTENTIONAL,
+ * not a bug:
+ *
+ *   - **Audit (`agsRuntimePolicyEvents`) is the canonical security
+ *     ledger.** Compliance / forensics / audit trail integrity all
+ *     depend on no dispatch happening without a row. If audit-write
+ *     fails, the dispatch must fail too — silent dispatch with no
+ *     audit row is the worst possible outcome (an unrecorded action
+ *     against a real MCP server).
+ *
+ *   - **Trace (`agsToolCallTraces`) is a per-ProposedToolCall
+ *     operator-visible cache.** Trace rows enrich the operator UI
+ *     ("which validation gates fired", "what was the approval
+ *     decision") but the canonical record of what dispatched is
+ *     already in audit (which carries `approvalRequestId` after
+ *     M4-c5). If trace-write fails, the audit row still exists and
+ *     forensics can resolve "which approval permitted this" via the
+ *     audit payload directly — the trace is a convenience, not a
+ *     correctness requirement.
+ *
+ *   - **Resulting failure mode:** if audit succeeds + trace fails,
+ *     `agsRuntimePolicyEvents` carries the canonical row, the
+ *     trace row is missing, the operator UI shows the dispatch
+ *     without per-validation-gate breadcrumbs. Operationally
+ *     visible (the `console.warn` lands in logs) but does NOT erode
+ *     the audit ledger's completeness.
+ *
+ *   - **Why not symmetrize:** option A (both fatal) would make
+ *     trace-write failures fail the chat loop — unacceptable for a
+ *     non-canonical observability cache. Option B (both best-effort)
+ *     would erode the audit ledger's "no dispatch without a row"
+ *     invariant — unacceptable for compliance. The asymmetry is the
+ *     correct shape for the layering: canonical-fatal +
+ *     observability-best-effort. Cycle-5 closure: document the
+ *     intent so a future audit / refactor doesn't re-flag this as
+ *     an inconsistency to "fix".
+ *
+ * Lockstep test: `tests/agent-studio/trace-audit-asymmetry-doc.test.ts`
+ * asserts this comment block carries the L4-c5 marker + names the
+ * asymmetry (audit fatal vs trace best-effort) + records why. A
+ * future PR that flips the trace path to fatal (or that flips the
+ * audit path to best-effort) without updating this doc fails the
+ * lockstep.
  */
 export async function persistRuntimeToolCallTrace(
   input: PersistRuntimeTraceInput,
