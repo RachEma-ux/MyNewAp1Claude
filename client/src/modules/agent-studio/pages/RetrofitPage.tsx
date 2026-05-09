@@ -551,7 +551,19 @@ function ApprovalRow({
               <Button
                 size="sm"
                 disabled={isDeciding}
-                onClick={() => onDecide("allowed", reason)}
+                // M2-c4 (cycle-4 audit §M2-c4) — confirm before commit.
+                // Matches the cycle-2 R4-c2 G5 precedent (8 agent-studio
+                // destructive buttons use window.confirm). Approve grants
+                // a 1-hour validity window for the tool call.
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Approve "${row.toolName}" for this agent? This grants a 1-hour validity window for the tool call.`,
+                    )
+                  ) {
+                    onDecide("allowed", reason);
+                  }
+                }}
               >
                 Allow
               </Button>
@@ -559,7 +571,17 @@ function ApprovalRow({
                 size="sm"
                 variant="destructive"
                 disabled={isDeciding}
-                onClick={() => onDecide("denied", reason)}
+                // M2-c4 — deny is also destructive (the agent-loop sees
+                // a tool error and may give up the task). Confirm.
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Deny "${row.toolName}"? The agent will see a tool error and may abandon the current task.`,
+                    )
+                  ) {
+                    onDecide("denied", reason);
+                  }
+                }}
               >
                 Deny
               </Button>
