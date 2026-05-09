@@ -191,6 +191,19 @@ export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceR
   const traceTimeoutReason =
     approvalStatus === "expired" ? input.traceTimeoutReason ?? null : null;
 
+  // M2-c7 (cycle-7 audit closure §M2-c7): mirror the H5-c6 + isRejected
+  // "drop fields that don't apply to this verdict shape" pattern for
+  // errorMessage. A successful dispatch (`dispatchResult === "ok"`)
+  // MUST NOT carry a caller-provided errorMessage on the row — that
+  // would seed garbage data into a column operators rely on for
+  // failure forensics. Pre-cycle-7 the builder passed errorMessage
+  // through unconditionally; the audit flagged this as a missing
+  // invariant assertion (the test gap was the symptom — fixing the
+  // builder closes the gap structurally rather than just testing it).
+  const dispatchEffective = isRejected ? null : input.dispatchResult ?? null;
+  const errorMessage =
+    dispatchEffective === "ok" ? null : input.errorMessage ?? null;
+
   return {
     workspaceId: input.workspaceId,
     agentId: input.agentId,
@@ -206,10 +219,10 @@ export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceR
     approvalRequestId: isRejected ? null : input.approvalRequestId ?? null,
     approvalStatus,
     governanceVerdict: isRejected ? null : input.governanceVerdict ?? null,
-    dispatchResult: isRejected ? null : input.dispatchResult ?? null,
+    dispatchResult: dispatchEffective,
     dispatchAuditId: isRejected ? null : input.dispatchAuditId ?? null,
     durationMs: input.durationMs ?? null,
-    errorMessage: input.errorMessage ?? null,
+    errorMessage,
     traceTimeoutReason,
   };
 }

@@ -343,4 +343,36 @@ describe("persistRuntimeToolCallTrace", () => {
     const arg = recordTrace.mock.calls[0][0];
     expect(arg.traceTimeoutReason).toBeNull();
   });
+
+  // ── M1-c7 (cycle-7 audit closure §M1-c7) — validator_rejected ─────
+  // The H5-c6 timeout-reason tests above only exercised approval_*
+  // verdicts. The audit flagged that the validator-rejected verdict
+  // ALSO collapses traceTimeoutReason to null (because approvalStatus
+  // becomes null when isRejected — the H5-c6 invariant only sets the
+  // reason when approvalStatus === "expired"), but the path was
+  // unasserted. A future PR that subtly changed the validator
+  // verdict's downstream shape could silently leak a stale
+  // traceTimeoutReason into the trace row without this assertion.
+
+  it("M1-c7: validator_rejected verdict → traceTimeoutReason=null (no approval status, so reason can't apply)", async () => {
+    const recordTrace = vi.fn().mockResolvedValue({ id: 113 });
+    await persistRuntimeToolCallTrace({
+      workspaceId: 1,
+      agentId: 1,
+      agentDraftId: 1,
+      runtimeRunId: 50,
+      runtimeTraceId: null,
+      messageId: null,
+      // validator_rejected has no approvalRequestId — the validator
+      // rejected the call before approval was even relevant. The
+      // trace row's approvalStatus collapses to null, so
+      // traceTimeoutReason MUST also be null.
+      verdict: rejectedVerdict("validator_rejected"),
+      validation: okValidation(),
+      dispatchResult: null,
+      recordTrace,
+    });
+    const arg = recordTrace.mock.calls[0][0];
+    expect(arg.traceTimeoutReason).toBeNull();
+  });
 });
