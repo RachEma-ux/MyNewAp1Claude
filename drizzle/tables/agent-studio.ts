@@ -2120,8 +2120,24 @@ export const agsMcpToolKnowledge = pgTable(
     lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
     /** Flipped to false when the tool disappears from the live registry. */
     available: boolean("available").notNull().default(true),
-    /** Materialized as a NormalizedKnowledgeUnit; FK to ags_knowledge_units. */
-    knowledgeUnitId: integer("knowledge_unit_id"),
+    /**
+     * Materialized as a NormalizedKnowledgeUnit; FK to ags_knowledge_units.
+     *
+     * M2-c5 (cycle-5 audit closure §M2-c5): drizzle-level FK declared
+     * with `onDelete: "set null"` — if the underlying knowledge unit
+     * is deleted (KB cleanup, source removal), the mirror row stays in
+     * place so historic traces still resolve, with the unit pointer
+     * cleared. ASDB's table-by-table reconciler does NOT apply FK
+     * constraints from drizzle declarations; the production constraint
+     * is installed via operator-applied
+     * `scripts/migrations/manual/ags-mcp-tool-knowledge-fk.sql` (M2-c5
+     * PR-B). This declaration is the architectural source of truth +
+     * lockstep target for `tool-knowledge-fk-decl.test.ts`.
+     */
+    knowledgeUnitId: integer("knowledge_unit_id").references(
+      () => agsKnowledgeUnits.id,
+      { onDelete: "set null" },
+    ),
     /** Optional approval ttl override (D-APP-EXT-5). */
     approvalTtlSeconds: integer("approval_ttl_seconds"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
