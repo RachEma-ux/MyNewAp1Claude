@@ -241,10 +241,29 @@ export async function evaluateApprovalGate(
   );
 
   if (decision === "permit" && row) {
-    await db
-      .update(agsPendingPermissionRequests)
-      .set({ lastUsedAt: now })
-      .where(eq(agsPendingPermissionRequests.id, row.id));
+    // M1-c6 (cycle-6 audit closure §M1-c6): only UPDATE lastUsedAt
+    // when stale (older than the staleness threshold) or unset.
+    // Pre-cycle-6 every permit-evaluation wrote unconditionally —
+    // benign at the row level (Postgres serializes concurrent
+    // UPDATEs) but produced audit-log noise on tight permit loops
+    // (e.g., agent retrying a tool call repeatedly within seconds
+    // of the previous permit). The staleness guard reduces UPDATE
+    // traffic to at-most-one-per-staleness-window per row.
+    //
+    // Resolution kept at 60s — finer than the typical operator-UI
+    // refresh interval (5s) would just re-introduce the noise; coarser
+    // than ~minutes would lose meaningful "recently used" signal.
+    const LAST_USED_STALENESS_MS = 60_000;
+    const lastUsed = row.lastUsedAt as Date | null | undefined;
+    const isStale =
+      !lastUsed ||
+      now.getTime() - new Date(lastUsed).getTime() >= LAST_USED_STALENESS_MS;
+    if (isStale) {
+      await db
+        .update(agsPendingPermissionRequests)
+        .set({ lastUsedAt: now })
+        .where(eq(agsPendingPermissionRequests.id, row.id));
+    }
   }
 
   return {
