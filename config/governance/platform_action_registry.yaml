@@ -709,6 +709,20 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # C1-c4 — Publish-workflow approval decision. Companion to
+  # toolApprovals.decide: same shape, different surface (publish step
+  # lifecycle, not MCP tool-call hash). The decision IS the gate, so
+  # approval: none (mirrors toolApprovals reasoning). R2 because the
+  # decision writes a LIFECYCLE_TRANSITION audit row + idempotent on
+  # step state (already-decided steps return CONFLICT before any write).
+  agentStudio.publish.decideApproval:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # Workspace-scoped default provider/model binding — set or update
   # the default binding used when no per-agent binding is present.
   agentStudio.workspaceDefaultBindings.upsert:
