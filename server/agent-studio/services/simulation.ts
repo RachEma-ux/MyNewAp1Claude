@@ -20,6 +20,11 @@
 
 import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
+// H1-c6 (cycle-6 audit closure §H1-c6): system-driven timeout flip
+// migrated from `repo.decidePendingPermissionRequest` to
+// `decideApprovalRequest` so the audit ledger records the system's
+// timed_out transition. Pre-cycle-6 the flip was silent.
+import { decideApprovalRequest } from "./approval/approval-gate";
 import { fireHooksForEvent } from "./hook-runner";
 import * as mcpManager from "./mcp/mcp-manager";
 import { dispatchMcpToolCall } from "./mcp/dispatcher";
@@ -664,9 +669,12 @@ export async function runSimulation(input: {
         // flip the row to timed_out so the UI reflects reality.
         const finalRow = await repo.getPendingPermissionRequestById(pending.id);
         if (finalRow && finalRow.status === "pending") {
-          await repo.decidePendingPermissionRequest({
-            requestId: pending.id,
+          // H1-c6: system timeout flip via the audit-writing service
+          // path. `decidedBy` stays null (no operator authored this).
+          await decideApprovalRequest({
+            approvalRequestId: pending.id,
             status: "timed_out",
+            decidedBy: null,
             reason: `No human response within ${pollTimeoutMs / 1000}s`,
           });
           finalDecision = "deny";

@@ -2283,38 +2283,17 @@ export async function listPendingPermissionRequests(runtimeRunId: number) {
     .orderBy(desc(agsPendingPermissionRequests.createdAt));
 }
 
-/**
- * Decide a pending request — flips status, records the decider, and
- * stamps `decidedAt`. Idempotent: re-deciding a non-pending request is a
- * no-op so concurrent UI clicks don't fight.
- */
-export async function decidePendingPermissionRequest(input: {
-  requestId: number;
-  status: "allowed" | "denied" | "timed_out";
-  decidedBy?: number | null;
-  reason?: string | null;
-}): Promise<typeof agsPendingPermissionRequests.$inferSelect | null> {
-  const conn = db();
-  // Only update if still pending — prevents races
-  const [updated] = await conn
-    .update(agsPendingPermissionRequests)
-    .set({
-      status: input.status,
-      decidedBy: input.decidedBy ?? null,
-      decidedAt: new Date(),
-      reason: input.reason ?? null,
-    })
-    .where(
-      and(
-        eq(agsPendingPermissionRequests.id, input.requestId),
-        eq(agsPendingPermissionRequests.status, "pending")
-      )
-    )
-    .returning();
-  if (updated) return updated;
-  // Already decided — return current row so caller sees terminal state
-  return getPendingPermissionRequestById(input.requestId);
-}
+// H1-c6 (cycle-6 audit closure §H1-c6): the legacy
+// `decidePendingPermissionRequest` was deleted. Pre-cycle-6 it was
+// the second decide path on `agsPendingPermissionRequests` and it
+// did NOT write the canonical audit row in `agsRuntimePolicyEvents`
+// (D-APP-EXT-6). The 2 callers (`api/router.ts:permissions.decide`
+// + `services/simulation.ts` system-timeout flip) both migrated to
+// `services/approval/approval-gate.ts → decideApprovalRequest`,
+// which is now the single decide-with-audit path on this table.
+// Source-scan lockstep at
+// `tests/agent-studio/legacy-decide-removed.test.ts` asserts no
+// caller of the removed symbol resurfaces.
 
 // ── Phase 13: Catalog skills (user-authored) ───────────────────────────────
 
