@@ -175,7 +175,7 @@ describe("resolveAndAssembleContext — empty query", () => {
     });
     expect(out.capabilityPack).toBe(cagSection);
     expect(out.retrievalEvidence).toBeNull();
-    expect(out.trace.fallbackReason).toBe("no_query");
+    expect(out.trace.primaryFallbackReason).toBe("no_query");
     expect(out.trace.cagPackId).toBe(99);
     expect(vi.mocked(listProfilesForDraft)).not.toHaveBeenCalled();
   });
@@ -198,7 +198,7 @@ describe("resolveAndAssembleContext — no RAC profile", () => {
     });
     expect(out.capabilityPack).toBe(cagSection);
     expect(out.retrievalEvidence).toBeNull();
-    expect(out.trace.fallbackReason).toBe("no_profile");
+    expect(out.trace.primaryFallbackReason).toBe("no_profile");
     expect(vi.mocked(planRetrieval)).not.toHaveBeenCalled();
   });
 
@@ -217,7 +217,7 @@ describe("resolveAndAssembleContext — no RAC profile", () => {
       query: "anything",
     });
     expect(out.retrievalEvidence).toBeNull();
-    expect(out.trace.fallbackReason).toBe("no_profile");
+    expect(out.trace.primaryFallbackReason).toBe("no_profile");
   });
 });
 
@@ -337,8 +337,13 @@ describe("resolveAndAssembleContext — safe_degraded + retrieval throw", () => 
     });
     expect(out.capabilityPack).toBe(cagSection);
     expect(out.retrievalEvidence).toBeNull();
-    expect(out.trace.fallbackReason).toBe("retrieval_error");
-    expect(out.warnings.some((w) => /retrieval: failed/.test(w))).toBe(true);
+    expect(out.trace.primaryFallbackReason).toBe("retrieval_error");
+    // M2-c8: warning format standardized to `fallback: <reason> (<detail>)`
+    // by `recordFallback`. Detail carries the underlying error message
+    // (M9-c8) so forensics still see "DB unavailable".
+    expect(out.warnings.some((w) => /fallback: retrieval_error.*DB unavailable/.test(w))).toBe(true);
+    expect(out.trace.primaryFallbackDetail).toContain("DB unavailable");
+    expect(out.trace.fallbackReasons).toContain("retrieval_error");
   });
 });
 

@@ -59,6 +59,22 @@ export class RetrievalRequiredError extends Error {
   }
 }
 
+/**
+ * M1-c8 (cycle-8 audit `/sdcard/Download/RAC_ORCHESTRATOR_AUDIT_2026-05-09.md`
+ * §M1-c8) — typed discriminated union for fallback reasons.
+ *
+ * Pre-cycle-8 the trace's `fallbackReason` was free-form `string`,
+ * so a typo (`"no_profle"`) compiled silently and broke operator
+ * filtering with no compile-time signal. Mirrors cycle-7 M8-c7's
+ * `TransportErrorCode` taxonomy. New reasons MUST be added to this
+ * union (typescript catches the omission at every call site).
+ */
+export type FallbackReason =
+  | "no_query"
+  | "no_profile"
+  | "cag_resolver_error"
+  | "retrieval_error";
+
 export interface ResolveContextInput {
   mode: ComposerMode;
   workspaceId: number;
@@ -66,9 +82,17 @@ export interface ResolveContextInput {
   agentDraftId: number;
   actorId: number;
   /**
-   * Most recent user message — the retrieval query. When empty (e.g.
-   * a turn with only system content), retrieval is skipped to save
-   * latency.
+   * Most recent user message — the retrieval query.
+   *
+   * **M4-c8 (cycle-8 audit closure §M4-c8) — empty-string semantic.**
+   * When this field is empty (`""` or undefined), retrieval is
+   * SKIPPED ENTIRELY (not "use default query"). Callers passing
+   * `userMessage ?? ""` when userMessage is undefined silently
+   * disable retrieval — the orchestrator emits a warning entry
+   * (M2-c8) so the disable is operator-visible, but the field's
+   * semantic is still surprising. Callers that need retrieval to
+   * always run should pass a synthesized query (e.g., the agent's
+   * mission statement) rather than relying on default behavior.
    */
   query?: string;
   /**
@@ -89,7 +113,32 @@ export interface RuntimeTraceMetrics {
   chunksFiltered: number;
   chunksIncluded: number;
   truncatedByBudget: number;
-  fallbackReason: string | null;
+  /**
+   * M3-c8 + M1-c8: PRIMARY (first) fallback reason encountered in
+   * this turn. Renamed from `fallbackReason` to make the
+   * "first-only" semantic explicit. The full cascade lives in
+   * `fallbackReasons`. Operator UI keys off this field for the
+   * principal cause; forensics use `fallbackReasons` for the chain.
+   */
+  primaryFallbackReason: FallbackReason | null;
+  /**
+   * M3-c8 (cycle-8 audit closure §M3-c8) — full cascade of fallback
+   * reasons in the order they fired. Pre-cycle-8 the orchestrator
+   * used `??=` to record only the FIRST reason, losing causality on
+   * multi-fallback turns (e.g., both CAG and retrieval failing).
+   * The array preserves the chain so operators can reconstruct the
+   * cascade without re-running the turn.
+   */
+  fallbackReasons: FallbackReason[];
+  /**
+   * M9-c8 (cycle-8 audit closure §M9-c8) — free-form detail string
+   * for the PRIMARY fallback. Pre-cycle-8 the bucket
+   * (`retrieval_error`) was recorded but the underlying error
+   * detail (`timeout` vs `adapter_error` vs `validation_error`)
+   * was discarded. Mirrors cycle-7 H3-c7's `sandboxErrorCode`
+   * pattern (typed bucket alongside free-form context).
+   */
+  primaryFallbackDetail: string | null;
   /** U5-b.3: per-trace counter of PII-blocked chunks (subset of chunksFiltered). */
   piiBlockedCount: number;
   /** U5-b.3: per-trace counter of license-blocked chunks (subset of chunksFiltered). */
@@ -124,6 +173,73 @@ export interface ResolvedContext {
 const PROFILE_KEY_DEFAULT = "default";
 
 /**
+ * M2-c8 + M3-c8 + M9-c8: helper that records a fallback into the
+ * trace AND emits a warning entry. Replaces the pre-cycle-8 inline
+ * `trace.fallbackReason ??= "..."` pattern which:
+ *   1. Lost causality on multi-fallback turns (`??=` only records
+ *      the first), and
+ *   2. Skipped the warning emit on `no_query` / `no_profile` paths
+ *      (silent disables, breaking the operator-visible-degradation
+ *      contract).
+ *
+ * The first call sets `primaryFallbackReason` + `primaryFallbackDetail`;
+ * subsequent calls APPEND to `fallbackReasons` so the cascade is
+ * preserved. EVERY fallback emits a warning (uniform contract).
+ */
+function recordFallback(
+  trace: RuntimeTraceMetrics,
+  warnings: string[],
+  reason: FallbackReason,
+  detail: string,
+): void {
+  if (trace.primaryFallbackReason === null) {
+    trace.primaryFallbackReason = reason;
+    trace.primaryFallbackDetail = detail;
+  }
+  trace.fallbackReasons.push(reason);
+  warnings.push(`fallback: ${reason} (${detail})`);
+}
+
+/**
+ * H4-c8 (cycle-8 audit closure §H4-c8) — collapse repeated warnings
+ * before the caller emits them. Pre-cycle-8 a workspace with N
+ * sources could produce N+ "source skipped" warnings per turn, each
+ * `console.info`'d separately by the chat flows. The result was
+ * stdout flooding under chat-volume load.
+ *
+ * The dedup is INTRA-TURN (per-call), not cross-turn: the
+ * orchestrator's warnings array is rebuilt every turn, so the
+ * collapse only runs across the warnings collected during ONE
+ * orchestration. Repeated reasons within the turn are grouped to
+ * `<reason> (xN)`; unique reasons pass through unchanged.
+ *
+ * The "reason key" is the prefix-up-to-first-colon (`plan:`,
+ * `exec:`, `cag:`, `assembler:`, `filter:`, `fallback:`) plus the
+ * first 40 characters of the message body. Distinct details within
+ * the same prefix collapse separately (so "plan: no embedding for
+ * source 1" and "plan: no embedding for source 2" stay distinct
+ * while three identical "plan: source disabled" lines collapse).
+ */
+export function dedupeWarnings(warnings: string[]): string[] {
+  const counts = new Map<string, { sample: string; count: number; firstIdx: number }>();
+  warnings.forEach((w, idx) => {
+    const head = w.slice(0, 80);
+    const existing = counts.get(head);
+    if (existing) {
+      existing.count++;
+    } else {
+      counts.set(head, { sample: w, count: 1, firstIdx: idx });
+    }
+  });
+  const ordered = Array.from(counts.values()).sort(
+    (a, b) => a.firstIdx - b.firstIdx,
+  );
+  return ordered.map((entry) =>
+    entry.count > 1 ? `${entry.sample} (x${entry.count})` : entry.sample,
+  );
+}
+
+/**
  * Resolve CAG pack + retrieval evidence for one runtime turn. Pure
  * orchestration over P1C/P2/P4/P5 primitives — no Model Access call,
  * no MCP dispatcher, no chat-state mutation.
@@ -142,7 +258,9 @@ export async function resolveAndAssembleContext(
     chunksFiltered: 0,
     chunksIncluded: 0,
     truncatedByBudget: 0,
-    fallbackReason: null,
+    primaryFallbackReason: null,
+    fallbackReasons: [],
+    primaryFallbackDetail: null,
     piiBlockedCount: 0,
     licenseBlockedCount: 0,
   };
@@ -168,8 +286,9 @@ export async function resolveAndAssembleContext(
     for (const w of resolved.warnings) warnings.push(`cag: ${w}`);
   } catch (err) {
     if (err instanceof CagRequiredError) throw err;
-    warnings.push(`cag: orchestrator caught ${(err as Error).message}; capabilityPack=null`);
-    trace.fallbackReason = "cag_resolver_error";
+    const detail = err instanceof Error ? err.message : String(err);
+    warnings.push(`cag: orchestrator caught ${detail}; capabilityPack=null`);
+    recordFallback(trace, warnings, "cag_resolver_error", detail);
   }
 
   // ── Retrieval (P4 + P5) ────────────────────────────────────────
@@ -178,11 +297,14 @@ export async function resolveAndAssembleContext(
     return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
-  // Skip when there's no query text — the planner would fan zero
-  // adapter calls anyway, but explicit short-circuit saves the
-  // profile lookup and keeps the trace clean.
+  // M2-c8: skip when there's no query text. Pre-cycle-8 this path
+  // silently set the fallback reason without emitting a warning;
+  // post-cycle-8 the warning is uniform with every other fallback
+  // path so callers checking `warnings.length > 0` see the
+  // degradation. The empty-query case is documented on the
+  // ResolveContextInput.query field per M4-c8.
   if (!input.query || input.query.trim().length === 0) {
-    trace.fallbackReason ??= "no_query";
+    recordFallback(trace, warnings, "no_query", "query is empty or whitespace-only");
     return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
@@ -192,11 +314,18 @@ export async function resolveAndAssembleContext(
   );
 
   if (!profile) {
-    // No RAC profile registered for this draft — retrieval simply
-    // doesn't run. This is the common case for agents that haven't
-    // opted in to retrieval, so emit a soft note rather than a
-    // warning that would noise up the trace.
-    trace.fallbackReason ??= "no_profile";
+    // M2-c8: no RAC profile registered for this draft. Pre-cycle-8
+    // this path was a silent fallback ("common case, don't noise
+    // up the trace"); post-cycle-8 the warning is uniform — every
+    // degraded path leaves a discoverable breadcrumb. The H4-c8
+    // dedup logic collapses repeats so high-volume agents don't
+    // spam the trace with the same "no_profile" line.
+    recordFallback(
+      trace,
+      warnings,
+      "no_profile",
+      `no enabled RAC profile with key=${profileKey} for draft=${input.agentDraftId}`,
+    );
     return { capabilityPack, retrievalEvidence: null, warnings, trace, sourceTrace };
   }
 
@@ -265,8 +394,7 @@ export async function resolveAndAssembleContext(
         `RAC retrieval failed in strict mode: ${detail}`,
       );
     }
-    warnings.push(`retrieval: failed (${detail}); proceeding without evidence`);
-    trace.fallbackReason ??= "retrieval_error";
+    recordFallback(trace, warnings, "retrieval_error", detail);
     evidence = null;
   }
 
