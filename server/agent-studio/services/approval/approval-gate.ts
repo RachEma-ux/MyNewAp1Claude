@@ -141,6 +141,17 @@ export interface ApprovalRowSnapshot {
  *   - status="denied"                         → denied
  *   - status="pending"                        → pending
  *   - row not found                           → approval_required
+ *
+ * M3-c6: `expiresAt` is the source of truth — `status` is a
+ * convenience column that lags. The runtime gate is correct
+ * regardless of whether the row's `status` was swept from `allowed`
+ * to `timed_out` after expiry. But operator-facing surfaces that
+ * filter by `status` (`tool-approvals-router.listByDraft` with
+ * `status: "allowed"`) overcount active permits until the sweep
+ * runs. Operators should run
+ * `scripts/migrations/manual/ags-pending-perm-expiry-sweep.sql`
+ * periodically (recommended weekly on active deployments) to
+ * reconcile `status` with `expiresAt`.
  */
 export function decideApprovalState(
   row: ApprovalRowSnapshot | null,
