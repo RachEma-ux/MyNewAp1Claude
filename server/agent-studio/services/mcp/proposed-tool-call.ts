@@ -161,17 +161,13 @@ export function approvalRequiredFor(cls: ToolRiskClass): boolean {
 
 // ── Canonicalization (D-PTC-4) ────────────────────────────────────────
 
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const k of Object.keys(value as Record<string, unknown>).sort()) {
-      out[k] = sortKeys((value as Record<string, unknown>)[k]);
-    }
-    return out;
-  }
-  return value;
-}
+// M1-c5 (cycle-5 audit closure §M1-c5) — single source of truth for
+// schema hash + key sorting. Pre-cycle-5 this file had its own copies
+// of `sortKeys` + `computeLiveSchemaHash`; both are now imported from
+// `tool-schema-hash.ts` for the schema-hash path. The local sortKeys
+// usage in `canonicalProposedToolCall` (D-PTC-4 hash, distinct concern)
+// uses the same exported helper.
+import { sortKeys, hashMcpToolSchema } from "./tool-schema-hash";
 
 /**
  * D-PTC-4 canonical form. Includes rationale (different rationale =
@@ -203,13 +199,13 @@ export function hashProposedToolCall(call: ProposedToolCall): string {
 
 // ── Schema hash (matches Phase 7 sync) ────────────────────────────────
 
+// M1-c5: delegates to single source of truth.
 function computeLiveSchemaHash(tool: McpTool): string {
-  const canonical = JSON.stringify({
+  return hashMcpToolSchema({
     name: tool.name,
-    description: tool.description ?? "",
-    inputSchema: sortKeys(tool.inputSchema ?? {}),
+    description: tool.description,
+    inputSchema: tool.inputSchema,
   });
-  return createHash("sha256").update(canonical).digest("hex");
 }
 
 // ── Argument-schema validator (D-PTC-2 #2) ────────────────────────────
