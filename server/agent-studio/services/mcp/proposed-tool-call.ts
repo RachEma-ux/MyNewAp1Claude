@@ -111,6 +111,18 @@ export interface ProposedToolCallValidatorContext {
   retrievalChunkIdSet: ReadonlySet<string>;
   /** Set of knowledge unit ids surfaced this turn. */
   knowledgeUnitIdSet: ReadonlySet<number>;
+  /**
+   * Set of tool-knowledge ids surfaced this turn — distinct from
+   * `knowledgeUnitIdSet`. Tool-knowledge rows live in
+   * `agsMcpToolKnowledge` (Phase 7 mirror; D-NKU-6); knowledge units
+   * live in `agsKnowledgeUnits`. They share an integer id space but
+   * the rows are NOT interchangeable. C3-c6 (cycle-6 audit closure
+   * §C3-c6) closed a latent bug where Gate 3 was iterating
+   * `call.toolKnowledgeIds` against `knowledgeUnitIdSet`. The bug was
+   * latent (no production caller emits `toolKnowledgeIds` today) but
+   * any future caller would have hit systematic false-rejection.
+   */
+  toolKnowledgeIdSet: ReadonlySet<number>;
   /** Set of CAG section ids loaded this turn. */
   cagBlockIdSet: ReadonlySet<string>;
   /** Sandbox health probe (Phase 9 / D-SBX-2). */
@@ -323,8 +335,16 @@ export async function validateProposedToolCall(
       };
     }
   }
+  // C3-c6 (cycle-6 audit closure §C3-c6): pre-cycle-6 this loop
+  // checked against `ctx.knowledgeUnitIdSet` — the wrong set.
+  // Tool-knowledge ids and knowledge-unit ids share an integer space
+  // but the rows live in different tables (agsMcpToolKnowledge vs
+  // agsKnowledgeUnits) with no overlap. Latent bug: no production
+  // caller emits toolKnowledgeIds today, so the misdirected check
+  // never fires. Any future caller would have hit systematic
+  // false-rejection.
   for (const id of call.toolKnowledgeIds ?? []) {
-    if (!ctx.knowledgeUnitIdSet.has(id)) {
+    if (!ctx.toolKnowledgeIdSet.has(id)) {
       return {
         ok: false,
         code: "fabricated_evidence",

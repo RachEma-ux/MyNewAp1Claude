@@ -119,6 +119,13 @@ export async function validateRuntimeToolCall(
     resolveRiskClass: () => riskClass,
     retrievalChunkIdSet: new Set(input.evidenceChunkIds ?? []),
     knowledgeUnitIdSet: new Set(input.knowledgeUnitIds ?? []),
+    // C3-c6: distinct set for tool-knowledge ids (Phase 7 mirror,
+    // D-NKU-6). Pre-cycle-6 this set didn't exist and Gate 3 fell
+    // back to knowledgeUnitIdSet — the wrong table. Currently no
+    // production caller passes toolKnowledgeIds (the field exists on
+    // the input interface for forward-compat), so the set is
+    // typically empty.
+    toolKnowledgeIdSet: new Set(input.toolKnowledgeIds ?? []),
     cagBlockIdSet: new Set(input.cagBlockIds ?? []),
     sandboxHealthOk: input.sandboxHealthOk ?? true,
   };
