@@ -51,6 +51,7 @@ import {
   hashProposedToolCall,
   type ProposedToolCall,
 } from "../mcp/proposed-tool-call";
+import { getApprovalEventBus } from "../runtime/approval-event-bus";
 
 // ── H1-c4 — MCP gate boundary ─────────────────────────────────────────
 // The set of YAML action-keys whose enforcement happens at THIS gate
@@ -373,6 +374,17 @@ export async function decideApprovalRequest(
       toolName: updated.toolName,
       expiresAt: expiresAt ? expiresAt.toISOString() : null,
     },
+  });
+
+  // C2-c4 PR-2 (D-RESUME-1) — emit on the in-process bus so any
+  // chat-stream waiter for this approvalRequestId can resume. Fired
+  // AFTER the audit row write so the bus event always succeeds the
+  // committed DB state. No-op if no subscribers; D-RESUME-3 covers
+  // the approve-before-subscribe race in the caller via DB re-eval.
+  getApprovalEventBus().emit({
+    approvalRequestId: updated.id,
+    status: updated.status as "allowed" | "denied" | "timed_out",
+    expiresAt,
   });
 
   return {
