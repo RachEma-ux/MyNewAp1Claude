@@ -151,6 +151,26 @@ export interface ToolCallTraceRow {
  *   - When validator rejected, approval/dispatch fields are NOT
  *     populated — a rejection short-circuits before approval/dispatch.
  *     Callers that pass them anyway get them silently dropped.
+ *
+ * C2-c7 (cycle-7 audit closure §C2-c7) — runtimeTraceId / messageId
+ * nullability is INTENTIONAL:
+ *   - runtimeTraceId is null on early-rejection paths (validator
+ *     rejection before the RAC trace is assigned) and on direct/system
+ *     dispatches that bypass the chat loop. Operator UI joining
+ *     trace rows back to RAC traces MUST tolerate null and render an
+ *     "unattached trace" placeholder rather than dropping the row.
+ *   - messageId is null when the dispatch was not initiated from a
+ *     chat message (simulation / manual_test source). Same UI-tolerance
+ *     contract.
+ *   - Neither column carries a foreign-key constraint at the DB
+ *     layer — partly because runtimeTraceId targets `agsRacRuntimeTraces`
+ *     in ASDB while messageId targets `ags_messages` in MAIN DB
+ *     (cross-DB FK is impossible), and partly because the trace
+ *     writer is best-effort by L4-c5 contract — a delayed FK violation
+ *     would re-introduce the silent-trace-loss problem the breadcrumb
+ *     was designed to avoid.
+ *   The persistence-side message-vs-trace asymmetry is documented on
+ *   `persistRuntimeToolCallTrace` (proposed-tool-call-runtime.ts).
  */
 export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceRow {
   const { verdict, code, message } = validationVerdictFromResult(input.validation);
