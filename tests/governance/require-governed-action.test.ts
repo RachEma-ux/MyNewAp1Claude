@@ -505,6 +505,50 @@ describe("requireGovernedAction — H1-c4 dual_control / MCP gate boundary", () 
     ).not.toMatch(/GOVERNANCE_ENFORCE_APPROVALS/);
   });
 
+  it("approval-gate.ts has no admin-role bypass — symmetry-of-roles is intentional (M4-c4)", async () => {
+    // Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M4-c4)
+    // surfaced the asymmetry: requireGovernedAction.ts:516 lets admin
+    // bypass capability checks; the MCP approval gate has NO admin
+    // shortcut. The decision is to ACCEPT the asymmetry — they govern
+    // different things (platform layer = tRPC procedures; MCP gate =
+    // runtime tool dispatches), and the audit trail benefit of "every
+    // tool call has a real approval row" is large.
+    //
+    // This test locks the absence: approval-gate.ts must not gain a
+    // code-level admin shortcut (e.g., `role === "admin"` early
+    // return). If the design changes (e.g., emergency-response need),
+    // add the bypass with a tagged audit row (`admin_auto_approval`)
+    // AND update this test with the new allowed shape.
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const src = readFileSync(
+      join(
+        process.cwd(),
+        "server/agent-studio/services/approval/approval-gate.ts",
+      ),
+      "utf8",
+    );
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+
+    // Two patterns to catch typical bypass shapes:
+    //   1. Quoted "admin" string (used in role comparisons)
+    //   2. The literal `isAdmin` / `bypassForAdmin` style identifier
+    expect(
+      stripped,
+      `M4-c4 violation: approval-gate.ts contains an "admin" role string ` +
+        `outside comments. The MCP gate is intentionally role-symmetric ` +
+        `(audit-trail integrity > admin ergonomics). If this is a deliberate ` +
+        `design change, add a tagged audit row + update this test.`,
+    ).not.toMatch(/['"]admin['"]/);
+    expect(
+      stripped,
+      `M4-c4 violation: approval-gate.ts references an admin-bypass ` +
+        `identifier. See M4-c4 doc block in approval-gate.ts header.`,
+    ).not.toMatch(/\b(isAdmin|bypassForAdmin|adminBypass|adminOverride)\b/);
+  });
+
   it("agsPendingPermissionRequests has no workspaceId column — implicit-safe via FK chain (L1-c4)", async () => {
     // Cycle-4 audit §L1-c4: this table has no workspace_id column;
     // cross-workspace safety today is implicit via the agentDraftId FK
