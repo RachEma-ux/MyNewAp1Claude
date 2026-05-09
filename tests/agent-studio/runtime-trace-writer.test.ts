@@ -190,6 +190,42 @@ describe("buildToolCallTraceRow", () => {
     expect(row.durationMs).toBe(30000);
   });
 
+  // ── M2-c7 (cycle-7 audit closure §M2-c7) — drop errorMessage on ok ─
+  // The "preserves error message for failed dispatch" test above
+  // pinned the error-side. The audit flagged the missing inverse:
+  // when `dispatchResult === "ok"`, any caller-provided
+  // `errorMessage` MUST be dropped so the failure-forensics column
+  // doesn't get seeded with garbage. Mirrors the H5-c6
+  // "traceTimeoutReason only when expired" + isRejected
+  // "drop fields that don't apply" patterns. Pre-cycle-7 the
+  // builder passed errorMessage through unconditionally; PR-F
+  // closes the gap structurally (builder enforces) AND assertively
+  // (this test).
+
+  it("M2-c7: dispatchResult='ok' drops caller-provided errorMessage (mirrors isRejected drop pattern)", () => {
+    const row = buildToolCallTraceRow({
+      workspaceId: 1,
+      agentId: 10,
+      agentDraftId: 100,
+      proposedToolCall: SAMPLE_HIGH_CALL,
+      proposedToolCallHash: "abc",
+      validation: okResult,
+      approvalDecision: "permit",
+      governanceVerdict: "allow",
+      dispatchResult: "ok",
+      // Caller passes a stray errorMessage with ok=true (could
+      // happen if a partial-failure tool returns a non-fatal warning
+      // string and a sloppy caller threads it through). The trace
+      // row MUST drop it — the column belongs to failure forensics
+      // only.
+      errorMessage: "this should be dropped",
+      durationMs: 5,
+    });
+    expect(row.dispatchResult).toBe("ok");
+    expect(row.errorMessage).toBeNull();
+    expect(row.durationMs).toBe(5);
+  });
+
   // ── H5-c6 — traceTimeoutReason invariant: only-set-when-expired ──
   // Pre-cycle-6 the trace row had no way to distinguish operator-wait
   // timeout from approval TTL elapsed; both collapsed to
