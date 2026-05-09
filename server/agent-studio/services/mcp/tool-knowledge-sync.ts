@@ -23,7 +23,6 @@
  * in place so historic traces still resolve.
  */
 
-import { createHash } from "crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection";
 import {
@@ -35,47 +34,22 @@ import {
   recordProvenance,
 } from "../ingestion";
 import type { McpTool } from "./types";
+// M1-c5 (cycle-5 audit closure §M1-c5) — single source of truth for
+// the canonical MCP tool-schema hash. Pre-cycle-5 this logic was
+// inlined here AND duplicated in proposed-tool-call.ts; both now
+// delegate to tool-schema-hash.ts.
+import {
+  canonicalizeMcpToolSchema,
+  hashMcpToolSchema,
+} from "./tool-schema-hash";
 
-// ── Pure helpers ──────────────────────────────────────────────────────
+// ── Pure helpers (re-exported for caller compatibility) ───────────────
 
-/**
- * Canonical JSON of an MCP tool snapshot. Deterministic regardless of
- * input key order so the hash is stable across runtime restarts.
- */
-export function canonicalizeToolSnapshot(snapshot: {
-  name: string;
-  description?: string;
-  inputSchema?: Record<string, unknown>;
-}): string {
-  return JSON.stringify({
-    name: snapshot.name,
-    description: snapshot.description ?? "",
-    inputSchema: sortKeys(snapshot.inputSchema ?? {}),
-  });
-}
+/** @deprecated Use `canonicalizeMcpToolSchema` from `./tool-schema-hash`. */
+export const canonicalizeToolSnapshot = canonicalizeMcpToolSchema;
 
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    const keys = Object.keys(value as Record<string, unknown>).sort();
-    for (const k of keys) {
-      out[k] = sortKeys((value as Record<string, unknown>)[k]);
-    }
-    return out;
-  }
-  return value;
-}
-
-export function computeSchemaHash(snapshot: {
-  name: string;
-  description?: string;
-  inputSchema?: Record<string, unknown>;
-}): string {
-  return createHash("sha256")
-    .update(canonicalizeToolSnapshot(snapshot))
-    .digest("hex");
-}
+/** @deprecated Use `hashMcpToolSchema` from `./tool-schema-hash`. */
+export const computeSchemaHash = hashMcpToolSchema;
 
 // ── Service contract ──────────────────────────────────────────────────
 
