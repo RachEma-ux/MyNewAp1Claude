@@ -59,6 +59,34 @@
  * `tests/governance/require-governed-action.test.ts` H2-c4 describe
  * block locks the invariant by asserting this file does NOT reference
  * the env-flag string.
+ *
+ * M4-c4 — admin role has NO fast-path through this gate (intentional)
+ * --------------------------------------------------------------------
+ * Cycle-4 audit (§M4-c4) surfaced the symmetry: `requireGovernedAction`
+ * (server/governance/requireGovernedAction.ts:516) lets admin role
+ * bypass capability checks, but the MCP approval gate has NO admin
+ * shortcut. Admins must follow the same queue-and-decide flow as any
+ * operator. This is intentional, not an oversight:
+ *
+ *   1. The two layers govern different things: the platform layer
+ *      governs tRPC procedures (e.g., admin can publish without
+ *      approval); this gate governs runtime tool dispatches (the
+ *      operator decides whether the agent's actions are safe).
+ *   2. Audit trail integrity: every dispatched tool call has a real
+ *      `agsPendingPermissionRequests` row recording who approved it,
+ *      when, and why. An admin auto-bypass would leave a hole in this
+ *      ledger and create a forensic gap if an admin's account is
+ *      compromised.
+ *   3. Security best practice: no special paths for admin. Admin
+ *      already has the operational fast path — they can self-approve
+ *      via `agentStudio.toolApprovals.decide` (their own UI click).
+ *      The cost is 1-2 extra clicks; the audit-trail benefit is large.
+ *   4. Symmetry-of-roles is a feature, not friction.
+ *
+ * Lockstep test: `tests/governance/require-governed-action.test.ts`
+ * M4-c4 describe block asserts this file does NOT contain a code-level
+ * admin bypass (e.g., `role === "admin"` short-circuit). The doc block
+ * here explains the boundary by name; the test guards the code body.
  */
 import { and, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection";
