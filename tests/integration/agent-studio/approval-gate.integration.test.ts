@@ -246,5 +246,81 @@ describe.skipIf(!hasDb())(
         .where(eq(agsRuntimePolicyEvents.runId, RUNTIME_RUN_ID));
       expect(after.length).toBe(beforeCount);
     });
+
+    // C2-c4 PR-3 (D-RESUME-1, D-RESUME-2) — resume bus end-to-end:
+    // a chat-stream-style waiter subscribes via getApprovalEventBus()
+    // and resolves when decideApprovalRequest() commits the new state.
+    // This integration test exercises the cross-module flow: gate
+    // → subscribe → decide → emit → resolve → re-eval → permit.
+    it("resume bus: waiter receives decide event + gate re-eval permits (C2-c4 PR-3)", async () => {
+      const { getApprovalEventBus, _resetApprovalEventBusForTests } =
+        await import(
+          "../../../server/agent-studio/services/runtime/approval-event-bus"
+        );
+      _resetApprovalEventBusForTests();
+
+      const RESUME_RUN_ID = 999_003;
+      const RESUME_DRAFT_ID = 999_003;
+      const RESUME_TOOL: ProposedToolCall = {
+        mcpServerId: "test-srv-c2",
+        toolName: "fetch_url",
+        arguments: { url: "https://example.com/c2c4" },
+        rationale: "operator approval flow",
+        evidenceChunkIds: [],
+        riskLevel: "high",
+        requiresApproval: true,
+      };
+
+      const db = getAsDb()!;
+      try {
+        // 1. Create the pending row.
+        const created = await createApprovalRequest({
+          runtimeRunId: RESUME_RUN_ID,
+          agentDraftId: RESUME_DRAFT_ID,
+          proposedToolCall: RESUME_TOOL,
+          description: "C2-c4 resume test",
+        });
+        expect(created.created).toBe(true);
+
+        // 2. Subscribe BEFORE deciding (mirrors chat-stream wait order).
+        const waitPromise = getApprovalEventBus().waitFor(
+          created.approvalRequestId,
+          5000, // 5s — generous for slow CI
+        );
+
+        // 3. Decide allowed — emits on the bus AFTER the audit row write.
+        const decideResult = await decideApprovalRequest({
+          approvalRequestId: created.approvalRequestId,
+          status: "allowed",
+          decidedBy: 999_103,
+          reason: "operator approves",
+          ttlSecondsOverride: null,
+        });
+        expect(decideResult.ok).toBe(true);
+        expect(decideResult.status).toBe("allowed");
+
+        // 4. Wait must resolve with the event (not "timeout").
+        const event = await waitPromise;
+        expect(event).not.toBe("timeout");
+        if (event === "timeout") return; // narrow for TS
+        expect(event.approvalRequestId).toBe(created.approvalRequestId);
+        expect(event.status).toBe("allowed");
+        expect(event.expiresAt).toBeInstanceOf(Date);
+
+        // 5. Gate re-eval (chat-stream's confirm step) returns permit.
+        const gateAfter = await evaluateApprovalGate({
+          agentDraftId: RESUME_DRAFT_ID,
+          proposedToolCall: RESUME_TOOL,
+        });
+        expect(gateAfter.decision).toBe("permit");
+      } finally {
+        await db
+          .delete(agsRuntimePolicyEvents)
+          .where(eq(agsRuntimePolicyEvents.runId, RESUME_RUN_ID));
+        await db
+          .delete(agsPendingPermissionRequests)
+          .where(eq(agsPendingPermissionRequests.runtimeRunId, RESUME_RUN_ID));
+      }
+    });
   },
 );

@@ -61,6 +61,7 @@ import {
   type RuntimeDispatchVerdict,
   type RuntimeValidationResult,
 } from "./services/runtime/proposed-tool-call-runtime";
+import { getApprovalEventBus } from "./services/runtime/approval-event-bus";
 import {
   CagRequiredError,
   type ComposerMode,
@@ -80,6 +81,18 @@ type SseSend = (data: unknown) => void;
 const MAX_TOOL_TURNS = 6;
 const INPUT_COST_PER_1M = 5; // USD, gpt-4o mid-tier estimate
 const OUTPUT_COST_PER_1M = 15;
+
+// C2-c4 PR-3 (D-RESUME-2) — bounded wait window for an operator to
+// decide on a pending approval before the chat-stream surrenders. Default
+// 300s = 5 min. Configurable via env so ops can tune per environment
+// (browser/proxy SSE timeouts vary). Lower bound 1s to avoid pathological
+// negative values; upper bound left unbounded — operator policy.
+function approvalResumeTimeoutMs(): number {
+  const raw = process.env.APPROVAL_RESUME_TIMEOUT_SEC;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+  return Math.max(1, seconds) * 1000;
+}
 
 function setupSse(res: Response): SseSend {
   res.setHeader("Content-Type", "text/event-stream");
@@ -439,6 +452,89 @@ async function runStreamingToolLoop(args: {
             runtimeRunId: sessionId,
             description: `chat session ${sessionId} · tool ${openaiName}`,
           });
+
+          // C2-c4 PR-3 (D-RESUME-2 + D-RESUME-3) — when the gate returns
+          // approval_required/approval_pending and we have an
+          // approvalRequestId to subscribe on, hold the chat-stream open
+          // for a bounded window instead of surfacing failure to the LLM
+          // immediately. The LLM only ever sees the FINAL outcome; the
+          // operator's decision (or timeout) determines what gets
+          // appended to chat history.
+          if (
+            !runtimeVerdict.ok &&
+            (runtimeVerdict.reason === "approval_required" ||
+              runtimeVerdict.reason === "approval_pending") &&
+            runtimeVerdict.approvalRequestId !== null
+          ) {
+            const reqId = runtimeVerdict.approvalRequestId;
+            const timeoutMs = approvalResumeTimeoutMs();
+
+            // Surface "awaiting" state to the SSE client (distinct from
+            // error). UI can render a "waiting for approval" badge here.
+            sendEvent({
+              type: "tool_end",
+              toolName: openaiName,
+              ok: false,
+              status: "awaiting_approval",
+              approvalRequestId: reqId,
+              timeoutSec: Math.floor(timeoutMs / 1000),
+            });
+
+            // D-RESUME-2 step 4 — race bus event vs timeout. Subscribe
+            // BEFORE the DB re-eval so an event that fires between
+            // re-eval and subscribe is not lost.
+            const waitPromise = getApprovalEventBus().waitFor(reqId, timeoutMs);
+
+            // D-RESUME-3 — DB-poll fallback for the approve-before-
+            // subscribe race: re-eval the gate once. If the row is
+            // already permit, skip the wait entirely.
+            const recheck = await gateRuntimeDispatch({
+              validation: runtimeValidation,
+              agentDraftId: draftId,
+              runtimeRunId: sessionId,
+              description: `chat session ${sessionId} · tool ${openaiName} · resume re-eval`,
+            });
+            if (recheck.ok) {
+              runtimeVerdict = recheck;
+            } else {
+              const event = await waitPromise;
+              if (event === "timeout") {
+                runtimeVerdict = {
+                  ok: false,
+                  reason: "approval_timeout",
+                  message: `approval did not resolve within ${Math.floor(timeoutMs / 1000)}s`,
+                  code: null,
+                  call: runtimeVerdict.call,
+                  approvalRequestId: reqId,
+                };
+              } else if (event.status === "allowed") {
+                // Defensive re-eval per D-RESUME-2 step 5 — confirm DB
+                // matches the bus event (handles rare race where row
+                // was decided then re-decided between events).
+                const final = await gateRuntimeDispatch({
+                  validation: runtimeValidation,
+                  agentDraftId: draftId,
+                  runtimeRunId: sessionId,
+                  description: `chat session ${sessionId} · tool ${openaiName} · resume confirm`,
+                });
+                runtimeVerdict = final;
+              } else {
+                // event.status is "denied" or "timed_out"
+                runtimeVerdict = {
+                  ok: false,
+                  reason:
+                    event.status === "denied"
+                      ? "approval_denied"
+                      : "approval_expired",
+                  message: `approval ${event.status}`,
+                  code: null,
+                  call: runtimeVerdict.call,
+                  approvalRequestId: reqId,
+                };
+              }
+            }
+          }
+
           if (!runtimeVerdict.ok) {
             // Follow-up A3: persist a trace row even on rejection so
             // the runs page surfaces blocked attempts.
