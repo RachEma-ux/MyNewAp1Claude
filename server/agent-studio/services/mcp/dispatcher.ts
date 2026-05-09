@@ -62,6 +62,31 @@
  * fires with explicit remediation guidance. Mirrors the cycle-4
  * `approval-gate.ts` 5-absence doc-block + tests pattern (H1-c4 +
  * H2-c4 + H3-c4 + L1-c4 + M4-c4).
+ *
+ * L3-c7 (cycle-7 audit closure §L3-c7) — OAuth token lifecycle:
+ *
+ * The transports' connect path resolves the bearer token from
+ * `services/mcp/auth.ts` (per-server-row OAuth state) ONCE at
+ * `getOrConnectMcpServer` time. Refresh on expiry happens
+ * implicitly: the next call after expiry sees a `401` from the
+ * server, the transport throws `McpAuthRequiredError`, and the
+ * mcp-manager FSM flips the row into `needs_auth` so the operator
+ * is prompted to re-authorize. There is NO mid-call silent
+ * refresh — a token that expires mid-`tools/call` surfaces as a
+ * hard failure (transport_http_error per M8-c7), not a transparent
+ * retry.
+ *
+ * Why no silent refresh:
+ *   - Refresh requires a network round-trip that could itself fail;
+ *     hiding that under a successful tools/call path makes the
+ *     latency model unpredictable for callers (the model loop's
+ *     turn budget would silently absorb refresh time).
+ *   - OAuth tokens for MCP servers are usually long-lived (1h+);
+ *     mid-call expiry is rare in practice. The `needs_auth` UI flow
+ *     handles the recovery case explicitly.
+ *   - A future change that adds mid-call refresh MUST update this
+ *     doc-block + the L3-c7 lockstep so reviewers see the latency-
+ *     model impact.
  */
 
 import * as repo from "../../repository";
@@ -341,24 +366,39 @@ export function sanitizeArgsForAudit(
 /**
  * Truncate the result preview written to the audit row payload.
  * Bytes (not chars) — JSON-stringified, then sliced.
+ *
+ * L4-c7 (cycle-7 audit closure §L4-c7): returns a discriminated
+ * `{ preview, truncated }` shape so the audit-row builder can pin
+ * the explicit `resultTruncated: boolean` field on the payload.
+ * Pre-cycle-7 the function returned just the preview value and
+ * truncation was inferable only via the "…[truncated]" sentinel
+ * string. External audit-row readers had to grep for the sentinel,
+ * which collided with any tool result that legitimately contained
+ * that substring.
  */
-function truncateResultPreview(result: unknown): unknown {
-  if (result == null) return null;
+function truncateResultPreview(result: unknown): {
+  preview: unknown;
+  truncated: boolean;
+} {
+  if (result == null) return { preview: null, truncated: false };
   let serialized: string;
   try {
     serialized = JSON.stringify(result);
   } catch {
-    return "[unserializable result]";
+    return { preview: "[unserializable result]", truncated: false };
   }
   if (serialized.length <= RESULT_PREVIEW_MAX_BYTES) {
     // Re-parse to keep it as structured data when small
     try {
-      return JSON.parse(serialized);
+      return { preview: JSON.parse(serialized), truncated: false };
     } catch {
-      return serialized;
+      return { preview: serialized, truncated: false };
     }
   }
-  return serialized.slice(0, RESULT_PREVIEW_MAX_BYTES) + "…[truncated]";
+  return {
+    preview: serialized.slice(0, RESULT_PREVIEW_MAX_BYTES) + "…[truncated]",
+    truncated: true,
+  };
 }
 
 // ── Authorization ──────────────────────────────────────────────────────────
@@ -480,6 +520,11 @@ export async function dispatchMcpToolCall(
     // filter "all sandbox timeouts in the last hour" without parsing
     // errorMessage.
     sandboxErrorCode: null,
+    // L4-c7: explicit truncation flag. False until the success-path
+    // calls `truncateResultPreview` and the helper reports
+    // `truncated: true` (the only path that flips this — failures
+    // don't write a resultPreview).
+    resultTruncated: false,
   };
 
   /** Helper to build a structured failure result + write the audit row */
@@ -791,7 +836,13 @@ export async function dispatchMcpToolCall(
   }
 
   // ── 10. Success — write the audit row + return ──
-  auditPayload.resultPreview = truncateResultPreview(result);
+  // L4-c7: capture both the (possibly truncated) preview AND the
+  // explicit `truncated` boolean. Operators investigating "did the
+  // model see the full tool result?" key off the boolean rather
+  // than grepping for the "…[truncated]" sentinel string.
+  const previewResult = truncateResultPreview(result);
+  auditPayload.resultPreview = previewResult.preview;
+  auditPayload.resultTruncated = previewResult.truncated;
   auditPayload.durationMs = Date.now() - startMs;
 
   let auditId: number | undefined;

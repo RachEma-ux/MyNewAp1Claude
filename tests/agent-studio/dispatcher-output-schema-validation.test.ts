@@ -144,7 +144,10 @@ describe("H2-c7 — dispatcher integration", () => {
     // validator block appears earlier than the truncateResultPreview
     // line (lexically AND in execution order).
     const validatorIdx = src.indexOf("validateMcpToolResponse(tool, result)");
-    const previewIdx = src.indexOf("auditPayload.resultPreview = truncateResultPreview");
+    // L4-c7 changed truncateResultPreview to return {preview, truncated}.
+    // The success path now binds the result first then assigns into the
+    // payload; match the call site rather than the (now-split) assignment.
+    const previewIdx = src.indexOf("truncateResultPreview(result)");
     expect(
       validatorIdx,
       "expected to find validateMcpToolResponse call",
