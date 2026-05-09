@@ -172,6 +172,18 @@ export type ConnectionEvent =
 /**
  * Errors thrown during connect/disconnect/callTool. Wrapped so the
  * caller can distinguish manager-level errors from arbitrary throws.
+ *
+ * M8-c7 (cycle-7 audit closure §M8-c7): the field is intentionally
+ * typed `string` rather than narrowed to `TransportErrorCode`.
+ * Reason: `mcp-manager.callMcpTool` re-throws dispatcher errors via
+ * `new McpError(dispatcherCode, ...)` for legacy-shim backward
+ * compatibility — those codes can be ANY `DispatchErrorCode` (e.g.
+ * `tool_call_timeout`, `governance_blocked`), not just transport-
+ * level codes. Narrowing the field would break the shim. Transport
+ * sites SHOULD use the closed `TransportErrorCode` enum so the
+ * dispatcher's `mapTransportCodeToDispatchCode` can route them to
+ * richer `DispatchErrorCode` variants instead of flattening into
+ * `tool_execution_failed`. The mapping is runtime, not compile-time.
  */
 export class McpError extends Error {
   constructor(
