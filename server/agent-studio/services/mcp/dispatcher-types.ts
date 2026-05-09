@@ -24,6 +24,14 @@ export type DispatchErrorCode =
   | "governance_blocked"
   | "tool_execution_failed"
   | "tool_call_timeout"
+  // H2-c7 (cycle-7 audit closure §H2-c7): MCP server returned a
+  // response whose shape doesn't match the tool's advertised
+  // outputSchema. Pre-cycle-7 the dispatcher accepted any response
+  // unchecked → malformed responses propagated to the trace and
+  // the LLM, where the model could reason on garbage data. New
+  // result-validator gate at post-invoke catches schema drift /
+  // server bugs and surfaces them with this distinct code.
+  | "schema_mismatch_on_output"
   // H3-c7 (cycle-7 audit closure §H3-c7): sandbox-specific failure
   // modes that the dispatcher used to collapse into the generic
   // `tool_execution_failed` bucket. Audit + trace + operator UI

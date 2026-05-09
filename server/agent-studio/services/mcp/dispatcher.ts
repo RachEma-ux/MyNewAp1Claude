@@ -92,6 +92,13 @@ import type {
 // error for forensics — operators with audit-row read access need
 // the unredacted message to debug security incidents.
 import { sanitizeMcpErrorMessage } from "./sanitize-error-message";
+// H2-c7 (cycle-7 audit closure §H2-c7): MCP response output-schema
+// validator. Runs at dispatcher post-invoke (before the success-path
+// audit-row write); no-ops when the tool has no outputSchema.
+// Mismatches surface as `schema_mismatch_on_output`, distinct from
+// `tool_execution_failed`, so model + operator UI can distinguish
+// server-returned-an-error from server-returned-wrong-shape.
+import { validateMcpToolResponse } from "./result-validator";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -732,6 +739,21 @@ export async function dispatchMcpToolCall(
     return fail(code, invokeError.message, {
       original: String(invokeError.original),
     });
+  }
+
+  // ── 9b. H2-c7: validate the response shape against the tool's
+  // outputSchema (when advertised). No-op when the tool doesn't
+  // declare an outputSchema (most don't yet). Mismatches surface as
+  // schema_mismatch_on_output — distinct from tool_execution_failed
+  // so audit + trace + operator UI can tell "server returned an
+  // error" from "server returned the wrong shape".
+  const responseFailure = validateMcpToolResponse(tool, result);
+  if (responseFailure) {
+    return fail(
+      "schema_mismatch_on_output",
+      responseFailure.message,
+      { code: responseFailure.code },
+    );
   }
 
   // ── 10. Success — write the audit row + return ──
