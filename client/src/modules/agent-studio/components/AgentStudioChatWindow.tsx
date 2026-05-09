@@ -36,6 +36,7 @@ import {
   Pencil,
   Check,
   Wrench,
+  Clock,
 } from "lucide-react";
 
 // ── Avatar colors (deterministic by name) — copied from source ────────────
@@ -188,8 +189,19 @@ export function AgentStudioChatWindow() {
   const [streamingText, setStreamingText] = useState("");
   // Tool activity buffer — rendered as tiny inline chips while the
   // streaming tool loop runs, cleared on `done`.
+  // H6-c7 (cycle-7 audit closure §H6-c7): chip status now includes
+  // `awaiting_approval` to render a pending-approval badge instead of
+  // collapsing the AwaitingApprovalEvent SSE event into a generic
+  // tool error. approvalRequestId + timeoutSec carry the operator-
+  // facing context (request id for click-through, countdown).
   const [activeTools, setActiveTools] = useState<
-    Array<{ name: string; status: "running" | "ok" | "error"; durationMs?: number }>
+    Array<{
+      name: string;
+      status: "running" | "ok" | "error" | "awaiting_approval";
+      durationMs?: number;
+      approvalRequestId?: number;
+      timeoutSec?: number;
+    }>
   >([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -270,17 +282,33 @@ export function AgentStudioChatWindow() {
             ]);
           } else if (data.type === "tool_end") {
             setActiveTools((prev) => {
-              // Mark the first still-running entry with this name as done
+              // Mark the first still-running entry with this name as done.
+              // H6-c7 (cycle-7 audit closure §H6-c7): also update the
+              // chip when an awaiting_approval event arrives — operator
+              // sees the dispatch is paused on operator decision rather
+              // than failed. The status discrimination MUST happen
+              // BEFORE the ok/error branch — otherwise an AwaitingApprovalEvent
+              // (`{ok: false, status: "awaiting_approval"}`) would
+              // collapse to "error" and confuse the operator.
               const idx = prev.findIndex(
                 (t) => t.name === data.toolName && t.status === "running"
               );
               if (idx < 0) return prev;
               const next = prev.slice();
-              next[idx] = {
-                name: data.toolName,
-                status: data.ok ? "ok" : "error",
-                durationMs: data.durationMs,
-              };
+              if (data.status === "awaiting_approval") {
+                next[idx] = {
+                  name: data.toolName,
+                  status: "awaiting_approval",
+                  approvalRequestId: data.approvalRequestId,
+                  timeoutSec: data.timeoutSec,
+                };
+              } else {
+                next[idx] = {
+                  name: data.toolName,
+                  status: data.ok ? "ok" : "error",
+                  durationMs: data.durationMs,
+                };
+              }
               return next;
             });
           } else if (data.type === "done") {
@@ -794,10 +822,20 @@ export function AgentStudioChatWindow() {
                     ? "bg-muted/50 border-muted-foreground/20 text-muted-foreground"
                     : t.status === "ok"
                     ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    : t.status === "awaiting_approval"
+                    ? // H6-c7: amber palette signals "operator action
+                      // required" without conflating with success/error.
+                      "bg-amber-500/10 border-amber-500/30 text-amber-500"
                     : "bg-destructive/10 border-destructive/30 text-destructive"
                 )}
                 title={
-                  t.durationMs != null
+                  t.status === "awaiting_approval"
+                    ? `${t.name} · awaiting operator approval` +
+                      (t.approvalRequestId != null
+                        ? ` (#${t.approvalRequestId})`
+                        : "") +
+                      (t.timeoutSec != null ? ` · timeout ${t.timeoutSec}s` : "")
+                    : t.durationMs != null
                     ? `${t.name} · ${t.durationMs}ms`
                     : t.name
                 }
@@ -806,11 +844,16 @@ export function AgentStudioChatWindow() {
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                 ) : t.status === "ok" ? (
                   <Check className="h-2.5 w-2.5" />
+                ) : t.status === "awaiting_approval" ? (
+                  <Clock className="h-2.5 w-2.5" />
                 ) : (
                   <X className="h-2.5 w-2.5" />
                 )}
                 <Wrench className="h-2.5 w-2.5" />
                 <span>{t.name}</span>
+                {t.status === "awaiting_approval" && t.timeoutSec != null && (
+                  <span className="opacity-70">· {t.timeoutSec}s</span>
+                )}
               </span>
             ))}
           </div>
