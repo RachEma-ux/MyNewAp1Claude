@@ -101,6 +101,36 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-scheduler] start skipped — ${message}`);
   }
 
+  // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
+  // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
+  // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
+  // function existed (`auto-sync.ts:installAutoSync`) but was never
+  // called at boot, leaving the mirror permanently empty unless an
+  // operator manually triggered `agentStudio.mcpSchemaSync.sync`.
+  //
+  // Resolver: env-flag-gated single-workspace fallback by default
+  // (AGENT_STUDIO_AUTO_SYNC_WORKSPACE_ID). Multi-workspace deployments
+  // inject a custom resolver via `setAutoSyncResolver()`. See
+  // `services/mcp/auto-sync-resolver.ts` header for the full rationale.
+  try {
+    const { installAutoSync } = await import("./services/mcp/auto-sync");
+    const { getAutoSyncResolver } = await import(
+      "./services/mcp/auto-sync-resolver"
+    );
+    installAutoSync({
+      resolveContext: (serverId: number) => getAutoSyncResolver()(serverId),
+      onError: (err, serverId) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[ags-mcp-auto-sync] sync failed for serverId=${serverId}: ${msg}`,
+        );
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-mcp-auto-sync] install skipped — ${message}`);
+  }
+
   // Step 4: Public API handlers for agentStudio.agent.publish + agentStudio.run.execute
   try {
     const { registerPublicApi } = await import("../platform/modules/module-gateway");
