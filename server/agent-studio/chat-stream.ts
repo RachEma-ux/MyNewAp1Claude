@@ -67,6 +67,10 @@ import {
 // The helper internally consults `getApprovalEventBus()`; the inline
 // import from approval-event-bus is no longer needed in this file.
 import { awaitApprovalDecision } from "./services/runtime/approval-resume-loop";
+// H8-c7 (cycle-7 audit closure §H8-c7): conversation-context windowing
+// before each model.execute() call. Bounded by MAX_CONTEXT_TOKENS env
+// var (default 32000). Pre-cycle-7 long sessions grew unbounded.
+import { windowChatHistory } from "./services/runtime/context-window";
 import {
   CagRequiredError,
   type ComposerMode,
@@ -145,6 +149,33 @@ const MAX_CALLS_PER_TOOL_PER_REQUEST = (() => {
       `[chat] MAX_CALLS_PER_TOOL_PER_REQUEST=${raw} is not a positive integer; using default 3`,
     );
     return 3;
+  }
+  return n;
+})();
+
+/**
+ * H8-c7 (cycle-7 audit closure §H8-c7) — token budget for
+ * windowing the conversation history before each model.execute()
+ * call. Default 32000 — covers GPT-4 Turbo / Claude 3 with
+ * headroom for the model's response. Operator override via
+ * `MAX_CONTEXT_TOKENS` env var to match deployment-specific
+ * model windows; out-of-range values warn + fall back.
+ *
+ * Single global budget rather than model-specific; model-aware
+ * windowing (read context_window from a per-model registry) is
+ * deferred to cycle-8 — requires a registry that doesn't exist
+ * yet. The estimate is intentionally a heuristic (chars/4) so
+ * tuning the env var is the right knob, not adjusting the math.
+ */
+const MAX_CONTEXT_TOKENS = (() => {
+  const raw = process.env.MAX_CONTEXT_TOKENS;
+  if (!raw) return 32_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[chat] MAX_CONTEXT_TOKENS=${raw} is not a positive integer; using default 32000`,
+    );
+    return 32_000;
   }
   return n;
 })();
@@ -392,6 +423,41 @@ async function runStreamingToolLoop(args: {
       }
     }
 
+    // H8-c7: window the message history to fit MAX_CONTEXT_TOKENS
+    // BEFORE the model.execute() call. Pre-cycle-7 long sessions
+    // grew unbounded until the provider's context limit was hit
+    // and the chat failed unrecoverably. The helper preserves the
+    // system message + as much recent history as fits.
+    const windowed = windowChatHistory(messagesForModelAccess, {
+      maxTokens: MAX_CONTEXT_TOKENS,
+    });
+    if (windowed.truncated) {
+      // Best-effort observability — operators can grep for
+      // context_truncation events to spot sessions that hit the
+      // budget. Failure to write the audit row does NOT fail the
+      // chat (mirrors L4-c5 trace-vs-audit + H7-c7 loop-guard
+      // shape).
+      try {
+        await repo.appendRuntimePolicyEvent({
+          runId: sessionId,
+          policyKey: "context_truncation",
+          decision: "warn",
+          reason: "context_window_exceeded",
+          payload: {
+            maxTokens: MAX_CONTEXT_TOKENS,
+            evictedCount: windowed.evictedCount,
+            estimatedTokens: windowed.estimatedTokens,
+            keptCount: windowed.messages.length,
+            source: "chat-stream",
+          },
+        });
+      } catch (e) {
+        console.warn(
+          `[chat-stream] context_truncation event write failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
     // Phase 27.3 — non-streaming Model Access execute per turn.
     // Tool-call streaming on Model Access is deferred to a future
     // phase; we honestly degrade by emitting the turn's assistant
@@ -400,7 +466,7 @@ async function runStreamingToolLoop(args: {
     const executeInput: ModelAccessExecuteInput = {
       providerConnectionId,
       modelRef,
-      messages: messagesForModelAccess,
+      messages: windowed.messages,
       tools: toolSchemas as unknown as unknown[],
       stream: false,
       tokenBudget: maxTokens,
