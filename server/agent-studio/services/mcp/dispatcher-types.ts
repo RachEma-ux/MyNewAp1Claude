@@ -150,4 +150,19 @@ export interface McpDispatchAuditPayload {
    * hour" without parsing `errorMessage`.
    */
   sandboxErrorCode: string | null;
+  /**
+   * L4-c7 (cycle-7 audit closure §L4-c7): explicit boolean flag
+   * recording whether `resultPreview` was truncated to fit the
+   * `RESULT_PREVIEW_MAX_BYTES` audit-row budget. Pre-cycle-7 the
+   * truncation was implicit (the preview ended in the literal
+   * "…[truncated]" sentinel string). External readers parsing the
+   * audit row had to grep for the sentinel in `resultPreview` —
+   * fragile because the sentinel is a string and the preview's
+   * own data could legitimately contain that substring. The
+   * boolean is unambiguous: `true` means the original result
+   * exceeded the budget; `false` means the preview is the full
+   * serialized result. Operators investigating "did the model see
+   * the full tool result?" can now key off the flag directly.
+   */
+  resultTruncated: boolean;
 }

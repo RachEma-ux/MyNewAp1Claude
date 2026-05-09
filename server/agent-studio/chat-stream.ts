@@ -843,6 +843,26 @@ async function runStreamingToolLoop(args: {
           content: toolContent,
           toolPayload: { toolCallId: call.id, name: openaiName },
         });
+        // L2-c7 (cycle-7 audit closure §L2-c7) — KNOWN LIMITATION:
+        // `result` is emitted as-is with no size cap on this path.
+        // A 10MB tool result (e.g. a file-read MCP tool returning a
+        // large blob) JSON-stringifies to >10MB on the wire and
+        // could stall the SSE stream. Mitigation rationale for
+        // deferring the cap to a follow-up:
+        //   1. Most MCP tools return small results (search hits,
+        //      file metadata, structured records — KB scale).
+        //   2. Durable persistence happened above (`appendChatMessage`)
+        //      so the message-store row is the canonical record; a
+        //      stalled SSE doesn't lose data, only the live notification.
+        //   3. The right cap point is the MCP tool-spec
+        //      `outputSchema` (H2-c7 framework already in place) —
+        //      schema-level enforcement at registration time
+        //      prevents oversize results from ever reaching the
+        //      dispatcher, rather than SSE-side truncation that
+        //      would diverge what the model sees from what the
+        //      operator UI sees. Folded into the H2-c7 schema-
+        //      validation follow-up; lockstep test pins this
+        //      doc-block so the limitation is discoverable.
         sendEvent({
           type: "tool_end",
           toolName: openaiName,
