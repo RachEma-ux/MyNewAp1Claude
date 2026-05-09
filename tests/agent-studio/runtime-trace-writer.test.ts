@@ -189,6 +189,68 @@ describe("buildToolCallTraceRow", () => {
     expect(row.errorMessage).toBe("timeout after 30s");
     expect(row.durationMs).toBe(30000);
   });
+
+  // ── H5-c6 — traceTimeoutReason invariant: only-set-when-expired ──
+  // Pre-cycle-6 the trace row had no way to distinguish operator-wait
+  // timeout from approval TTL elapsed; both collapsed to
+  // approvalStatus="expired". H5-c6 adds traceTimeoutReason; the
+  // builder enforces "only set when approvalStatus === 'expired'" so
+  // the column's semantic stays clean.
+
+  it("H5-c6: traceTimeoutReason flows through when approvalDecision='expired'", () => {
+    const row = buildToolCallTraceRow({
+      workspaceId: 1,
+      agentId: 10,
+      agentDraftId: 100,
+      proposedToolCall: SAMPLE_HIGH_CALL,
+      proposedToolCallHash: "abc",
+      validation: okResult,
+      approvalDecision: "expired",
+      approvalRequestId: 77,
+      governanceVerdict: "allow",
+      dispatchResult: "blocked",
+      traceTimeoutReason: "operator_wait_timeout",
+    });
+    expect(row.approvalStatus).toBe("expired");
+    expect(row.traceTimeoutReason).toBe("operator_wait_timeout");
+  });
+
+  it("H5-c6: traceTimeoutReason DROPPED when approvalDecision is not 'expired' (caller passes non-null)", () => {
+    // The builder is responsible for not letting downstream consumers
+    // see traceTimeoutReason on rows where it's semantically wrong.
+    // Caller passes "operator_wait_timeout" but approvalDecision is
+    // "permit" — builder must drop the timeout reason.
+    const row = buildToolCallTraceRow({
+      workspaceId: 1,
+      agentId: 10,
+      agentDraftId: 100,
+      proposedToolCall: SAMPLE_HIGH_CALL,
+      proposedToolCallHash: "abc",
+      validation: okResult,
+      approvalDecision: "permit",
+      approvalRequestId: 77,
+      governanceVerdict: "allow",
+      dispatchResult: "ok",
+      traceTimeoutReason: "operator_wait_timeout", // contradiction
+    });
+    expect(row.approvalStatus).toBe("allowed");
+    expect(row.traceTimeoutReason).toBeNull();
+  });
+
+  it("H5-c6: traceTimeoutReason DROPPED on validator rejection (chain short-circuited)", () => {
+    const row = buildToolCallTraceRow({
+      workspaceId: 1,
+      agentId: 10,
+      agentDraftId: 100,
+      proposedToolCall: SAMPLE_HIGH_CALL,
+      proposedToolCallHash: "abc",
+      validation: rejectedResult,
+      approvalDecision: "expired",
+      traceTimeoutReason: "operator_wait_timeout",
+    });
+    expect(row.approvalStatus).toBeNull();
+    expect(row.traceTimeoutReason).toBeNull();
+  });
 });
 
 describe("buildRacTracePatch", () => {

@@ -77,6 +77,15 @@ export function approvalStatusForTrace(
   }
 }
 
+/**
+ * H5-c6 (cycle-6 audit closure §H5-c6) — distinguishes why an
+ * `approvalStatus = "expired"` trace row got there. NULL when
+ * `approvalStatus !== "expired"`.
+ */
+export type TraceTimeoutReason =
+  | "approval_ttl_elapsed"
+  | "operator_wait_timeout";
+
 export interface ToolCallTraceInput {
   workspaceId: number;
   agentId: number;
@@ -94,6 +103,16 @@ export interface ToolCallTraceInput {
   dispatchAuditId?: number | null;
   durationMs?: number | null;
   errorMessage?: string | null;
+  /**
+   * H5-c6: caller's distinction when `approvalDecision === "expired"`.
+   * Set to `"operator_wait_timeout"` when the verdict reason was
+   * `approval_timeout` (chat-stream surrendered after the bounded
+   * wait). Set to `"approval_ttl_elapsed"` when the audit gate
+   * computed `expiresAt` was in the past (operator granted approval
+   * but TTL elapsed before re-use). The build phase enforces the
+   * "only set when expired" invariant.
+   */
+  traceTimeoutReason?: TraceTimeoutReason | null;
 }
 
 export interface ToolCallTraceRow {
@@ -115,6 +134,8 @@ export interface ToolCallTraceRow {
   dispatchAuditId: number | null;
   durationMs: number | null;
   errorMessage: string | null;
+  /** H5-c6: only set when approvalStatus === "expired"; else null. */
+  traceTimeoutReason: TraceTimeoutReason | null;
 }
 
 /**
@@ -142,6 +163,14 @@ export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceR
         input.approvalDecision,
       );
 
+  // H5-c6: traceTimeoutReason is ONLY meaningful when approvalStatus
+  // is "expired". Drop it on any other status so the column's
+  // semantic stays clean — operators querying for `expired` rows can
+  // group by `traceTimeoutReason` without filtering out spurious
+  // values from rows where it doesn't apply.
+  const traceTimeoutReason =
+    approvalStatus === "expired" ? input.traceTimeoutReason ?? null : null;
+
   return {
     workspaceId: input.workspaceId,
     agentId: input.agentId,
@@ -161,6 +190,7 @@ export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceR
     dispatchAuditId: isRejected ? null : input.dispatchAuditId ?? null,
     durationMs: input.durationMs ?? null,
     errorMessage: input.errorMessage ?? null,
+    traceTimeoutReason,
   };
 }
 
@@ -221,6 +251,7 @@ export async function recordToolCallTrace(
       dispatchAuditId: row.dispatchAuditId,
       durationMs: row.durationMs,
       errorMessage: row.errorMessage,
+      traceTimeoutReason: row.traceTimeoutReason,
     })
     .returning({ id: agsToolCallTraces.id });
   return { id: created.id };
