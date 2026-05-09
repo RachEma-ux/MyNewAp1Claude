@@ -84,6 +84,14 @@ import type {
   DispatchErrorCode,
   McpDispatchAuditPayload,
 } from "./dispatcher-types";
+// C1-c7 (cycle-7 audit closure §C1-c7): scrub PII / secrets from
+// `result.error.message` at the dispatcher boundary so 3 downstream
+// sinks (SSE tool_end / agsToolCallTraces.errorMessage / role="tool"
+// LLM message-content) automatically receive the sanitized version.
+// The audit payload (`auditPayload.errorMessage`) keeps the RAW
+// error for forensics — operators with audit-row read access need
+// the unredacted message to debug security incidents.
+import { sanitizeMcpErrorMessage } from "./sanitize-error-message";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -348,6 +356,9 @@ export async function dispatchMcpToolCall(
     message: string,
     details?: Record<string, unknown>
   ): Promise<DispatchMcpToolCallResult> => {
+    // C1-c7: audit row keeps the RAW message (forensics); the
+    // returned result carries the SANITIZED message (operator-UI /
+    // LLM / SSE).
     auditPayload.errorCode = code;
     auditPayload.errorMessage = message;
     auditPayload.durationMs = Date.now() - startMs;
@@ -360,19 +371,27 @@ export async function dispatchMcpToolCall(
         payload: auditPayload,
       });
     } catch {
-      // Audit write failed during a fail() — return internal_error
+      // Audit write failed during a fail() — return internal_error.
+      // Sanitize the inner message before exposing it.
       return {
         ok: false,
         error: {
           code: "internal_error",
-          message: `Audit write failed while reporting ${code}: ${message}`,
+          message:
+            sanitizeMcpErrorMessage(
+              `Audit write failed while reporting ${code}: ${message}`,
+            ) ?? "internal error",
         },
         durationMs: Date.now() - startMs,
       };
     }
     return {
       ok: false,
-      error: { code, message, details },
+      error: {
+        code,
+        message: sanitizeMcpErrorMessage(message) ?? message,
+        details,
+      },
       durationMs: auditPayload.durationMs,
       auditId,
       governanceVerdict: auditPayload.preVerdict ?? undefined,
@@ -584,12 +603,14 @@ export async function dispatchMcpToolCall(
       payload: auditPayload,
     });
   } catch (e) {
-    // R5: audit write failure on a successful invoke is also fatal
+    // R5: audit write failure on a successful invoke is also fatal.
+    // C1-c7: sanitize the error message before exposing it.
+    const rawMessage = `Audit row write failed after successful invoke: ${e instanceof Error ? e.message : String(e)}`;
     return {
       ok: false,
       error: {
         code: "internal_error",
-        message: `Audit row write failed after successful invoke: ${e instanceof Error ? e.message : String(e)}`,
+        message: sanitizeMcpErrorMessage(rawMessage) ?? "internal error",
       },
       durationMs: auditPayload.durationMs,
       governanceVerdict: preVerdict,
