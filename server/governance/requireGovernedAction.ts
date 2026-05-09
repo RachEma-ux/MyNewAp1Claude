@@ -286,22 +286,70 @@ export async function requireGovernedAction(
     );
 
     if (!approvalSatisfied) {
+      // R6-c3: env-flag-gated approval enforcement. Cycle-3 audit
+      // (`/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md` §2.5) found
+      // that the prior placeholder logged "approval_logged" as success
+      // and proceeded — so 101 R3+ actions declaring approval (R3 role_any
+      // workspace.approve / R4 dual_control agent.controlPlane.promote /
+      // R5 dual_control catalog.publish / etc.) silently bypassed
+      // approval enforcement at this layer.
+      //
+      // Migration path: GOVERNANCE_ENFORCE_APPROVALS defaults to "false"
+      // to preserve current operator workflows. When set to "true" (or
+      // "1"), the function returns buildDenial — fail-closed — until the
+      // caller passes a satisfying `approvals` array. Operators flip the
+      // flag in staging once their UI / admin tooling is wired to
+      // present approval-token submission, then promote to production.
+      //
+      // Either way the audit log now distinguishes the two modes via
+      // metadata.placeholder so operators can grep for residual gaps:
+      // false-mode emits decision_result="success" with placeholder=true;
+      // true-mode emits decision_result="denied" with placeholder=false.
+      const enforce =
+        process.env.GOVERNANCE_ENFORCE_APPROVALS === "true" ||
+        process.env.GOVERNANCE_ENFORCE_APPROVALS === "1";
+
+      if (enforce) {
+        await audit.log({
+          actor_id: input.actorPrincipalId,
+          action_type: "GATE_CHECK",
+          target_type: "approval_required",
+          target_id: input.subject.subjectId,
+          workspace_id: input.workspaceId ?? null,
+          decision_result: "denied",
+          metadata: {
+            actionKey: input.actionKey,
+            approvalRule: actionDef.approval,
+            reason: "approval_required",
+            placeholder: false,
+            enforced: true,
+          },
+        });
+        return buildDenial(
+          input,
+          actionDef.risk,
+          now,
+          `Approval required for "${input.actionKey}" (rule: ${actionDef.approval}) — ` +
+            `caller did not provide a satisfying approvals array`,
+        );
+      }
+
       approvalStatus = "pending";
-      // For now, log that approval is pending but don't block
-      // In production, this would query the approvals table
-      // and block if no approval exists. Since the existing system
-      // doesn't have a separate approvals table yet, we log and continue.
       try {
         await audit.log({
           actor_id: input.actorPrincipalId,
           action_type: "GATE_CHECK",
           target_type: "approval_required",
           target_id: input.subject.subjectId,
+          workspace_id: input.workspaceId ?? null,
           decision_result: "success",
           metadata: {
             actionKey: input.actionKey,
             approvalRule: actionDef.approval,
             status: "approval_logged",
+            placeholder: true,
+            enforced: false,
+            note: "set GOVERNANCE_ENFORCE_APPROVALS=true to fail-close this path",
           },
         });
       } catch {
