@@ -591,6 +591,11 @@ async function runStreamingToolLoop(args: {
           args: parsedArgs,
           source: "live_runtime",
           runtimeRunId: sessionId,
+          // M4-c5: thread the verdict's approval-row id (when present)
+          // into the dispatcher's audit payload so forensics can resolve
+          // "which approval permitted this dispatch" without joining
+          // through agsToolCallTraces.
+          approvalRequestId: runtimeVerdict?.approvalRequestId ?? undefined,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {

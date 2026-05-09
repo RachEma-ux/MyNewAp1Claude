@@ -558,4 +558,59 @@ describe("dispatchMcpToolCall", () => {
     // for both, but the spy records two separate calls — that's the
     // invariant: dispatcher emits one row per call, never deduplicates).
   });
+
+  // ── M4-c5 ── 16. approvalRequestId omitted → audit payload carries `null` ──
+  // Cycle-5 §M4-c5: forensic completeness — the dispatcher's
+  // `agsRuntimePolicyEvents` row should record the
+  // `agsPendingPermissionRequests` id that permitted the dispatch
+  // when present. Direct/system paths (e.g. agentDraftId=-1, manual
+  // tests) omit it; the field defaults to `null`.
+  it("omits approvalRequestId → audit payload.approvalRequestId is null (M4-c5)", async () => {
+    await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: { title: "x" },
+      source: "live_runtime",
+      // no approvalRequestId
+    });
+    const call = expectAuditCalled("allow");
+    expect(call.payload.approvalRequestId).toBeNull();
+  });
+
+  // ── M4-c5 ── 17. approvalRequestId provided → flows verbatim into audit payload ──
+  it("provided approvalRequestId → audit payload.approvalRequestId === that id (M4-c5)", async () => {
+    await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: { title: "x" },
+      source: "live_runtime",
+      approvalRequestId: 4242,
+    });
+    const call = expectAuditCalled("allow");
+    expect(call.payload.approvalRequestId).toBe(4242);
+  });
+
+  // ── M4-c5 ── 18. approvalRequestId flows into the FAILURE audit row too ──
+  // Forensics on rejected dispatches must also be one query away from
+  // the approval row that drove the decision (e.g., dispatch refused
+  // because pre-invoke deny → operator wants to see "approval N told
+  // us to allow, but pre-invoke later denied").
+  it("approvalRequestId flows into failure audit payload (M4-c5)", async () => {
+    (evaluateMcpPreInvoke as any).mockResolvedValue({
+      verdict: "deny",
+      reason: "policy-test",
+    });
+    await dispatchMcpToolCall({
+      agentDraftId: 100,
+      runtimeRunId: 5,
+      toolName: "mcp__github__create_issue",
+      args: {},
+      source: "live_runtime",
+      approvalRequestId: 7777,
+    });
+    const call = expectAuditCalled("deny");
+    expect(call.payload.approvalRequestId).toBe(7777);
+  });
 });

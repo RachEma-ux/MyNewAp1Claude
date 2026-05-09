@@ -43,6 +43,16 @@ export interface DispatchMcpToolCallInput {
   source: DispatchSource;
   /** Optional caller context for audit */
   caller?: { userId?: number; sessionId?: string };
+  /**
+   * M4-c5 (cycle-5 audit closure §M4-c5): when this dispatch was
+   * permitted by an `agsPendingPermissionRequests` row (i.e. the
+   * runtime gate's `approvalRequestId`), pass it here so the
+   * dispatcher writes it into the audit payload. Eliminates the
+   * forensic two-hop reconstruction (audit row → trace row →
+   * approval row). Optional — direct/system dispatches that bypass
+   * approval omit it.
+   */
+  approvalRequestId?: number;
 }
 
 export interface DispatchMcpToolCallResult {
@@ -87,4 +97,12 @@ export interface McpDispatchAuditPayload {
   durationMs: number;
   cost: number | null;
   caller: { userId?: number; sessionId?: string } | null;
+  /**
+   * M4-c5: approval-request id when this dispatch was permitted by
+   * an `agsPendingPermissionRequests` row. `null` for direct/system
+   * paths (e.g., `agentDraftId === -1`, manual ad-hoc tests). Allows
+   * forensic reconstruction without the dispatcher → trace → approval
+   * two-hop join.
+   */
+  approvalRequestId: number | null;
 }
