@@ -202,24 +202,44 @@ export interface RacTracePatchInput {
   cagCompiledHash?: string | null;
 }
 
-export interface RacTracePatch {
+export type RacTracePatch = Partial<{
   plannerMode: string | null;
   plannerReason: string | null;
   cagCompiledHash: string | null;
-}
+}>;
 
 /**
- * Pure: normalize an arbitrary patch into the canonical trace row shape
- * (every nullable field present, even if null). Callers can pass a
- * partial — anything missing comes back as null and the writer sends
- * the SET clause exactly once.
+ * Pure: filter an arbitrary patch input down to ONLY the fields the
+ * caller explicitly provided (i.e. keys that are present, even with
+ * a `null` value). Missing keys are omitted from the output so the
+ * downstream `patchRacRuntimeTrace` writer can build a SET clause
+ * that targets only those fields.
+ *
+ * H4-c7 / C2-c7 (cycle-7 audit closure §H4-c7) — pre-cycle-7 this
+ * function normalized every missing field to `null` and the writer
+ * sent all 3 fields to Drizzle's `.set()`. Drizzle's
+ * `.set({foo: null})` is indistinguishable from
+ * `.set({foo: value})` in SQL — both write the literal NULL. Two
+ * concurrent callers could race: caller A sets
+ * `{plannerMode: "hybrid_cag_rag"}`; caller B then patches
+ * `{plannerReason: "fresh"}` (no plannerMode key); the second UPDATE
+ * overwrites A's plannerMode with NULL.
+ *
+ * The new contract distinguishes:
+ *   - key absent              → leave the column alone (omit from SET)
+ *   - key present with `null` → explicitly clear the column
+ *   - key present with value  → set the column to that value
+ *
+ * Idempotent — calling twice on the same input produces the same
+ * output. Returns an empty object when no keys were provided
+ * (`patchRacRuntimeTrace` short-circuits in that case).
  */
 export function buildRacTracePatch(input: RacTracePatchInput): RacTracePatch {
-  return {
-    plannerMode: input.plannerMode ?? null,
-    plannerReason: input.plannerReason ?? null,
-    cagCompiledHash: input.cagCompiledHash ?? null,
-  };
+  const out: RacTracePatch = {};
+  if ("plannerMode" in input) out.plannerMode = input.plannerMode ?? null;
+  if ("plannerReason" in input) out.plannerReason = input.plannerReason ?? null;
+  if ("cagCompiledHash" in input) out.cagCompiledHash = input.cagCompiledHash ?? null;
+  return out;
 }
 
 // ── DB-backed writers ─────────────────────────────────────────────────
@@ -264,12 +284,12 @@ export async function patchRacRuntimeTrace(
   const db = getAsDb();
   if (!db) throw new Error("ASDB unavailable");
   const norm = buildRacTracePatch(patch);
+  // H4-c7: spread only the keys the caller provided. An UPDATE with
+  // empty SET is a SQL syntax error AND a wasted round-trip — skip
+  // the call entirely when there's nothing to write.
+  if (Object.keys(norm).length === 0) return;
   await db
     .update(agsRacRuntimeTraces)
-    .set({
-      plannerMode: norm.plannerMode,
-      plannerReason: norm.plannerReason,
-      cagCompiledHash: norm.cagCompiledHash,
-    })
+    .set(norm)
     .where(eq(agsRacRuntimeTraces.id, traceId));
 }
