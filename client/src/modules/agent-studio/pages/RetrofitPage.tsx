@@ -445,7 +445,17 @@ function ApprovalsPanel({ agentDraftId }: { agentDraftId: number | null }) {
   const canDecide = canDecideApproval(user?.role);
   const list = trpc.agentStudio.toolApprovals.listByDraft.useQuery(
     { agentDraftId: agentDraftId ?? 0, status: "pending", limit: 50 },
-    { enabled: agentDraftId !== null },
+    {
+      enabled: agentDraftId !== null,
+      // M3-c4 (cycle-4 audit §M3-c4) — refetch every 5s so a second
+      // operator's view stays in sync after operator A decides. Without
+      // this, the list was query-invalidate-only (refresh on local
+      // mutation), so two-operator coordination collapsed to "first
+      // operator's view." 5s rather than AgentRunsPage's 2s because
+      // RetrofitPage approval rows are typically longer-lived than
+      // per-run permission rows.
+      refetchInterval: 5000,
+    },
   );
   const decide = trpc.agentStudio.toolApprovals.decide.useMutation({
     onSuccess: (res) => {
