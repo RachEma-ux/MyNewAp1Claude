@@ -143,6 +143,20 @@ export const toolApprovalsRouter = router({
         .limit(input.limit);
     }),
 
+  /**
+   * M3-c6: filtering by `status: "allowed"` returns rows whose
+   * `expiresAt` may already be in the past. The runtime gate
+   * (`evaluateApprovalGate`) reads `expiresAt` per-call and rejects
+   * expired rows correctly, but this listing endpoint surfaces
+   * `status` verbatim. Operators who want a "currently-permitted"
+   * count should either (a) run the periodic expiry-sweep SQL
+   * (`scripts/migrations/manual/ags-pending-perm-expiry-sweep.sql`)
+   * which flips elapsed `allowed` rows to `timed_out` with
+   * `reason='expiry_sweep'`, or (b) post-filter the response by
+   * `expiresAt > now`. We do not auto-filter at the SQL layer
+   * because that would hide rows the operator legitimately wants
+   * to see (e.g. for audit/forensic purposes).
+   */
   listByDraft: protectedProcedure
     .input(
       z.object({
