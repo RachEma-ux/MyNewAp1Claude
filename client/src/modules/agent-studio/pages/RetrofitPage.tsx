@@ -42,6 +42,28 @@ import { PageHeader, LoadingState, EmptyState, SectionLabel } from "../component
  * NOT a security boundary — the server enforces RBAC. This is purely a UX
  * affordance to avoid clicks that would 403.
  */
+
+/**
+ * L5-c4 (cycle-4 audit §L5-c4 / §G6-c4) — naming asymmetry between the
+ * two approval surfaces operators see in the agent-studio UI:
+ *
+ *   - `agentStudio.toolApprovals.*` (this page, RetrofitPage Approvals tab)
+ *     — Phase 9 surface. Scoped to a specific tool-call hash within a
+ *     `ProposedToolCall`. Each row corresponds to one (agentDraftId,
+ *     proposedToolCallHash). Operator decides whether THAT specific tool
+ *     invocation can run.
+ *
+ *   - `agentStudio.permissions.*` (AgentRunsPage permission alert)
+ *     — older run-level surface. Scoped to a runtime run + a permission
+ *     rule that says "ask before allowing this category of action".
+ *     Coarser-grained than the tool-call hash surface.
+ *
+ * The two surfaces are NOT redundant — they govern different things at
+ * different lifecycle points. Operators see both because they serve
+ * complementary purposes (per-call vs per-run). Future work could
+ * unify the operator-facing label, but the underlying surfaces should
+ * stay separate (different tables, different lifecycle).
+ */
 const APPROVAL_DECIDER_ROLES: ReadonlySet<string> = new Set([
   "admin",
   "operator",
@@ -466,7 +488,24 @@ function ApprovalsPanel({ agentDraftId }: { agentDraftId: number | null }) {
   });
 
   if (agentDraftId === null) return <LoadingState label="Resolving draft…" />;
-  if (list.isLoading) return <LoadingState label="Loading approvals…" />;
+  // L5-c4 (cycle-4 audit §L5-c4) — skeleton on initial load instead of
+  // the bare top-level spinner. Three placeholder rows give the
+  // operator a sense of structure while the query resolves.
+  if (list.isLoading) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-3 space-y-2">
+              <div className="h-3 w-1/2 rounded bg-zinc-800/60 animate-pulse" />
+              <div className="h-2 w-2/3 rounded bg-zinc-800/40 animate-pulse" />
+              <div className="h-7 w-full rounded bg-zinc-800/30 animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
   if (list.isError) {
     return (
       <div className="text-sm text-red-400">
@@ -551,12 +590,20 @@ function ApprovalRow({
         {canDecide ? (
           <>
             <Textarea
-              placeholder="Reason (optional)"
+              // L5-c4 — placeholder hints + 2000-char lock matching the
+              // server-side `z.string().max(2000)` on the decide input.
+              placeholder="Reason (optional) — recorded with the audit row. 2000 char max."
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => setReason(e.target.value.slice(0, 2000))}
               rows={2}
               className="text-xs"
+              maxLength={2000}
             />
+            {reason.length > 1800 ? (
+              <div className="text-[10px] text-zinc-500 text-right">
+                {reason.length} / 2000
+              </div>
+            ) : null}
             <div className="flex gap-2">
               <Button
                 size="sm"
