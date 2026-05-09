@@ -24,6 +24,13 @@ import * as govSvc from "../services/governance-adapter";
 import * as simSvc from "../services/simulation";
 import * as testSvc from "../services/testing";
 import * as versionSvc from "../services/versioning";
+// H1-c6 (cycle-6 audit closure §H1-c6): permissions.decide migrated
+// from `repo.decidePendingPermissionRequest` (no audit row) to
+// `decideApprovalRequest` (writes the agsRuntimePolicyEvents
+// state-transition row per D-APP-EXT-6 + emits the resume bus event).
+// Pre-cycle-6 the legacy path bypassed the canonical audit ledger.
+// Mirrors cycle-4 C1-c4 — different operator surface, same gap shape.
+import { decideApprovalRequest } from "../services/approval/approval-gate";
 import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
@@ -1751,19 +1758,29 @@ const permissionsRouter = router({
   decide: protectedProcedure
     .input(decidePermissionRequestSchema)
     .mutation(async ({ ctx, input }) => {
-      const updated = await repo.decidePendingPermissionRequest({
-        requestId: input.requestId,
+      // H1-c6: route through `decideApprovalRequest` so the
+      // canonical audit row is written + the resume bus event fires.
+      // The service writes a rejection-audit row when the row is
+      // already terminal (M5-c4 closure — concurrent-decide
+      // forensics).
+      await decideApprovalRequest({
+        approvalRequestId: input.requestId,
         status: input.allowed ? "allowed" : "denied",
         decidedBy: ctx.user.id,
-        reason: input.reason,
+        reason: input.reason ?? null,
       });
-      if (!updated) {
+      // Re-read the row to preserve the legacy return shape
+      // (`agsPendingPermissionRequests.$inferSelect` — clients of the
+      // `permissions.decide` mutation expect the full row, not the
+      // service's `{ok, status, expiresAt, reason}` projection).
+      const row = await repo.getPendingPermissionRequestById(input.requestId);
+      if (!row) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: `Permission request ${input.requestId} not found`,
         });
       }
-      return updated;
+      return row;
     }),
 });
 
