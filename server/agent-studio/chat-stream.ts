@@ -1253,7 +1253,11 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         chunksFiltered: t.chunksFiltered,
         chunksIncluded: t.chunksIncluded,
         truncatedByBudget: t.truncatedByBudget,
-        fallbackReason: t.fallbackReason,
+        // M3-c8 (cycle-8 audit closure §M3-c8): persist the PRIMARY
+        // fallback (renamed from `fallbackReason`); the full cascade
+        // lives in `t.fallbackReasons` and is captured in the
+        // warnings array via M2-c8's `recordFallback` helper.
+        fallbackReason: t.primaryFallbackReason,
         warnings: racBuilt.context.warnings,
         perSourceLatencyMs: t.perSourceLatencyMs,
         piiBlockedCount: t.piiBlockedCount,
