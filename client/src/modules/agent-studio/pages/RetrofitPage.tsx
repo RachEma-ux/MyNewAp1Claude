@@ -17,6 +17,7 @@
 
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,31 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { PageHeader, LoadingState, EmptyState, SectionLabel } from "../components/ui";
+
+/**
+ * M1-c4 (cycle-4 audit `/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M1-c4)
+ * — client-side role gate for approve/deny buttons. Mirrors the YAML
+ * registration of `agentStudio.toolApprovals.decide` (R2 / agent.manage),
+ * which `COARSE_CAPABILITY_ROLES` (server/governance/rbac-model.ts) maps
+ * to {operator, developer}. Admin always permitted via the requireGovernedAction
+ * early-return. Pre-cycle-4 the buttons rendered for any authenticated user;
+ * the server-side governedProcedure rejected the click but the UI gave no
+ * upfront signal. This helper hides the buttons + renders a "view-only"
+ * badge instead.
+ *
+ * NOT a security boundary — the server enforces RBAC. This is purely a UX
+ * affordance to avoid clicks that would 403.
+ */
+const APPROVAL_DECIDER_ROLES: ReadonlySet<string> = new Set([
+  "admin",
+  "operator",
+  "developer",
+]);
+
+function canDecideApproval(role: string | undefined | null): boolean {
+  if (!role) return false;
+  return APPROVAL_DECIDER_ROLES.has(role);
+}
 
 interface Props {
   agentId: number;
@@ -415,6 +441,8 @@ function ToolKnowledgePanel({ workspaceId }: { workspaceId: number }) {
 
 function ApprovalsPanel({ agentDraftId }: { agentDraftId: number | null }) {
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const canDecide = canDecideApproval(user?.role);
   const list = trpc.agentStudio.toolApprovals.listByDraft.useQuery(
     { agentDraftId: agentDraftId ?? 0, status: "pending", limit: 50 },
     { enabled: agentDraftId !== null },
@@ -452,11 +480,17 @@ function ApprovalsPanel({ agentDraftId }: { agentDraftId: number | null }) {
 
   return (
     <div className="space-y-2">
+      {!canDecide && (
+        <div className="text-xs text-zinc-400 italic px-1">
+          View-only — approving / denying tool calls requires admin, operator, or developer role.
+        </div>
+      )}
       {rows.map((r) => (
         <ApprovalRow
           key={r.id}
           row={r}
           isDeciding={decide.isPending}
+          canDecide={canDecide}
           onDecide={(status, reason) =>
             decide.mutate({
               approvalRequestId: r.id,
@@ -473,6 +507,7 @@ function ApprovalsPanel({ agentDraftId }: { agentDraftId: number | null }) {
 function ApprovalRow({
   row,
   isDeciding,
+  canDecide,
   onDecide,
 }: {
   row: {
@@ -483,6 +518,7 @@ function ApprovalRow({
     createdAt: Date;
   };
   isDeciding: boolean;
+  canDecide: boolean;
   onDecide: (status: "allowed" | "denied", reason: string) => void;
 }) {
   const [reason, setReason] = useState("");
@@ -502,30 +538,34 @@ function ApprovalRow({
         {row.description ? (
           <div className="text-xs text-zinc-400">{row.description}</div>
         ) : null}
-        <Textarea
-          placeholder="Reason (optional)"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={2}
-          className="text-xs"
-        />
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={isDeciding}
-            onClick={() => onDecide("allowed", reason)}
-          >
-            Allow
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={isDeciding}
-            onClick={() => onDecide("denied", reason)}
-          >
-            Deny
-          </Button>
-        </div>
+        {canDecide ? (
+          <>
+            <Textarea
+              placeholder="Reason (optional)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              className="text-xs"
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={isDeciding}
+                onClick={() => onDecide("allowed", reason)}
+              >
+                Allow
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={isDeciding}
+                onClick={() => onDecide("denied", reason)}
+              >
+                Deny
+              </Button>
+            </div>
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );

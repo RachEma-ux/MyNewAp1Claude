@@ -7,6 +7,21 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+
+// M1-c4 (cycle-4 audit §M1-c4) — client-side role gate for publish-workflow
+// Approve/Reject buttons. Server enforces RBAC via the C1-c4-converted
+// `agentStudio.publish.decideApproval` governedProcedure (R2 / agent.manage,
+// COARSE_CAPABILITY_ROLES → operator/developer + admin); this is the
+// matching client-side affordance to avoid clicks that would 403.
+const PUBLISH_DECIDER_ROLES: ReadonlySet<string> = new Set([
+  "admin",
+  "operator",
+  "developer",
+]);
+function canDecidePublishApproval(role: string | undefined | null): boolean {
+  return !!role && PUBLISH_DECIDER_ROLES.has(role);
+}
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +63,9 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
+  // M1-c4 — gate the Approve/Reject buttons on role.
+  const { user: currentUser } = useAuth();
+  const canDecidePublish = canDecidePublishApproval(currentUser?.role);
 
   const withdrawMut = trpc.agentStudio.publish.withdrawRequest.useMutation({
     onSuccess: () => {
@@ -412,7 +430,7 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
                         {s.decisionNote && (
                           <div className="text-[10px] mt-0.5 opacity-80">{s.decisionNote}</div>
                         )}
-                        {s.state === "pending" && (
+                        {s.state === "pending" && canDecidePublish && (
                           <div className="flex items-center gap-1 mt-1">
                             <Button
                               size="sm"
@@ -444,6 +462,11 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
                             >
                               <XCircle className="h-3 w-3 mr-0.5" /> Reject
                             </Button>
+                          </div>
+                        )}
+                        {s.state === "pending" && !canDecidePublish && (
+                          <div className="text-[9px] mt-1 text-muted-foreground italic">
+                            view-only — admin / operator / developer required
                           </div>
                         )}
                       </li>

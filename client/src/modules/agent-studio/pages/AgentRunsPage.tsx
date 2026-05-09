@@ -8,6 +8,20 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+
+// M1-c4 (cycle-4 audit §M1-c4) — client-side role gate for the per-run
+// permission allow/deny buttons. Mirrors the role allowlist used in
+// RetrofitPage's ApprovalsPanel for consistency. Server enforces RBAC;
+// this is purely a UX affordance to avoid clicks that 403.
+const PERM_DECIDER_ROLES: ReadonlySet<string> = new Set([
+  "admin",
+  "operator",
+  "developer",
+]);
+function canDecidePermission(role: string | undefined | null): boolean {
+  return !!role && PERM_DECIDER_ROLES.has(role);
+}
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -101,6 +115,9 @@ export default function AgentRunsPage({
     },
     onError: (e) => toast.error(e.message),
   });
+  // M1-c4 — gate the allow/deny buttons on role.
+  const { user: currentUser } = useAuth();
+  const canDecidePerm = canDecidePermission(currentUser?.role);
   const pendingRequests = (pendingPermsQuery.data ?? []).filter(
     (r: any) => r.status === "pending"
   );
@@ -434,39 +451,45 @@ export default function AgentRunsPage({
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 px-2 text-[10px] border-emerald-500/40 hover:bg-emerald-500/10"
-                          disabled={decidePermMut.isPending}
-                          onClick={() =>
-                            decidePermMut.mutate({
-                              requestId: r.id,
-                              allowed: true,
-                            })
-                          }
-                          title="Allow this tool call to proceed"
-                        >
-                          <Check className="h-3 w-3 mr-1" /> Allow
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 px-2 text-[10px] border-red-500/40 hover:bg-red-500/10"
-                          disabled={decidePermMut.isPending}
-                          onClick={() =>
-                            decidePermMut.mutate({
-                              requestId: r.id,
-                              allowed: false,
-                              reason: "Denied by user from runs page",
-                            })
-                          }
-                          title="Deny this tool call"
-                        >
-                          <X className="h-3 w-3 mr-1" /> Deny
-                        </Button>
-                      </div>
+                      {canDecidePerm ? (
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[10px] border-emerald-500/40 hover:bg-emerald-500/10"
+                            disabled={decidePermMut.isPending}
+                            onClick={() =>
+                              decidePermMut.mutate({
+                                requestId: r.id,
+                                allowed: true,
+                              })
+                            }
+                            title="Allow this tool call to proceed"
+                          >
+                            <Check className="h-3 w-3 mr-1" /> Allow
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[10px] border-red-500/40 hover:bg-red-500/10"
+                            disabled={decidePermMut.isPending}
+                            onClick={() =>
+                              decidePermMut.mutate({
+                                requestId: r.id,
+                                allowed: false,
+                                reason: "Denied by user from runs page",
+                              })
+                            }
+                            title="Deny this tool call"
+                          >
+                            <X className="h-3 w-3 mr-1" /> Deny
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground italic shrink-0">
+                          view-only
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
