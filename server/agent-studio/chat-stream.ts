@@ -656,6 +656,16 @@ async function runStreamingToolLoop(args: {
               error: dispatchResult.error?.message ?? "dispatch failed",
               code: dispatchResult.error?.code,
             });
+        // M5-c7 (cycle-7 audit closure §M5-c7) — persistence ordering
+        // invariant: appendChatMessage MUST resolve BEFORE sendEvent
+        // emits the SSE `tool_end` event. The contract is "the SSE
+        // client never sees a tool result that isn't yet durable in
+        // the message store." Reordering for perceived latency would
+        // let a client disconnect mid-stream see a result that's not
+        // in the persistent record — operator UI re-fetching on
+        // reconnect would lose the tool turn. The SSE event is the
+        // notification, not the source of truth. Same pattern in
+        // services/chat.ts (non-streaming append-then-return).
         await repo.appendChatMessage({
           sessionId,
           role: "tool",
