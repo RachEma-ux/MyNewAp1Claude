@@ -27,6 +27,8 @@
  * smoke-testing surface, deliberate per the §223/§224 lesson).
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import {
   agsMcpToolKnowledge,
@@ -58,6 +60,35 @@ describe("M2-c5 — agsMcpToolKnowledge.knowledgeUnitId carries declared FK", ()
         "'FK to ags_knowledge_units' must match a real declaration.",
     ).toBeDefined();
     expect(knowledgeUnitFk!.foreignTable).toBe(agsKnowledgeUnits);
+  });
+
+  it("M2-c5 PR-B manual SQL exists and installs the FK with ON DELETE SET NULL", () => {
+    // Lockstep with the drizzle declaration: ASDB's reconciler does NOT
+    // apply FK constraints from drizzle, so the production constraint
+    // lives in `scripts/migrations/manual/ags-mcp-tool-knowledge-fk.sql`.
+    // If a future PR removes the manual SQL or changes its semantics,
+    // the drizzle declaration would silently drift from production.
+    const sqlPath = join(
+      process.cwd(),
+      "scripts/migrations/manual/ags-mcp-tool-knowledge-fk.sql",
+    );
+    expect(
+      existsSync(sqlPath),
+      "M2-c5 violated: missing manual ops migration at " +
+        "scripts/migrations/manual/ags-mcp-tool-knowledge-fk.sql. " +
+        "ASDB's reconciler does NOT apply FK constraints from drizzle " +
+        "declarations — the production constraint must be installed " +
+        "by an operator-applied SQL script.",
+    ).toBe(true);
+    const sql = readFileSync(sqlPath, "utf8");
+    expect(
+      sql,
+      "M2-c5 violated: manual SQL must declare the FK with " +
+        "REFERENCES ags_knowledge_units(id) ON DELETE SET NULL. " +
+        "Cascade or restrict would silently break the mirror lifecycle.",
+    ).toMatch(
+      /REFERENCES\s+ags_knowledge_units\s*\(\s*id\s*\)\s+ON\s+DELETE\s+SET\s+NULL/i,
+    );
   });
 
   it("knowledge_unit_id FK uses onDelete: 'set null' (preserves mirror row when underlying unit is deleted)", () => {
