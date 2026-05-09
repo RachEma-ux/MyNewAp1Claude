@@ -112,6 +112,26 @@ export interface SendChatMessageResult {
    * Phase 14 picker rather than just the human-readable error string.
    */
   code?: "binding_required" | "binding_missing_model" | string;
+  /**
+   * H5-c7 (cycle-7 audit closure §H5-c7) — non-streaming
+   * awaiting-approval signal. When the chat turn hit a tool call
+   * that required operator approval and the runtime gate's
+   * `awaitApprovalDecision` paused the loop, this carries the
+   * `approvalRequestId` + countdown of the most recent pending
+   * decision. Lets the blocking RPC caller (e.g. a tRPC mutation
+   * calling `sendChatMessage`) render a "waiting for approval"
+   * surface instead of blocking silently for up to
+   * `APPROVAL_RESUME_TIMEOUT_SEC`. The streaming path emits an
+   * `AwaitingApprovalEvent` SSE event for the same purpose; this
+   * field is the non-streaming equivalent (mirrors the cycle-5/6
+   * parallel-flow asymmetry pattern — chat-stream had the signal,
+   * chat.ts didn't).
+   *
+   * Set on the LAST `onAwaiting` fire within the turn (rare to
+   * have multiple in one turn since each tool call awaits then
+   * resolves before the next). Absent when no tool call awaited.
+   */
+  awaitingApproval?: { approvalRequestId: number; timeoutSec: number };
 }
 
 // ── Tool-call helpers (Phase 19 follow-up Task #5) ───────────────────────────
@@ -302,6 +322,15 @@ async function runChatWithToolsViaBinding(input: {
   // Cost is not surfaced by Model Access in Phase 4 / 18 — leave at 0
   // and let Phase 20+ pricing rollup populate it.
 
+  // H5-c7 (cycle-7 audit closure §H5-c7): capture awaiting-approval
+  // state across the turn so the BLOCKING caller (sendChatMessage's
+  // tRPC entry point) can surface it in the result alongside the
+  // assistantMessage. Pre-cycle-7 chat.ts passed no `onAwaiting`
+  // callback (chat-stream.ts emitted SSE; chat.ts blocked silently
+  // for up to APPROVAL_RESUME_TIMEOUT_SEC). Recorded as the LAST
+  // awaiting-approval event the turn observed.
+  let lastAwaiting: { approvalRequestId: number; timeoutSec: number } | null = null;
+
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     const history = await repo.listChatMessages(input.sessionId);
     const messages: ModelAccessMessage[] = [
@@ -488,7 +517,21 @@ async function runChatWithToolsViaBinding(input: {
                   runtimeRunId: input.sessionId,
                   description: `chat session ${input.sessionId} · tool ${call.name} · resume`,
                 }),
-              // Non-streaming path: no SSE event surface, no onAwaiting.
+              // H5-c7 (cycle-7 audit closure §H5-c7): chat.ts is the
+              // non-streaming path — no SSE surface, but the BLOCKING
+              // caller still benefits from knowing approval is pending.
+              // Capture the (approvalRequestId, timeoutSec) into the
+              // outer-scope `lastAwaiting` var so the function's return
+              // shape can surface it (mirrors chat-stream.ts:549-559's
+              // SSE `onAwaiting` for the streaming path; same parallel-
+              // flow asymmetry resolution as cycle-6 C1-c6's D-RESUME
+              // helper extraction).
+              onAwaiting: (rid, tms) => {
+                lastAwaiting = {
+                  approvalRequestId: rid,
+                  timeoutSec: Math.floor(tms / 1000),
+                };
+              },
             });
             runtimeVerdict = resume.verdict;
           }
@@ -577,6 +620,14 @@ async function runChatWithToolsViaBinding(input: {
               error: dispatchResult.error?.message ?? "dispatch failed",
               code: dispatchResult.error?.code,
             });
+        // M5-c7 (cycle-7 audit closure §M5-c7) — persistence ordering
+        // invariant: appendChatMessage MUST resolve BEFORE the loop
+        // proceeds to the next iteration (which rebuilds the LLM
+        // history from the message store). Reordering would let the
+        // next turn see a history without the just-completed tool
+        // result — model would hallucinate or repeat the call.
+        // Mirrors chat-stream.ts's append-before-send invariant for
+        // the streaming SSE path.
         await repo.appendChatMessage({
           sessionId: input.sessionId,
           role: "tool",
@@ -607,6 +658,10 @@ async function runChatWithToolsViaBinding(input: {
       costMicrocents: cumulativeCostMicrocents,
       durationMs,
       content: finalContent,
+      // H5-c7: surface the LAST awaiting-approval event the turn
+      // observed so sendChatMessage's blocking caller can render a
+      // pending-approval state. null when no tool call awaited.
+      awaitingApproval: lastAwaiting,
     };
   }
 
@@ -630,6 +685,9 @@ async function runChatWithToolsViaBinding(input: {
     costMicrocents: cumulativeCostMicrocents,
     durationMs,
     content: capMsg,
+    // H5-c7: max-turns-hit return path also surfaces awaitingApproval
+    // when the loop hit pending approval before exhausting turns.
+    awaitingApproval: lastAwaiting,
   };
 }
 
@@ -948,6 +1006,11 @@ export async function sendChatMessage(
               durationMs: loopResult.durationMs,
               model: candidateBinding.modelRef,
             },
+            // H5-c7: surface the LAST awaiting-approval event the
+            // turn observed so the blocking caller can render a
+            // pending-approval state. `?? undefined` collapses null
+            // to undefined for the optional field.
+            awaitingApproval: loopResult.awaitingApproval ?? undefined,
           };
         } catch (e) {
           return {
