@@ -24,7 +24,11 @@ import {
   governedProcedure,
 } from "../../_core/trpc";
 import { getAsDb } from "../db/connection";
-import { agsPendingPermissionRequests } from "../../../drizzle/tables/agent-studio";
+import {
+  agsAgentDrafts,
+  agsAgents,
+  agsPendingPermissionRequests,
+} from "../../../drizzle/tables/agent-studio";
 import { decideApprovalRequest } from "../services/approval/approval-gate";
 
 function asdb() {
@@ -33,6 +37,44 @@ function asdb() {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ASDB unavailable" });
   }
   return db;
+}
+
+/**
+ * C2-c6 (cycle-6 audit closure §C2-c6) — per-row authorization for the
+ * `decide` mutation.
+ *
+ * Pre-cycle-6: `decide` ran `decideApprovalRequest(approvalRequestId)`
+ * directly. `governedProcedure` only checks the action-key-level RBAC
+ * (cycle-3 R7 COARSE_CAPABILITY_ROLES), not which approval row the
+ * caller has access to. An authenticated user with API access could
+ * decide approvals on drafts they didn't own by guessing or
+ * brute-forcing `approvalRequestId` — cross-workspace privilege
+ * escalation.
+ *
+ * Post-cycle-6: this helper resolves the approval row → draft → agent
+ * chain and returns the agent's `ownerId`. `decide` then enforces
+ * `ownerId === ctx.user.id` OR caller has admin role. Returns null
+ * when the approval row doesn't exist (caller gets `NOT_FOUND`); the
+ * draft chain rows must exist if the approval row does (FK invariant
+ * holds at the DB layer once M2-c5 + future approval-row FKs land —
+ * for now the chain is best-effort and returns null on any missing
+ * link, surfacing as `NOT_FOUND`).
+ */
+async function resolveApprovalOwner(
+  db: ReturnType<typeof asdb>,
+  approvalRequestId: number,
+): Promise<{ ownerId: number | null } | null> {
+  const rows = await db
+    .select({ ownerId: agsAgents.ownerId })
+    .from(agsPendingPermissionRequests)
+    .innerJoin(
+      agsAgentDrafts,
+      eq(agsPendingPermissionRequests.agentDraftId, agsAgentDrafts.id),
+    )
+    .innerJoin(agsAgents, eq(agsAgentDrafts.agentId, agsAgents.id))
+    .where(eq(agsPendingPermissionRequests.id, approvalRequestId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export const toolApprovalsRouter = router({
@@ -114,7 +156,31 @@ export const toolApprovalsRouter = router({
         ttlSecondsOverride: z.number().int().positive().max(86_400).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const db = asdb();
+
+      // C2-c6: per-row authorization. governedProcedure already
+      // enforces action-key-level RBAC; this resolves the approval
+      // row's owning agent and asserts the caller owns it (or is
+      // admin). Without this check, approvalRequestId is sufficient
+      // by itself to decide any approval in any draft — a
+      // cross-workspace privilege escalation.
+      const owner = await resolveApprovalOwner(db, input.approvalRequestId);
+      if (!owner) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `approval request ${input.approvalRequestId} not found`,
+        });
+      }
+      const isOwner = owner.ownerId !== null && owner.ownerId === ctx.user.id;
+      const isAdmin = ctx.user.role === "admin";
+      if (!isOwner && !isAdmin) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "not authorized to decide this approval",
+        });
+      }
+
       try {
         return await decideApprovalRequest({
           approvalRequestId: input.approvalRequestId,
