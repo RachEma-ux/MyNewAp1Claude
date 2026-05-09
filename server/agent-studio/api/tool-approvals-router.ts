@@ -106,6 +106,27 @@ const PUBLIC_APPROVAL_COLUMNS = {
  * holds at the DB layer once M2-c5 + future approval-row FKs land —
  * for now the chain is best-effort and returns null on any missing
  * link, surfacing as `NOT_FOUND`).
+ *
+ * L2-c6 (cycle-6 audit closure §L2-c6) — nullable agentDraftId case:
+ *   `agsPendingPermissionRequests.agentDraftId` is `integer` (nullable
+ *   — the column was added in retrofit P9 D-APP-EXT-2 with no
+ *   backfill, so legacy rows from before that phase carry NULL).
+ *   When `agentDraftId IS NULL`, the `innerJoin` on
+ *   `agsAgentDrafts.id` returns zero rows (NULL ≠ any id), so this
+ *   helper returns null and the C2-c6 owner check throws
+ *   `NOT_FOUND`. That is the CORRECT behavior — a legacy approval
+ *   row has no resolvable owner and cannot be authorized — but the
+ *   caller-visible 404 looks like a row-not-found error rather than
+ *   a "row exists but is unauthorized." Operators triaging
+ *   support tickets should distinguish:
+ *     - 404 with no row in the table → typo / already-deleted
+ *     - 404 with row in table but `agentDraftId IS NULL` → legacy
+ *       row that needs backfill or hard-delete via DBA
+ *   The L2-c6 closure is the documentation itself; no code change
+ *   because the behavior is already correct (verify-then-decide
+ *   via `if (!owner) throw NOT_FOUND`). A future PR that adds
+ *   D-APP-EXT-2 backfill + NOT NULL constraint can remove this
+ *   doc-block at the same time.
  */
 async function resolveApprovalOwner(
   db: ReturnType<typeof asdb>,
