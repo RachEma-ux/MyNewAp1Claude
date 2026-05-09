@@ -51,6 +51,9 @@ import {
 // approved out-of-band. Both call sites (chat-stream + chat.ts)
 // delegate to the same shared helper post-cycle-6.
 import { awaitApprovalDecision } from "./runtime/approval-resume-loop";
+// H8-c7 (cycle-7 audit closure §H8-c7): conversation-context windowing
+// before each model.execute() call. Mirrors chat-stream.ts wire-up.
+import { windowChatHistory } from "./runtime/context-window";
 
 function approvalResumeTimeoutMs(): number {
   // C1-c6: same env var as chat-stream.ts uses (APPROVAL_RESUME_TIMEOUT_SEC,
@@ -253,6 +256,25 @@ const MAX_CALLS_PER_TOOL_PER_REQUEST = (() => {
   return n;
 })();
 
+/**
+ * H8-c7 (cycle-7 audit closure §H8-c7) — token budget for windowing
+ * the conversation history before each model.execute() call. Mirrors
+ * chat-stream.ts's MAX_CONTEXT_TOKENS exactly — same env var
+ * controls both flows so operators can't drift them apart.
+ */
+const MAX_CONTEXT_TOKENS = (() => {
+  const raw = process.env.MAX_CONTEXT_TOKENS;
+  if (!raw) return 32_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[chat] MAX_CONTEXT_TOKENS=${raw} is not a positive integer; using default 32000`,
+    );
+    return 32_000;
+  }
+  return n;
+})();
+
 
 /**
  * Start a new chat session attached to an agent, with an optional
@@ -414,10 +436,40 @@ async function runChatWithToolsViaBinding(input: {
       }
     }
 
+    // H8-c7: window the conversation history to fit MAX_CONTEXT_TOKENS
+    // BEFORE the model.execute() call. Mirrors chat-stream.ts's
+    // wire-up exactly so both flows behave identically (parallel-flow
+    // lockstep). On truncation, emit a best-effort context_truncation
+    // audit row for operator visibility.
+    const windowed = windowChatHistory(messages, {
+      maxTokens: MAX_CONTEXT_TOKENS,
+    });
+    if (windowed.truncated) {
+      try {
+        await repo.appendRuntimePolicyEvent({
+          runId: input.sessionId,
+          policyKey: "context_truncation",
+          decision: "warn",
+          reason: "context_window_exceeded",
+          payload: {
+            maxTokens: MAX_CONTEXT_TOKENS,
+            evictedCount: windowed.evictedCount,
+            estimatedTokens: windowed.estimatedTokens,
+            keptCount: windowed.messages.length,
+            source: "chat",
+          },
+        });
+      } catch (e) {
+        console.warn(
+          `[chat] context_truncation event write failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
     const executeInput: ModelAccessExecuteInput = {
       providerConnectionId: input.providerConnectionId,
       modelRef: input.modelRef,
-      messages,
+      messages: windowed.messages,
       tools: toolSchemas,
       intent: "chat",
       workspaceId: input.workspaceId,
