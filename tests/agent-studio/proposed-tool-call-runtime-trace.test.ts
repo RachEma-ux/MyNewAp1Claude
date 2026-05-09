@@ -8,13 +8,21 @@
  * The DB-backed call itself is exercised in Phase 13 e2e (B3 follow-up).
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   approvalDecisionFromVerdict,
   persistRuntimeToolCallTrace,
+  __resetTraceWarnRateLimitForTests,
   type RuntimeDispatchVerdict,
   type RuntimeValidationResult,
 } from "../../server/agent-studio/services/runtime/proposed-tool-call-runtime";
+
+// H9-c7: the trace-write warn is rate-limited per (workspace, agent)
+// per 60s. Reset the budget before each test so additions to this
+// file don't accidentally suppress each other.
+beforeEach(() => {
+  __resetTraceWarnRateLimitForTests();
+});
 import type { ProposedToolCall } from "../../server/agent-studio/services/mcp/proposed-tool-call";
 
 const SAMPLE_CALL: ProposedToolCall = {
