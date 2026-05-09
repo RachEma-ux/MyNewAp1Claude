@@ -862,6 +862,58 @@ export const agsRuntimeHookExecutions = pgTable(
  *
  * Timeouts are written by the same simulation poll loop when the
  * configured timeout elapses (default 5 min).
+ *
+ * ── M6-c7 (cycle-7 audit closure §M6-c7) — runtimeRunId threading ─
+ *
+ * The `runtimeRunId` column anchors approval rows to the originating
+ * runtime run. For OFFLINE / SCHEDULED runs (the original Phase 3
+ * use case) this is straightforward: there's a real `agsRuntimeRuns`
+ * row that owns the dispatcher chain, and operator forensics can
+ * join `approval → runtime_run → audit (agsRuntimePolicyEvents)` in
+ * one hop.
+ *
+ * For LIVE CHAT sessions (Phase 18+ binding-aware chat-stream / chat
+ * service), there is NO formal `agsRuntimeRuns` row. The chat
+ * session's id stands in (`runtimeRunId = sessionId`), which works
+ * for the schema's NOT NULL + index requirements but creates a
+ * subtle forensics asymmetry:
+ *
+ *   - Offline run forensic join: approval.runtimeRunId →
+ *       runtimeRuns.id → policyEvents WHERE runtimeRunId = ...
+ *     (one canonical anchor, monotonically growing)
+ *
+ *   - Live chat forensic join: approval.runtimeRunId →
+ *       chatSessions.id → policyEvents WHERE runtimeRunId = ...
+ *     (the same column, but sourced from a different table; an
+ *     operator filtering policyEvents by `runtimeRunId` for
+ *     "all dispatches under run #5" will get TWO populations
+ *     mixed if a chat session and a runtime run happen to collide
+ *     on the integer id).
+ *
+ * Cycle-7 closure shape: doc-block FLAG, no migration. Eliminating
+ * the asymmetry properly requires a Phase 12.6+ design that either:
+ *   (a) auto-creates a sentinel `agsRuntimeRuns` row per chat
+ *       session (uniform anchor, but introduces lifecycle questions
+ *       — when does the row close? what does `status` mean for a
+ *       long-lived chat?), or
+ *   (b) splits `runtimeRunId` into a tagged union
+ *       (`{ kind: "run"|"chat", id: number }`) at the audit + trace
+ *       layer (cleaner semantics, but a SCHEMA migration touching
+ *       agsPendingPermissionRequests + agsRuntimePolicyEvents +
+ *       agsToolCallTraces — too much surface for cycle-7's scope).
+ *
+ * Today's mitigation: M4-c5 already threaded `approvalRequestId`
+ * directly into `agsRuntimePolicyEvents.payload` so the
+ * approval → audit join doesn't NEED runtimeRunId-as-pivot
+ * (operator queries can JOIN ON approvalRequestId instead). The
+ * runtimeRunId asymmetry is a forensic-clarity issue, not a
+ * data-integrity one. L6-c7 (folded) covers the same ambiguity at
+ * the chat-session-lifecycle layer; the formal `agsRuntimeRuns`-
+ * for-chat design is the joint resolution path.
+ *
+ * A future migration that tackles the asymmetry MUST update this
+ * doc-block and the M6-c7 lockstep so reviewers see the design
+ * trade-off before re-introducing the join confusion.
  */
 export const agsPendingPermissionRequests = pgTable(
   "ags_pending_permission_requests",
