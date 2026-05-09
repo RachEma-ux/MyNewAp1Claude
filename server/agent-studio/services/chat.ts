@@ -468,11 +468,19 @@ async function runChatWithToolsViaBinding(input: {
             continue;
           }
         }
+        // C1-c5 (cycle-5 audit `/sdcard/Download/MCP_DISPATCHER_AUDIT_2026-05-09.md` §C1-c5)
+        // — thread `sessionId` as `runtimeRunId` so the dispatcher writes
+        // its `agsRuntimePolicyEvents` audit row. Same bug as the chat-
+        // stream call site (chat-stream.ts:579 pre-cycle-5): omitting
+        // `runtimeRunId` makes `writeAuditRow()` (dispatcher.ts:259)
+        // return `undefined`, silently skipping the canonical governance-
+        // audit ledger insert.
         const dispatchResult = await dispatchMcpToolCall({
           agentDraftId: input.draftId,
           toolName: dispatchKey,
           args,
           source: "live_runtime",
+          runtimeRunId: input.sessionId,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {
