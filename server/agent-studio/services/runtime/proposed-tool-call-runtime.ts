@@ -467,7 +467,63 @@ export interface PersistRuntimeTraceInput {
  *   future PR that promotes trace-write to fatal (or message-store
  *   to best-effort) without updating this doc + the lockstep should
  *   fail review.
+ *
+ * ── H9-c7 (cycle-7 audit closure §H9-c7) — warn rate-limit contract ─
+ *
+ * The trace-write `console.warn` breadcrumb above is BEST-EFFORT
+ * observability, not actionable telemetry. Pre-cycle-7 it fired on
+ * every failed write — a prolonged ASDB outage during live chat
+ * (every tool call in every turn) produced O(1000) warnings/min,
+ * which under default log-rotation pressure could exhaust disk on
+ * the operator console. The audit doc flagged this as "rate-limit
+ * the warn so persistent outages don't drown observability."
+ *
+ * The rate limit:
+ *   - **One warn per (workspaceId, agentId) tuple per 60s.** Operator
+ *     still gets a fresh signal per agent within each workspace
+ *     (failure modes are usually agent-specific — bad spec, bad
+ *     pin), but a chatty agent can't burn the disk.
+ *   - **Suppressed warns are SILENTLY dropped.** No buffering, no
+ *     "suppressed N warnings since last" — the trace failure is
+ *     observability, not audit; if you need every failure, query
+ *     `agsRuntimePolicyEvents` (which is fatal-on-write).
+ *   - **The window is process-local, not cross-process.** If two
+ *     server processes are running, each gets its own rate budget.
+ *     Acceptable: process count is bounded; per-process drop is
+ *     still ~1/min/agent in the steady state.
+ *
+ * ── L1-c7 (cycle-7 audit closure §L1-c7) — approvalRequestId in warn ─
+ *
+ * Pre-cycle-7 the warn breadcrumb included workspace/agent/draft IDs
+ * but not `verdict.approvalRequestId`. Operators investigating a
+ * trace-write outage had to cross-reference the warn against
+ * `agsRuntimePolicyEvents` and `agsPendingPermissionRequests` to
+ * find the matching approval row — extra hops for forensics.
+ * Including `approvalRequestId` (or `null` when no approval gate
+ * was used) collapses that cross-reference to a single grep.
+ *
+ * Lockstep tests: `tests/agent-studio/h9-l1-c7-trace-warn-rate-limit.test.ts`
+ * pin both the rate-limit window AND the approvalRequestId
+ * inclusion. A future PR that removes either would fail the lockstep.
  */
+
+/**
+ * H9-c7 process-local rate-limit map. Key = `${workspaceId}:${agentId}`,
+ * value = monotonic timestamp (Date.now()) of the last warn fired for
+ * that key. Module-level so the budget survives across calls but
+ * does NOT survive process restart (acceptable — see contract above).
+ *
+ * Exported __test helper resets the map for deterministic tests
+ * (mirrors the test-helpers pattern used elsewhere in the runtime).
+ */
+const TRACE_WARN_MIN_INTERVAL_MS = 60_000;
+const lastTraceWarnAt = new Map<string, number>();
+
+/** H9-c7: test-only escape hatch. Resets the rate-limit budget. */
+export function __resetTraceWarnRateLimitForTests(): void {
+  lastTraceWarnAt.clear();
+}
+
 export async function persistRuntimeToolCallTrace(
   input: PersistRuntimeTraceInput,
 ): Promise<{ id: number | null }> {
@@ -516,10 +572,20 @@ export async function persistRuntimeToolCallTrace(
     // Best-effort: never block the chat loop on trace-write failure.
     // Surface as a warning so operators see persistent trace-write
     // outages (production observability hook). Review-polish PR.
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[ags-runtime] tool-call trace write failed (workspace=${input.workspaceId} agent=${input.agentId} draft=${input.agentDraftId}): ${msg}`,
-    );
+    //
+    // H9-c7 + L1-c7: rate-limit one warn per (workspace, agent) per
+    // 60s + include `approvalRequestId` so forensics don't need an
+    // extra cross-reference hop. See doc-block above for contract.
+    const key = `${input.workspaceId}:${input.agentId}`;
+    const now = Date.now();
+    const lastAt = lastTraceWarnAt.get(key);
+    if (lastAt === undefined || now - lastAt >= TRACE_WARN_MIN_INTERVAL_MS) {
+      lastTraceWarnAt.set(key, now);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[ags-runtime] tool-call trace write failed (workspace=${input.workspaceId} agent=${input.agentId} draft=${input.agentDraftId} approvalRequestId=${input.verdict.approvalRequestId ?? "null"}): ${msg}`,
+      );
+    }
     return { id: null };
   }
 }
