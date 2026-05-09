@@ -476,6 +476,13 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   // Conservative registration: same shape as agentStudio.cag.refreshPack.
   "agentStudio.mcpSchemaSync.sync": "agentStudio.mcpSchemaSync.sync",
   "agentStudio.toolApprovals.decide": "agentStudio.toolApprovals.decide",
+  // C1-c4 — publish-workflow approval decision. The companion to
+  // toolApprovals.decide: same intent (operator decides on a pending
+  // approval), different surface (publish-step lifecycle vs MCP tool-call
+  // hash). Was protectedProcedure with no audit; cycle-4 audit found it
+  // governance-blind. Now governedProcedure, registered, and emits a
+  // LIFECYCLE_TRANSITION audit row per state change.
+  "agentStudio.publish.decideApproval": "agentStudio.publish.decideApproval",
   "agentStudio.workspaceDefaultBindings.upsert": "agentStudio.workspaceDefaultBindings.upsert",
   "agentStudio.workspaceDefaultBindings.delete": "agentStudio.workspaceDefaultBindings.delete",
   "agentStudio.plugins.validate": "agentStudio.plugins.validate",

@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
+import { getAuditLogger } from "../../services/auditLogger";
 import * as repo from "../repository";
 import * as readinessSvc from "../services/readiness";
 import * as govSvc from "../services/governance-adapter";
@@ -1038,13 +1039,22 @@ const publishRouter = router({
    * request advances to "approved" and the agent's lifecycle moves to
    * "ready_to_publish". A reject moves both to "rejected"/"blocked".
    */
-  // Phase 19 follow-up pattern: downgraded from governedProcedure.
-  // Approval decisions still flow through the per-agent lifecycle
-  // state machine (pending → approved/rejected → lifecycle change),
-  // which is the actual enforcement surface.
-  decideApproval: protectedProcedure
+  // C1-c4 — Publish-workflow approval decision. Was protectedProcedure
+  // since Phase 19 with the framing that the per-agent lifecycle state
+  // machine was the enforcement surface. Cycle-4 audit
+  // (/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md §C1-c4) flagged this:
+  // the state machine enforces transition order, not who is allowed to
+  // decide, and zero audit rows were emitted, leaving the procedure
+  // governance-blind. Now governedProcedure (so RBAC + freeze checks
+  // run via the tRPC middleware) and writes a LIFECYCLE_TRANSITION
+  // governance_audit_logs row per state change (rejected, all-approved,
+  // single-step-approved). agsRuntimePolicyEvents is not used here
+  // because that table requires a runtime run ID and publish-workflow
+  // approvals are not bound to a runtime run.
+  decideApproval: governedProcedure
     .input(decideApprovalStepSchema)
     .mutation(async ({ ctx, input }) => {
+      const audit = getAuditLogger();
       const step = await repo.getApprovalStepById(input.stepId);
       if (!step) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Approval step not found" });
@@ -1069,6 +1079,18 @@ const publishRouter = router({
       const allSteps = await repo.listApprovalSteps(step.publishRequestId);
       const request = await repo.getPublishRequestById(step.publishRequestId);
       if (!request) {
+        await audit.log({
+          actor_id: String(ctx.user.id),
+          action_type: "LIFECYCLE_TRANSITION",
+          target_type: "publish_approval_step",
+          target_id: String(input.stepId),
+          decision_result: "success",
+          metadata: {
+            stepDecision: input.decision,
+            publishRequestId: step.publishRequestId,
+            note: "publish_request_missing_no_rollup",
+          },
+        }).catch(() => {});
         return { success: true, step: updated };
       }
 
@@ -1080,6 +1102,20 @@ const publishRouter = router({
           state: "rejected",
         });
         await repo.updateAgentLifecycleState(request.agentId, "blocked");
+        await audit.log({
+          actor_id: String(ctx.user.id),
+          action_type: "LIFECYCLE_TRANSITION",
+          target_type: "publish_approval_step",
+          target_id: String(input.stepId),
+          decision_result: "denied",
+          metadata: {
+            stepDecision: "rejected",
+            publishRequestId: step.publishRequestId,
+            agentId: request.agentId,
+            requestState: "rejected",
+            agentState: "blocked",
+          },
+        }).catch(() => {});
         return {
           success: true,
           step: updated,
@@ -1098,6 +1134,20 @@ const publishRouter = router({
           state: "approved",
         });
         await repo.updateAgentLifecycleState(request.agentId, "ready_to_publish");
+        await audit.log({
+          actor_id: String(ctx.user.id),
+          action_type: "LIFECYCLE_TRANSITION",
+          target_type: "publish_approval_step",
+          target_id: String(input.stepId),
+          decision_result: "success",
+          metadata: {
+            stepDecision: "approved",
+            publishRequestId: step.publishRequestId,
+            agentId: request.agentId,
+            requestState: "approved",
+            agentState: "ready_to_publish",
+          },
+        }).catch(() => {});
         return {
           success: true,
           step: updated,
@@ -1105,6 +1155,19 @@ const publishRouter = router({
           agentState: "ready_to_publish" as const,
         };
       }
+      await audit.log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "publish_approval_step",
+        target_id: String(input.stepId),
+        decision_result: "success",
+        metadata: {
+          stepDecision: "approved",
+          publishRequestId: step.publishRequestId,
+          agentId: request.agentId,
+          rollup: "partial",
+        },
+      }).catch(() => {});
       return { success: true, step: updated };
     }),
   withdrawRequest: protectedProcedure

@@ -108,13 +108,21 @@ const EXPECTED_REGISTERED: ReadonlyArray<{
     trpcPath: "agentStudio.marketplace.refresh",
     source: "server/agent-studio/api/router.ts",
   },
+  // C1-c4 — publish-workflow approval decision converted from
+  // protectedProcedure → governedProcedure (cycle-4 audit closure).
+  {
+    trpcPath: "agentStudio.publish.decideApproval",
+    source: "server/agent-studio/api/router.ts",
+  },
 ];
 
 /**
  * Per-file declaration count of `<name>: governedProcedure` lines under
- * `server/`. Cycle-3 baseline: 656 across 99 files. Of these, 12 are
- * in EXPECTED_REGISTERED above; the remaining 644 are pre-existing
- * cycle-3 backlog (R2-c3) — see `/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md`
+ * `server/`. Cycle-3 baseline: 656 across 99 files. C1-c4 (cycle-4)
+ * added 1 (publish.decideApproval converted from protectedProcedure);
+ * current baseline: 657 across 99 files. Of these, 13 are in
+ * EXPECTED_REGISTERED above; the remaining 644 are pre-existing cycle-3
+ * backlog (R2-c3) — see `/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md`
  * §2.1 for the per-domain breakdown.
  *
  * **Maintenance:** adding or removing a `governedProcedure` declaration
@@ -126,7 +134,7 @@ const EXPECTED_PER_FILE: Record<string, number> = {
   "server/agent-studio/api/cag-router.ts": 1,
   "server/agent-studio/api/kb-router.ts": 2,
   "server/agent-studio/api/mcp-schema-sync-router.ts": 1,
-  "server/agent-studio/api/router.ts": 5,
+  "server/agent-studio/api/router.ts": 6,
   "server/agent-studio/api/tool-approvals-router.ts": 1,
   "server/agent-studio/api/workspace-default-bindings-router.ts": 2,
   "server/agents/router.ts": 8,
