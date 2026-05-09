@@ -473,6 +473,67 @@ describe("requireGovernedAction — H1-c4 dual_control / MCP gate boundary", () 
         `invariant cannot silently degrade.`,
     ).toBe(0);
   });
+
+  it("approval-gate.ts does not read GOVERNANCE_ENFORCE_APPROVALS — env-flag is platform-layer-only (H2-c4)", async () => {
+    // Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §H2-c4)
+    // surfaced the asymmetry: cycle-3 R6-c3 (#319) added
+    // GOVERNANCE_ENFORCE_APPROVALS to the platform-governance layer
+    // (`requireGovernedAction.checkApproval`), but the MCP approval gate
+    // has no such flag — by design, because the gate is always-enforcing
+    // (it consults DB row state directly, not a placeholder). This test
+    // locks the boundary: approval-gate.ts must NOT contain a code-level
+    // reference to the env-flag string. The doc block in the file
+    // explains the boundary by name, which is fine — only code-level
+    // usage is the violation.
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const src = readFileSync(
+      join(
+        process.cwd(),
+        "server/agent-studio/services/approval/approval-gate.ts",
+      ),
+      "utf8",
+    );
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(
+      stripped,
+      "H2-c4 violation: approval-gate.ts references GOVERNANCE_ENFORCE_APPROVALS " +
+        "outside comments. The env flag is platform-layer-only (R6-c3); the MCP " +
+        "approval gate is always-enforcing by construction.",
+    ).not.toMatch(/GOVERNANCE_ENFORCE_APPROVALS/);
+  });
+
+  it("agsPendingPermissionRequests has no workspaceId column — implicit-safe via FK chain (L1-c4)", async () => {
+    // Cycle-4 audit §L1-c4: this table has no workspace_id column;
+    // cross-workspace safety today is implicit via the agentDraftId FK
+    // to a workspace-scoped draft. This test locks the schema shape:
+    // if a future PR adds workspace_id, the test fires AND the fix is
+    // (a) add cross-workspace enforcement to decideApprovalRequest,
+    // (b) update this test to allow the new column.
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const src = readFileSync(
+      join(process.cwd(), "drizzle/tables/agent-studio.ts"),
+      "utf8",
+    );
+    const startIdx = src.indexOf(
+      "export const agsPendingPermissionRequests",
+    );
+    expect(
+      startIdx,
+      "agsPendingPermissionRequests declaration not found",
+    ).toBeGreaterThanOrEqual(0);
+    const blockEnd = src.indexOf("\n);", startIdx);
+    const block = src.slice(startIdx, blockEnd);
+    expect(
+      block,
+      "L1-c4 violation: agsPendingPermissionRequests gained a workspaceId / " +
+        "workspace_id column. If this is intentional, add cross-workspace " +
+        "enforcement to decideApprovalRequest first, then update this test.",
+    ).not.toMatch(/workspaceId|workspace_id/);
+  });
 });
 
 describe("requireGovernedAction — R4-c3 subject-id-0 freeze bypass closure", () => {
