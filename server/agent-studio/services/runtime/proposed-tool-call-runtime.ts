@@ -148,7 +148,11 @@ export type RuntimeDispatchRejection =
   | "approval_denied"
   | "approval_expired"
   | "approval_pending"
-  | "approval_required";
+  | "approval_required"
+  // C2-c4 PR-3 (D-RESUME-2) — operator did not decide within
+  // APPROVAL_RESUME_TIMEOUT_SEC (default 300s). Distinct from
+  // approval_expired (which means an operator-granted TTL elapsed).
+  | "approval_timeout";
 
 /**
  * Flattened so callers branch on `ok` cleanly under strictNullChecks:
@@ -305,6 +309,12 @@ export function approvalDecisionFromVerdict(
       case "approval_denied":
         return "denied";
       case "approval_expired":
+        return "expired";
+      case "approval_timeout":
+        // C2-c4 PR-3 — chat-stream wait elapsed without operator
+        // decision. Surfaces as "expired" in the trace ledger (closest
+        // existing ApprovalDecision; the distinct rejection reason
+        // preserves the original signal for audit consumers).
         return "expired";
       case "approval_pending":
         return "pending";
