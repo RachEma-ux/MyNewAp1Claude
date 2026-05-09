@@ -24,6 +24,17 @@ export interface McpTool {
   description?: string;
   /** JSON Schema for the tool's arguments */
   inputSchema?: Record<string, unknown>;
+  /**
+   * H2-c7 (cycle-7 audit closure §H2-c7): JSON Schema for the
+   * tool's RESPONSE shape. Optional — many MCP servers don't
+   * advertise an output schema, in which case the dispatcher's
+   * result-validator no-ops. When present, the dispatcher's
+   * `validateMcpToolResponse` checks the call result against this
+   * schema after the invoke succeeds; mismatches surface as
+   * `DispatchErrorCode.schema_mismatch_on_output` so the model
+   * loop doesn't reason on malformed data.
+   */
+  outputSchema?: Record<string, unknown>;
 }
 
 /**
