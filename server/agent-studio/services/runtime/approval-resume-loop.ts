@@ -25,8 +25,8 @@
  *     module owns the resume loop only.)
  *
  * Cycle-6 closure: extract the loop into ONE shared helper. Both
- * call sites delegate. The helper subscribes BEFORE re-eval (D-RESUME-3
- * race protection), races bus event vs timeout, and on early-return
+ * call sites delegate. The helper subscribes BEFORE re-eval per
+ * D-RESUME-3 race protection, races bus event vs timeout, and on early-return
  * (recheck succeeds) ABORTS the subscription via the new C4-c6
  * AbortSignal API on the bus's `waitFor()`. The listener releases
  * synchronously instead of leaking for the timeout window.
@@ -106,8 +106,8 @@ export interface AwaitApprovalDecisionResult {
 
 /**
  * Wait for an approval decision (or timeout) and return the resulting
- * verdict. Subscribes BEFORE re-eval (D-RESUME-3 race protection) and
- * cancels the subscription on early-return (C4-c6 leak fix).
+ * verdict. Subscribes BEFORE re-eval per D-RESUME-3 race protection,
+ * and cancels the subscription on early-return (C4-c6 leak fix).
  */
 export async function awaitApprovalDecision(
   input: AwaitApprovalDecisionInput,
@@ -119,7 +119,7 @@ export async function awaitApprovalDecision(
   // C4-c6: AbortController so the early-return path can release the
   // bus listener synchronously instead of leaking until timeout.
   const ac = new AbortController();
-  // Subscribe BEFORE re-eval (D-RESUME-3 race window protection).
+  // Subscribe BEFORE re-eval per D-RESUME-3 race window protection.
   const waitPromise = bus.waitFor(reqId, timeoutMs, ac.signal);
 
   // C1-c6: streaming caller hooks here to emit the awaiting_approval
