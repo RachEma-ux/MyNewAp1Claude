@@ -1157,6 +1157,13 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       for (const w of racBuilt.context.warnings) console.info(`[chat-stream/rac] ${w}`);
       for (const w of racBuilt.composerWarnings) console.info(`[chat-stream/composer] ${w}`);
     } catch (err) {
+      // H1-c8 (cycle-8 audit closure §H1-c8): explicit catch for the
+      // two orchestrator error classes so the structured `code` field
+      // reaches the SSE client. chat.ts has the parallel-flow mirror
+      // (cycle-7 standing pattern); the cross-flow lockstep test
+      // (`tests/agent-studio/h1-c8-orchestrator-error-cross-flow.test.ts`)
+      // pins both shapes so a future PR that updates one without the
+      // other fails review.
       if (err instanceof CagRequiredError) {
         sendEvent({ type: "error", error: err.message, code: "cag_required" });
         res.end();

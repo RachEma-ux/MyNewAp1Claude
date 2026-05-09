@@ -114,7 +114,20 @@ export interface SendChatMessageResult {
    * degraded state. UIs key off this to render an inline link to the
    * Phase 14 picker rather than just the human-readable error string.
    */
-  code?: "binding_required" | "binding_missing_model" | string;
+  /**
+   * Structured error code. Pre-cycle-8 only `binding_required` /
+   * `binding_missing_model` were surfaced; H1-c8 added the orchestrator
+   * codes (`cag_required`, `retrieval_required`) so the non-streaming
+   * caller's UI can distinguish them from binding-related errors.
+   * The trailing `| string` keeps room for future codes without breaking
+   * downstream consumers.
+   */
+  code?:
+    | "binding_required"
+    | "binding_missing_model"
+    | "cag_required"
+    | "retrieval_required"
+    | string;
   /**
    * H5-c7 (cycle-7 audit closure §H5-c7) — non-streaming
    * awaiting-approval signal. When the chat turn hit a tool call
@@ -1033,28 +1046,56 @@ export async function sendChatMessage(
   });
 
   // RAC P6 — runtime orchestrator owns CAG + retrieval + composer.
-  // CagRequiredError / RetrievalRequiredError bubble up to the caller
-  // for chat-error mapping; warnings flow into stdout for ops.
+  //
+  // H1-c8 (cycle-8 audit closure §H1-c8): mirror chat-stream.ts's
+  // explicit catch for CagRequiredError + RetrievalRequiredError so
+  // the structured error code reaches the non-streaming caller's
+  // result shape. Pre-cycle-8 these errors propagated to the outer
+  // generic try/catch and collapsed into `{ ok: false, error: msg }`
+  // with no `code` field — UI couldn't distinguish "needs CAG" from
+  // "needs retrieval" from "binding broken." The instanceof branches
+  // below set `code: "cag_required" | "retrieval_required"` so the
+  // result-shape mirrors chat-stream.ts's SSE error contract. Lockstep
+  // pinned by `tests/agent-studio/h1-c8-orchestrator-error-cross-flow.test.ts`.
   const cagMode = (process.env.CAG_MODE as ComposerMode) ?? "safe_degraded";
-  const built = await buildRuntimeSystemPrompt({
-    mode: cagMode,
-    workspaceId: options.workspaceId ?? 1,
-    agentId: (draft as any).agentId ?? draft.id,
-    agentDraftId: draft.id,
-    actorId: options.actorId ?? 1,
-    query: input.userMessage,
-    draft: {
-      name: (draft as any).name ?? null,
-      role: (draft as any).role ?? null,
-      scope: (draft as any).scope ?? null,
-      mission: (draft as any).mission ?? null,
-      systemInstructions: draft.systemInstructions ?? null,
-      roleInstructions: draft.roleInstructions ?? null,
-      policyInstructions: (draft as any).policyInstructions ?? null,
-      successCriteria: (draft as any).successCriteria ?? null,
-      escalationRules: (draft as any).escalationRules ?? null,
-    },
-  });
+  let built: Awaited<ReturnType<typeof buildRuntimeSystemPrompt>>;
+  try {
+    built = await buildRuntimeSystemPrompt({
+      mode: cagMode,
+      workspaceId: options.workspaceId ?? 1,
+      agentId: (draft as any).agentId ?? draft.id,
+      agentDraftId: draft.id,
+      actorId: options.actorId ?? 1,
+      query: input.userMessage,
+      draft: {
+        name: (draft as any).name ?? null,
+        role: (draft as any).role ?? null,
+        scope: (draft as any).scope ?? null,
+        mission: (draft as any).mission ?? null,
+        systemInstructions: draft.systemInstructions ?? null,
+        roleInstructions: draft.roleInstructions ?? null,
+        policyInstructions: (draft as any).policyInstructions ?? null,
+        successCriteria: (draft as any).successCriteria ?? null,
+        escalationRules: (draft as any).escalationRules ?? null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof CagRequiredError) {
+      return {
+        ok: false,
+        error: err.message,
+        code: "cag_required",
+      };
+    }
+    if (err instanceof RetrievalRequiredError) {
+      return {
+        ok: false,
+        error: err.message,
+        code: "retrieval_required",
+      };
+    }
+    throw err;
+  }
   const composedForBinding = { text: built.systemPrompt };
   for (const w of built.context.warnings) console.info(`[chat/rac] ${w}`);
   for (const w of built.composerWarnings) console.info(`[chat/composer] ${w}`);
