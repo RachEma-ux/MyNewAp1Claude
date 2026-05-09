@@ -15,6 +15,31 @@
  * State transitions write to `agsRuntimePolicyEvents` (D-APP-EXT-6) so
  * the same ledger that records dispatch events captures the approval
  * lifecycle.
+ *
+ * H1-c4 — `dual_control` non-coverage at this layer
+ * --------------------------------------------------
+ * This gate operates on `proposedToolCallHash` and consults
+ * `agsPendingPermissionRequests.status` ∈ {pending, allowed, denied,
+ * timed_out}. It does NOT read the YAML `approval:` field — a single
+ * "allowed" row is permit, regardless of how many approvers signed off.
+ *
+ * Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §H1-c4)
+ * surfaced the question: does this matter? Today: NO. All 11 YAML
+ * `approval: dual_control` entries (agent.controlPlane.promote,
+ * agentPromotion.approve, keyRotation.{activateKey,revokeKey,
+ * activateVersion,createRotation,rollbackRotation}, catalog.{approve,
+ * publish,recall}, governance.unfreezeSubject) flow through tRPC
+ * `governedProcedure` middleware → `requireGovernedAction.checkApproval`
+ * (server/governance/requireGovernedAction.ts:597-604), which DOES count
+ * distinct approver IDs. None resolve to this MCP gate path.
+ *
+ * Lockstep test: `tests/governance/dual-control-mcp-boundary.test.ts`
+ * scans YAML for `approval: dual_control` entries and asserts each is
+ * NOT in `MCP_GATE_BOUND_ACTION_KEYS`. The test fails if a future PR
+ * (a) registers a new MCP-bound action with dual_control, or (b) flips
+ * the only currently-MCP-bound key (`agentStudio.toolApprovals.decide`,
+ * which is `approval: none`) to dual_control. Either change requires
+ * adding dual_control logic to this file FIRST.
  */
 import { and, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection";
@@ -26,6 +51,21 @@ import {
   hashProposedToolCall,
   type ProposedToolCall,
 } from "../mcp/proposed-tool-call";
+
+// ── H1-c4 — MCP gate boundary ─────────────────────────────────────────
+// The set of YAML action-keys whose enforcement happens at THIS gate
+// (`evaluateApprovalGate` / `decideApprovalRequest`). The gate is
+// hash-driven, not action-key-driven, so this set is empty by design:
+// no YAML entry is "MCP-bound" in the dual-control sense. Kept as an
+// explicit named export so the lockstep test
+// `tests/governance/dual-control-mcp-boundary.test.ts` can assert no
+// `approval: dual_control` YAML entry has migrated into this set.
+//
+// If the gate is ever extended to consult action-key-level approval
+// rules (e.g., to implement dual_control here), populate this set with
+// the affected action-keys AND add the dual_control counting logic
+// before doing so.
+export const MCP_APPROVAL_GATE_ACTION_KEYS: ReadonlySet<string> = new Set();
 
 // ── Pure state machine (D-APP-EXT-2) ──────────────────────────────────
 

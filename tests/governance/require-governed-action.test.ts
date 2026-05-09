@@ -399,6 +399,82 @@ describe("requireGovernedAction — R10-c3 R1/R2 evidence policy lock", () => {
   });
 });
 
+describe("requireGovernedAction — H1-c4 dual_control / MCP gate boundary", () => {
+  // Cycle-4 audit (`/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §H1-c4)
+  // surfaced that the MCP approval gate (server/agent-studio/services/
+  // approval/approval-gate.ts) consults `agsPendingPermissionRequests.status`
+  // and treats `"allowed"` as permit, regardless of how many approvers
+  // signed off. It does NOT honor `dual_control` — dual_control counting
+  // is implemented only at the platform-governance layer
+  // (requireGovernedAction.checkApproval).
+  //
+  // This test locks the boundary: every YAML `approval: dual_control`
+  // entry must NOT resolve through the MCP gate. The gate's binding set
+  // (`MCP_APPROVAL_GATE_ACTION_KEYS`, exported from approval-gate.ts) is
+  // empty by design today — the gate is hash-driven, not action-key-driven.
+  //
+  // If a future PR (a) adds an action-key to MCP_APPROVAL_GATE_ACTION_KEYS,
+  // OR (b) declares `approval: dual_control` on a YAML entry that also
+  // appears in that set, this test fails. The fix is to add dual_control
+  // counting logic to approval-gate.ts FIRST, then re-allow the migration.
+  it("no YAML dual_control entry resolves through the MCP approval gate", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const { MCP_APPROVAL_GATE_ACTION_KEYS } = await import(
+      "../../server/agent-studio/services/approval/approval-gate"
+    );
+
+    const yamlSrc = readFileSync(
+      join(process.cwd(), "config/governance/platform_action_registry.yaml"),
+      "utf8",
+    );
+    // Same parser shape as the R10-c3 evidence-policy lock above.
+    const blocks = yamlSrc.split(/^  ([a-zA-Z][\w.]*?):$/m);
+    const dualControlActionKeys = new Set<string>();
+    for (let i = 1; i < blocks.length; i += 2) {
+      const name = blocks[i];
+      const body = blocks[i + 1] ?? "";
+      const approvalMatch = body.match(/^    approval:\s*(\S+)/m);
+      if (approvalMatch && approvalMatch[1] === "dual_control") {
+        dualControlActionKeys.add(name);
+      }
+    }
+
+    // Cycle-4 baseline: 11 dual_control entries, all platform-bound:
+    // agent.controlPlane.promote, agentPromotion.approve,
+    // keyRotation.{activateKey,revokeKey,activateVersion,createRotation,
+    // rollbackRotation}, catalog.{approve,publish,recall},
+    // governance.unfreezeSubject. None should be in MCP_APPROVAL_GATE_ACTION_KEYS.
+    const violations = [...dualControlActionKeys].filter((k) =>
+      MCP_APPROVAL_GATE_ACTION_KEYS.has(k),
+    );
+
+    expect(
+      violations,
+      `Dual-control YAML entries that resolve through the MCP approval gate ` +
+        `(approval-gate.ts MCP_APPROVAL_GATE_ACTION_KEYS) — the gate does ` +
+        `NOT count distinct approvers, so dual_control would silently ` +
+        `degrade to single-approver permit. Add dual_control counting to ` +
+        `approval-gate.ts FIRST, OR downgrade these to role_any:\n  ${violations.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("MCP_APPROVAL_GATE_ACTION_KEYS stays empty until dual_control is implemented at the gate (H1-c4)", async () => {
+    const { MCP_APPROVAL_GATE_ACTION_KEYS } = await import(
+      "../../server/agent-studio/services/approval/approval-gate"
+    );
+    // Belt-and-suspenders: even if no dual_control entries currently bind
+    // to the gate, lock the empty-set invariant. Adding a key here without
+    // adding gate-side dual_control logic flips the invariant silently.
+    expect(
+      MCP_APPROVAL_GATE_ACTION_KEYS.size,
+      `MCP_APPROVAL_GATE_ACTION_KEYS grew. Before populating it, add ` +
+        `dual_control counting logic to approval-gate.ts so the H1-c4 ` +
+        `invariant cannot silently degrade.`,
+    ).toBe(0);
+  });
+});
+
 describe("requireGovernedAction — R4-c3 subject-id-0 freeze bypass closure", () => {
   beforeEach(() => {
     getAuditLogger().clear();
