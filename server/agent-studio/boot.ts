@@ -721,6 +721,44 @@ export async function bootAgentStudio(): Promise<void> {
  * → returns undefined → tools list passed to OpenAI is empty → the
  * model free-associates a tool call in prose instead of emitting a
  * structured tool_calls delta → output looks garbled/broken.
+ *
+ * ── L1-c5 (cycle-5 audit closure §L1-c5) — boot ordering race ──────
+ *
+ * Known race window: the listener accepts requests AS SOON AS
+ * `server.listen()` resolves; this function runs sequentially AFTER
+ * that point and may take O(seconds) when many MCP servers are
+ * configured (each `connectMcpServer` does a stdio spawn / http
+ * handshake + initial `tools/list` round-trip).
+ *
+ * Concretely: a chat request that arrives in that window calls
+ * `dispatchMcpToolCall` → registry returns `tool_not_found` because
+ * `publishSnapshot` has not yet been invoked for the relevant server.
+ * The dispatcher's audit row records the failure with the correct
+ * error code, so it is NOT silent — but it IS operationally
+ * surprising on cold-start ("the same call worked five seconds ago").
+ *
+ * Mitigation chosen — DOC-ONLY (per audit §L1-c5 remediation menu):
+ *
+ *   Option A (chosen): document the race here so operators reading
+ *     a `tool_not_found` immediately after a deploy can recognize
+ *     the cold-start window. The dispatcher's existing error code
+ *     (`tool_not_found`) is structurally correct; no new error
+ *     needed.
+ *
+ *   Option B (rejected for cycle-5): add a process-level "MCP ready"
+ *     gate (boolean flipped at the end of this function) and have
+ *     the dispatcher reject with a new `service_warming_up` error
+ *     before it. Wider blast-radius — would change runtime semantics
+ *     for every dispatch path + add a new error code to the contract
+ *     + need new UI surface to show the warming state. Defer to a
+ *     future cycle if cold-start race becomes a frequent operational
+ *     pain point.
+ *
+ * Lockstep test: `tests/agent-studio/boot-ordering-doc.test.ts`
+ * asserts this doc-block carries the L1-c5 closure marker + names
+ * both options + identifies why option A was chosen. A future PR
+ * that strips the documentation (or quietly switches to option B
+ * without updating the doc) fails the lockstep.
  */
 export async function bootAgentStudioPostListen(): Promise<void> {
   try {
