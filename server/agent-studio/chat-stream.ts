@@ -576,11 +576,21 @@ async function runStreamingToolLoop(args: {
             continue;
           }
         }
+        // C1-c5 (cycle-5 audit `/sdcard/Download/MCP_DISPATCHER_AUDIT_2026-05-09.md` §C1-c5)
+        // — thread `sessionId` as `runtimeRunId` so the dispatcher writes
+        // its `agsRuntimePolicyEvents` audit row. Pre-cycle-5 this call
+        // omitted `runtimeRunId`; `writeAuditRow()` (dispatcher.ts:259)
+        // returns `undefined` when `runId == null`, silently skipping the
+        // canonical governance-audit ledger insert for the entire
+        // production live-chat path. Trace row IS written below at line
+        // 591 with the same `sessionId` surrogate; this just mirrors the
+        // same shape for the audit ledger.
         const dispatchResult = await dispatchMcpToolCall({
           agentDraftId: draftId,
           toolName: dispatchKey,
           args: parsedArgs,
           source: "live_runtime",
+          runtimeRunId: sessionId,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {
