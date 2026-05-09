@@ -22,6 +22,22 @@ export const GOVERNANCE_ROLES = [
 
 export type GovernanceRole = (typeof GOVERNANCE_ROLES)[number];
 
+/**
+ * R8-c3 — read-only roles surfaced from `requireGovernedAction.checkCapability`'s
+ * inline `["viewer", "auditor"]` fallback. These role names are NOT in
+ * `GOVERNANCE_ROLES` (so `normalizeRole(role)` coerces them to "user"), but
+ * the runtime denial logic still references them by raw string. This is a
+ * known inconsistency: any "viewer"/"auditor" role assignment in the
+ * `users.role` column (which is unconstrained `varchar(50)`) gets normalized
+ * to "user" for permission lookup but treated as read-only in capability
+ * checks. A complete fix requires either (a) adding these roles to
+ * GOVERNANCE_ROLES with explicit permission sets + a migration constraining
+ * `users.role` to the enum, or (b) removing the read-only fallback entirely.
+ * For cycle-3 closure scope, this constant just lifts the inline list out
+ * of `requireGovernedAction.ts` so callers reference one canonical source.
+ */
+export const READ_ONLY_ROLES: ReadonlySet<string> = new Set(["viewer", "auditor"]);
+
 // ============================================================================
 // Permission Actions
 // ============================================================================
@@ -137,6 +153,88 @@ const ROLE_PERMISSIONS: Record<GovernanceRole, Set<PermissionAction>> = {
     "governance.drift.read",
     "audit.read",
   ]),
+};
+
+// ============================================================================
+// R7-c3 — Coarse Capability → Role Map
+// ============================================================================
+
+/**
+ * Bridges the coarse `<domain>.<verb>` capabilities used in
+ * `config/governance/platform_action_registry.yaml` (e.g., `agent.manage`,
+ * `knowledge.manage`, `pmt.manage` — 32 distinct values) to the explicit set
+ * of roles that may hold each one. Cycle-3 audit
+ * (`/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md` §2.7) flagged the
+ * coarse-vs-fine mismatch: `hasPermission` knows fine-grained
+ * `PermissionAction` values like `agent.create` / `agent.execute`, but
+ * the YAML's `agent.manage` isn't in that list, so `hasPermission` returns
+ * false and `checkCapability` falls through to a permissive default.
+ *
+ * The map is consulted by `requireGovernedAction.checkCapability` BEFORE
+ * the legacy permissive fallback. Default behavior: coarse-map results are
+ * ADVISORY (audit-log breadcrumb on divergence). Setting the env var
+ * `RBAC_ENFORCE_COARSE=true` (or `=1`) turns the map into a hard gate.
+ *
+ * Maintenance:
+ *   - When YAML adds a new capability, this map must add an entry.
+ *   - The `tests/governance/coarse-capability-coverage.test.ts` (R7-c3)
+ *     enforces the invariant: every YAML `capability:` value must appear
+ *     here.
+ *
+ * Conservative role assignments (preserving today's permissive behavior):
+ *   - Operator and developer roles can perform domain `.manage` actions
+ *     (matches the existing `ROLE_PERMISSIONS` operator/developer pattern).
+ *   - User can perform `.use` capabilities + `collaboration.manage`
+ *     (chat / message create are user-level operations).
+ *   - System can perform a curated lifecycle subset.
+ *   - governance_reviewer holds governance.* + audit.read.
+ *   - admin bypasses via the early return in `checkCapability` and is
+ *     not listed individually here.
+ */
+export const COARSE_CAPABILITY_ROLES: Record<string, ReadonlySet<GovernanceRole>> = {
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  "auth.session": new Set(["governance_reviewer", "operator", "developer", "user", "system"]),
+
+  // ── Domain `.manage` capabilities (admin/operator/developer tier) ────────
+  "agent.manage":         new Set(["operator", "developer"]),
+  "agents.manage":        new Set(["operator", "developer"]),
+  "knowledge.manage":     new Set(["operator", "developer"]),
+  "workflow.manage":      new Set(["operator", "developer"]),
+  "provider.manage":      new Set(["operator", "developer"]),
+  "secret.manage":        new Set(["operator", "developer"]),
+  "model.manage":         new Set(["operator", "developer"]),
+  "embedding.manage":     new Set(["operator", "developer"]),
+  "openRouter.manage":    new Set(["operator", "developer"]),
+  "wiki.manage":          new Set(["operator", "developer"]),
+  "document.manage":      new Set(["operator", "developer"]),
+  "kgia.manage":          new Set(["operator", "developer"]),
+  "bot.manage":           new Set(["operator", "developer"]),
+  "catalog.manage":       new Set(["operator", "developer"]),
+  "workspace.manage":     new Set(["operator", "developer"]),
+  "ps.manage":            new Set(["operator", "developer"]),
+  "pmt.manage":           new Set(["operator", "developer"]),
+  "llm.manage":           new Set(["operator", "developer"]),
+  "policy.manage":        new Set(["operator"]),
+  "deploy.manage":        new Set(["operator"]),
+  "module.manage":        new Set(["operator"]),
+  "vectordb.manage":      new Set(["operator"]),
+  "system.manage":        new Set([]), // admin-only; admin handled via early return
+  "hr.manage":            new Set(["operator"]),
+  "organization.manage":  new Set(["operator"]),
+  "reporting.manage":     new Set(["operator"]),
+  "governance.manage":    new Set(["governance_reviewer"]),
+
+  // ── Collaboration & content (broader user access) ────────────────────────
+  "collaboration.manage": new Set(["operator", "developer", "user"]),
+
+  // ── `.use` capabilities (user-level) ─────────────────────────────────────
+  "chat.use":             new Set(["operator", "developer", "user"]),
+  "kgia.use":             new Set(["operator", "developer", "user"]),
+  "inference.use":        new Set(["operator", "developer", "user"]),
+  "openRouter.use":       new Set(["operator", "developer", "user"]),
+
+  // ── `.view` capabilities (broader read access) ───────────────────────────
+  "reporting.view":       new Set(["governance_reviewer", "operator", "developer", "user"]),
 };
 
 // ============================================================================

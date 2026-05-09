@@ -21,7 +21,13 @@
 import { getActionDef, isAboveThreshold, type RiskLevel } from "./action-registry";
 import { requireGate, type GateResult } from "./requireGate";
 import { isFrozen, getFreezeDetails } from "./scorecard";
-import { hasPermission, normalizeRole, type PermissionAction } from "./rbac-model";
+import {
+  hasPermission,
+  normalizeRole,
+  READ_ONLY_ROLES,
+  COARSE_CAPABILITY_ROLES,
+  type PermissionAction,
+} from "./rbac-model";
 import { getAuditLogger } from "../services/auditLogger";
 
 // ============================================================================
@@ -361,6 +367,17 @@ export async function requireGovernedAction(
   }
 
   // ── 8. Validate evidence requirements ──────────────────────────────────
+  //
+  // R10-c3 (cycle-3 medium-tier closure): the `&& aboveThreshold` guard
+  // means evidence is only enforced for R3+ actions. R1/R2 actions
+  // declaring `evidence: { required: true }` would silently skip
+  // enforcement. This is intentional today — no R1/R2 YAML action
+  // currently sets `required: true`, and the policy is "evidence
+  // requirements are an R3+ concern." If a future R1/R2 action needs
+  // evidence enforcement, the right fix is either to promote it to R3
+  // OR to drop the `&& aboveThreshold` guard here. The
+  // `tests/governance/r10-c3-evidence-policy.test.ts` invariant pins the
+  // policy by asserting no R1/R2 YAML action has `required: true`.
   const evidenceRefs: string[] = [];
 
   if (actionDef.evidence.required && aboveThreshold) {
@@ -465,34 +482,104 @@ function buildDenial(
 
 /**
  * Check if a role has a capability.
- * Maps action registry capabilities to the existing RBAC model.
- * Uses a permissive mapping: admin/deployer roles have all capabilities,
- * user roles have standard capabilities, viewer roles are read-only.
+ *
+ * R7-c3 + R8-c3 (cycle-3 medium-tier closure):
+ *
+ * Layered resolution:
+ *   1. `admin` bypasses all checks. Note: "deployer" was previously also
+ *      bypassed unconditionally — that has been REMOVED in R8-c3 because
+ *      "deployer" is not in `GOVERNANCE_ROLES`, so it's a ghost role; if
+ *      operators want a deploy-bypass tier, they should add it to
+ *      `GOVERNANCE_ROLES` + `ROLE_PERMISSIONS` properly.
+ *   2. Coarse capability map (`COARSE_CAPABILITY_ROLES`, R7-c3) — the
+ *      YAML registry uses coarse `<domain>.<verb>` names (`agent.manage`,
+ *      `knowledge.manage`, etc.) which `PERMISSION_ACTIONS` doesn't list.
+ *      The coarse map declares which roles MAY hold each coarse capability.
+ *      If the capability is in the map and the role is allowed → true. If
+ *      the capability is in the map but the role isn't allowed → emit an
+ *      audit-log breadcrumb (so operators can grep for divergences) and
+ *      then fall through to the legacy permissive logic below. The
+ *      coarse-map check is observability-only by default; setting
+ *      `RBAC_ENFORCE_COARSE=true` (or `=1`) turns it into a hard gate that
+ *      overrides the legacy fallback.
+ *   3. Fine-grained `hasPermission()` — for capabilities that ARE in
+ *      `PERMISSION_ACTIONS`, use the existing role/permission matrix.
+ *   4. Legacy permissive fallback — if none of the above resolved, return
+ *      `false` for read-only roles (viewer/auditor per `READ_ONLY_ROLES`),
+ *      `true` for everything else. This is the historical "RBAC theatre"
+ *      shape that the cycle-3 audit (`/sdcard/Download/GOVERNANCE_AUDIT_2026-05-08.md`
+ *      §2.7) flagged. Future PR can flip the default of `RBAC_ENFORCE_COARSE`
+ *      to true once coarse map coverage is complete.
  */
 function checkCapability(role: string, capability: string): boolean {
-  // Admin roles have all capabilities
-  if (role === "admin" || role === "deployer") return true;
+  // 1. Admin bypass.
+  if (role === "admin") return true;
 
-  // Try direct governance permission check
+  // 2. Coarse capability map (R7-c3).
+  const allowedRoles = COARSE_CAPABILITY_ROLES[capability];
+  if (allowedRoles) {
+    const normalized = normalizeRole(role);
+    const coarseAllowed = allowedRoles.has(normalized);
+    const enforce =
+      process.env.RBAC_ENFORCE_COARSE === "true" ||
+      process.env.RBAC_ENFORCE_COARSE === "1";
+    if (enforce) {
+      return coarseAllowed;
+    }
+    if (!coarseAllowed) {
+      // Observability breadcrumb: legacy fallback may permit, but the
+      // coarse map says "no." When operators flip RBAC_ENFORCE_COARSE,
+      // these grep results show what would change.
+      const audit = getAuditLogger();
+      void audit
+        .log({
+          actor_id: null,
+          action_type: "RBAC_DENIAL",
+          target_type: "coarse_capability_divergence",
+          target_id: capability,
+          decision_result: "attempted",
+          metadata: {
+            role: normalized,
+            capability,
+            coarseAllowed: false,
+            wouldDenyIfEnforced: true,
+            note: "RBAC_ENFORCE_COARSE is unset; legacy permissive fallback applies",
+          },
+        })
+        .catch(() => {
+          // Non-fatal — observability path.
+        });
+    } else {
+      return true;
+    }
+  }
+
+  // 3. Fine-grained PermissionAction check.
   try {
     return hasPermission(role as any, capability as PermissionAction);
   } catch {
-    // If capability doesn't map to a known permission, use role-based fallback
+    // Capability doesn't map to a known fine-grained PermissionAction.
   }
 
-  // Role-based fallback for non-governance capabilities
-  const readOnlyRoles = ["viewer", "auditor"];
-  if (readOnlyRoles.includes(role)) {
-    // Viewers can only read, not mutate
+  // 4. Legacy permissive fallback (R8-c3: now sources READ_ONLY_ROLES from
+  //    rbac-model.ts so the role list has one canonical location).
+  if (READ_ONLY_ROLES.has(role)) {
     return false;
   }
-
-  // User and above can perform standard mutations
   return true;
 }
 
 /**
  * Check if approval requirements are satisfied.
+ *
+ * R9-c3 (cycle-3 medium-tier closure): the `role_all` and `conditional`
+ * cases used to live here as dead code paths — `role_all` had identical
+ * logic to `role_any` (just `approvals.length > 0`), failing to verify
+ * that ALL required approvers were present. `conditional` accepted any
+ * approval. Cycle-3 audit found neither was used in
+ * `platform_action_registry.yaml`. They've been removed; the default
+ * case (deny) now applies if a YAML action declares either, surfacing
+ * the misconfiguration loudly rather than silently passing.
  */
 function checkApproval(
   rule: string,
@@ -507,10 +594,6 @@ function checkApproval(
       // At least one approval from someone other than the actor
       return approvals.length > 0;
 
-    case "role_all":
-      // All required approvers must have approved
-      return approvals.length > 0;
-
     case "dual_control":
       // Two distinct principals, neither being the actor
       const distinctApprovers = new Set(
@@ -520,11 +603,11 @@ function checkApproval(
       );
       return distinctApprovers.size >= 2;
 
-    case "conditional":
-      // Conditional approvals — treated as satisfied if any approval exists
-      return approvals.length > 0;
-
     default:
+      // R9-c3: unknown / removed rule names → fail closed. If a future
+      // YAML edit needs `role_all`, implement it properly (verify all
+      // required approver IDs are present, not just `approvals.length > 0`)
+      // and re-add the case here.
       return false;
   }
 }

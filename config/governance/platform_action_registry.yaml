@@ -1806,30 +1806,12 @@ actions:
     approval: role_any
     evidence: { required: true, types: [reason] }
 
-  # Direction B B3 — import a single Agent Studio export candidate.
-  # Wraps `agentStudio.exportCatalog.exportCandidate` via the gateway,
-  # which calls back into `aiTypes.catalog.register`. Risk parity with
-  # bulkCreate (R2): one row written per call, no high-blast operations.
-  catalogImport.importAgentStudioCandidate:
-    domain: catalog
-    risk: R2
-    capability: catalog.manage
-    stage: mutate
-    approval: none
-    evidence: { required: false }
-
-  # Direction B follow-up — bulk drift scan + best-effort repair of the
-  # AS catalog sync log. Wraps `agentStudio.exportCatalog.reconcileSync`
-  # (Phase 41 gateway action, medium risk, receipt-required). Risk R2 here
-  # because the dryRun=true path is read-only and the apply path only
-  # writes idempotent synthetic rows on the AS sync log.
-  catalogImport.reconcileAgentStudioSync:
-    domain: catalog
-    risk: R2
-    capability: catalog.manage
-    stage: mutate
-    approval: none
-    evidence: { required: false }
+  # R11-c3 (cycle-3 medium-tier closure): Removed 2 orphan catalogImport.*
+  # action defs (importAgentStudioCandidate, reconcileAgentStudioSync). They
+  # had no entry in `server/governance/action-key-map.ts` pointing at them,
+  # so no tRPC procedure could resolve to them. If a future PR wires the
+  # gateway path, it should re-add the action defs alongside the
+  # action-key-map entries (as cycle-2's R2-c2 pattern shows).
 
   # ═══════════════════════════════════════════════════════════════════════════
   # DISCOVERY OPS
@@ -2224,70 +2206,20 @@ actions:
     approval: none
     evidence: { required: false }
 
-  # PMT Lifecycle Governance
-  pmt.project.submitForIntake:
-    domain: pmt
-    risk: R2
-    capability: pmt.manage
-    stage: mutate
-    approval: none
-    evidence: { required: true, types: [reason] }
-
-  pmt.project.transition:
-    domain: pmt
-    risk: R3
-    capability: pmt.manage
-    stage: mutate
-    approval: role_any
-    evidence: { required: true, types: [reason] }
-
-  pmt.gate.request:
-    domain: pmt
-    risk: R3
-    capability: pmt.manage
-    stage: mutate
-    approval: role_any
-    evidence: { required: true, types: [reason, plan] }
-
-  pmt.gate.evaluate:
-    domain: pmt
-    risk: R4
-    capability: pmt.manage
-    stage: mutate
-    approval: dual_control
-    evidence: { required: true, types: [reason, probe_results] }
-
-  pmt.gate.waive:
-    domain: pmt
-    risk: R5
-    capability: pmt.manage
-    stage: mutate
-    approval: dual_control
-    evidence: { required: true, types: [reason] }
-
-  pmt.change.create:
-    domain: pmt
-    risk: R2
-    capability: pmt.manage
-    stage: mutate
-    approval: none
-    evidence: { required: true, types: [reason] }
-
-  pmt.change.submit:
-    domain: pmt
-    risk: R3
-    capability: pmt.manage
-    stage: mutate
-    approval: role_any
-    evidence: { required: true, types: [reason, plan] }
-
-  pmt.project.archive:
-    domain: pmt
-    risk: R3
-    capability: pmt.manage
-    stage: mutate
-    approval: role_any
-    evidence: { required: true, types: [reason] }
+  # R11-c3 (cycle-3 medium-tier closure): Removed 8 orphan pmt.* action defs
+  # (project.submitForIntake, project.transition, project.archive, gate.request,
+  # gate.evaluate, gate.waive, change.create, change.submit). They were declared
+  # under a "# PMT Lifecycle Governance" header but had no entry in
+  # `server/governance/action-key-map.ts` pointing at them, so no tRPC
+  # procedure could resolve to them. Aspirational governance gates that
+  # were never wired up.
+  #
+  # If a future PMT governance-flow PR wires these gates, it should add the
+  # action defs alongside the action-key-map entries (as cycle-2's R2-c2
+  # pattern shows). The cycle-3 R10-c3 finding (R1/R2 evidence required is
+  # silently skipped at runtime) made this cleanup more useful: 2 of the 8
+  # removed entries (submitForIntake R2 + change.create R2) had `evidence:
+  # required: true` that the runtime would have skipped anyway.
 
   pmt.workItemTemplate.create:
     domain: pmt
