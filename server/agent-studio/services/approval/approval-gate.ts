@@ -218,6 +218,31 @@ export interface EvaluateApprovalGateResult {
  * job for the dispatch event itself. State-transition rows are written
  * by `createApprovalRequest` and `decideApprovalRequest` (the two paths
  * that move the row between statuses).
+ *
+ * L1-c6 (cycle-6 audit closure §L1-c6) — revoke race window:
+ *   The verdict returned here is a SNAPSHOT, not a CONTRACT. Between
+ *   this SELECT and the dispatcher's actual MCP invocation:
+ *     - an operator could call `decideApprovalRequest` to flip the
+ *       row from `allowed` to `denied`/`timed_out` (revoke);
+ *     - the M3-c6 expiry sweep could flip the row to `timed_out`
+ *       if `expiresAt` elapsed mid-flight;
+ *     - `expiresAt` itself could elapse between this gate and the
+ *       dispatch (no re-evaluation happens at dispatch time).
+ *
+ *   The gate runs once per dispatch attempt and the dispatcher
+ *   does NOT re-validate. This is acceptable for the intended
+ *   semantic: an `allowed` row at the moment of evaluation IS a
+ *   permit-to-dispatch, and the M5-c4 already-terminal
+ *   rejection-audit captures the operator's revoke attempt as a
+ *   forensic event even when the dispatch already started.
+ *
+ *   Operators who require strict concurrent-revoke semantics
+ *   should run the M3-c6 expiry sweep frequently and rely on the
+ *   M2-c6 UNIQUE INDEX to prevent duplicate row creation. There
+ *   is no plan to add a re-validate-at-dispatch step because the
+ *   race window is ~milliseconds (gate → dispatch invoke) and
+ *   the operational cost of double-evaluation outweighs the
+ *   benefit on every permit.
  */
 export async function evaluateApprovalGate(
   input: EvaluateApprovalGateInput,
