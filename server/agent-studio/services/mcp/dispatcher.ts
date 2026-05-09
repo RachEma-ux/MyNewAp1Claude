@@ -176,6 +176,42 @@ function isTimeoutError(e: unknown): boolean {
 }
 
 /**
+ * H3-c7 (cycle-7 audit closure §H3-c7): map a `ToolSandboxErrorCode`
+ * to a `DispatchErrorCode` so the dispatcher's structured error
+ * surface preserves the sandbox failure mode for audit + trace +
+ * operator UI.
+ *
+ * Pre-cycle-7 every sandbox failure collapsed to
+ * `tool_execution_failed`. Operator forensics could not distinguish
+ * "policy denied this code" (config issue, not retryable) from
+ * "sandbox unavailable" (infra issue, retryable after restart) from
+ * "user code threw" (tool semantics, not retryable). The mapping
+ * function makes each failure visible at the dispatcher boundary.
+ *
+ * Returns null when the input doesn't match a known SBX_* code —
+ * the caller should fall through to `tool_execution_failed` so
+ * unknown sandbox codes still produce a typed dispatch error.
+ */
+function mapSandboxCodeToDispatchCode(
+  sandboxCode: string | undefined,
+): DispatchErrorCode | null {
+  switch (sandboxCode) {
+    case "SBX_TIMEOUT":
+      return "sandbox_timeout";
+    case "SBX_MEMORY":
+      return "sandbox_memory";
+    case "SBX_DENY_GLOBAL":
+      return "sandbox_policy_denied";
+    case "SBX_UNAVAILABLE":
+      return "sandbox_unavailable";
+    case "SBX_THROWN":
+      return "sandbox_thrown";
+    default:
+      return null;
+  }
+}
+
+/**
  * Field names whose values get redacted in the audit payload's
  * argsPreview. Anything matching these (case-insensitive substring)
  * is replaced with `"[REDACTED]"`. Compliance + security baseline.
@@ -422,6 +458,12 @@ export async function dispatchMcpToolCall(
     // row so forensics doesn't need the dispatcher → trace → approval
     // two-hop join.
     approvalRequestId: input.approvalRequestId ?? null,
+    // H3-c7: structured sandbox error code surfaced on sandbox-route
+    // failures (riskClass === "code_execution"). Null on non-sandbox
+    // dispatches and successful sandbox runs. Lets operator forensics
+    // filter "all sandbox timeouts in the last hour" without parsing
+    // errorMessage.
+    sandboxErrorCode: null,
   };
 
   /** Helper to build a structured failure result + write the audit row */
@@ -668,14 +710,25 @@ export async function dispatchMcpToolCall(
 
   // ── 9. Handle invoke failure ──
   if (invokeError) {
-    // H1-c7: distinguish timeout from other invoke failures so audit
-    // + trace + operator UI can tell "server didn't respond within
-    // ceiling" from "server returned an error". Timeouts are
-    // operationally distinct (retryable vs not, indicates server
-    // health vs tool semantics).
-    const code: DispatchErrorCode = invokeError.timedOut
-      ? "tool_call_timeout"
-      : "tool_execution_failed";
+    // H3-c7: structured sandbox-error-code in audit payload (set
+    // BEFORE fail() so the audit row carries the SBX_* signal even
+    // on failure). Null on non-sandbox failures.
+    auditPayload.sandboxErrorCode = invokeError.sandboxCode ?? null;
+
+    // H1-c7 + H3-c7: distinguish timeout / sandbox-specific / generic
+    // failures so audit + trace + operator UI can tell "server didn't
+    // respond within ceiling" from "sandbox policy denied this code"
+    // from "server returned an error". Operationally distinct
+    // (retryable vs not, indicates infra vs config vs tool semantics).
+    let code: DispatchErrorCode;
+    if (invokeError.timedOut) {
+      code = "tool_call_timeout";
+    } else {
+      const sandboxMapped = mapSandboxCodeToDispatchCode(
+        invokeError.sandboxCode,
+      );
+      code = sandboxMapped ?? "tool_execution_failed";
+    }
     return fail(code, invokeError.message, {
       original: String(invokeError.original),
     });
