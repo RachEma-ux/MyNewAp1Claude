@@ -279,6 +279,126 @@ describe("requireGovernedAction — R6-c3 approval enforcement (env-flag-gated)"
   });
 });
 
+describe("requireGovernedAction — R7-c3 coarse capability map coverage", () => {
+  it("COARSE_CAPABILITY_ROLES covers every YAML capability used in platform_action_registry.yaml", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const { COARSE_CAPABILITY_ROLES } = await import(
+      "../../server/governance/rbac-model"
+    );
+
+    const yamlSrc = readFileSync(
+      join(process.cwd(), "config/governance/platform_action_registry.yaml"),
+      "utf8",
+    );
+    // Every `    capability: <X>` line in the YAML.
+    const declaredCaps = new Set<string>();
+    for (const m of yamlSrc.matchAll(/^    capability:\s*(\S+)/gm)) {
+      declaredCaps.add(m[1]);
+    }
+
+    const mappedCaps = new Set(Object.keys(COARSE_CAPABILITY_ROLES));
+    const missing: string[] = [];
+    for (const cap of declaredCaps) {
+      if (!mappedCaps.has(cap)) missing.push(cap);
+    }
+
+    expect(
+      missing,
+      `Capabilities used in platform_action_registry.yaml but not in COARSE_CAPABILITY_ROLES (rbac-model.ts):\n  ${missing.join("\n  ")}\n` +
+        `Add each to the map with the appropriate role set, OR remove the YAML actions that reference it.`,
+    ).toEqual([]);
+  });
+});
+
+describe("requireGovernedAction — R9-c3 dead approval rules removed", () => {
+  it("default case (unknown / removed rule) → deny", async () => {
+    // Direct unit test on checkApproval — since it's not exported, we
+    // exercise it indirectly via requireGovernedAction. Use a fake
+    // YAML action with an unknown rule. Easiest: assert that role_all
+    // (removed in R9-c3) is not handled — the default case fires
+    // and approval is denied. We can't trivially mock actionDef.approval
+    // without a YAML edit, so instead assert the YAML never declares
+    // role_all or conditional anywhere — that's the policy lock R9-c3
+    // creates.
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const yamlSrc = readFileSync(
+      join(process.cwd(), "config/governance/platform_action_registry.yaml"),
+      "utf8",
+    );
+    const roleAllMatches = yamlSrc.match(/^    approval:\s*role_all\b/gm) ?? [];
+    const conditionalMatches =
+      yamlSrc.match(/^    approval:\s*conditional\b/gm) ?? [];
+    expect(
+      roleAllMatches.length,
+      "role_all approval rule was removed from checkApproval (R9-c3); no YAML action may declare it",
+    ).toBe(0);
+    expect(
+      conditionalMatches.length,
+      "conditional approval rule was removed from checkApproval (R9-c3); no YAML action may declare it",
+    ).toBe(0);
+  });
+});
+
+describe("requireGovernedAction — R10-c3 R1/R2 evidence policy lock", () => {
+  // Cycle-3 audit (G10-c3): the `&& aboveThreshold` guard at the evidence
+  // check means R1/R2 actions declaring `evidence: { required: true }`
+  // silently skip enforcement. After R11-c3 removed 2 such orphans
+  // (pmt.project.submitForIntake, pmt.change.create), 5 R1/R2 entries
+  // remain across the YAML — they're locked here as the EXPECTED set.
+  // Adding a NEW R1/R2 action with required:true must either upgrade to
+  // R3 (so enforcement actually fires) OR be added to this allowlist
+  // with rationale.
+  const EXPECTED_R1R2_EVIDENCE_REQUIRED: ReadonlyArray<string> = [
+    "agentPromotion.reject",
+    "trigger.reject",
+    "action.reject",
+    "llmCreation.cancelTraining",
+    "catalog.reject",
+  ];
+
+  it("only the documented R1/R2 actions declare evidence required (drift detection)", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const yamlSrc = readFileSync(
+      join(process.cwd(), "config/governance/platform_action_registry.yaml"),
+      "utf8",
+    );
+    // Parse each action block. Same approach as the R3-c3 enumeration script.
+    const blocks = yamlSrc.split(/^  ([a-zA-Z][\w.]*?):$/m);
+    const found = new Set<string>();
+    for (let i = 1; i < blocks.length; i += 2) {
+      const name = blocks[i];
+      const body = blocks[i + 1] ?? "";
+      const riskMatch = body.match(/^    risk:\s*(\S+)/m);
+      const evMatch = body.match(/^    evidence:\s*\{\s*required:\s*(\w+)/m);
+      if (!riskMatch || !evMatch) continue;
+      const risk = riskMatch[1];
+      const required = evMatch[1] === "true";
+      if ((risk === "R1" || risk === "R2") && required) {
+        found.add(name);
+      }
+    }
+
+    const expected = new Set(EXPECTED_R1R2_EVIDENCE_REQUIRED);
+    const newDrift = [...found].filter((n) => !expected.has(n));
+    const removedDrift = [...expected].filter((n) => !found.has(n));
+
+    expect(
+      newDrift,
+      `New R1/R2 actions with evidence required detected. The runtime silently skips ` +
+        `evidence enforcement for risk < R3 (see requireGovernedAction.ts evidence guard, R10-c3 comment). ` +
+        `Either upgrade these actions to R3 OR add them to EXPECTED_R1R2_EVIDENCE_REQUIRED with ` +
+        `documented rationale:\n  ${newDrift.join("\n  ")}`,
+    ).toEqual([]);
+    expect(
+      removedDrift,
+      `R1/R2 evidence-required actions in EXPECTED but not found in YAML — remove from EXPECTED:\n  ${removedDrift.join("\n  ")}`,
+    ).toEqual([]);
+  });
+});
+
 describe("requireGovernedAction — R4-c3 subject-id-0 freeze bypass closure", () => {
   beforeEach(() => {
     getAuditLogger().clear();
