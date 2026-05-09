@@ -446,6 +446,20 @@ export async function persistRuntimeToolCallTrace(
       dispatchResult,
       durationMs: input.dispatchResult?.durationMs ?? null,
       errorMessage: input.dispatchResult?.error?.message ?? null,
+      // H5-c6: distinguish "operator wait timeout" (chat-stream
+      // surrendered after 300s; verdict.reason === "approval_timeout")
+      // from "approval TTL elapsed" (operator decided allow but the
+      // expiresAt window passed; verdict.reason === "approval_expired").
+      // Both map to approvalStatus="expired" via approvalDecisionFromVerdict;
+      // the trace builder enforces "only set when expired" so this
+      // is safe to pass on every call.
+      traceTimeoutReason: !input.verdict.ok
+        ? input.verdict.reason === "approval_timeout"
+          ? "operator_wait_timeout"
+          : input.verdict.reason === "approval_expired"
+            ? "approval_ttl_elapsed"
+            : null
+        : null,
     });
     return { id: r.id };
   } catch (err) {

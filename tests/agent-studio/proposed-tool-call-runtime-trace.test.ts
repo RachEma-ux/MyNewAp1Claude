@@ -275,4 +275,64 @@ describe("persistRuntimeToolCallTrace", () => {
     const arg = recordTrace.mock.calls[0][0];
     expect(arg.proposedToolCallHash).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  // ── H5-c6 — traceTimeoutReason distinguishes "expired" outcomes ─
+
+  it("H5-c6: approval_timeout verdict → traceTimeoutReason='operator_wait_timeout'", async () => {
+    const recordTrace = vi.fn().mockResolvedValue({ id: 110 });
+    await persistRuntimeToolCallTrace({
+      workspaceId: 1,
+      agentId: 1,
+      agentDraftId: 1,
+      runtimeRunId: 50,
+      runtimeTraceId: null,
+      messageId: null,
+      verdict: rejectedVerdict("approval_timeout", 88),
+      validation: okValidation(),
+      dispatchResult: null,
+      recordTrace,
+    });
+    const arg = recordTrace.mock.calls[0][0];
+    // Both reasons collapse to approvalDecision='expired' but the
+    // trace row preserves the distinct cause via traceTimeoutReason.
+    expect(arg.approvalDecision).toBe("expired");
+    expect(arg.traceTimeoutReason).toBe("operator_wait_timeout");
+  });
+
+  it("H5-c6: approval_expired verdict → traceTimeoutReason='approval_ttl_elapsed'", async () => {
+    const recordTrace = vi.fn().mockResolvedValue({ id: 111 });
+    await persistRuntimeToolCallTrace({
+      workspaceId: 1,
+      agentId: 1,
+      agentDraftId: 1,
+      runtimeRunId: 50,
+      runtimeTraceId: null,
+      messageId: null,
+      verdict: rejectedVerdict("approval_expired", 88),
+      validation: okValidation(),
+      dispatchResult: null,
+      recordTrace,
+    });
+    const arg = recordTrace.mock.calls[0][0];
+    expect(arg.approvalDecision).toBe("expired");
+    expect(arg.traceTimeoutReason).toBe("approval_ttl_elapsed");
+  });
+
+  it("H5-c6: non-timeout verdicts pass null for traceTimeoutReason", async () => {
+    const recordTrace = vi.fn().mockResolvedValue({ id: 112 });
+    await persistRuntimeToolCallTrace({
+      workspaceId: 1,
+      agentId: 1,
+      agentDraftId: 1,
+      runtimeRunId: 50,
+      runtimeTraceId: null,
+      messageId: null,
+      verdict: rejectedVerdict("approval_denied", 88),
+      validation: okValidation(),
+      dispatchResult: null,
+      recordTrace,
+    });
+    const arg = recordTrace.mock.calls[0][0];
+    expect(arg.traceTimeoutReason).toBeNull();
+  });
 });

@@ -2195,6 +2195,25 @@ export const agsToolCallTraces = pgTable(
     durationMs: integer("duration_ms"),
     /** Stripped-stack error message when dispatch failed. */
     errorMessage: text("error_message"),
+    /**
+     * H5-c6 (cycle-6 audit closure §H5-c6): when `approvalStatus =
+     * "expired"`, distinguishes WHY:
+     *
+     *   - `"approval_ttl_elapsed"` — operator granted approval; the
+     *     row's `expiresAt` window passed before the next dispatch
+     *     attempt re-used it.
+     *   - `"operator_wait_timeout"` — operator never decided within
+     *     `APPROVAL_RESUME_TIMEOUT_SEC` (default 300s; chat-stream
+     *     surrendered).
+     *
+     * Pre-cycle-6 both outcomes recorded `approvalStatus = "expired"`
+     * in this table — operator forensics could not distinguish "TTL
+     * elapsed" from "operator never engaged." The verdict's `reason`
+     * preserved the signal but the per-trace row lost it.
+     *
+     * NULL when `approvalStatus !== "expired"`.
+     */
+    traceTimeoutReason: varchar("trace_timeout_reason", { length: 32 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
