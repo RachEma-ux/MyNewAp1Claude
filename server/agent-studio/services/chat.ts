@@ -231,6 +231,28 @@ async function buildToolsForDraft(draftId: number): Promise<ChatToolSpec[]> {
  */
 const MAX_TOOL_TURNS = 6;
 
+/**
+ * H7-c7 (cycle-7 audit closure §H7-c7) — per-tool dispatch ceiling
+ * within a single sendChatMessage call. Mirrors the chat-stream.ts
+ * constant exactly so both flows enforce the same loop-hygiene
+ * contract (parallel-flow lockstep — cycles 5/6/7 standing pattern).
+ *
+ * Operator override via `MAX_CALLS_PER_TOOL_PER_REQUEST` env var.
+ * Out-of-range values warn + fall back to the default.
+ */
+const MAX_CALLS_PER_TOOL_PER_REQUEST = (() => {
+  const raw = process.env.MAX_CALLS_PER_TOOL_PER_REQUEST;
+  if (!raw) return 3;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[chat] MAX_CALLS_PER_TOOL_PER_REQUEST=${raw} is not a positive integer; using default 3`,
+    );
+    return 3;
+  }
+  return n;
+})();
+
 
 /**
  * Start a new chat session attached to an agent, with an optional
@@ -330,6 +352,12 @@ async function runChatWithToolsViaBinding(input: {
   // for up to APPROVAL_RESUME_TIMEOUT_SEC). Recorded as the LAST
   // awaiting-approval event the turn observed.
   let lastAwaiting: { approvalRequestId: number; timeoutSec: number } | null = null;
+
+  // H7-c7 (cycle-7 audit closure §H7-c7): per-tool dispatch counter
+  // for THIS chat call (across all MAX_TOOL_TURNS turn iterations).
+  // Mirrors the chat-stream.ts loop-hygiene guard exactly — same
+  // shape as the cycles 5/6/7 parallel-flow lockstep pattern.
+  const toolDispatchCounts = new Map<string, number>();
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     const history = await repo.listChatMessages(input.sessionId);
@@ -440,6 +468,46 @@ async function runChatWithToolsViaBinding(input: {
           args = JSON.parse(call.arguments);
         } catch {
           args = {};
+        }
+        // H7-c7: per-tool dispatch ceiling. Same shape as
+        // chat-stream.ts's guard — increment, check ceiling, on
+        // excess emit a synthetic refusal + audit row + skip the
+        // dispatch. Persistence-ordering invariant (M5-c7) holds:
+        // refusal message is appended BEFORE the loop continues.
+        const dispatchCount =
+          (toolDispatchCounts.get(call.name) ?? 0) + 1;
+        toolDispatchCounts.set(call.name, dispatchCount);
+        if (dispatchCount > MAX_CALLS_PER_TOOL_PER_REQUEST) {
+          await repo.appendChatMessage({
+            sessionId: input.sessionId,
+            role: "tool",
+            content: JSON.stringify({
+              error: `tool call limit reached for "${call.name}" in this request`,
+              code: "tool_call_limit_exceeded",
+              limit: MAX_CALLS_PER_TOOL_PER_REQUEST,
+              attemptedCount: dispatchCount,
+            }),
+            toolPayload: { toolCallId: call.id, name: call.name },
+          });
+          try {
+            await repo.appendRuntimePolicyEvent({
+              runId: input.sessionId,
+              policyKey: "tool_loop_guard",
+              decision: "deny",
+              reason: "tool_call_limit_exceeded",
+              payload: {
+                toolName: call.name,
+                limit: MAX_CALLS_PER_TOOL_PER_REQUEST,
+                attemptedCount: dispatchCount,
+                source: "chat",
+              },
+            });
+          } catch (e) {
+            console.warn(
+              `[chat] tool_loop_guard event write failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+          continue;
         }
         const dispatchKey = dispatchKeyByOpenaiName.get(call.name);
         if (!dispatchKey) {
