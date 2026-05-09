@@ -417,6 +417,56 @@ export interface PersistRuntimeTraceInput {
  * future PR that flips the trace path to fatal (or that flips the
  * audit path to best-effort) without updating this doc fails the
  * lockstep.
+ *
+ * ── C2-c7 (cycle-7 audit closure §C2-c7) — message-vs-trace asymmetry ─
+ *
+ * The message-store path (`appendChatMessage` → `agsChatMessages` in
+ * MAIN DB) and the trace path (`recordToolCallTrace` → `agsToolCallTraces`
+ * in ASDB) are also asymmetric, mirroring the L4-c5 audit-vs-trace
+ * shape one layer up:
+ *
+ *   - **Message persistence is canonical.** `chat-stream.ts:659-664`
+ *     and `services/chat.ts:580-585` await `appendChatMessage`
+ *     synchronously. If the message write fails, the chat turn fails
+ *     — the user sees the error and can retry. The conversation
+ *     history's correctness depends on no tool result being shown
+ *     to the operator without a row.
+ *
+ *   - **Trace persistence is best-effort.** Same as L4-c5: the
+ *     `console.warn` breadcrumb (PR #220) lands the failure in logs,
+ *     but the chat loop proceeds.
+ *
+ *   - **Why not transactional:** ASDB and MAIN DB are SEPARATE
+ *     PostgreSQL databases (Phase 12.5 split). A single Postgres
+ *     transaction cannot span them. A 2-phase commit would couple
+ *     two operationally-independent databases — too high a cost for
+ *     the observability cache. The per-row asymmetry is the correct
+ *     shape: chat history (canonical) atomic to MAIN; trace
+ *     (observability) best-effort to ASDB.
+ *
+ *   - **Resulting failure mode:** if message-store succeeds + trace
+ *     fails, `agsChatMessages` carries the tool result content (with
+ *     C1-c7 sanitized error text), the trace row is missing,
+ *     operator UI shows the message but no per-validation-gate
+ *     breadcrumb (no validation verdict, no approval decision, no
+ *     dispatch duration). Operator UI MUST tolerate this — render
+ *     the message + a "trace unavailable" placeholder rather than
+ *     dropping the message or showing a broken state. The trace-row
+ *     `runtimeTraceId` / `messageId` nullable contract documented on
+ *     `buildToolCallTraceRow` (trace-writer.ts) supports this UI
+ *     case.
+ *
+ *   - **Forensics path:** the dispatcher's audit row in
+ *     `agsRuntimePolicyEvents` is unaffected — operators can still
+ *     query "which dispatches happened in this run" via audit rows
+ *     even when the per-trace observability row is missing. Audit
+ *     row carries `approvalRequestId` (M4-c5) so the cross-DB
+ *     reconstruction needs at most one extra hop.
+ *
+ *   This doc-block is the discovery surface for the asymmetry. A
+ *   future PR that promotes trace-write to fatal (or message-store
+ *   to best-effort) without updating this doc + the lockstep should
+ *   fail review.
  */
 export async function persistRuntimeToolCallTrace(
   input: PersistRuntimeTraceInput,
