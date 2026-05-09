@@ -121,6 +121,33 @@ export interface AwaitingApprovalEvent {
 }
 
 const MAX_TOOL_TURNS = 6;
+
+/**
+ * H7-c7 (cycle-7 audit closure §H7-c7) — per-tool dispatch ceiling
+ * within a single sendChatMessage / chat-stream call. Bounds how
+ * many times the model can invoke the SAME tool across the
+ * MAX_TOOL_TURNS=6 turn iterations. Default 3 — a legitimate
+ * loop (e.g. retrying a flaky tool) rarely needs more; a
+ * jailbroken / prompt-injected model trying to spam a destructive
+ * tool gets stopped after the third attempt with a synthetic
+ * refusal + audit row.
+ *
+ * Operator override via `MAX_CALLS_PER_TOOL_PER_REQUEST` env var
+ * for deployments with legitimate retry-heavy tools (e.g. an MCP
+ * tool that needs polling). Out-of-range values warn + fall back.
+ */
+const MAX_CALLS_PER_TOOL_PER_REQUEST = (() => {
+  const raw = process.env.MAX_CALLS_PER_TOOL_PER_REQUEST;
+  if (!raw) return 3;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[chat] MAX_CALLS_PER_TOOL_PER_REQUEST=${raw} is not a positive integer; using default 3`,
+    );
+    return 3;
+  }
+  return n;
+})();
 const INPUT_COST_PER_1M = 5; // USD, gpt-4o mid-tier estimate
 const OUTPUT_COST_PER_1M = 15;
 
@@ -314,6 +341,21 @@ async function runStreamingToolLoop(args: {
     durationMs: 0,
   };
 
+  // H7-c7 (cycle-7 audit closure §H7-c7): per-tool dispatch counter
+  // for the duration of THIS chat-stream call (across all
+  // MAX_TOOL_TURNS turn iterations). Pre-cycle-7 the only loop
+  // backstop was MAX_TOOL_TURNS=6; a model could call the same
+  // tool up to 6 times in a row (e.g., `delete_all_files` x6) with
+  // no per-tool guard. Each call is approved independently — the
+  // approval gate has no notion of "this tool was just denied 2
+  // turns ago." With this guard, after MAX_CALLS_PER_TOOL_PER_REQUEST
+  // dispatches of the same tool we emit a synthetic refusal as the
+  // tool result + emit a `tool_loop_guard` audit row and skip the
+  // dispatch. The model sees the refusal and (if not jailbroken)
+  // moves on; if it keeps trying, the next dispatch hits the same
+  // guard.
+  const toolDispatchCounts = new Map<string, number>();
+
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     // Rebuild messages from history so previous tool turns are in
     // scope for the next call. Map our internal shape onto
@@ -444,6 +486,57 @@ async function runStreamingToolLoop(args: {
           toolName: openaiName,
           args: parsedArgs,
         });
+        // H7-c7: per-tool dispatch ceiling. Increment AFTER tool_start
+        // emit (so the operator UI shows the running chip even on the
+        // refusal turn — they can see the model TRIED) but BEFORE
+        // any other dispatch logic. Refused dispatches don't count
+        // against approval gate or trace; they're a synthetic
+        // short-circuit + a security event.
+        const dispatchCount = (toolDispatchCounts.get(openaiName) ?? 0) + 1;
+        toolDispatchCounts.set(openaiName, dispatchCount);
+        if (dispatchCount > MAX_CALLS_PER_TOOL_PER_REQUEST) {
+          const refusalContent = JSON.stringify({
+            error: `tool call limit reached for "${openaiName}" in this request`,
+            code: "tool_call_limit_exceeded",
+            limit: MAX_CALLS_PER_TOOL_PER_REQUEST,
+            attemptedCount: dispatchCount,
+          });
+          await repo.appendChatMessage({
+            sessionId,
+            role: "tool",
+            content: refusalContent,
+            toolPayload: { toolCallId: call.id, name: openaiName },
+          });
+          // Emit the security event for operator visibility. Best-
+          // effort — failure here doesn't fail the chat (mirrors the
+          // L4-c5 trace-vs-audit asymmetry shape: this guard's audit
+          // is observability, not security-of-record).
+          try {
+            await repo.appendRuntimePolicyEvent({
+              runId: sessionId,
+              policyKey: "tool_loop_guard",
+              decision: "deny",
+              reason: "tool_call_limit_exceeded",
+              payload: {
+                toolName: openaiName,
+                limit: MAX_CALLS_PER_TOOL_PER_REQUEST,
+                attemptedCount: dispatchCount,
+                source: "chat-stream",
+              },
+            });
+          } catch (e) {
+            console.warn(
+              `[chat-stream] tool_loop_guard event write failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+          sendEvent({
+            type: "tool_end",
+            toolName: openaiName,
+            ok: false,
+            error: `tool call limit reached for "${openaiName}" (${dispatchCount}/${MAX_CALLS_PER_TOOL_PER_REQUEST})`,
+          });
+          continue;
+        }
         if (!dispatchKey) {
           const errContent = JSON.stringify({
             error: `unknown tool: ${openaiName}`,
