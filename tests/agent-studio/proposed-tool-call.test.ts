@@ -78,6 +78,7 @@ function makeCtx(overrides: Partial<ProposedToolCallValidatorContext> & {
     },
     retrievalChunkIdSet: overrides.retrievalChunkIdSet ?? new Set(),
     knowledgeUnitIdSet: overrides.knowledgeUnitIdSet ?? new Set(),
+    toolKnowledgeIdSet: overrides.toolKnowledgeIdSet ?? new Set(),
     cagBlockIdSet: overrides.cagBlockIdSet ?? new Set(),
     sandboxHealthOk: overrides.sandboxHealthOk ?? true,
   };
@@ -263,6 +264,60 @@ describe("validateProposedToolCall — Gate 3: evidence existence", () => {
         retrievalChunkIdSet: new Set(["c1"]),
         knowledgeUnitIdSet: new Set([1]),
         cagBlockIdSet: new Set(["sec-1"]),
+      }),
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  // ── C3-c6 — toolKnowledgeIds checked against the right set ────────
+  // Pre-cycle-6 Gate 3 iterated `call.toolKnowledgeIds` against
+  // `ctx.knowledgeUnitIdSet` — wrong set. Latent bug (no production
+  // caller emitted toolKnowledgeIds at the time) but a future caller
+  // would have hit systematic false-rejection. These two tests pin
+  // the new contract: tool-knowledge ids check against
+  // `toolKnowledgeIdSet` only; cross-set ids are rejected.
+
+  it("C3-c6: toolKnowledgeId in toolKnowledgeIdSet → ACCEPTED (was REJECTED pre-fix)", async () => {
+    // ID 42 is in toolKnowledgeIdSet but NOT in knowledgeUnitIdSet.
+    // Pre-fix: Gate 3 looked at knowledgeUnitIdSet, found nothing,
+    // rejected with fabricated_evidence. Post-fix: looks at the right
+    // set, finds 42, passes.
+    const r = await validateProposedToolCall(
+      baseCall({ toolKnowledgeIds: [42] }),
+      readCtx({
+        toolKnowledgeIdSet: new Set([42]),
+        knowledgeUnitIdSet: new Set(), // deliberately empty
+      }),
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("C3-c6: toolKnowledgeId only in knowledgeUnitIdSet → REJECTED (was ACCEPTED pre-fix)", async () => {
+    // ID 42 is in knowledgeUnitIdSet but NOT in toolKnowledgeIdSet.
+    // Pre-fix: Gate 3 looked at the wrong set and accepted.
+    // Post-fix: rejects because the right set is empty.
+    const r = await validateProposedToolCall(
+      baseCall({ toolKnowledgeIds: [42] }),
+      readCtx({
+        knowledgeUnitIdSet: new Set([42]),
+        toolKnowledgeIdSet: new Set(), // deliberately empty
+      }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("fabricated_evidence");
+  });
+
+  it("C3-c6: toolKnowledgeIds + knowledgeUnitIds checked independently", async () => {
+    // Both arrays populated; both sets populated; everything resolves.
+    // Catches a regression that re-merges the two sets.
+    const r = await validateProposedToolCall(
+      baseCall({
+        knowledgeUnitIds: [1],
+        toolKnowledgeIds: [42],
+      }),
+      readCtx({
+        knowledgeUnitIdSet: new Set([1]),
+        toolKnowledgeIdSet: new Set([42]),
       }),
     );
     expect(r.ok).toBe(true);

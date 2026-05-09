@@ -113,6 +113,9 @@ function makeCtx(opts: {
     },
     retrievalChunkIdSet: opts.chunks ?? new Set(),
     knowledgeUnitIdSet: opts.units ?? new Set(),
+    // C3-c6: distinct set; retrofit acceptance tests don't exercise
+    // tool-knowledge ids today, so empty default is correct.
+    toolKnowledgeIdSet: new Set(),
     cagBlockIdSet: opts.cagBlocks ?? new Set(),
     sandboxHealthOk: opts.sandboxOk ?? true,
   };
