@@ -179,7 +179,6 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
         draftId,
         name: "e2e-srv",
         transport: "stdio",
-        config: {},
         enabled: true,
       })
       .returning();
@@ -191,6 +190,7 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
     await db.insert(agsDraftPermissionRules).values([
       {
         draftId,
+        ruleSource: "projectSettings",
         toolPattern: `mcp__e2e-srv__*`,
         ruleBehavior: "allow",
         enabled: true,
