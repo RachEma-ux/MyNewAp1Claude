@@ -246,6 +246,12 @@ export async function runSimulation(input: {
   let risk = 0;
   let cost = 0;
   let aborted = false;
+  // Phase 11b-2 (Roadmap V3) — track the reason for the abort so the
+  // terminal `updateRuntimeRun` can populate `errorReason` (Phase 11a
+  // column #14). Operators dashboarding "why did this run fail?"
+  // previously had to dig into the steps array; now the run-level
+  // row carries the summary directly.
+  let abortReason: string | undefined;
   // Phase 19 follow-up: hoisted so the final return statement can
   // surface the actual LLM response + metadata in `result.output`.
   // Previously this was declared inside the `if (!aborted)` block at
@@ -317,6 +323,7 @@ export async function runSimulation(input: {
     });
     risk += 5;
     aborted = true;
+    abortReason = "intent classification blocked by strict policy";
   }
 
   // ── Step 2: Plan ──
@@ -417,7 +424,10 @@ export async function runSimulation(input: {
       } else if (isDestructive && !t.requiresApproval) {
         verdict = toggles.strictPolicy ? "blocked" : "warning";
         risk += 30;
-        if (toggles.strictPolicy) aborted = true;
+        if (toggles.strictPolicy) {
+          aborted = true;
+          abortReason = `destructive tool ${t.toolName} invoked without approval (strict policy)`;
+        }
       }
 
       // Phase 4: PreToolUse hook
@@ -711,6 +721,10 @@ export async function runSimulation(input: {
   }
   if (govResult.verdict === "blocked" && toggles.strictPolicy) {
     aborted = true;
+    abortReason =
+      govResult.reasons?.[0]?.message ??
+      govResult.reasons?.[0]?.rule ??
+      "governance evaluation blocked by strict policy";
   }
 
   // ── Step 6: Handoff (only if orchestration enabled) ──
@@ -1330,6 +1344,11 @@ export async function runSimulation(input: {
     outputTokens: liveUsage?.outputTokens,
     totalTokens: liveUsage?.totalTokens,
     costMicrocents: liveUsage?.costMicrocents,
+    // Phase 11b-2 — populate the run-level errorReason column when
+    // the simulation aborted. Per Phase 11a's audit, errorReason is
+    // metric #14 — surfaces "why did this run fail?" without parsing
+    // the steps array.
+    errorReason: aborted ? abortReason : undefined,
   });
 
   return {
