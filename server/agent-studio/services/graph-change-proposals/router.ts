@@ -53,8 +53,8 @@ const ProposalKindEnum = z.enum([
 
 const ProposalItemSchema = z.object({
   itemKind: z.string().min(1).max(100),
-  itemPayload: z.record(z.unknown()),
-  sourceEvidence: z.record(z.unknown()).optional(),
+  itemPayload: z.record(z.string(), z.unknown()),
+  sourceEvidence: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const graphChangeProposalsRouter = router({
