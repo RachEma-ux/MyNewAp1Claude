@@ -481,7 +481,10 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
         .where(eq(agsToolCallTraces.agentDraftId, draftId));
       expect(traceRows.length).toBe(1);
       expect(traceRows[0].dispatchResult).toBe("ok");
-      expect(traceRows[0].approvalStatus).toBe("permit");
+      // approvalStatusForTrace maps gate `decision="permit"` →
+      // trace column `"allowed"` (the trace surface is broader
+      // than the gate's decision shape). See trace-writer.ts:60.
+      expect(traceRows[0].approvalStatus).toBe("allowed");
       expect(traceRows[0].approvalRequestId).toBe(verdict2.approvalRequestId);
 
       const auditRows = await db
