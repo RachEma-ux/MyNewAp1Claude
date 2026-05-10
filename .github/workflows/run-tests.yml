@@ -190,6 +190,7 @@ jobs:
             tests/agent-studio/h6-c7-client-awaiting-handler.test.ts \
             tests/agent-studio/h7-c7-loop-reentrancy-guard.test.ts \
             tests/agent-studio/permission-default.test.ts \
+            tests/agent-studio/sse-heartbeat.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
