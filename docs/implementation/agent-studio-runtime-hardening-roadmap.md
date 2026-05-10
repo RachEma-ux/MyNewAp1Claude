@@ -448,7 +448,12 @@ Define + capture metrics: stream id, session id, agent id, runtime state, SSE du
 ### Phase 11b — Runtime Observability UI
 Add focused observability surfaces on Runtime / RAC / Governance pages + trace detail + chat diagnostics panel. Reuses Phase 11a data; no external APM clone.
 
-### Phase 11c — Runtime Alerts + SLOs
+### Phase 11c — Runtime Alerts + SLOs — **CLOSED**
+
+**Status:** Shipped. Canonical SLO doc at `docs/operations/agent-studio-runtime-slo.md` (version 1.0.0). Documents 10 SLOs (S1–S10) covering all Gate 7 numerics: ≥25 SSE no-tool streams, p95 first-token <5s, ≥10 tool streams, ≥100 trace writes/min, 0 unbounded memory growth across 2-min stream + degradation curve through 1.5×/2×/3×/catastrophic. Alert routing P0–P3 with audit-log fallback (`agsRuntimePolicyEvents.policyKey='runtime_slo_alert'`); Slack / PagerDuty external integrations are optional. Lockstep test `tests/agent-studio/runtime-slo-doc-lockstep.test.ts` (17 cases) wired into Layer 8 — locks Gate 7 numerics, Phase 11a column references, alert tier ladder, optionality of external integrations, semver lifecycle. Phase 12 load tests will assert against §2 numerics.
+
+**Note on phase ordering:** Phase 11b (Runtime Observability UI) is multi-week and not blocking Phase 12 load tests. Track B execution skipped 11b in favor of 11a → 11c → 12 to race to Gate 7 closure. Phase 11b becomes a UI polish phase post-Gate 7 closure.
+
 Document SLOs with thresholds (Gate 7 numerics). Alert routing: dashboard banner, admin notification, audit/event log. External integrations (Slack, PagerDuty) optional.
 
 ### Phase 12 — Runtime Load Certification
