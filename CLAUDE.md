@@ -78,6 +78,41 @@ Tracked in `docs/implementation/agent-studio-roadmap-delta.md` (Phase 0 delivera
 
 (DOCX closed at R5 — `D-PARSE-DOCX-1..4` per `docs/architecture/agent-studio-docx-parser.md`. OCR-PDF closed at R6 — `D-PARSE-OCRPDF-1..4` per `docs/architecture/agent-studio-ocr-pdf-parser.md`.)
 
+## Native Graph Workspace — Non-Build List (MVP 0–4)
+
+The Native Graph Workspace initiative (per `docs/implementation/agent-studio-native-graph-workspace-roadmap.md`) **extends** existing graph-shaped infrastructure and must NOT duplicate it.
+
+Existing systems to extend, not greenfield:
+- `server/kgra-agent/` — existing Knowledge Graph + Reasoning Agent (12-node pipeline, RAGDB-backed). Graph Agent Lite (Phase 13) is a vault-aware **sibling**; mirrors module shape (manifest / ports / public-api / engine / nodes / state); calls KGRA `actions.ts` (`ingestProject`, `buildKnowledgeGraph`, `getGraphStats`) for entity / relationship extraction.
+- `server/modules/kgia/` — existing Neo4j Inference Agent with stub adapter, query planner, schema discovery, frontend pages at `/kgia/*`. The new `Neo4jCommunityGraphRepository` (Phase 7.5) wraps and hardens KGIA's adapter; new Native Graph Workspace UI at `/agent-studio/graph-workspace/` coexists with `/kgia/*`.
+- `server/data-analysis/graphrag/` — existing GraphRAG control plane (Python worker on `:8484`). Phase 12 GraphRAG Retrieval Router calls existing `dataAnalysis.graphRag.*` tRPC for index / query workflows; does not greenfield indexing.
+- `drizzle/tables/graphrag.ts` — existing `graphrag_sources`, `graphrag_sync_runs`, `graphrag_index_runs`, `graphrag_query_runs`, `graphrag_artifact_registry`. New `ags_*` tables (`ags_vault_*`, `ags_graph_*`, `ags_graph_projection_*`, etc.) are **additive**; new vault sources register via existing `graphrag_sources`.
+- `drizzle/tables/ragdb.ts` — existing `kgra_entities`, `kgra_relationships`, `kgra_build_runs`, `kgra_manual_nodes`. Read-only projection target; not modified.
+- `server/agent-studio/services/cag/` — Phase 10 adds CAG block → source note version reference; existing CAG runtime contract preserved.
+- `server/agent-studio/services/rac/` — Phase 12 GraphRAG router registers as new `RetrievalPlanItem` source type; existing planner / executor / filter unchanged.
+- `server/agent-studio/services/mcp/dispatcher.ts` — single tool execution chokepoint. Graph Agent Lite must use `dispatchMcpToolCall(input)`; no parallel tool execution.
+- `server/openrouter/model-access/` — single model execution path. Graph Agent Lite must use `execute()` / `stream()` / `embed()`; no direct provider SDK imports.
+- `agsRuntimeRuns` (V3 Phase 11a observability columns) — Native Graph Workspace adds Neo4j projection (Phase 14); preserves Postgres source-of-truth.
+
+Hard rules:
+- All graph access goes through `GraphRepository` (`server/agent-studio/services/graph/repository/`). No `neo4j-driver` imports outside `server/agent-studio/services/graph/repository/**` and `server/modules/kgia/**`. Source-scan tested.
+- Postgres = source of truth; Neo4j CE = projected backend. No reverse direction outside ADR-approved bidirectional flows.
+- Graph Agent Lite must not mutate graph facts directly. Mutations route through Phase 11.5 graph change proposals + existing approval scaffolding.
+- Cypher templates must be parameterized; no raw query strings outside `ags_query_templates` registry.
+- Read-only Text2Cypher; mutations forbidden.
+
+Out of scope for MVP 0–4:
+- `kgra/` Python sidecar at repo root
+- `server/kgra-agent/` internal changes
+- `server/data-analysis/` internal changes
+- Full Canvas / full Bases / plugin framework
+- Real-time collaborative editing / CRDT
+- Offline sync / local-first mode
+- Neo4j Enterprise / Aura migration (Phase 27 documents the upgrade path)
+- Multi-region graph deployment
+
+ADR index: `docs/architecture/agent-studio-native-graph-workspace.md` (top-level), `agent-studio-postgres-neo4j-responsibility-split.md`, `agent-studio-graph-agent-integration-boundaries.md`, `agent-studio-graph-repository-and-backend-strategy.md`, `agent-studio-active-graph-backend-decision.md` (Phase 1.5 closure).
+
 ---
 
 ## CRITICAL: Device Workflow Rules
