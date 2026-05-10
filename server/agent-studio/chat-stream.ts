@@ -1079,6 +1079,31 @@ async function runPureStream(args: {
 
 // ── Request handler ──────────────────────────────────────────────────────────
 
+/**
+ * Phase 3.3 (Roadmap V3) — MVP reconnect contract.
+ *
+ * The server makes no attempt to resume a partial stream after a
+ * connection drop. Instead, the client (AgentChatPage +
+ * AgentStudioChatWindow) calls `es.close()` on EventSource error,
+ * suppressing the browser's default auto-reconnect. Combined with
+ * Phase 3.2's `clientMessageId` idempotency, this gives us:
+ *
+ *   - User can click "send" again on the same text → fresh
+ *     `clientMessageId` is generated → server runs it as a NEW
+ *     request. The legitimate retry path.
+ *   - Browser auto-reconnect (which we explicitly suppress) — even
+ *     if we missed a code path, the same URL with the same
+ *     `clientMessageId` would hit `idempotency_conflict` server-side
+ *     and refuse to dispatch tools or run the model again.
+ *   - Manual double-submit is gated client-side by `isStreaming`
+ *     state; backend `idempotency_conflict` is the second line.
+ *
+ * Phase 3.4 will fold in `client_disconnected` handling via an
+ * AbortController plumbed from `req.on("close")` into gatewayCall +
+ * dispatchMcpToolCall (closes Phase 1e §3 H2). Phase 10 (stretch)
+ * adds true resumable streaming if production telemetry shows it's
+ * needed.
+ */
 export async function handleAgentStudioChatStream(req: Request, res: Response) {
   const sessionIdRaw = req.query.sessionId as string | undefined;
   const userMessage = req.query.message as string | undefined;

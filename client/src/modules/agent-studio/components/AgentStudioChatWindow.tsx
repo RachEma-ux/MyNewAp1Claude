@@ -336,7 +336,19 @@ export function AgentStudioChatWindow() {
             setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
-            toast.error(data.error ?? "Studio Chat error");
+            // Phase 3.3 — discriminate on the stable `code` field so
+            // `idempotency_conflict` produces a friendly "duplicate
+            // request, your original is still running" message rather
+            // than a generic error. Other codes fall through to the
+            // generic path; Phase 3.4 will expand this lattice.
+            if (data.code === "idempotency_conflict") {
+              toast.info(
+                "Duplicate send detected — your original request is still running. " +
+                  "Refresh to see the persisted state.",
+              );
+            } else {
+              toast.error(data.error ?? "Studio Chat error");
+            }
             // Refresh the message list anyway — the user message
             // was persisted even though the stream failed.
             utils.agentStudio.chat.listMessages.invalidate({
