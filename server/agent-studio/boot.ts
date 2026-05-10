@@ -111,6 +111,34 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ASDB] Graph Skill row seed skipped — ${message}`);
   }
 
+  // Step 2d: Native Graph Workspace Phase 11 — promotion adapter wiring.
+  //
+  // Injects the Drizzle-backed PromotionAdapter into the promotion router
+  // so submit/approve/reject/rollback procedures stop returning
+  // PRECONDITION_FAILED. Skipped (logged) when getAsDb() returns null —
+  // promotion router will continue to surface the precondition error
+  // until the next boot succeeds against ASDB.
+  try {
+    const { getAsDb } = await import("./db/connection");
+    const db = getAsDb();
+    if (db) {
+      const { AsdbPromotionAdapter } = await import(
+        "./services/promotion/adapter-asdb"
+      );
+      const { _setPromotionAdapter } = await import(
+        "./services/promotion/router"
+      );
+      _setPromotionAdapter(new AsdbPromotionAdapter({ db }));
+    } else {
+      console.warn(
+        "[ags-promotion] adapter wiring skipped — no asdb connection",
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-promotion] adapter wiring skipped — ${message}`);
+  }
+
   // Step 3: Phase 10 scheduler — formalized boot path
   try {
     const { ensureSchedulerStarted } = await import("./services/scheduler");
