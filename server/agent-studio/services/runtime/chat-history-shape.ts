@@ -99,11 +99,14 @@ export interface ChatHistoryRow {
  * null as "drop the message" rather than "fall back to empty
  * string" — the empty-string fallback was the original M9-c7 bug.
  *
- * NOTE: chat-stream.ts and chat.ts currently still do
- * `?? ""` to preserve pre-cycle-7 behavior for in-flight sessions;
- * the migration to honor the null is deferred to a follow-up. The
- * helper exposes the strictly-correct shape so the upgrade path is
- * a one-line caller change rather than another inline rewrite.
+ * H5-c8 (cycle-8 audit closure §H5-c8): both chat flows now consume
+ * the strict reconstructor and DROP rows whose toolCallId cannot be
+ * extracted. The empty-string fallback (cycle-7's in-flight compat
+ * concession) was the audit's concern — letting malformed rows
+ * reach `windowChatHistory` and then the model. Drop + breadcrumb
+ * is now the policy; the breadcrumb is rate-limited per session per
+ * 60s so a single corrupt row in a chatty session doesn't flood
+ * stdout (mirrors cycle-7 H9-c7 trace-warn rate-limit).
  */
 export function reconstructToolHistoryMessage(
   row: ChatHistoryRow,
@@ -119,4 +122,63 @@ export function reconstructToolHistoryMessage(
     content: row.content,
     toolCallId: id,
   };
+}
+
+/**
+ * H5-c8 — process-local rate-limit map for the malformed-row warn.
+ * Key = chat session id; value = monotonic timestamp of last warn
+ * fired for that session. Module-level so the budget survives
+ * across calls but does NOT survive process restart (acceptable —
+ * the breadcrumb is observability, not audit). Mirrors cycle-7
+ * H9-c7's `lastTraceWarnAt` map shape exactly.
+ */
+const MALFORMED_ROW_WARN_MIN_INTERVAL_MS = 60_000;
+const lastMalformedRowWarnAt = new Map<number, number>();
+
+/** H5-c8: test-only escape hatch. Resets the rate-limit budget. */
+export function __resetMalformedRowWarnRateLimitForTests(): void {
+  lastMalformedRowWarnAt.clear();
+}
+
+/**
+ * H5-c8 — reconstruct a tool-role row OR emit a rate-limited
+ * "malformed row dropped" breadcrumb when reconstruction returns
+ * null. Returns the reconstructed message on success, null on
+ * drop. Callers should treat null as "skip this row" (don't push
+ * into the messages array).
+ *
+ * Rate-limit:
+ *   - One warn per (sessionId) per 60s (process-local).
+ *   - Suppressed warns are silently dropped (cycle-7 H9-c7 contract).
+ *
+ * The breadcrumb names sessionId + the persisted shape preview
+ * (first 80 chars of JSON.stringify(toolPayload)) so operators can
+ * find the row in `agsChatMessages` without grepping the message
+ * store.
+ */
+export function reconstructToolHistoryMessageOrLog(
+  row: ChatHistoryRow,
+  ctx: { sessionId: number; flow: "chat-stream" | "chat" },
+): ModelAccessMessage | null {
+  const msg = reconstructToolHistoryMessage(row);
+  if (msg !== null) return msg;
+  if (row.role !== "tool") return null; // not a tool row — silent skip is correct
+  const now = Date.now();
+  const lastAt = lastMalformedRowWarnAt.get(ctx.sessionId);
+  if (
+    lastAt === undefined ||
+    now - lastAt >= MALFORMED_ROW_WARN_MIN_INTERVAL_MS
+  ) {
+    lastMalformedRowWarnAt.set(ctx.sessionId, now);
+    let preview: string;
+    try {
+      preview = JSON.stringify(row.toolPayload ?? null).slice(0, 80);
+    } catch {
+      preview = "[unserializable]";
+    }
+    console.warn(
+      `[${ctx.flow}] dropped malformed tool history row (session=${ctx.sessionId} payload=${preview}): missing/empty toolCallId — see runtime/chat-history-shape.ts H5-c8 contract`,
+    );
+  }
+  return null;
 }
