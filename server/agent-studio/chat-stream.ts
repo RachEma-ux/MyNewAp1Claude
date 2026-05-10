@@ -390,6 +390,13 @@ async function runStreamingToolLoop(args: {
    * disconnect."
    */
   signal?: AbortSignal;
+  /**
+   * Phase 5b (Roadmap V3) — runtime context built by the SSE handler
+   * via `buildRuntimeContext`. Forwarded into `dispatchMcpToolCall`
+   * so the dispatcher's `checkAllowedTools` can apply fail-closed
+   * defaults for published agents with zero permission rules.
+   */
+  runtimeContext?: import("./services/runtime/runtime-context").RuntimeContext;
 }): Promise<{
   assistantRowId: number;
   content: string;
@@ -410,6 +417,7 @@ async function runStreamingToolLoop(args: {
     tools,
     sendEvent,
     signal,
+    runtimeContext,
   } = args;
   // Local alias kept for code locality with the persistence calls below.
   const model = modelRef;
@@ -880,6 +888,11 @@ async function runStreamingToolLoop(args: {
           // Without this, the audit ledger has caller=null for every
           // live-chat tool dispatch.
           caller: { userId: actorId, sessionId: String(sessionId) },
+          // Phase 5b: forward the runtime context so the dispatcher
+          // can apply the fail-closed default for published agents
+          // with zero enabled permission rules. Gated by
+          // `RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED` inside the gate.
+          runtimeContext,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {
@@ -1424,6 +1437,10 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
             tools: toolSpecs,
             sendEvent,
             signal: abortController.signal,
+            // Phase 5b: forward runtime context into the tool loop so
+            // every per-call dispatch carries it; the dispatcher uses
+            // it to enforce fail-closed for published agents.
+            runtimeContext,
           })
         : await runPureStream({
             providerConnectionId,

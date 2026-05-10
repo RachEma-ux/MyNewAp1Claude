@@ -7,6 +7,8 @@
  * the dispatcher implementation. Helps tree-shaking and tests.
  */
 
+import type { RuntimeContext } from "../runtime/runtime-context";
+
 /** Source of an MCP tool call — affects audit attribution */
 export type DispatchSource =
   | "simulation"
@@ -87,6 +89,22 @@ export interface DispatchMcpToolCallInput {
    * approval omit it.
    */
   approvalRequestId?: number;
+  /**
+   * Phase 5b (Roadmap V3) — runtime context (built by chat-stream.ts
+   * + chat.ts via `buildRuntimeContext`). When the agent is in the
+   * `published` lifecycle state AND zero enabled permission rules
+   * exist for the draft, `checkAllowedTools` returns `"deny"` with
+   * the audit reason `deny_missing_rules_for_published_agent`. For
+   * any other lifecycle state (or when this field is omitted), the
+   * existing `"skip"` (warn-allow) behavior is preserved — drafts
+   * keep their dev-friendly defaults.
+   *
+   * Optional — system / simulation / mcp-manager call sites that
+   * don't carry an agent identity should omit this. Gated by the
+   * `RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED` env flag (default `false`
+   * — operator flips after Phase 5a's impact-scan reports clean).
+   */
+  runtimeContext?: RuntimeContext;
 }
 
 export interface DispatchMcpToolCallResult {
