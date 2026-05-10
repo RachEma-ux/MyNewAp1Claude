@@ -358,7 +358,11 @@ function checkAllowedTools(agentDraftId, fullToolName, runtimeContext) {
 
 ## 4. Track B — Runtime Maturity / Post-MVP
 
-### Phase 6 — Lightweight Runtime Config Schema Governance
+### Phase 6 — Lightweight Runtime Config Schema Governance — **CLOSED**
+
+**Status:** Shipped. New module `server/agent-studio/services/runtime/config-schema-version.ts` exports `RUNTIME_CONFIG_SCHEMA_VERSION = "1.0.0"`, `SUPPORTED_RUNTIME_CONFIG_VERSIONS`, `RUNTIME_CONFIG_BLOCK_NAMES` (9 blocks), and three helpers: `validateConfigSchemaVersion`, `stampConfigSchemaVersion`, `assertConfigSchemaVersion`. The write boundary in `repository.updateDraft` iterates the canonical block list, asserts on inbound `schemaVersion`, and stamps every present block. New unit + source-scan test `config-schema-version.test.ts` (21 cases) wired into Layer 8.
+
+**Design choice — sibling field, not wrapper.** The roadmap example showed `{ schemaVersion: "1.0.0", data: { ... } }`. Wrapper form would break every existing reader (chat-stream, chat, simulation, governance, RAC) on day one. The sibling shape `{ schemaVersion: "1.0.0", ...existingFields }` is additive: readers ignore unknown keys, the constraint enforces at the write boundary, and a future migration to wrapper form ships as a one-shot rewriter when the version bumps to 2.0.0. Pre-Phase-6 unstamped rows are tolerated on read — they get stamped on next write, no DB migration required.
 
 Add `schemaVersion` to runtime config blocks: `runtimeConfig`, `providerConfig`, `governancePolicy`, `simulationDefaults`, `memoryConfig`, `knowledgeConfig`, `workflowConfig`, `scheduleConfig`, `statusLineConfig`. Initially support only `"1.0.0"`; reject unsupported versions; **no migration engine** until schema drift actually surfaces.
 

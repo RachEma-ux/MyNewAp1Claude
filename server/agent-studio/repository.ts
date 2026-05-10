@@ -296,6 +296,28 @@ export async function updateDraft(
       ),
     };
   }
+  // Phase 6 (Roadmap V3) — config schema versioning. Reject any
+  // inbound block carrying an unsupported `schemaVersion`, then stamp
+  // every present block with the current canonical version. Existing
+  // unstamped rows drift to stamped state on their next write — no
+  // migration required for read paths.
+  {
+    const {
+      RUNTIME_CONFIG_BLOCK_NAMES,
+      assertConfigSchemaVersion,
+      stampConfigSchemaVersion,
+    } = await import("./services/runtime/config-schema-version");
+    const stamped: Record<string, unknown> = {};
+    for (const name of RUNTIME_CONFIG_BLOCK_NAMES) {
+      const v = (safePatch as Record<string, unknown>)[name];
+      if (v === undefined) continue;
+      assertConfigSchemaVersion(v, name);
+      stamped[name] = stampConfigSchemaVersion(v as Record<string, unknown>);
+    }
+    if (Object.keys(stamped).length > 0) {
+      safePatch = { ...safePatch, ...stamped } as typeof patch;
+    }
+  }
   await conn
     .update(agsAgentDrafts)
     .set({ ...safePatch, updatedAt: new Date() })
