@@ -194,6 +194,7 @@ jobs:
             tests/agent-studio/client-message-id-idempotency.test.ts \
             tests/agent-studio/mvp-reconnect.test.ts \
             tests/agent-studio/stream-error-codes.test.ts \
+            tests/agent-studio/runtime-boundaries-script.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
@@ -215,6 +216,20 @@ jobs:
 
       - name: Provider env-key boundary (D1)
         run: npx tsx scripts/check-provider-key-env-boundary.ts
+
+      # ── Runtime boundaries (Phase 4.5, Roadmap V3 Gate 6) ──────────
+      # Four static rules that close the boundary-lint gaps surfaced by
+      # Phase 1a §3 row 8:
+      #   R1 — No raw provider SDK in server/agent-studio/**
+      #   R2 — validateRuntimeToolCall precedes dispatchMcpToolCall
+      #        on chat lanes (chat-stream.ts + chat.ts)
+      #   R3 — Direct conn.callTool forbidden outside dispatcher.ts
+      #   R4 — gateRuntimeDispatch precedes dispatchMcpToolCall on
+      #        chat lanes (parallel-flow lockstep with R2)
+      # Pure-surface, no DB, no network. Repo is currently clean by
+      # inspection — these rules are regression-prevention.
+      - name: Runtime boundaries (Phase 4.5)
+        run: npx tsx scripts/check-runtime-boundaries.ts
 
       # ── Additional Tests (manual trigger) ───────────────────────────
       - name: Run additional tests
