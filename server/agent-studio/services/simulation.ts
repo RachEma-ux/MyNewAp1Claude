@@ -193,17 +193,26 @@ export async function runSimulation(input: {
   const draft = await repo.getCurrentDraft(input.agentId);
   if (!draft) throw new Error(`No draft found for agent ${input.agentId}`);
 
-  // Phase 5c (Roadmap V3) — load the agent row to thread workspaceId
-  // into every persistRuntimeToolCallTrace call AND derive the runtime
-  // lifecycle state for parallel-flow lockstep with chat-stream.ts +
-  // chat.ts (Phase 5a/5b). Pre-flight #6 of the roadmap: the published-
-  // fail-closed gate is agent-level, not lane-level, so simulation of a
-  // published agent must enforce the same default as production.
+  // Phase 5c (Roadmap V3) — load the agent row so we can derive the
+  // runtime lifecycle state for parallel-flow lockstep with
+  // chat-stream.ts + chat.ts (Phase 5a/5b). Pre-flight #6 of the
+  // roadmap: the published-fail-closed gate is agent-level, not
+  // lane-level, so simulation of a published agent must enforce the
+  // same default as production.
   const agent = await repo.getAgentById(input.agentId);
   if (!agent) throw new Error(`No agent found for id ${input.agentId}`);
   const runtimeContext = buildRuntimeContext({
     agentLifecycleState: (agent as { lifecycleState?: string }).lifecycleState ?? null,
   });
+  // Same sentinel-fallback pattern as chat-stream.ts:1316 — the
+  // ags_agents Drizzle schema doesn't expose `workspace_id` (the
+  // column exists at the DB level for `listPublishedAgents`'s raw SQL
+  // but the typed select() doesn't project it). Trace rows accept the
+  // sentinel `1` until the schema rebase carries the column over.
+  const workspaceId =
+    typeof (agent as { workspaceId?: number }).workspaceId === "number"
+      ? ((agent as { workspaceId?: number }).workspaceId as number)
+      : 1;
 
   const scenario = input.scenarioId
     ? await repo.getSimulationScenarioById(input.scenarioId)
@@ -531,7 +540,7 @@ export async function runSimulation(input: {
 
           if (!runtimeVerdict.ok) {
             await persistRuntimeToolCallTrace({
-              workspaceId: agent.workspaceId,
+              workspaceId: workspaceId,
               agentId: input.agentId,
               agentDraftId: draft.id,
               runtimeRunId: runtimeRun.id,
@@ -574,7 +583,7 @@ export async function runSimulation(input: {
               verdict = "warning";
             }
             await persistRuntimeToolCallTrace({
-              workspaceId: agent.workspaceId,
+              workspaceId: workspaceId,
               agentId: input.agentId,
               agentDraftId: draft.id,
               runtimeRunId: runtimeRun.id,
