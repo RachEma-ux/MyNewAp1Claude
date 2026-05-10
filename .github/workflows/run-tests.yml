@@ -221,6 +221,7 @@ jobs:
             tests/agent-studio/config-schema-version.test.ts \
             tests/agent-studio/stream-event-union.test.ts \
             tests/agent-studio/runtime-observability-data-model.test.ts \
+            tests/agent-studio/runtime-slo-doc-lockstep.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
