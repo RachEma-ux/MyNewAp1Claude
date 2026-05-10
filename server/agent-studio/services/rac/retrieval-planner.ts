@@ -33,6 +33,55 @@ import {
   type RacIngestionAdapter,
   type ResolvedEmbeddingBinding,
 } from "./ingestion";
+// H3-c8 (cycle-8 audit closure §H3-c8): bound the planner's I/O so a
+// hung DB query (lock contention, ASDB outage mid-query) doesn't
+// stall the entire chat turn. Same shape as H2-c8's CAG-resolver
+// timeout one layer up; reuses the shared `withTimeout` helper.
+import {
+  withTimeout,
+  isTimeoutError,
+} from "../runtime/with-timeout";
+
+/**
+ * H3-c8: per-call timeout ceiling for the planner's source-registry
+ * I/O. Default 5s — DB queries should complete in milliseconds; a
+ * 5s ceiling catches lock-contention or ASDB outages without
+ * stalling the chat turn. Operator override via
+ * `RAC_PLANNER_TIMEOUT_MS`. Out-of-range warns + falls back per the
+ * standing pattern (cycle-7 L5-c6 / H1-c7 / H7-c7 / H8-c7 / H2-c8).
+ *
+ * On timeout the planner throws a `PlannerTimeoutError` so the
+ * orchestrator's safe_degraded mode catches it and degrades
+ * gracefully (retrieval is best-effort by design; the chat shouldn't
+ * fail just because retrieval is slow).
+ */
+const RAC_PLANNER_TIMEOUT_MS = (() => {
+  const raw = process.env.RAC_PLANNER_TIMEOUT_MS;
+  if (!raw) return 5_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[rac-planner] RAC_PLANNER_TIMEOUT_MS=${raw} is not a positive integer; using default 5000ms`,
+    );
+    return 5_000;
+  }
+  return n;
+})();
+
+/**
+ * H3-c8: typed error surfaced when the planner's I/O exceeds the
+ * timeout ceiling. Distinct from the orchestrator's
+ * `RetrievalRequiredError` (which is the strict-mode escalation);
+ * `PlannerTimeoutError` is the safe-degraded signal the orchestrator
+ * catches + records as `retrieval_error` fallback.
+ */
+export class PlannerTimeoutError extends Error {
+  readonly code = "rac_planner_timeout";
+  constructor(detail: string) {
+    super(`RAC planner I/O timed out: ${detail}`);
+    this.name = "PlannerTimeoutError";
+  }
+}
 
 export interface RetrievalPlanItem {
   source: RacSource;
@@ -87,7 +136,25 @@ const IN_PROCESS_TYPES: ReadonlySet<string> = new Set(["cag_pack"]);
 export async function planRetrieval(
   input: PlanRetrievalInput,
 ): Promise<RetrievalPlan> {
-  const profile = await getProfile(input.profileId);
+  // H3-c8: bound EACH I/O call independently. Wrapping the
+  // Promise.all as a whole would mean a single hung query takes the
+  // full timeout budget AND no breadcrumb names which one stalled.
+  // Per-call wrapping surfaces the offender via the timeout label.
+  let profile: RacProfile | null;
+  try {
+    profile = await withTimeout(
+      getProfile(input.profileId),
+      RAC_PLANNER_TIMEOUT_MS,
+      `getProfile(${input.profileId})`,
+    );
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new PlannerTimeoutError(
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+    throw err;
+  }
   if (!profile) throw new Error(`RAC profile ${input.profileId} not found`);
   if (profile.workspaceId !== input.workspaceId) {
     throw new Error(
@@ -95,10 +162,29 @@ export async function planRetrieval(
     );
   }
 
-  const [sources, workspaceDefault] = await Promise.all([
-    listSourcesForProfile(input.profileId),
-    getWorkspaceEmbeddingDefault(input.workspaceId),
-  ]);
+  let sources: RacSource[];
+  let workspaceDefault: RacWorkspaceEmbeddingDefault | null;
+  try {
+    [sources, workspaceDefault] = await Promise.all([
+      withTimeout(
+        listSourcesForProfile(input.profileId),
+        RAC_PLANNER_TIMEOUT_MS,
+        `listSourcesForProfile(${input.profileId})`,
+      ),
+      withTimeout(
+        getWorkspaceEmbeddingDefault(input.workspaceId),
+        RAC_PLANNER_TIMEOUT_MS,
+        `getWorkspaceEmbeddingDefault(${input.workspaceId})`,
+      ),
+    ]);
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new PlannerTimeoutError(
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+    throw err;
+  }
 
   const items: RetrievalPlanItem[] = sources.map((source) =>
     buildItem(source, workspaceDefault),

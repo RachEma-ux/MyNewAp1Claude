@@ -9,6 +9,10 @@
 export {
   planRetrieval,
   buildItem,
+  // H3-c8: surface PlannerTimeoutError so callers can recognize the
+  // typed timeout error (orchestrator uses it for safe-degraded
+  // mapping; downstream tests use it to assert behavior).
+  PlannerTimeoutError,
   type RetrievalPlan,
   type RetrievalPlanItem,
   type PlanRetrievalInput,
