@@ -90,6 +90,10 @@ import {
 // matching case branch in BOTH flows.
 import { OrchestrationError } from "./services/runtime/orchestration-error";
 import {
+  buildRuntimeContext,
+  isPublishedRuntime,
+} from "./services/runtime/runtime-context";
+import {
   writeTrace,
   writeContextBlocks,
   buildContextBlockRows,
@@ -1231,6 +1235,26 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       });
       res.end();
       return;
+    }
+
+    // Phase 5a (Roadmap V3) — derive the runtime lifecycle state from
+    // the agent row. Single source of truth per pre-flight #4. Phase
+    // 5b will pass the runtime context into `checkAllowedTools` to
+    // enforce fail-closed permissions when an agent's
+    // `lifecycle_state === "published"` and zero enabled rules exist.
+    // Today the value is computed and surfaced in stdout for forensic
+    // purposes (operators can grep `[chat-stream/runtime] lifecycle=`
+    // before flipping the Phase 5b feature flag).
+    const lifecycleState = await repo.getAgentLifecycleState(session.agentId);
+    const runtimeContext = buildRuntimeContext({
+      agentLifecycleState: lifecycleState,
+    });
+    if (process.env.AGS_RUNTIME_CONTEXT_LOG === "1") {
+      console.info(
+        `[chat-stream/runtime] session=${sessionId} agent=${session.agentId} ` +
+          `lifecycle=${runtimeContext.agentLifecycleState ?? "null"} ` +
+          `published=${isPublishedRuntime(runtimeContext)}`,
+      );
     }
 
     const providerConfig = (draft.providerConfig ?? {}) as Record<string, unknown>;

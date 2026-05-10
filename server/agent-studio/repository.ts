@@ -128,6 +128,28 @@ export async function getAgentById(agentId: number) {
 }
 
 /**
+ * Phase 5a (Roadmap V3) — single-column lookup for the runtime
+ * lifecycle gate. Returns the `lifecycle_state` field on the agent
+ * row (`"new" | "draft" | "design" | "simulation" | "staging" |
+ * "published" | "archived"`). Cheaper than `getAgentById` for the
+ * hot path — chat-stream.ts and chat.ts call this on every request.
+ *
+ * Phase 5b will use this as the "is this a published agent?"
+ * discriminator inside `checkAllowedTools` to enforce fail-closed
+ * permissions when no rules exist.
+ */
+export async function getAgentLifecycleState(
+  agentId: number,
+): Promise<string | null> {
+  const rows = await db()
+    .select({ lifecycleState: agsAgents.lifecycleState })
+    .from(agsAgents)
+    .where(eq(agsAgents.id, agentId))
+    .limit(1);
+  return rows[0]?.lifecycleState ?? null;
+}
+
+/**
  * Lookup an agent by its `internal_key`. Used by the openllm-agent2 seeder
  * to make seeding idempotent.
  */
