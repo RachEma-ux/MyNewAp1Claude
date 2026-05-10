@@ -50,6 +50,10 @@ import { assembleRetrievalEvidence } from "../rac/context-assembler";
 import type { RacRetrievalChunk } from "../rac/ingestion";
 import { listProfilesForDraft, getPolicyForProfile } from "../rac/sources";
 import type { SystemPromptSection } from "../cag";
+// M7-c8 (cycle-8 audit closure §M7-c8): orchestration-error registry.
+// RetrievalRequiredError now extends OrchestrationError so the chat
+// flows can switch on a typed code with TS exhaustiveness checking.
+import { OrchestrationError } from "./orchestration-error";
 
 /**
  * L4-c8 (cycle-8 audit closure §L4-c8) — namespace boundary note.
@@ -84,8 +88,8 @@ import type { SystemPromptSection } from "../cag";
  *
  * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts.
  */
-export class RetrievalRequiredError extends Error {
-  readonly code = "retrieval_required";
+export class RetrievalRequiredError extends OrchestrationError {
+  readonly code = "retrieval_required" as const;
   constructor(message = "RAC retrieval required but failed") {
     super(message);
     this.name = "RetrievalRequiredError";
