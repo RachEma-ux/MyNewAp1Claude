@@ -17,6 +17,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../repository", () => ({
   getChatSessionById: vi.fn(),
   getCurrentDraft: vi.fn(),
+  // Phase 5a (Roadmap V3) — chat.ts now reads the agent lifecycle
+  // state right after the draft lookup to build a RuntimeContext for
+  // the Phase 5b fail-closed permission gate. Mock returns "draft" so
+  // these binding-routing tests stay on the dev-friendly side of the
+  // lattice (isPublishedRuntime → false). The actual fail-closed
+  // behavior is exercised by the Phase 5b unit tests, not here.
+  getAgentLifecycleState: vi.fn(() => Promise.resolve("draft")),
   appendChatMessage: vi.fn(),
   listChatMessages: vi.fn(),
   bumpChatSessionTotals: vi.fn(),
@@ -167,6 +174,7 @@ beforeEach(() => {
 
   mockedRepo.getChatSessionById.mockResolvedValue(defaultSession());
   mockedRepo.getCurrentDraft.mockResolvedValue(defaultDraft());
+  mockedRepo.getAgentLifecycleState.mockResolvedValue("draft");
   mockedRepo.appendChatMessage.mockResolvedValue({ id: 99 });
   mockedRepo.listChatMessages.mockResolvedValue([
     { role: "user", content: "Hi" },

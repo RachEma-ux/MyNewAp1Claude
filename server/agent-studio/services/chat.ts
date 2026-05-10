@@ -98,6 +98,10 @@ import {
 // Mirrors chat-stream.ts wire-up. Cross-flow lockstep pinned by
 // tests/agent-studio/m7-c8-orchestration-error-registry.test.ts.
 import { OrchestrationError } from "./runtime/orchestration-error";
+import {
+  buildRuntimeContext,
+  isPublishedRuntime,
+} from "./runtime/runtime-context";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -1056,6 +1060,24 @@ export async function sendChatMessage(
       ok: false,
       error: `Agent ${session.agentId} has no current draft`,
     };
+  }
+
+  // Phase 5a (Roadmap V3) — derive the runtime lifecycle state from
+  // the agent row. Parallel-flow lockstep with chat-stream.ts (cycle-6
+  // C1-c6 + Phase 4.5 R2/R4 invariant). Phase 5b will pass the runtime
+  // context into `checkAllowedTools` to enforce fail-closed permissions
+  // when an agent's `lifecycle_state === "published"` and zero enabled
+  // rules exist.
+  const lifecycleState = await repo.getAgentLifecycleState(session.agentId);
+  const runtimeContext = buildRuntimeContext({
+    agentLifecycleState: lifecycleState,
+  });
+  if (process.env.AGS_RUNTIME_CONTEXT_LOG === "1") {
+    console.info(
+      `[chat/runtime] session=${input.sessionId} agent=${session.agentId} ` +
+        `lifecycle=${runtimeContext.agentLifecycleState ?? "null"} ` +
+        `published=${isPublishedRuntime(runtimeContext)}`,
+    );
   }
 
   // 2. Persist the user message FIRST so it's saved even if the LLM
