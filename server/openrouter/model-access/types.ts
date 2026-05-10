@@ -139,6 +139,75 @@ export interface ModelAccessStreamChunk {
 }
 
 /**
+ * Phase 7.5 (Roadmap V3) — discriminated stream-event union. Forward-
+ * looking shape that lets the streaming layer carry tool-call deltas
+ * + completed-tool-call markers alongside text deltas. The Phase 7
+ * pre-flight audit confirmed that `ModelAccessStreamChunk` is text-
+ * only today (per `execute.ts:314-319` doc-block: tool-call streaming
+ * deferred to Phase 17/18).
+ *
+ * **Backward compatibility.** This union is ADDITIVE — no caller is
+ * forced to migrate. The existing `stream()` generator continues to
+ * yield `ModelAccessStreamChunk`. Consumers that opt into tool-call
+ * streaming will use `streamEvents()` (a future producer) which
+ * yields this union instead. When Phase 17/18 lands the upstream
+ * tool-call SSE parsers, the producer is wired up; today this type
+ * is purely the contract surface so chat-stream's eventual switch
+ * is a one-line type swap rather than a shape redesign.
+ *
+ * **Variant choice — discriminated by `type` field.** OpenAI and
+ * Anthropic SSE both surface tool calls as separate events from text
+ * deltas (OpenAI: `delta.tool_calls[]` partials + `finish_reason:
+ * "tool_calls"`; Anthropic: `content_block_delta` with
+ * `input_json_delta`). The discriminant maps cleanly onto either
+ * provider without normalizing through a lossy intermediate.
+ *
+ * **`tool_call_delta` carries partial JSON.** When the model streams
+ * arguments incrementally (the OpenAI default for chat-completions),
+ * each delta event carries a `partialJson` string fragment. Consumers
+ * accumulate by `toolCallId` until the matching `tool_call_complete`
+ * event arrives with the parsed full call. `partialJson` is
+ * intentionally not parsed mid-stream — JSON parsing is fragile on
+ * partial input, and the complete event always arrives before any
+ * dispatch decision.
+ */
+export type ModelAccessStreamEvent =
+  | {
+      type: "text_delta";
+      /** Incremental text delta. Same semantic as `ModelAccessStreamChunk.delta`. */
+      delta: string;
+    }
+  | {
+      type: "tool_call_delta";
+      /** Stable tool-call id assigned by the provider on first event. */
+      toolCallId: string;
+      /**
+       * Optional partial tool name. OpenAI sends the function name only
+       * on the first delta; subsequent deltas carry only `partialJson`.
+       * Anthropic sends `tool_use.name` once on the start event and
+       * never repeats it.
+       */
+      partialName?: string;
+      /**
+       * Optional partial JSON-encoded arguments fragment. May be empty
+       * on the first event (which carries the id + name) and arrive
+       * incrementally on subsequent events. Consumers MUST NOT parse
+       * mid-stream — wait for `tool_call_complete`.
+       */
+      partialJson?: string;
+    }
+  | {
+      type: "tool_call_complete";
+      /** Fully reconstructed tool call. Same shape as the non-streaming `toolCalls[]` entry. */
+      toolCall: ModelAccessToolCall;
+    }
+  | {
+      type: "done";
+      usage?: ModelAccessUsage;
+      finishReason?: string;
+    };
+
+/**
  * Phase 28.4 (D-MA-EMBED-1): input for the embedding-execute primitive.
  * Mirrors `ModelAccessExecuteInput` minus chat-specific fields. Inputs
  * may be a single string (returned as a one-element batch) or an
