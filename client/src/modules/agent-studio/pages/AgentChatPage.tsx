@@ -29,15 +29,26 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, Wrench, Check, X, Plus, Trash2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Loader2, Wrench, Check, X, Plus, Trash2, Pencil, ChevronDown, ChevronUp, Clock } from "lucide-react";
 
 export default function AgentChatPage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
   const [message, setMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  // The `awaiting_approval` status is the same SSE event the FAB widget
+  // (AgentStudioChatWindow.tsx) handles — emitted as `tool_end` with
+  // `status:"awaiting_approval"` while the dispatcher is paused on
+  // operator decision. Without this branch the chip would collapse to
+  // "error" red and confuse the operator (Phase 1e M3 finding).
   const [activeTools, setActiveTools] = useState<
-    Array<{ name: string; status: "running" | "ok" | "error"; durationMs?: number }>
+    Array<{
+      name: string;
+      status: "running" | "ok" | "error" | "awaiting_approval";
+      durationMs?: number;
+      approvalRequestId?: number;
+      timeoutSec?: number;
+    }>
   >([]);
   // Task #7 — session list state. Identical semantics to the FAB so
   // the user can switch sessions, rename, delete, and start new ones
@@ -199,11 +210,20 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
               );
               if (idx < 0) return prev;
               const next = prev.slice();
-              next[idx] = {
-                name: data.toolName,
-                status: data.ok ? "ok" : "error",
-                durationMs: data.durationMs,
-              };
+              if (data.status === "awaiting_approval") {
+                next[idx] = {
+                  name: data.toolName,
+                  status: "awaiting_approval",
+                  approvalRequestId: data.approvalRequestId,
+                  timeoutSec: data.timeoutSec,
+                };
+              } else {
+                next[idx] = {
+                  name: data.toolName,
+                  status: data.ok ? "ok" : "error",
+                  durationMs: data.durationMs,
+                };
+              }
               return next;
             });
           } else if (data.type === "done") {
@@ -473,21 +493,36 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
                     ? "bg-muted/50 border-muted-foreground/20 text-muted-foreground"
                     : t.status === "ok"
                     ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    : t.status === "awaiting_approval"
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
                     : "bg-destructive/10 border-destructive/30 text-destructive"
                 }`}
                 title={
-                  t.durationMs != null ? `${t.name} · ${t.durationMs}ms` : t.name
+                  t.status === "awaiting_approval"
+                    ? `${t.name} · awaiting operator approval` +
+                      (t.approvalRequestId != null
+                        ? ` (#${t.approvalRequestId})`
+                        : "") +
+                      (t.timeoutSec != null ? ` · timeout ${t.timeoutSec}s` : "")
+                    : t.durationMs != null
+                    ? `${t.name} · ${t.durationMs}ms`
+                    : t.name
                 }
               >
                 {t.status === "running" ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : t.status === "ok" ? (
                   <Check className="h-3 w-3" />
+                ) : t.status === "awaiting_approval" ? (
+                  <Clock className="h-3 w-3" />
                 ) : (
                   <X className="h-3 w-3" />
                 )}
                 <Wrench className="h-3 w-3" />
                 <span>{t.name}</span>
+                {t.status === "awaiting_approval" && t.timeoutSec != null && (
+                  <span className="opacity-70">· {t.timeoutSec}s</span>
+                )}
               </span>
             ))}
           </div>
