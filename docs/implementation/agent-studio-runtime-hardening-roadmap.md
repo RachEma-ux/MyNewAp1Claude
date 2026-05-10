@@ -248,7 +248,11 @@ Persistence policy:
 
 ---
 
-### Phase 4 — Runtime Governance E2E Tests
+### Phase 4 — Runtime Governance E2E Tests — **CLOSED**
+
+**Status:** Shipped. New integration test `tests/integration/agent-studio/runtime-governance-e2e.integration.test.ts` exercises the full integrated tool-call governance loop against a live ASDB with only `getMcpConnection` mocked. Wired into CI as Layer 3c. Closes Gate 3 — last production-readiness gate.
+
+**Scope decision:** the test exercises the *governance chain* (validateRuntimeToolCall → gateRuntimeDispatch → dispatchMcpToolCall → DB persistence) end-to-end. The full SSE/model loop on top is already source-scan locked by cycle-7/8 invariant tests + `permission-default.test.ts` + `simulation-lane-governance.test.ts`. Wiring a real model + SSE into CI would add cost/flakiness without proportional governance evidence (the load-bearing claim is "the chain produces correct DB state for every governance outcome"). Phase 4b (full SSE E2E) is deferred unless an audit finding surfaces a gap.
 
 Prove the full tool-call governance loop end-to-end (Gate 3).
 
@@ -530,7 +534,7 @@ PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial
 |---|---|
 | Gate 1 — Runtime Contract Evidence | CLOSED (Phase 1a–1e shipped #384/#386 + Phase 1e remediation #387) |
 | Gate 2 — CI Enforcement | CLOSED (Layer 8 wired #388 — runs on push + PR) |
-| Gate 3 — Runtime Governance E2E | Pending (closes after Phase 4) |
+| Gate 3 — Runtime Governance E2E | CLOSED (Phase 4 — Layer 3c E2E test wired) |
 | Gate 4 — SSE Robustness | CLOSED (Phase 3.4 #391) |
 | Gate 5 — Published Fail-Closed | CLOSED (Phase 5a #393 + Phase 5b — gated on `RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED=true`) |
 | Gate 6 — Boundary Integrity (static) | CLOSED (Phase 4.5 #392 — 4 static rules wired into CI) |
@@ -538,7 +542,7 @@ PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial
 
 **Production-ready** when Gates 1–6 close. **Reference-grade** when Gate 7 also closes.
 
-**Production-ready as of Phase 5b: 5 of 6 gates closed.** Gate 3 (Runtime Governance E2E) is the last remaining production-readiness gate; closes after Phase 4.
+**Production-ready as of Phase 4: 6 of 6 gates closed.** Track A complete. Gate 7 (Observability + Load) closes the reference-grade tier via Phase 12.
 
 ---
 
