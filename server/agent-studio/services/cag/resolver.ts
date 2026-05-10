@@ -44,6 +44,53 @@ import type {
 } from "./types";
 import type { ComposerMode } from "../runtime/system-prompt-composer";
 import { CagRequiredError } from "../runtime/system-prompt-composer";
+// H2-c8 (cycle-8 audit closure §H2-c8): bounded wait on the
+// CAG-build chain. Pre-cycle-8 the resolver had no per-operation
+// timeout, so a hung MCP `listTools()` (during the snapshot
+// enumeration in `buildFromCurrentSources`) or a stalled ASDB
+// write would block the orchestrator indefinitely. Mirrors
+// cycle-7 H1-c7's `withTimeout` pattern at the dispatcher layer.
+import { withTimeout, isTimeoutError } from "../runtime/with-timeout";
+
+/**
+ * H2-c8: per-operation timeout ceilings for the CAG-resolve chain.
+ * The two ceilings target operationally-distinct hazards:
+ *   - `CAG_BUILD_TIMEOUT_MS` (default 10s): wraps the MCP-snapshot
+ *     enumeration + builder. The MCP `listTools()` calls are the
+ *     dominant latency contributor; 10s is generous for normal
+ *     listing but bounds a hung server.
+ *   - `CAG_PERSIST_TIMEOUT_MS` (default 5s): wraps the ASDB writes
+ *     (`createPack`, `markPackUsed`). DB writes should be fast; a
+ *     5s ceiling catches lock-contention or ASDB outages without
+ *     stalling the chat turn.
+ *
+ * Both env-var overrides validate + warn-on-out-of-range per the
+ * standing pattern (cycle-7 L5-c6 / H1-c7 / H7-c7 / H8-c7).
+ */
+const CAG_BUILD_TIMEOUT_MS = (() => {
+  const raw = process.env.CAG_BUILD_TIMEOUT_MS;
+  if (!raw) return 10_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[ags-cag] CAG_BUILD_TIMEOUT_MS=${raw} is not a positive integer; using default 10000ms`,
+    );
+    return 10_000;
+  }
+  return n;
+})();
+const CAG_PERSIST_TIMEOUT_MS = (() => {
+  const raw = process.env.CAG_PERSIST_TIMEOUT_MS;
+  if (!raw) return 5_000;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n) || n <= 0) {
+    console.warn(
+      `[ags-cag] CAG_PERSIST_TIMEOUT_MS=${raw} is not a positive integer; using default 5000ms`,
+    );
+    return 5_000;
+  }
+  return n;
+})();
 
 export interface ResolveCagInput {
   workspaceId: number;
@@ -73,7 +120,14 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
   const warnings: string[] = [];
 
   try {
-    const built = await buildFromCurrentSources(input);
+    // H2-c8: bound the MCP-snapshot + builder chain. A hung
+    // `getSnapshot` / slow MCP server would block the orchestrator
+    // indefinitely pre-cycle-8.
+    const built = await withTimeout(
+      buildFromCurrentSources(input),
+      CAG_BUILD_TIMEOUT_MS,
+      "CAG build (MCP snapshot enumeration)",
+    );
 
     const validation = validatePackContent(built.content);
     if (!validation.ok) {
@@ -130,23 +184,29 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       pack = latest;
       reused = true;
     } else {
-      const created = await createPack({
-        workspaceId: input.workspaceId,
-        agentId: input.agentId,
-        agentDraftId: input.agentDraftId,
-        contentJson: built.content as unknown as Record<string, unknown>,
-        sourceManifest: built.sourceManifest,
-        createdBy: input.actorId,
-        // D-CAG-RECON-3/4/5: persist compile + governance metadata so
-        // traces can verify which pack version actually rendered and
-        // which validation outcome it shipped under.
-        compiledHash: section.contentHash,
-        compileResult,
-        compileWarnings,
-        governanceVerdict: "cleared",
-        governanceBlockers: [],
-        tokenBudgetEstimate: section.tokenEstimate,
-      });
+      // H2-c8: bound the persist write. Lock contention or ASDB
+      // outage would otherwise stall the chat turn.
+      const created = await withTimeout(
+        createPack({
+          workspaceId: input.workspaceId,
+          agentId: input.agentId,
+          agentDraftId: input.agentDraftId,
+          contentJson: built.content as unknown as Record<string, unknown>,
+          sourceManifest: built.sourceManifest,
+          createdBy: input.actorId,
+          // D-CAG-RECON-3/4/5: persist compile + governance metadata so
+          // traces can verify which pack version actually rendered and
+          // which validation outcome it shipped under.
+          compiledHash: section.contentHash,
+          compileResult,
+          compileWarnings,
+          governanceVerdict: "cleared",
+          governanceBlockers: [],
+          tokenBudgetEstimate: section.tokenEstimate,
+        }),
+        CAG_PERSIST_TIMEOUT_MS,
+        "CAG createPack",
+      );
       pack = created.pack;
       reused = created.reused;
       if (!reused && latest && latest.status === "fresh") {
@@ -178,7 +238,15 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
     // updated the timestamp, leaving the counter pinned at 0 even
     // though `pack_used` events fired on every resolve. `markPackUsed`
     // returns the new count so we can thread it into the event payload.
-    const useCount = await markPackUsed(pack.id).catch((err) => {
+    //
+    // H2-c8: bounded by `CAG_PERSIST_TIMEOUT_MS`. Failure (including
+    // timeout) is best-effort — the pack is already used, the
+    // counter is observability-only.
+    const useCount = await withTimeout(
+      markPackUsed(pack.id),
+      CAG_PERSIST_TIMEOUT_MS,
+      "CAG markPackUsed",
+    ).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[ags-cag] markPackUsed failed (pack=${pack.id}): ${msg}`);
       return null;
@@ -201,13 +269,23 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
     return { section, pack, warnings };
   } catch (err) {
     if (err instanceof CagRequiredError) throw err;
+    // H2-c8: discriminate timeout from generic failure so operator
+    // forensics can tell "MCP enumeration hung" from "validator
+    // rejected" from "DB write failed". Timeout warning carries
+    // the structured prefix `cag: timeout` for grep-ability.
+    const detail = err instanceof Error ? err.message : String(err);
+    const isTimeout = isTimeoutError(err);
     if (input.mode === "strict") {
       throw new CagRequiredError(
-        `CAG resolution failed: ${err instanceof Error ? err.message : String(err)}`,
+        isTimeout
+          ? `CAG resolution timed out: ${detail}`
+          : `CAG resolution failed: ${detail}`,
       );
     }
     warnings.push(
-      `cag: resolution failed (${err instanceof Error ? err.message : String(err)}); proceeding without pack`,
+      isTimeout
+        ? `cag: timeout (${detail}); proceeding without pack`
+        : `cag: resolution failed (${detail}); proceeding without pack`,
     );
     return { section: null, pack: null, warnings };
   }
