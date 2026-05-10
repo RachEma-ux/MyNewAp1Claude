@@ -38,6 +38,11 @@
 
 import { hashJsonStable, estimateTokens } from "../cag";
 import type { SystemPromptSection } from "../cag";
+// M7-c8 (cycle-8 audit closure §M7-c8): orchestration-error registry.
+// CagRequiredError now extends OrchestrationError so the chat flows
+// can switch on a typed code with TS exhaustiveness checking. See
+// runtime/orchestration-error.ts for the full rationale.
+import { OrchestrationError } from "./orchestration-error";
 
 export const TOTAL_SYSTEM_PROMPT_TOKENS = 6144;
 
@@ -67,16 +72,20 @@ export type ComposerMode = "disabled" | "safe_degraded" | "strict";
 
 /**
  * Thrown by `composeSystemPrompt` when `mode === "strict"` and
- * `capabilityPack === null`. The chat flows + SSE mapper pattern-match on
- * `instanceof CagRequiredError` (preferred) and on `.code === "cag_required"`
- * (the discriminated-union path). Both surfaces are pinned by
- * `system-prompt-composer.test.ts` (M5-c8 — strengthens the type-only
- * assertion the cycle-8 audit flagged: now also covers `.code`, `.name`,
- * message-shape, pre-throw guarantee, source-scan throw-site, and the
- * canonical class declaration shape).
+ * `capabilityPack === null`. The chat flows + SSE mapper pattern-match
+ * on `instanceof OrchestrationError` (M7-c8 — the registry base) and
+ * then `switch (err.code)` for the per-class branch. The
+ * `.code` field is `as const` so TypeScript narrows it to the literal
+ * `"cag_required"` in switch branches.
+ *
+ * Both surfaces are pinned:
+ *   - M5-c8 (system-prompt-composer.test.ts) covers the throw site +
+ *     property shape (.code, .name, message, pre-throw guarantee).
+ *   - M7-c8 (m7-c8-orchestration-error-registry.test.ts) covers the
+ *     base-class extension + the chat-flow switch shape.
  */
-export class CagRequiredError extends Error {
-  readonly code = "cag_required";
+export class CagRequiredError extends OrchestrationError {
+  readonly code = "cag_required" as const;
   constructor(message = "CAG capability pack required but missing") {
     super(message);
     this.name = "CagRequiredError";

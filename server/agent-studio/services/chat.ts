@@ -89,13 +89,15 @@ import type {
 } from "../../openrouter/model-access/types";
 import { evaluateProviderUsePolicy } from "./provider-use-governance";
 import {
-  CagRequiredError,
   type ComposerMode,
 } from "./runtime/system-prompt-composer";
 import {
   buildRuntimeSystemPrompt,
-  RetrievalRequiredError,
 } from "./runtime/rac-orchestrator";
+// M7-c8 (cycle-8 audit closure §M7-c8): orchestration-error registry.
+// Mirrors chat-stream.ts wire-up. Cross-flow lockstep pinned by
+// tests/agent-studio/m7-c8-orchestration-error-registry.test.ts.
+import { OrchestrationError } from "./runtime/orchestration-error";
 
 export interface SendChatMessageInput {
   sessionId: number;
@@ -1103,19 +1105,30 @@ export async function sendChatMessage(
       },
     });
   } catch (err) {
-    if (err instanceof CagRequiredError) {
-      return {
-        ok: false,
-        error: err.message,
-        code: "cag_required",
-      };
-    }
-    if (err instanceof RetrievalRequiredError) {
-      return {
-        ok: false,
-        error: err.message,
-        code: "retrieval_required",
-      };
+    // M7-c8 (cycle-8 audit closure §M7-c8): single-base catch with
+    // discriminated-union switch. Mirrors chat-stream.ts.
+    if (err instanceof OrchestrationError) {
+      switch (err.code) {
+        case "cag_required":
+          return {
+            ok: false,
+            error: err.message,
+            code: "cag_required",
+          };
+        case "retrieval_required":
+          return {
+            ok: false,
+            error: err.message,
+            code: "retrieval_required",
+          };
+        default: {
+          // Exhaustiveness check — see chat-stream.ts:~1180 for the
+          // load-bearing rationale.
+          const _exhaustive: never = err.code;
+          void _exhaustive;
+          throw err;
+        }
+      }
     }
     throw err;
   }

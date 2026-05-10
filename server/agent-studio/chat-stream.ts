@@ -78,13 +78,17 @@ import { windowChatHistory } from "./services/runtime/context-window";
 // flood stdout.
 import { reconstructToolHistoryMessageOrLog } from "./services/runtime/chat-history-shape";
 import {
-  CagRequiredError,
   type ComposerMode,
 } from "./services/runtime/system-prompt-composer";
 import {
   buildRuntimeSystemPrompt,
-  RetrievalRequiredError,
 } from "./services/runtime/rac-orchestrator";
+// M7-c8 (cycle-8 audit closure §M7-c8): orchestration-error registry.
+// The chat-flow catch block uses `instanceof OrchestrationError` plus
+// `switch (err.code)` with a `_exhaustive: never` default — TS fails
+// compile when a new OrchestrationErrorCode is added without a
+// matching case branch in BOTH flows.
+import { OrchestrationError } from "./services/runtime/orchestration-error";
 import {
   writeTrace,
   writeContextBlocks,
@@ -1177,15 +1181,32 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       // (`tests/agent-studio/h1-c8-orchestrator-error-cross-flow.test.ts`)
       // pins both shapes so a future PR that updates one without the
       // other fails review.
-      if (err instanceof CagRequiredError) {
-        sendEvent({ type: "error", error: err.message, code: "cag_required" });
-        res.end();
-        return;
-      }
-      if (err instanceof RetrievalRequiredError) {
-        sendEvent({ type: "error", error: err.message, code: "retrieval_required" });
-        res.end();
-        return;
+      // M7-c8 (cycle-8 audit closure §M7-c8): single-base catch with
+      // a discriminated-union switch. Replaces the pre-cycle-8
+      // `instanceof CagRequiredError` / `instanceof RetrievalRequiredError`
+      // chain. The `_exhaustive: never` in default is load-bearing —
+      // TS fails compile when a new OrchestrationErrorCode is added
+      // without a matching case branch.
+      if (err instanceof OrchestrationError) {
+        switch (err.code) {
+          case "cag_required":
+            sendEvent({ type: "error", error: err.message, code: "cag_required" });
+            res.end();
+            return;
+          case "retrieval_required":
+            sendEvent({ type: "error", error: err.message, code: "retrieval_required" });
+            res.end();
+            return;
+          default: {
+            // Exhaustiveness check — if a new OrchestrationErrorCode
+            // is added without a `case` branch above, this assignment
+            // fails compile. The `void` is to silence an unused-var
+            // lint rule without losing the never-narrowing.
+            const _exhaustive: never = err.code;
+            void _exhaustive;
+            throw err;
+          }
+        }
       }
       throw err;
     }

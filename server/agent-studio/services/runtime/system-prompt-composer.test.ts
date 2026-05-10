@@ -330,8 +330,15 @@ describe("M5-c8 — strict-mode throw site source-scan", () => {
     // The .code field is the discriminator. If a future PR drops `readonly`
     // or renames `code`, both this test AND the property-shape tests above
     // catch it — defense in depth.
+    //
+    // M7-c8 update: post-cycle-8 PR-J the class extends OrchestrationError
+    // (the registry base) instead of Error directly, and the field is
+    // `as const` so TS narrows it to the literal in switch branches.
+    // The regex accepts both `extends Error` (pre-M7-c8) and
+    // `extends OrchestrationError` (post-M7-c8). The M7-c8-specific
+    // shape is pinned by m7-c8-orchestration-error-registry.test.ts.
     const re =
-      /class\s+CagRequiredError\s+extends\s+Error\s*\{\s*readonly\s+code\s*=\s*["']cag_required["']/;
+      /class\s+CagRequiredError\s+extends\s+(?:Error|OrchestrationError)\s*\{\s*readonly\s+code\s*=\s*["']cag_required["'](?:\s+as\s+const)?/;
     expect(composerSrc).toMatch(re);
   });
 
