@@ -142,12 +142,15 @@ export function assertConfigSchemaVersion(
   blockName: RuntimeConfigBlockName,
 ): void {
   const r = validateConfigSchemaVersion(block);
-  if (r.ok) return;
+  if (r.ok === true) return;
+  // tsconfig has `strict: false` so the discriminated union doesn't
+  // narrow on `r.ok === true`. Cast to the failure shape explicitly.
+  const fail = r as Exclude<ValidateConfigSchemaResult, { ok: true }>;
   throw new Error(
-    `[config_schema_${r.reason}] ${blockName} ` +
-      `rejected: ${r.reason}` +
-      (r.observedVersion !== undefined
-        ? ` observed=${JSON.stringify(r.observedVersion)} ` +
+    `[config_schema_${fail.reason}] ${blockName} ` +
+      `rejected: ${fail.reason}` +
+      (fail.observedVersion !== undefined
+        ? ` observed=${JSON.stringify(fail.observedVersion)} ` +
           `supported=${JSON.stringify([...SUPPORTED_RUNTIME_CONFIG_VERSIONS])}`
         : ""),
   );
