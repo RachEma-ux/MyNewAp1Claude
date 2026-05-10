@@ -171,6 +171,18 @@ export interface ToolCallTraceRow {
  *     was designed to avoid.
  *   The persistence-side message-vs-trace asymmetry is documented on
  *   `persistRuntimeToolCallTrace` (proposed-tool-call-runtime.ts).
+ *
+ * L1-c8 (cycle-8 audit closure §L1-c8) — the cross-DB FK absence is
+ * an operator-visible contract, not just an implementation note.
+ * Operator dashboards joining trace rows MUST left-outer-join on
+ * runtimeTraceId / messageId and tolerate the null row (orphan
+ * rows are permitted by design, not a bug). A future single-database
+ * consolidation that re-introduces strict FKs would break the
+ * orphan-tolerance contract that the operator UI depends on.
+ *
+ * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts
+ * which source-scans for the L1-c8 marker + the cross-DB FK absence
+ * keywords ("cross-DB FK is impossible" + "orphan").
  */
 export function buildToolCallTraceRow(input: ToolCallTraceInput): ToolCallTraceRow {
   const { verdict, code, message } = validationVerdictFromResult(input.validation);

@@ -129,6 +129,24 @@ export interface ComposedSystemPrompt {
   sections: ComposedSection[];
   tokenEstimate: number;
   truncations: TruncationRecord[];
+  /**
+   * L3-c8 (cycle-8 audit closure §L3-c8) — known-limitation marker.
+   *
+   * Composer warnings accumulator. UNBOUNDED in size by design —
+   * each section can push warnings (CAG validator findings, render
+   * truncations, missing-pack notices), and the trace row write
+   * carries the full array. In practice typical compositions emit
+   * <10 warnings, so this hasn't surfaced as a real issue.
+   *
+   * If it ever does (operator reports composer warnings dominating
+   * trace row size on certain agents), fold into a cycle-7-style
+   * ceiling: cap at MAX_COMPOSER_WARNINGS (e.g. 50), record a
+   * truncation flag, surface "warnings truncated" in operator UI.
+   * Pure documentation for now — no enforcement layer.
+   *
+   * Mirrors L2-c8's perSourceLatencyMs known-limitation marker.
+   * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts.
+   */
   warnings: string[];
   /** D-PRM-5 cache key — excludes retrieval-evidence. */
   cacheKey: string;
