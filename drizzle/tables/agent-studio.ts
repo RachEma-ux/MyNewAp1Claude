@@ -467,6 +467,22 @@ export const agsRuntimeRuns = pgTable(
     // agent's loop (subagent_invoke message), this points at the parent
     // run. The runs page renders children nested under their parent.
     parentRunId: integer("parent_run_id"),
+    // Phase 11a (Roadmap V3) — runtime observability data model. Five
+    // columns added to close the §11a metric inventory; populated by
+    // chat-stream / chat.ts on terminal SSE events (Phase 11b wires
+    // the writers alongside the UI). All nullable / defaulted so
+    // existing rows + simulation-only paths stay compatible. Audit:
+    // docs/evidence/runtime-hardening/2026-05-10-phase-11a/.
+    /** SSE first-token latency in ms. Closes Gate 7 numeric (p95 < 5s). */
+    sseFirstTokenMs: integer("sse_first_token_ms"),
+    /** SSE-only duration in ms (distinct from `durationMs` which covers full run). */
+    sseDurationMs: integer("sse_duration_ms"),
+    /** Run-level error summary when `status='failed'`. Per-call errors stay on agsToolCallTraces.errorMessage. */
+    errorReason: text("error_reason"),
+    /** True when the run terminated because the SSE client disconnected (Phase 3.4 abort signal). */
+    clientDisconnected: boolean("client_disconnected").default(false),
+    /** Count of `clientMessageId` idempotency conflicts seen this run (Phase 3.2). */
+    idempotencyConflicts: integer("idempotency_conflicts").default(0),
     startedAt: timestamp("started_at"),
     finishedAt: timestamp("finished_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
