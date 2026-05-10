@@ -261,11 +261,20 @@ export function AgentStudioChatWindow() {
       // stream is open; on `done` we clear it and refetch the
       // persisted message list.
       setStreamingText("");
+      // Phase 3.2 — generate a fresh clientMessageId per send so the
+      // backend can dedup retries / EventSource auto-reconnects.
+      // Generated per send-button-press; distinct sends with identical
+      // text get distinct ids and remain allowed.
+      const clientMessageId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const url =
         "/api/agent-studio/chat/stream?" +
         new URLSearchParams({
           sessionId: activeSessionId.toString(),
           message: text,
+          clientMessageId,
         });
       const es = new EventSource(url);
       eventSourceRef.current = es;

@@ -184,11 +184,21 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
         await utils.agentStudio.chat.listSessions.invalidate({ agentId });
       }
 
+      // Phase 3.2 — generate a fresh clientMessageId per send so the
+      // backend can dedup retries / EventSource auto-reconnects on the
+      // user-message persistence step. Re-using an id across distinct
+      // sends would suppress legitimate messages with identical text;
+      // we therefore generate per send-button-press, not per message.
+      const clientMessageId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const url =
         "/api/agent-studio/chat/stream?" +
         new URLSearchParams({
           sessionId: activeSessionId.toString(),
           message: userMessage,
+          clientMessageId,
         });
       const es = new EventSource(url);
       eventSourceRef.current = es;

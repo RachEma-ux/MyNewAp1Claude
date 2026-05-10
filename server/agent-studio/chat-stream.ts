@@ -1082,6 +1082,11 @@ async function runPureStream(args: {
 export async function handleAgentStudioChatStream(req: Request, res: Response) {
   const sessionIdRaw = req.query.sessionId as string | undefined;
   const userMessage = req.query.message as string | undefined;
+  // Phase 3.2 — clientMessageId is optional for backward-compat with
+  // older clients but should always be set by the in-tree UI. Without
+  // it, retries / EventSource auto-reconnects can duplicate user
+  // messages, model spend, and tool dispatches (Phase 1b §4).
+  const clientMessageIdRaw = req.query.clientMessageId as string | undefined;
   if (!sessionIdRaw || !userMessage) {
     res
       .status(400)
@@ -1091,6 +1096,21 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
   const sessionId = parseInt(sessionIdRaw, 10);
   if (!Number.isFinite(sessionId) || sessionId <= 0) {
     res.status(400).json({ error: "Invalid sessionId" });
+    return;
+  }
+  // Length-cap to match the schema column. 64 chars covers a UUID v4
+  // (36 chars) with margin; refuse anything longer rather than letting
+  // PG truncate or fail the insert.
+  const clientMessageId =
+    typeof clientMessageIdRaw === "string" &&
+    clientMessageIdRaw.length > 0 &&
+    clientMessageIdRaw.length <= 64
+      ? clientMessageIdRaw
+      : null;
+  if (clientMessageIdRaw && !clientMessageId) {
+    res
+      .status(400)
+      .json({ error: "Invalid clientMessageId (length 1-64)" });
     return;
   }
 
@@ -1163,12 +1183,31 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         ? (session as any).createdBy
         : 1;
 
-    // Persist user message FIRST so it survives LLM failures
-    await repo.appendChatMessage({
+    // Persist user message FIRST so it survives LLM failures.
+    // Phase 3.2 — silent dedup on `(sessionId, clientMessageId)`. When
+    // a duplicate clientMessageId arrives (retry, EventSource
+    // auto-reconnect, double-submit), the existing row is returned
+    // with `created: false` and we abort the stream with
+    // `idempotency_conflict` rather than running the model and
+    // dispatching tools a second time.
+    const userPersist = await repo.appendChatMessageWithIdempotency({
       sessionId,
       role: "user",
       content: userMessage,
+      clientMessageId,
     });
+    if (!userPersist.created) {
+      sendEvent({
+        type: "error",
+        error:
+          "Duplicate clientMessageId for this session — the original " +
+          "request handled (or is handling) this message. Refresh to " +
+          "see the persisted state.",
+        code: "idempotency_conflict",
+      });
+      res.end();
+      return;
+    }
 
     // RAC P6 — runtime orchestrator owns the locked sequence:
     // resolveCagPack -> RAC profile/plan/execute/filter/assemble ->
