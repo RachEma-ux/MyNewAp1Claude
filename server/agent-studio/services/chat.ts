@@ -353,6 +353,15 @@ async function runChatWithToolsViaBinding(input: {
   maxTokens?: number;
   /** Plan v3 Phase 21 — passed through so the policy gate has refs. */
   binding: import("../bindings").AgentProviderBindingPublic;
+  /**
+   * Phase 5b (Roadmap V3) — runtime context built by `sendChatMessage`
+   * via `buildRuntimeContext`. Forwarded into every per-call
+   * `dispatchMcpToolCall` so the dispatcher can apply the fail-closed
+   * default for published agents with zero permission rules.
+   * Parallel-flow lockstep with `runStreamingToolLoop` in
+   * `chat-stream.ts`.
+   */
+  runtimeContext?: import("./runtime/runtime-context").RuntimeContext;
 }) {
   const dispatchKeyByOpenaiName = new Map<string, string>(
     input.tools.map((t) => [t.openaiName, t.dispatchKey]),
@@ -762,6 +771,11 @@ async function runChatWithToolsViaBinding(input: {
           // the dispatch, not just WHICH approval permitted it.
           // Same shape as chat-stream.ts.
           caller: { userId: input.actorId, sessionId: String(input.sessionId) },
+          // Phase 5b: forward the runtime context so the dispatcher
+          // can apply the fail-closed default for published agents
+          // with zero enabled permission rules (parallel-flow lockstep
+          // with chat-stream.ts).
+          runtimeContext: input.runtimeContext,
         });
         // Follow-up A3: persist per-dispatch trace row.
         if (runtimeValidation && runtimeVerdict) {
@@ -1208,6 +1222,10 @@ export async function sendChatMessage(
             temperature: tempForLoop,
             maxTokens: maxTokensForLoop,
             binding: candidateBinding,
+            // Phase 5b: forward the runtime context built earlier in
+            // sendChatMessage so the per-call dispatcher gate has
+            // visibility into the agent's lifecycle state.
+            runtimeContext,
           });
           const postCount = (await repo.listChatMessages(input.sessionId))
             .length;

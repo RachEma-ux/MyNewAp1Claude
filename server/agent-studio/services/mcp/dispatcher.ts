@@ -117,6 +117,13 @@ import type {
 // error for forensics — operators with audit-row read access need
 // the unredacted message to debug security incidents.
 import { sanitizeMcpErrorMessage } from "./sanitize-error-message";
+// Phase 5b (Roadmap V3) — fail-closed default for published agents.
+// `isPublishedRuntime` is the strict-equality check that gates the
+// new lattice cell; the env flag lets operators stage the rollout.
+import {
+  isPublishedRuntime,
+  type RuntimeContext,
+} from "../runtime/runtime-context";
 // M8-c7 (cycle-7 audit closure §M8-c7): map transport-level
 // `McpError.code` (TransportErrorCode) → richer `DispatchErrorCode`.
 // Pre-cycle-7 every transport failure flattened into
@@ -404,23 +411,64 @@ function truncateResultPreview(result: unknown): {
 // ── Authorization ──────────────────────────────────────────────────────────
 
 /**
+ * Phase 5b (Roadmap V3) — env flag that gates the published-agent
+ * fail-closed default. Read on every call so operators can flip the
+ * flag without restarting the server. `"true"` (case-insensitive)
+ * activates the new deny path; any other value preserves the legacy
+ * `"skip"` behavior. Default-off lets deploy be a no-op until the
+ * operator runs `scripts/scan-published-agents-no-rules.ts`,
+ * remediates the listed agents, and intentionally flips the switch.
+ */
+function isFailClosedPublishedEnabled(): boolean {
+  return (
+    (process.env.RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED ?? "").toLowerCase() ===
+    "true"
+  );
+}
+
+/**
+ * Audit `reason` strings emitted by `checkAllowedTools`. The dispatcher
+ * forwards the reason into `agsRuntimePolicyEvents.payload.errorMessage`
+ * + the SSE `tool_end` error so denial-trace forensics can distinguish
+ * "no rule covered this tool" from "Phase 5b fail-closed kicked in".
+ */
+const REASON_DENY_MISSING_RULES_PUBLISHED =
+  "deny_missing_rules_for_published_agent";
+const REASON_DENY_NO_MATCHING_RULE = "deny_no_matching_rule";
+const REASON_DENY_EXPLICIT = "deny_explicit_rule";
+const REASON_DENY_ASK_RULE = "deny_ask_rule_in_sync_path";
+const REASON_DENY_DB_ERROR = "deny_permission_rules_read_failed";
+
+interface AllowedToolsVerdict {
+  /** The dispatcher acts on this verdict. "skip" is the legacy warn-allow. */
+  verdict: "allow" | "deny" | "ask" | "skip";
+  /** Stable reason key for audit / trace / SSE; absent when verdict=allow|skip */
+  reason?: string;
+}
+
+/**
  * Resolve the agent's allowedTools verdict for a given tool name.
  *
- * Returns:
+ * Returns (verdict + reason):
  *  - "allow"  → rule explicitly permits this tool
- *  - "deny"   → rule explicitly denies, OR no matching rule (safe default)
+ *  - "deny"   → rule explicitly denies, no matching rule, OR Phase 5b
+ *               fail-closed (zero enabled rules + `runtimeContext`
+ *               carries lifecycleState `"published"` + the env flag is on)
  *  - "ask"    → rule says ask. Dispatcher treats as "deny" (decision #3a)
- *  - "skip"   → no rules at all → bypass (the draft hasn't configured
- *               permissions yet, treat as wide open). This matches the
- *               behavior simulation.ts has today for unconfigured drafts.
+ *  - "skip"   → no rules at all → bypass (warn-allow). Preserved for
+ *               drafts and for non-published lifecycle states. Also
+ *               preserved when `runtimeContext` is omitted (system
+ *               paths, simulation, mcp-manager shim) so this gate
+ *               only kicks in when callers opt in.
  */
 async function checkAllowedTools(
   agentDraftId: number,
-  fullToolName: string
-): Promise<"allow" | "deny" | "ask" | "skip"> {
+  fullToolName: string,
+  runtimeContext?: RuntimeContext,
+): Promise<AllowedToolsVerdict> {
   // System calls bypass the allowedTools check entirely (decision #2a).
   // Used by the legacy `mcpManager.callMcpTool` shim.
-  if (agentDraftId === SYSTEM_DRAFT_ID) return "skip";
+  if (agentDraftId === SYSTEM_DRAFT_ID) return { verdict: "skip" };
 
   let rules: Array<{
     toolPattern: string;
@@ -431,19 +479,37 @@ async function checkAllowedTools(
     rules = await repo.listPermissionRules(agentDraftId);
   } catch {
     // DB read failed — fail closed
-    return "deny";
+    return { verdict: "deny", reason: REASON_DENY_DB_ERROR };
   }
   const enabled = rules.filter((r) => r.enabled !== false);
-  if (enabled.length === 0) return "skip";
+  if (enabled.length === 0) {
+    // Phase 5b lattice cell: zero enabled rules + published + flag on
+    // → fail closed. Zero rules + draft (or any non-published state)
+    // → preserve the dev-friendly "skip" / warn-allow path. Zero rules
+    // + no runtimeContext → preserve "skip" too: the caller didn't opt
+    // in to the gate, so behavior is unchanged from cycle-8.
+    if (
+      isFailClosedPublishedEnabled() &&
+      runtimeContext &&
+      isPublishedRuntime(runtimeContext)
+    ) {
+      return {
+        verdict: "deny",
+        reason: REASON_DENY_MISSING_RULES_PUBLISHED,
+      };
+    }
+    return { verdict: "skip" };
+  }
 
   for (const rule of enabled) {
     if (matchesToolPattern(fullToolName, rule.toolPattern)) {
-      if (rule.ruleBehavior === "allow") return "allow";
-      if (rule.ruleBehavior === "ask") return "ask";
-      return "deny";
+      if (rule.ruleBehavior === "allow") return { verdict: "allow" };
+      if (rule.ruleBehavior === "ask")
+        return { verdict: "ask", reason: REASON_DENY_ASK_RULE };
+      return { verdict: "deny", reason: REASON_DENY_EXPLICIT };
     }
   }
-  return "deny";
+  return { verdict: "deny", reason: REASON_DENY_NO_MATCHING_RULE };
 }
 
 // ── Audit ──────────────────────────────────────────────────────────────────
@@ -643,16 +709,30 @@ export async function dispatchMcpToolCall(
   }
 
   // ── 5. allowedTools authorization (decision #4a — fast first) ──
-  const authVerdict = await checkAllowedTools(
+  // Phase 5b: `runtimeContext` (when supplied by chat-stream / chat
+  // lanes) lets the gate enforce fail-closed for published agents
+  // with zero permission rules. Other call sites (simulation,
+  // mcp-manager shim) omit it and keep the legacy "skip" behavior.
+  const authResult = await checkAllowedTools(
     input.agentDraftId,
-    input.toolName
+    input.toolName,
+    input.runtimeContext,
   );
-  if (authVerdict === "deny" || authVerdict === "ask") {
+  if (authResult.verdict === "deny" || authResult.verdict === "ask") {
+    // Phase 5b: surface the structured reason in the error message so
+    // operator forensics can grep `errorMessage` for the stable token
+    // (`deny_missing_rules_for_published_agent`) without parsing the
+    // free-form prefix. The audit row's `errorMessage` field captures
+    // the same string verbatim.
+    const baseMessage =
+      authResult.verdict === "ask"
+        ? `Tool "${input.toolName}" requires human approval ("ask" rule). The dispatcher path is sync — use the simulation engine for the human-approval flow.`
+        : authResult.reason === REASON_DENY_MISSING_RULES_PUBLISHED
+          ? `Tool "${input.toolName}" denied: published agent has no enabled permission rules (Phase 5b fail-closed default). Add an explicit allow rule on the agent's draft.`
+          : `Tool "${input.toolName}" denied by agent's permission rules`;
     return fail(
       "not_authorized",
-      authVerdict === "ask"
-        ? `Tool "${input.toolName}" requires human approval ("ask" rule). The dispatcher path is sync — use the simulation engine for the human-approval flow.`
-        : `Tool "${input.toolName}" denied by agent's permission rules`
+      authResult.reason ? `[${authResult.reason}] ${baseMessage}` : baseMessage,
     );
   }
 

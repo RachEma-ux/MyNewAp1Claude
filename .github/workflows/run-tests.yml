@@ -196,6 +196,7 @@ jobs:
             tests/agent-studio/stream-error-codes.test.ts \
             tests/agent-studio/runtime-boundaries-script.test.ts \
             tests/agent-studio/runtime-context-and-impact-scan.test.ts \
+            tests/agent-studio/fail-closed-permission-gate.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose

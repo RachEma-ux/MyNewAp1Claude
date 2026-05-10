@@ -306,7 +306,9 @@ Phase 1a §3 row 8 found that current boundary-lint coverage is partial. Existin
 
 ---
 
-### Phase 5b — Published-Agent Fail-Closed Permission Defaults
+### Phase 5b — Published-Agent Fail-Closed Permission Defaults — **CLOSED**
+
+**Status:** Shipped. `dispatchMcpToolCall` now threads `runtimeContext` through `checkAllowedTools`; when zero enabled rules exist on the draft AND `runtimeContext.agentLifecycleState === "published"` AND the env flag `RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED=true`, the verdict flips to `deny` with stable audit reason `deny_missing_rules_for_published_agent`. Default-off so the operator first runs `scripts/scan-published-agents-no-rules.ts`, remediates the listed agents, then enables the flag. Closes Gate 5.
 
 **Enforcement logic** (per pre-flight #5):
 
@@ -524,15 +526,17 @@ PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial
 
 | Gate | Status |
 |---|---|
-| Gate 1 — Runtime Contract Evidence | Pending (closes after Phase 1e) |
-| Gate 2 — CI Enforcement | Pending (closes after Phase 2) |
+| Gate 1 — Runtime Contract Evidence | CLOSED (Phase 1a–1e shipped #384/#386 + Phase 1e remediation #387) |
+| Gate 2 — CI Enforcement | CLOSED (Layer 8 wired #388 — runs on push + PR) |
 | Gate 3 — Runtime Governance E2E | Pending (closes after Phase 4) |
-| Gate 4 — SSE Robustness | Pending (closes after Phase 3.4) |
-| Gate 5 — Published Fail-Closed | Pending (closes after Phase 5b) |
-| Gate 6 — Boundary Integrity (static) | Pending (verify boundary-lint coverage in Phase 1a) |
+| Gate 4 — SSE Robustness | CLOSED (Phase 3.4 #391) |
+| Gate 5 — Published Fail-Closed | CLOSED (Phase 5a #393 + Phase 5b — gated on `RUNTIME_FAIL_CLOSED_PUBLISHED_ENABLED=true`) |
+| Gate 6 — Boundary Integrity (static) | CLOSED (Phase 4.5 #392 — 4 static rules wired into CI) |
 | Gate 7 — Observability + Load | Pending (closes after Phase 12) |
 
 **Production-ready** when Gates 1–6 close. **Reference-grade** when Gate 7 also closes.
+
+**Production-ready as of Phase 5b: 5 of 6 gates closed.** Gate 3 (Runtime Governance E2E) is the last remaining production-readiness gate; closes after Phase 4.
 
 ---
 
