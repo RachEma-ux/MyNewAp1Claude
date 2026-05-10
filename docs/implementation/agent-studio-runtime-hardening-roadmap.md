@@ -169,20 +169,36 @@ These seven items are recorded here so they cannot be lost between the V2 plan a
 
 ### Phase 2 — CI Contract Closure
 
-**Goal:** Make the safety-critical runtime/retrofit subset enforceable in default CI.
+**Goal:** Add the safety-critical runtime unit subset to default CI as a new **Layer 8**.
 
-**Input:** Phase 1d's CI coverage matrix + Phase 1e's recommendations.
+**Scope clarification (R6, post Phase 1d):** Phase 1d falsified the V1 hypothesis that retrofit acceptance was outside default CI. `tests/agent-studio/retrofit-acceptance.test.ts` already runs on every PR via `run-tests.yml` Layer 6. Phase 2's actual work is **wiring the safety-critical unit subset** (14 existing tests + 1 new `permission-default.test.ts`) as a new **Layer 8**, not the retrofit acceptance suite.
 
-**Required default-CI coverage:** retrofit acceptance suite + Phase-1-approved lightweight runtime safety subset (chat-stream contract, MCP dispatcher, ProposedToolCall validation, approval gate, permission defaults, RAC/CAG trace contract, provider credential boundary).
+**Input:** Phase 1d's CI coverage matrix + Phase 1e §4 PR-required classification (units #4 + #14).
+
+**Layer 8 contents** (per Phase 1e §4 unit #4):
+1. `tests/agent-studio/proposed-tool-call.test.ts`
+2. `tests/agent-studio/approval-gate.test.ts`
+3. `tests/agent-studio/sandbox-gate.test.ts`
+4. `tests/agent-studio/dispatcher-tool-call-timeout.test.ts`
+5. `tests/agent-studio/dispatcher-error-sanitization.test.ts` + `sanitize-mcp-error-message.test.ts`
+6. `tests/agent-studio/dispatcher-output-schema-validation.test.ts`
+7. `tests/agent-studio/dispatcher-sandbox-error-mapping.test.ts`
+8. `tests/agent-studio/runtime-trace-writer.test.ts` + `rac-trace.test.ts`
+9. `tests/agent-studio/cag-boundaries.test.ts`
+10. `tests/agent-studio/canonical-determinism.test.ts`
+11. `tests/agent-studio/h6-c7-client-awaiting-handler.test.ts` + `h7-c7-loop-reentrancy-guard.test.ts`
+12. `server/agent-studio/services/mcp/__tests__/dispatcher.test.ts`
+13. `server/openrouter/model-access/execute.test.ts`
+14. **NEW (to author)** `tests/agent-studio/permission-default.test.ts` — closes the single authorship gap from Phase 1d §3 (M4)
 
 **Constraint — OOM-safe:**
-- Single-fork where needed (`--pool=forks --poolOptions.forks.singleFork`)
+- Layer 8 runs with `--pool=forks --poolOptions.forks.singleFork` (matches existing Layer 5/6/7)
 - No broad test-glob expansion
-- Heavy DB/integration suites scheduled or manually triggered (per pre-flight #4 cost classification)
+- Heavy DB/integration suites scheduled or manually triggered
 
-**Target file:** `.github/workflows/run-tests.yml`. Placement: after existing lightweight unit layers, before static governance scan, before heavy integration layers.
+**Target file:** `.github/workflows/run-tests.yml`. Placement: after Layer 7 (PMB invariants), before static governance scan.
 
-**Acceptance criteria:** retrofit acceptance suite runs on push + PR; safety-critical subset on every PR; failure blocks merge; CI cost documented; no implementation code changes bundled.
+**Acceptance criteria:** Layer 8 runs on push + PR; failure blocks merge; CI cost documented; the new `permission-default.test.ts` asserts current "no rules → permitted" behavior so Phase 5b's flip is detectable.
 
 ---
 
@@ -203,7 +219,10 @@ Add client-generated `clientMessageId` to the stream URL. Backend idempotency ke
 - Persisted messages are source of truth
 - Already-dispatched tools are not re-dispatched
 
-#### Phase 3.4 — Stream error reconciliation
+#### Phase 3.4 — Stream error reconciliation + client-disconnect handling
+
+**Scope expansion (R3, from Phase 1e H2):** Phase 1b confirmed `req.on("close")` returns 0 matches in chat-stream.ts. Long-running tool loops continue dispatching after the user closes the tab, burning model spend. Folding the `AbortController` plumbing into Phase 3.4 since `client_disconnected` is already in the error-code list — same surface, same PR.
+
 Stable error codes:
 ```
 stream_failed
@@ -212,7 +231,7 @@ tool_failed
 approval_blocked
 trace_write_failed
 audit_write_failed
-client_disconnected
+client_disconnected      ← thread AbortController from req.on("close") → gatewayCall → dispatchMcpToolCall
 gateway_failed
 retrieval_failed
 idempotency_conflict
@@ -225,6 +244,7 @@ Persistence policy:
 - Tool failure: persisted in trace + audit; visible in runtime diagnostics
 - Trace failure: surfaced as `trace_write_failed`; never silently treated as full success
 - Audit failure: defined fail-open / fail-closed behavior depending on risk
+- Client disconnect: emit `client_disconnected` audit row; abort outstanding gatewayCall + dispatcher; do NOT re-dispatch tools on retry (idempotency-keyed via Phase 3.2)
 
 ---
 
@@ -239,6 +259,23 @@ Prove the full tool-call governance loop end-to-end (Gate 3).
 **Path C — approval-required tool call:** request created; **pending** blocks dispatch; **denied** blocks dispatch; **expired** blocks dispatch; **permitted** allows dispatch. Every outcome writes audit + trace evidence.
 
 **Path D — dispatcher failure:** validator + approval permit; dispatcher fails; failure persisted; tool-call trace written; UI receives `tool_end` error; assistant + chat state remain coherent.
+
+---
+
+### Phase 4.5 — Boundary-lint hardening (NEW, R1)
+
+**Goal:** Close Gate 6 static enforcement gaps surfaced by Phase 1a.
+
+Phase 1a §3 row 8 found that current boundary-lint coverage is partial. Existing static rules: CAG boundary, provider-credential-resolver boundary, raw-env-var-key boundary. **Missing rules** (all required for Gate 6):
+
+1. **No raw provider SDK in `server/agent-studio/**`** — grep for `import openai`, `import @anthropic-ai/sdk`, `import google-genai`. Repo is currently clean by inspection but a future regression isn't lint-caught.
+2. **`validateRuntimeToolCall` precedes every `dispatchMcpToolCall`** on the chat lanes — currently asserted by `dispatcher-audit-coverage.test.ts` (test, not lint).
+3. **Direct `conn.callTool` forbidden outside `dispatcher.ts`** — currently asserted by doc-block (`dispatcher.ts:6`) and tests, not lint.
+4. **Approval gate must precede dispatch on approval-required calls** — currently asserted by tests.
+
+**Implementation:** add 4 new scripts under `scripts/check-runtime-boundary-*.ts`, wire into `npm run check` and `.github/workflows/run-tests.yml` boundary-scan steps.
+
+**Acceptance:** all 4 lint rules pass on current main with zero failures (proves they're correctly scoped); seed-failure smoke test confirms each rule actually catches its violation; CI step added.
 
 ---
 
@@ -295,6 +332,22 @@ function checkAllowedTools(agentDraftId, fullToolName, runtimeContext) {
 
 ---
 
+### Phase 5c — Simulation lane governance (NEW, R2)
+
+**Goal:** Close H1 surfaced by Phase 1a/1c — `simulation.ts:439` calls `dispatchMcpToolCall` without ProposedToolCall validator or approval gate.
+
+**Two options** (decision deferred to phase entry):
+
+**Option A — wire validator + gate into simulation.ts** (mirror chat-stream.ts:682/691). Same audit + trace evidence as production lanes; `agsPendingPermissionRequests` rows created for approval-required tools.
+
+**Option B — ADR-deferred exception.** Document simulation as a permanent dispatcher-only-governance lane (only `allowedTools` + `evaluateMcpPreInvoke` enforced) with a clear ADR explaining why ProposedToolCall envelope is intentionally unused for simulation. Risk: simulation of a published agent dispatches governance-sensitive tools without operator approval.
+
+**Recommendation:** Option A. The asymmetry isn't load-bearing and Phase 5b's published-fail-closed behavior should apply uniformly to all lanes (per pre-flight #6). Choose Option B only if Phase 5a impact analysis shows simulation behavior is intentionally permissive.
+
+**Acceptance (Option A):** simulation.ts:439 wraps `dispatchMcpToolCall` with `validateRuntimeToolCall` + `gateRuntimeDispatch` mirroring chat-stream's pattern; `persistRuntimeToolCallTrace` called; tests prove parity with chat-stream governance.
+
+---
+
 ## 4. Track B — Runtime Maturity / Post-MVP
 
 ### Phase 6 — Lightweight Runtime Config Schema Governance
@@ -323,7 +376,7 @@ Add `schemaVersion` to runtime config blocks: `runtimeConfig`, `providerConfig`,
 
 ### Phase 7.5 — OpenRouter Model Access Streaming Primitive (conditional)
 
-**Required only if** OpenRouter Model Access does not already expose streaming primitives for text deltas + tool-call deltas. Phase 1 audit determines whether 7.5 is needed.
+**Required only if** OpenRouter Model Access does not already expose streaming primitives for text deltas + tool-call deltas. Phase 1 audit did **not** conclusively determine this (out of scope for Phase 1a–1d). **R7 — add a Phase 7.5 pre-flight micro-audit** at Phase 7 entry: read `server/openrouter/model-access/execute.ts` + `stream.ts` (if exists), grep for `text_delta` / `tool_call_delta` / `tool_call_complete`, verify whether the normalized stream-event shape below already exists. If yes, skip Phase 7.5 entirely; if no, scope 7.5 work then.
 
 If needed, Model Access must support normalized stream events:
 
@@ -403,25 +456,27 @@ The `boundary-lint` allowlist (cycle-5/6) enforces these statically.
 
 PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial]` must wait for the prior PR.
 
+**Updated post Phase 1 (R5):** units 1–6 actually shipped as 2 PRs (V3 doc + Phase 1a–1e bundle) since the 4 audit matrices are doc-only and don't conflict. Phase 4.5 (R1) and Phase 5c (R2) inserted; M3 standalone fix (R4) added as unit 0.5; H2 folded into Phase 3.4 (R3).
+
 | Order | PR | Phase | Parallelism | Touches |
 |---|---|---|---|---|
 | 1 | `docs(runtime): runtime hardening roadmap V3` | (this doc) | — | docs only |
-| 2 | `audit(runtime/1a): wiring + sequence + boundary integrity` | 1a | [parallel] (with 1b/1c/1d) | docs only |
-| 3 | `audit(runtime/1b): SSE + persistence + error-path matrices` | 1b | [parallel] | docs only |
-| 4 | `audit(runtime/1c): governance + RAC trace matrices` | 1c | [parallel] | docs only |
-| 5 | `audit(runtime/1d): test + CI coverage matrices` | 1d | [parallel] | docs only |
-| 6 | `audit(runtime/1e): proven-vs-unverified + gaps + PR sequence` | 1e | [serial — needs 1a–1d] | docs only |
-| 7 | `ci(runtime): retrofit acceptance + safety-critical subset` | 2 | [serial — needs 1d/1e] | `.github/workflows/run-tests.yml` |
-| 8 | `feat(runtime): SSE heartbeat (Phase 3.1)` | 3.1 | [serial — `chat-stream.ts`] | server + tests |
-| 9 | `feat(runtime): clientMessageId idempotency (Phase 3.2)` | 3.2 | [serial — `chat-stream.ts`] | server + client + tests |
-| 10 | `feat(runtime): basic reconnect (Phase 3.3)` | 3.3 | [serial — `chat-stream.ts`] | client + tests |
-| 11 | `feat(runtime): error reconciliation (Phase 3.4)` | 3.4 | [serial — `chat-stream.ts`] | server + client + tests |
-| 12 | `test(runtime): governance E2E paths A–D` | 4 | [parallel — different files] | tests only |
-| 13 | `audit(runtime/5a): permission impact + published signal` | 5a | [parallel with 12] | docs + minor schema |
-| 14 | `feat(runtime): fail-closed published permission defaults` | 5b | [serial — needs 5a] | server + client + tests |
-| 15+ | Track B phases 6 → 12 | various | as scoped | — |
+| 2 | `audit(runtime/1a-1e): Phase 1 closure (5 files bundled)` | 1a–1e | [parallel sub-agents → bundled PR] | docs only |
+| 2.5 | `fix(agent-studio): AgentChatPage awaiting_approval parity` | M3 standalone | [parallel — disjoint file] | client only |
+| 3 | `docs(runtime): roadmap V3 R1–R7 revisions` | (this PR) | [parallel with 2.5] | docs only |
+| 4 | `ci(runtime): Layer 8 — safety-critical unit subset + new permission-default test` | 2 | [serial — needs Phase 1d findings] | `.github/workflows/run-tests.yml` + 1 new test |
+| 5 | `feat(runtime): SSE heartbeat (Phase 3.1)` | 3.1 | [serial — `chat-stream.ts`] | server + tests |
+| 6 | `feat(runtime): clientMessageId idempotency (Phase 3.2)` | 3.2 | [serial — `chat-stream.ts`] | server + client + tests |
+| 7 | `feat(runtime): basic reconnect (Phase 3.3)` | 3.3 | [serial — `chat-stream.ts`] | client + tests |
+| 8 | `feat(runtime): error reconciliation + client-disconnect (Phase 3.4)` | 3.4 + H2 | [serial — `chat-stream.ts`] | server + client + tests |
+| 9 | `test(runtime): governance E2E paths A–D` | 4 | [parallel — different files] | tests only |
+| 10 | `feat(runtime): boundary-lint hardening (Phase 4.5)` | 4.5 | [parallel with 9] | scripts + workflow |
+| 11 | `audit(runtime/5a): permission impact + published signal` | 5a | [parallel with 9/10] | docs + minor schema |
+| 12 | `feat(runtime): fail-closed published permission defaults` | 5b | [serial — needs 5a] | server + client + tests |
+| 13 | `feat(runtime): simulation lane governance (Phase 5c, Option A or B)` | 5c | [serial — decision deps on 5a impact] | simulation.ts + tests OR ADR-only |
+| 14+ | Track B phases 6 → 12 | various | as scoped | — |
 
-**Effective sprint length:** ~5 sequential slots for Track A (vs 8 if fully serialized) due to parallelism in 1a–1d, 4+5a.
+**Effective sprint length:** ~5 sequential slots for Track A (vs 13 if fully serialized) due to parallelism in 2.5+3, 9+10+11.
 
 ---
 
@@ -429,25 +484,25 @@ PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial
 
 ### Phase status
 
-| Phase | Status | Branch / PR | Closure report |
+| Phase | Status | Branch / PR | Closure |
 |---|---|---|---|
-| Plan doc | In-Progress | `feat/runtime-hardening-roadmap` (this PR) | — |
-| 1a | Pending | — | — |
-| 1b | Pending | — | — |
-| 1c | Pending | — | — |
-| 1d | Pending | — | — |
-| 1e | Pending | — | — |
+| Plan doc V3 | **Done** | PR #383 | merged @ `3d12d03` |
+| 1a–1e | **Done** | PR #384 (bundled) | merged @ `0977186` |
+| M3 standalone fix | **In-Progress** | PR #385 | — |
+| Roadmap R1–R7 revisions | **In-Progress** | (this PR) | — |
 | 2 | Pending | — | — |
 | 3.1 | Pending | — | — |
 | 3.2 | Pending | — | — |
 | 3.3 | Pending | — | — |
-| 3.4 | Pending | — | — |
+| 3.4 (incl. H2 client-disconnect) | Pending | — | — |
 | 4 | Pending | — | — |
+| 4.5 (NEW — boundary-lint) | Pending | — | — |
 | 5a | Pending | — | — |
 | 5b | Pending | — | — |
+| 5c (NEW — simulation governance) | Pending — Option A/B decision deferred | — | — |
 | 6 | Pending | — | — |
 | 7 | Pending | — | — |
-| 7.5 | Conditional | — | — |
+| 7.5 | Conditional (R7 pre-flight at Phase 7 entry) | — | — |
 | 8 | Pending | — | — |
 | 9 | Pending | — | — |
 | 10 | Pending (stretch) | — | — |
@@ -458,7 +513,12 @@ PRs marked `[parallel]` may run concurrently with prior PRs. PRs marked `[serial
 
 ### PR ledger
 
-(empty — populated as PRs land)
+| # | PR | Title | Status |
+|---|---|---|---|
+| 1 | #383 | docs(runtime): Agent Studio Runtime Hardening Roadmap V3 | merged `3d12d03` |
+| 2 | #384 | audit(runtime/1a-1e): Phase 1 closure — wiring, SSE, governance, tests, synthesis | merged `0977186` |
+| 3 | #385 | fix(agent-studio): AgentChatPage handles awaiting_approval SSE event (Phase 1e M3) | open |
+| 4 | (this PR) | docs(runtime): Roadmap V3 R1–R7 revisions post-Phase 1 | open |
 
 ### Definition-of-Done gate status
 
