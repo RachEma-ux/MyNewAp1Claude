@@ -92,6 +92,25 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ASDB] Legacy fixtures seed failed: ${message}`);
   }
 
+  // Step 2c: Native Graph Workspace Phase 12.5 / 22 / 23 — graph-skill row seeds.
+  //
+  // After ASDB tables exist (Step 1), upsert the 16 default Cypher templates,
+  // 7 default Graph Skill Packs, and 4 Golden Question suites. Idempotent
+  // on every key. Failures per-row are logged but do not abort boot.
+  try {
+    const { seedGraphSkillRows } = await import("./db/seed-graph-skill-rows");
+    const r = await seedGraphSkillRows();
+    console.log(
+      `[ASDB] Graph Skill seeds — templates: ${r.cypherTemplates.inserted} ins / ${r.cypherTemplates.updated} upd / ${r.cypherTemplates.failed} err; ` +
+        `packs: ${r.graphSkillPacks.inserted} ins / ${r.graphSkillPacks.updated} upd / ${r.graphSkillPacks.failed} err; ` +
+        `golden suites: ${r.goldenQuestions.suitesInserted} ins / ${r.goldenQuestions.suitesUpdated} upd; ` +
+        `questions: ${r.goldenQuestions.questionsInserted} ins / ${r.goldenQuestions.questionsUpdated} upd / ${r.goldenQuestions.failed} err`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ASDB] Graph Skill row seed skipped — ${message}`);
+  }
+
   // Step 3: Phase 10 scheduler — formalized boot path
   try {
     const { ensureSchedulerStarted } = await import("./services/scheduler");
