@@ -722,8 +722,8 @@ export async function runSimulation(input: {
   if (govResult.verdict === "blocked" && toggles.strictPolicy) {
     aborted = true;
     abortReason =
-      govResult.reasons?.[0]?.detail ??
-      govResult.reasons?.[0]?.code ??
+      govResult.reasons?.[0]?.message ??
+      govResult.reasons?.[0]?.rule ??
       "governance evaluation blocked by strict policy";
   }
 
