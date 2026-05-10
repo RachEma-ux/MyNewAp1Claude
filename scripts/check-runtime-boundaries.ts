@@ -114,9 +114,16 @@ function checkR1NoRawProviderSdk(): Violation[] {
 
 // ── Helpers for proximity-style chat-lane rules ──────────────────────────────
 
-const CHAT_LANE_FILES = [
+// Phase 5c (Roadmap V3): simulation is now a peer governance lane —
+// same validate → gate → dispatch chain, same audit + trace evidence.
+// The R2 / R4 proximity rules apply uniformly to every file that
+// calls `dispatchMcpToolCall` from a runtime lane (mcp-manager.ts is
+// excluded because it's the system-call shim with `agentDraftId=-1`,
+// which short-circuits authorization by design).
+const TOOL_DISPATCH_LANE_FILES = [
   "server/agent-studio/chat-stream.ts",
   "server/agent-studio/services/chat.ts",
+  "server/agent-studio/services/simulation.ts",
 ] as const;
 
 function lineOf(src: string, idx: number): number {
@@ -152,7 +159,7 @@ function stripComments(src: string): string {
 
 function checkR2ValidatorPrecedesDispatch(): Violation[] {
   const violations: Violation[] = [];
-  for (const fileRel of CHAT_LANE_FILES) {
+  for (const fileRel of TOOL_DISPATCH_LANE_FILES) {
     const file = join(REPO_ROOT, fileRel);
     let src: string;
     try {
@@ -241,7 +248,7 @@ function checkR3McpChokepoint(): Violation[] {
 
 function checkR4ApprovalPrecedesDispatch(): Violation[] {
   const violations: Violation[] = [];
-  for (const fileRel of CHAT_LANE_FILES) {
+  for (const fileRel of TOOL_DISPATCH_LANE_FILES) {
     const file = join(REPO_ROOT, fileRel);
     let src: string;
     try {
