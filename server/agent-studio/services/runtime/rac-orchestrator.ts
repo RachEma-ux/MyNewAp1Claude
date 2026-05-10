@@ -51,6 +51,39 @@ import type { RacRetrievalChunk } from "../rac/ingestion";
 import { listProfilesForDraft, getPolicyForProfile } from "../rac/sources";
 import type { SystemPromptSection } from "../cag";
 
+/**
+ * L4-c8 (cycle-8 audit closure §L4-c8) — namespace boundary note.
+ *
+ * The `code` field on this class lives in the ORCHESTRATION-error
+ * code namespace, NOT the dispatch-error namespace. Three classes
+ * use the field name `code` and their values come from disjoint
+ * value spaces — a future error-mapping helper that conflates them
+ * would silently route the wrong way:
+ *
+ *   - `RetrievalRequiredError.code: "retrieval_required"`
+ *   - `CagRequiredError.code: "cag_required"`
+ *     ↳ Both surface from the orchestrator / composer pipeline.
+ *       SSE mapper at chat-stream.ts emits these as the SSE error
+ *       `code` field. UI layer pattern-matches on these strings.
+ *
+ *   - `McpError.code` / `DispatchErrorCode` (e.g. `validator_rejected`,
+ *     `governance_denied`, `internal_error`)
+ *     ↳ Surface from the MCP dispatcher. Operator audit ledger
+ *       (agsRuntimePolicyEvents) keys off these. UI tool-call
+ *       failure surface keys off these.
+ *
+ * The two namespaces are NOT mergeable — any helper that types both
+ * as `string` and pattern-matches across them silently violates the
+ * boundary. If a future PR introduces a unified error-mapping
+ * helper, it MUST type the input as a discriminated union with the
+ * namespace as the discriminator (e.g. `OrchestrationCode | DispatchCode`).
+ *
+ * Mirrors cycle-7 H3-c7 (sandbox vs. dispatch error code namespaces)
+ * and M7-c8 (registry pattern for orchestration errors, deferred to
+ * a follow-up).
+ *
+ * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts.
+ */
 export class RetrievalRequiredError extends Error {
   readonly code = "retrieval_required";
   constructor(message = "RAC retrieval required but failed") {
@@ -118,6 +151,23 @@ export interface RuntimeTraceMetrics {
   cagPackVersion: number | null;
   retrievalEnabled: boolean;
   retrievalLatencyMs: number;
+  /**
+   * L2-c8 (cycle-8 audit closure §L2-c8) — known-limitation marker.
+   *
+   * Per-source latency map keyed by `agsRacSources.id`. UNBOUNDED in
+   * size by design — a workspace with thousands of sources would
+   * serialize a correspondingly large map into the trace row. In
+   * practice typical workspaces have <20 sources, so this hasn't
+   * surfaced as a real issue.
+   *
+   * If it ever does (operator reports trace rows >1MB, slow trace
+   * inserts on huge workspaces), fold into the cycle-7-style ceiling
+   * pattern: cap at MAX_PER_SOURCE_TRACE_ENTRIES (e.g. 100), record
+   * a truncation flag in the trace row, surface in operator UI.
+   * Pure documentation for now — no enforcement layer.
+   *
+   * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts.
+   */
   perSourceLatencyMs: Record<number, number>;
   chunksReturned: number;
   chunksFiltered: number;
