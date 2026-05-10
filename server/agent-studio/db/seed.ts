@@ -24,6 +24,16 @@
 import pg from "pg";
 import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
 import * as agsSchema from "../../../drizzle/tables/agent-studio";
+// Native Graph Workspace — additional ags_* tables (Phase 0.5 / 1.6 / 1.7 / 7 / 11 / 12 / 13).
+// Imported here so the introspection loop picks them up at boot.
+import * as agsVaultSchema from "../../../drizzle/tables/agent-studio-vault";
+import * as agsGraphSchema from "../../../drizzle/tables/agent-studio-graph";
+import * as agsGraphProjectionSchema from "../../../drizzle/tables/agent-studio-graph-projection";
+import * as agsGraphPromotionSchema from "../../../drizzle/tables/agent-studio-graph-promotion";
+import * as agsGraphSkillSchema from "../../../drizzle/tables/agent-studio-graph-skill";
+import * as agsGraphAgentSchema from "../../../drizzle/tables/agent-studio-graph-agent";
+import * as agsGraphRagSchema from "../../../drizzle/tables/agent-studio-graph-rag";
+import * as agsGraphQualitySchema from "../../../drizzle/tables/agent-studio-graph-quality";
 
 interface SeedResult {
   created: number;
@@ -174,8 +184,23 @@ export async function seedAsDb(): Promise<SeedResult> {
     failures: [],
   };
 
+  // Combined iteration across the original agent-studio.ts schema and the
+  // Native Graph Workspace additions. Each new file uses the `ags*` export
+  // prefix so the filter below picks them up unchanged.
+  const combinedSchema: Record<string, unknown> = {
+    ...agsSchema,
+    ...agsVaultSchema,
+    ...agsGraphSchema,
+    ...agsGraphProjectionSchema,
+    ...agsGraphPromotionSchema,
+    ...agsGraphSkillSchema,
+    ...agsGraphAgentSchema,
+    ...agsGraphRagSchema,
+    ...agsGraphQualitySchema,
+  };
+
   try {
-    for (const [exportName, value] of Object.entries(agsSchema)) {
+    for (const [exportName, value] of Object.entries(combinedSchema)) {
       if (!exportName.startsWith("ags") || !value || typeof value !== "object") {
         continue;
       }
