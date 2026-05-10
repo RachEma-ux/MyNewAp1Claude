@@ -81,6 +81,19 @@ jobs:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
           TEST_MODE: staging-integration
 
+      # ── Layer 3: Integration Tests — Runtime Governance E2E ────────
+      # Phase 4 (Roadmap V3) — closes Definition-of-Done Gate 3.
+      # Exercises the full integrated tool-call governance loop
+      # (validate → gate → dispatch → audit + trace) against a live
+      # ASDB with only `getMcpConnection` mocked. Four canonical paths
+      # (A: read-only happy, B: validator rejection, C: approval-
+      # required lifecycle including denied, D: dispatcher failure).
+      - name: Runtime governance E2E (Layer 3c)
+        run: npx vitest run tests/integration/agent-studio/runtime-governance-e2e.integration.test.ts --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+          TEST_MODE: staging-integration
+
       # ── Layer 4: UI Selector Tests ─────────────────────────────────
       # Intake selectors, app selectors, chat selectors, bot wizard.
       - name: UI selector tests (Layer 4)
