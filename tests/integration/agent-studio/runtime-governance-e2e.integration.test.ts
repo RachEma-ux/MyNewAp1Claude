@@ -391,7 +391,12 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
         .from(agsToolCallTraces)
         .where(eq(agsToolCallTraces.agentDraftId, draftId));
       expect(traceRows.length).toBe(1);
-      expect(traceRows[0].dispatchResult).toBe("blocked");
+      // buildToolCallTraceRow forces dispatchResult to null when the
+      // validation verdict is "rejected" — there was no dispatch
+      // attempt at all, so the column's semantic doesn't apply
+      // (approval-blocked + dispatch-tried paths use "blocked" /
+      // "ok" / "error" respectively).
+      expect(traceRows[0].dispatchResult).toBeNull();
       expect(traceRows[0].validationVerdict).toBe("rejected");
     });
   });
@@ -433,7 +438,7 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
       await decideApprovalRequest({
         approvalRequestId: verdict1.approvalRequestId!,
         decidedBy: 0,
-        decision: "allowed",
+        status: "allowed",
       });
 
       // Second evaluation permits.
@@ -508,8 +513,8 @@ describe.skipIf(!hasDb())("Phase 4 — runtime governance E2E (live ASDB)", () =
       await decideApprovalRequest({
         approvalRequestId: verdict1.approvalRequestId!,
         decidedBy: 0,
-        decision: "denied",
-        denyReason: "operator denied",
+        status: "denied",
+        reason: "operator denied",
       });
 
       const verdict2 = await gateRuntimeDispatch({
