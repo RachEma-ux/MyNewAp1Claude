@@ -219,6 +219,7 @@ jobs:
             tests/agent-studio/fail-closed-permission-gate.test.ts \
             tests/agent-studio/simulation-lane-governance.test.ts \
             tests/agent-studio/config-schema-version.test.ts \
+            tests/agent-studio/stream-event-union.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose

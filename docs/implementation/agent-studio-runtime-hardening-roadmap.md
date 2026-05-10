@@ -388,7 +388,13 @@ Add `schemaVersion` to runtime config blocks: `runtimeConfig`, `providerConfig`,
 
 (Initial classifications came from Phase 1's boundary integrity matrix; Phase 7 only deep-audited items still labeled `Unverified`.)
 
-### Phase 7.5 — OpenRouter Model Access Streaming Primitive (conditional)
+### Phase 7.5 — OpenRouter Model Access Streaming Primitive (conditional) — **PARTIAL CLOSED (type surface)**
+
+**Status:** Type-surface shipped. New `ModelAccessStreamEvent` discriminated union exported from `server/openrouter/model-access/types.ts` + index barrel. Variants: `text_delta` / `tool_call_delta` / `tool_call_complete` / `done`. Existing `ModelAccessStreamChunk` preserved (additive change, no breaking renames). Test `tests/agent-studio/stream-event-union.test.ts` (12 cases) wired into Layer 8 — locks variant names, doc-block invariants ("Consumers MUST NOT parse mid-stream", "additive backward compat"), and the index re-exports.
+
+**Deferred (still Phase 17/18):** the actual `streamEvents()` producer that parses OpenAI / Anthropic SSE tool events and yields the new shapes; the `chat-stream.ts` consumer migration. Locking the type surface now means the producer + consumer migration is a one-line type swap rather than a coordinated cross-file redesign. This matches the Phase 7 pre-flight verdict (PARTIAL — text streaming exists; tool-call streaming explicitly deferred per `execute.ts:314-319`).
+
+
 
 **Required only if** OpenRouter Model Access does not already expose streaming primitives for text deltas + tool-call deltas. Phase 1 audit did **not** conclusively determine this (out of scope for Phase 1a–1d). **R7 — add a Phase 7.5 pre-flight micro-audit** at Phase 7 entry: read `server/openrouter/model-access/execute.ts` + `stream.ts` (if exists), grep for `text_delta` / `tool_call_delta` / `tool_call_complete`, verify whether the normalized stream-event shape below already exists. If yes, skip Phase 7.5 entirely; if no, scope 7.5 work then.
 
