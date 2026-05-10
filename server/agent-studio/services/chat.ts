@@ -1086,6 +1086,10 @@ export async function sendChatMessage(
       agentDraftId: draft.id,
       actorId: options.actorId ?? 1,
       query: input.userMessage,
+      // M8-c8: mirrors chat-stream.ts wire-up — thread session id as
+      // runtimeRunId so the CAG resolver can write a durable audit
+      // row when its event-log writes fail.
+      runtimeRunId: input.sessionId,
       draft: {
         name: (draft as any).name ?? null,
         role: (draft as any).role ?? null,

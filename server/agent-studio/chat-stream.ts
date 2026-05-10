@@ -1150,6 +1150,10 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         agentDraftId: draft.id,
         actorId,
         query: userMessage,
+        // M8-c8: thread the chat session id as runtimeRunId so the
+        // CAG resolver can write a durable audit row when its
+        // event-log writes fail (instead of stdout-only).
+        runtimeRunId: sessionId,
         draft: {
           name: (draft as any).name ?? null,
           role: (draft as any).role ?? null,

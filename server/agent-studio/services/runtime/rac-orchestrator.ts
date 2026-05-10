@@ -101,6 +101,16 @@ export interface ResolveContextInput {
    * orchestrator returns CAG-only.
    */
   profileKey?: string;
+  /**
+   * M8-c8 (cycle-8 audit closure §M8-c8) — runtime run id (typically
+   * the chat session id) threaded into the CAG resolver so its
+   * event-log write failures can fall back to a durable
+   * `agsRuntimePolicyEvents` row instead of a stdout-only breadcrumb.
+   * Optional because direct callers (tests, future background
+   * recompiles) may not have a run id; the resolver's helper falls
+   * back to structured stdout when absent.
+   */
+  runtimeRunId?: number | null;
 }
 
 export interface RuntimeTraceMetrics {
@@ -279,6 +289,9 @@ export async function resolveAndAssembleContext(
       agentDraftId: input.agentDraftId,
       actorId: input.actorId,
       mode: input.mode,
+      // M8-c8: thread the runtime run id so the resolver's event-log
+      // failure path can write a durable audit row.
+      runtimeRunId: input.runtimeRunId,
     });
     capabilityPack = resolved.section;
     trace.cagPackId = resolved.pack?.id ?? null;
