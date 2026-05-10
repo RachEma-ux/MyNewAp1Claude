@@ -58,10 +58,16 @@ describe("Phase 11b — observability writers (chat-stream)", () => {
       // sseStartedAt is the wall-clock anchor for sseDurationMs +
       // sseFirstTokenMs. Must be set BEFORE row creation so the
       // observability window starts at the SSE handler entry, not at
-      // the post-DB-insert moment.
-      expect(CHAT_STREAM).toMatch(
-        /const\s+sseStartedAt\s*=\s*Date\.now\(\)[\s\S]{0,400}repo\.appendRuntimeRun\(/,
+      // the post-DB-insert moment. The state was hoisted to the
+      // outer scope (so catch/finally can reach finalizeChatRun) —
+      // the precedence claim is a substring-index ordering check.
+      const startedAtIdx = CHAT_STREAM.indexOf(
+        "const sseStartedAt = Date.now()",
       );
+      const insertIdx = CHAT_STREAM.indexOf("repo.appendRuntimeRun(");
+      expect(startedAtIdx).toBeGreaterThan(0);
+      expect(insertIdx).toBeGreaterThan(0);
+      expect(startedAtIdx).toBeLessThan(insertIdx);
     });
 
     it("row creation is best-effort (try/catch warn-only)", () => {
