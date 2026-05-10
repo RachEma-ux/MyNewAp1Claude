@@ -2838,7 +2838,35 @@ export async function appendChatMessage(input: {
   costMicrocents?: number;
   model?: string;
   durationMs?: number;
-}) {
+  /**
+   * Phase 3.2 idempotency key. When set on role="user", a SELECT against
+   * `(sessionId, clientMessageId)` happens first; if a row already exists,
+   * we return it with `created: false` instead of inserting a duplicate.
+   * For non-user roles the field is ignored (assistant/tool messages
+   * carry no idempotency dimension from the client).
+   */
+  clientMessageId?: string | null;
+}): Promise<typeof agsChatMessages.$inferSelect> {
+  // Phase 3.2 — silent dedup on `(sessionId, clientMessageId)` for user
+  // messages. Pattern mirrors M2-c6 (`createApprovalRequest` SELECT-then-
+  // INSERT) and applies app-level race protection until the partial
+  // unique index from
+  // `scripts/migrations/manual/ags-chat-messages-client-message-id.sql`
+  // is operator-applied.
+  if (input.role === "user" && input.clientMessageId) {
+    const [existing] = await db()
+      .select()
+      .from(agsChatMessages)
+      .where(
+        and(
+          eq(agsChatMessages.sessionId, input.sessionId),
+          eq(agsChatMessages.clientMessageId, input.clientMessageId),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+  }
+
   const [created] = await db()
     .insert(agsChatMessages)
     .values({
@@ -2851,9 +2879,66 @@ export async function appendChatMessage(input: {
       costMicrocents: input.costMicrocents,
       model: input.model,
       durationMs: input.durationMs,
+      clientMessageId:
+        input.role === "user" ? (input.clientMessageId ?? null) : null,
     })
     .returning();
   return created;
+}
+
+/**
+ * Phase 3.2 — explicit "did I create this row, or did I find a duplicate"
+ * variant. Callers that need to know whether they're handling a fresh
+ * request vs an idempotency hit (e.g. chat-stream emitting
+ * `idempotency_conflict`) use this; the simpler `appendChatMessage`
+ * returns the row only.
+ */
+export async function appendChatMessageWithIdempotency(input: {
+  sessionId: number;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  toolPayload?: Record<string, unknown>;
+  inputTokens?: number;
+  outputTokens?: number;
+  costMicrocents?: number;
+  model?: string;
+  durationMs?: number;
+  clientMessageId?: string | null;
+}): Promise<{
+  created: boolean;
+  row: typeof agsChatMessages.$inferSelect;
+}> {
+  if (input.role === "user" && input.clientMessageId) {
+    const [existing] = await db()
+      .select()
+      .from(agsChatMessages)
+      .where(
+        and(
+          eq(agsChatMessages.sessionId, input.sessionId),
+          eq(agsChatMessages.clientMessageId, input.clientMessageId),
+        ),
+      )
+      .limit(1);
+    if (existing) return { created: false, row: existing };
+  }
+
+  const [row] = await db()
+    .insert(agsChatMessages)
+    .values({
+      sessionId: input.sessionId,
+      role: input.role,
+      content: input.content,
+      toolPayload: input.toolPayload,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      costMicrocents: input.costMicrocents,
+      model: input.model,
+      durationMs: input.durationMs,
+      clientMessageId:
+        input.role === "user" ? (input.clientMessageId ?? null) : null,
+    })
+    .returning();
+  return { created: true, row };
 }
 
 // ── Plan v3 Phase 40: catalog-sync log ──────────────────────────────────────

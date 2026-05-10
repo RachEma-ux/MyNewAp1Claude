@@ -1257,11 +1257,25 @@ export const agsChatMessages = pgTable(
     model: varchar("model", { length: 64 }),
     /** Wall-clock latency for the LLM call (assistant only) */
     durationMs: integer("duration_ms"),
+    /**
+     * Phase 3.2 (Roadmap V3) — client-generated idempotency key.
+     * Set by the chat-stream entry point on role="user" rows; null on
+     * assistant/tool/system rows (those carry no idempotency dimension).
+     * Lookup uses `(sessionId, clientMessageId)`; the partial unique
+     * index is in `scripts/migrations/manual/ags-chat-messages-client-message-id.sql`
+     * (operator-applied — same pattern as M2-c6 / cycle-6's
+     * `agsPendingPermissionRequests` `(draftId, hash)` unique index).
+     */
+    clientMessageId: varchar("client_message_id", { length: 64 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
     sessionIdx: index("idx_ags_chat_messages_session").on(t.sessionId),
     createdIdx: index("idx_ags_chat_messages_created").on(t.createdAt),
+    clientMsgIdx: index("idx_ags_chat_messages_client_msg").on(
+      t.sessionId,
+      t.clientMessageId,
+    ),
   })
 );
 
