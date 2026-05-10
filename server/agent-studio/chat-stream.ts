@@ -375,10 +375,22 @@ async function runStreamingToolLoop(args: {
   actorId: number;
   tools: ToolSpec[];
   sendEvent: SseSend;
+  /**
+   * Phase 3.4 (Roadmap V3) — client-disconnect abort signal.
+   * When the request is aborted (`req.on("close")` / `res.on("close")`),
+   * the loop checks `signal.aborted` between turns and breaks early.
+   * The CURRENT in-flight model call / tool dispatch finishes its
+   * round trip (we don't plumb signal into Model Access or the MCP
+   * dispatcher in this phase — that's Phase 7.5/8 work). The cost-
+   * limiting effect is "no MORE tool calls or model turns after
+   * disconnect."
+   */
+  signal?: AbortSignal;
 }): Promise<{
   assistantRowId: number;
   content: string;
   stats: LoopStats;
+  aborted?: boolean;
 }> {
   const {
     providerConnectionId,
@@ -393,6 +405,7 @@ async function runStreamingToolLoop(args: {
     actorId,
     tools,
     sendEvent,
+    signal,
   } = args;
   // Local alias kept for code locality with the persistence calls below.
   const model = modelRef;
@@ -429,6 +442,26 @@ async function runStreamingToolLoop(args: {
   const toolDispatchCounts = new Map<string, number>();
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+    // Phase 3.4 — client-disconnect abort. The in-flight model call
+    // / tool dispatch from the previous turn (if any) has already
+    // completed by this point; checking `signal.aborted` here stops
+    // the next turn cleanly. The synthetic assistant row at end-of-
+    // function still writes (one short row noting the disconnect)
+    // so the conversation history isn't left in a half-written state.
+    if (signal?.aborted) {
+      const row = await repo.appendChatMessage({
+        sessionId,
+        role: "assistant",
+        content: "(stream aborted — client disconnected)",
+        model,
+      });
+      return {
+        assistantRowId: row.id,
+        content: "(stream aborted — client disconnected)",
+        stats: { ...stats, durationMs: Date.now() - loopStart },
+        aborted: true,
+      };
+    }
     // Rebuild messages from history so previous tool turns are in
     // scope for the next call. Map our internal shape onto
     // ModelAccessMessage[].
@@ -974,10 +1007,18 @@ async function runPureStream(args: {
   workspaceId: number;
   actorId: number;
   sendEvent: SseSend;
+  /**
+   * Phase 3.4 — client-disconnect abort. Checked inside the chunk-
+   * iteration loop. When aborted, the partial assistant row still
+   * writes (with whatever was accumulated to that point) so the
+   * conversation isn't left half-written.
+   */
+  signal?: AbortSignal;
 }): Promise<{
   assistantRowId: number;
   content: string;
   stats: LoopStats;
+  aborted?: boolean;
 }> {
   const {
     providerConnectionId,
@@ -989,6 +1030,7 @@ async function runPureStream(args: {
     workspaceId,
     actorId,
     sendEvent,
+    signal,
   } = args;
   const model = modelRef;
 
@@ -1036,7 +1078,18 @@ async function runPureStream(args: {
     },
   });
 
+  let aborted = false;
   for await (const chunk of chunks) {
+    // Phase 3.4 — client-disconnect abort. We can't cancel the
+    // upstream Model Access stream (no signal plumbing in this phase),
+    // but we can stop forwarding chunks to the (gone) client and stop
+    // accumulating into memory. The generator is left to drain
+    // upstream — Phase 7.5/8 will plumb the signal into Model Access
+    // proper for true cancellation.
+    if (signal?.aborted) {
+      aborted = true;
+      break;
+    }
     if (chunk.delta && chunk.delta.length > 0) {
       accumulated += chunk.delta;
       sendEvent({ type: "token", content: chunk.delta });
@@ -1074,6 +1127,7 @@ async function runPureStream(args: {
       costMicrocents,
       durationMs,
     },
+    aborted,
   };
 }
 
@@ -1141,10 +1195,30 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
 
   const sendEvent = setupSse(res);
 
+  // Phase 3.4 — client-disconnect detection. AbortController is wired
+  // to BOTH `req.on("close")` (HTTP-level disconnect) and
+  // `res.on("close")` (response stream close). The signal threads into
+  // runStreamingToolLoop / runPureStream so the loop terminates on
+  // disconnect instead of running tool dispatch after the user closed
+  // the tab. Closes the H2 finding from Phase 1e (`req.on("close")`
+  // returned 0 matches before this phase). Full Model Access /
+  // dispatcher signal plumbing is deferred to Phase 7.5/8 — this
+  // phase stops the LOOP, not the in-flight model call.
+  const abortController = new AbortController();
+  const onClientDisconnect = () => {
+    if (!abortController.signal.aborted) abortController.abort();
+  };
+  req.on("close", onClientDisconnect);
+  res.on("close", onClientDisconnect);
+
   try {
     const session = await repo.getChatSessionById(sessionId);
     if (!session) {
-      sendEvent({ type: "error", error: `Chat session ${sessionId} not found` });
+      sendEvent({
+        type: "error",
+        error: `Chat session ${sessionId} not found`,
+        code: "session_not_found",
+      });
       res.end();
       return;
     }
@@ -1153,6 +1227,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       sendEvent({
         type: "error",
         error: `Agent ${session.agentId} has no current draft`,
+        code: "draft_not_found",
       });
       res.end();
       return;
@@ -1324,6 +1399,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
             actorId,
             tools: toolSpecs,
             sendEvent,
+            signal: abortController.signal,
           })
         : await runPureStream({
             providerConnectionId,
@@ -1335,6 +1411,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
             workspaceId,
             actorId,
             sendEvent,
+            signal: abortController.signal,
           });
 
     // Bump session totals + auto-title. The tool loop wrote multiple
@@ -1444,6 +1521,35 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         );
     }
 
+    // Phase 3.4 — if the loop / stream aborted on client disconnect,
+    // emit `client_disconnected` instead of `done`. The UI is already
+    // gone (that's what triggered the abort), so the SSE write may
+    // be a no-op — but the `code` discriminator reaches downstream
+    // SSE proxies / gateways for logging, and a stdout breadcrumb
+    // gives operators a single grep target for forensics.
+    if (pathResult.aborted) {
+      console.warn(
+        `[chat-stream] client_disconnected session=${sessionId} ` +
+          `(loop terminated after disconnect; in-flight model call ` +
+          `completed; no further turns)`,
+      );
+      try {
+        sendEvent({
+          type: "error",
+          error: "Client disconnected mid-stream; loop aborted.",
+          code: "client_disconnected",
+        });
+      } catch {
+        /* connection's gone — best effort */
+      }
+      try {
+        res.end();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
     sendEvent({
       type: "done",
       assistantMessageId: pathResult.assistantRowId,
@@ -1458,8 +1564,18 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     res.end();
   } catch (error: any) {
     console.error("[AgentStudioChatStream] Error:", error);
+    // Phase 3.4 — classify the catch-all. If the underlying error
+    // already carried a code (orchestrator + binding paths), we
+    // would have returned above; reaching here means the error is
+    // unclassified. Default to `stream_failed` — Phase 4.5's
+    // boundary-lint or a future Phase 8 audit can tighten the
+    // classification by adding more upstream catches.
     try {
-      sendEvent({ type: "error", error: error?.message ?? String(error) });
+      sendEvent({
+        type: "error",
+        error: error?.message ?? String(error),
+        code: "stream_failed",
+      });
     } catch {
       /* headers already sent, ignore */
     }
@@ -1468,5 +1584,10 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     } catch {
       /* ignore */
     }
+  } finally {
+    // Phase 3.4 — clean up the close-event listeners so the request
+    // handler doesn't hold a reference to req/res after returning.
+    req.off("close", onClientDisconnect);
+    res.off("close", onClientDisconnect);
   }
 }
