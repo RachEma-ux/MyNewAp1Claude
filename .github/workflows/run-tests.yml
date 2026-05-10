@@ -145,6 +145,55 @@ jobs:
       - name: PMB invariant suites (Layer 7)
         run: npx vitest run tests/pmb/ --pool=forks --poolOptions.forks.singleFork --reporter=verbose
 
+      # ── Layer 8: Runtime Hardening Safety Subset ───────────────────
+      # Roadmap V3 Phase 2 (closure for Definition-of-Done Gate 2).
+      # Per the Phase 1d audit findings (`docs/evidence/runtime-hardening/
+      # 2026-05-10-phase-1/04-test-and-ci-coverage.md`), the V1 audit's
+      # hypothesis that retrofit acceptance was outside default CI was
+      # falsified — Layer 6 above already runs it. The actual Phase-2
+      # gap was the safety-critical UNIT subset never running on PR.
+      # 84 tests under tests/agent-studio/ exist; only 1 (retrofit
+      # acceptance) ran on PR before this layer.
+      #
+      # Categories closed by this layer:
+      #  - ProposedToolCall validation (8-gate failure locality)
+      #  - Approval gate state machine + TTL math
+      #  - Sandbox gate (timeout, deny-global, frozen-intrinsic, UNAVAILABLE)
+      #  - MCP dispatcher (timeout sentinel, error sanitization,
+      #    output-schema validation, sandbox-error mapping)
+      #  - Trace-row builders (pure-functional)
+      #  - CAG boundary classifier
+      #  - Canonical serializer determinism
+      #  - chat-stream tool-loop guards (h6-c7, h7-c7)
+      #  - Full MCP dispatcher unit suite (mocked, no DB)
+      #  - OpenRouter Model Access execute path
+      #  - Permission default behavior (NEW — closes Phase 1e M4)
+      #
+      # All files are pure-surface (no DB, no network). singleFork per
+      # the standing OOM-safe pattern from Layer 5/6/7. Estimated added
+      # wall time: 8–15 s per Phase 1d §5.
+      - name: Runtime hardening safety subset (Layer 8)
+        run: |
+          npx vitest run \
+            tests/agent-studio/proposed-tool-call.test.ts \
+            tests/agent-studio/approval-gate.test.ts \
+            tests/agent-studio/sandbox-gate.test.ts \
+            tests/agent-studio/dispatcher-tool-call-timeout.test.ts \
+            tests/agent-studio/dispatcher-error-sanitization.test.ts \
+            tests/agent-studio/sanitize-mcp-error-message.test.ts \
+            tests/agent-studio/dispatcher-output-schema-validation.test.ts \
+            tests/agent-studio/dispatcher-sandbox-error-mapping.test.ts \
+            tests/agent-studio/runtime-trace-writer.test.ts \
+            tests/agent-studio/rac-trace.test.ts \
+            tests/agent-studio/cag-boundaries.test.ts \
+            tests/agent-studio/canonical-determinism.test.ts \
+            tests/agent-studio/h6-c7-client-awaiting-handler.test.ts \
+            tests/agent-studio/h7-c7-loop-reentrancy-guard.test.ts \
+            tests/agent-studio/permission-default.test.ts \
+            server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
+            server/openrouter/model-access/execute.test.ts \
+            --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+
       # ── Static Governance Guard ─────────────────────────────────────
       # Scans source code for forbidden patterns that violate governance invariants.
       - name: Static governance invariant scan
