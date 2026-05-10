@@ -686,6 +686,22 @@ async function runChatWithToolsViaBinding(input: {
 
           if (!runtimeVerdict.ok) {
             // Follow-up A3: persist a trace row even on rejection.
+            //
+            // M6-c8 cross-flow asymmetry note — chat.ts (this offline /
+            // test-run-binding flow) AWAITS its trace writes, unlike
+            // chat-stream.ts which fire-and-forgets the end-of-stream
+            // RAC trace. The two trace surfaces have different contracts:
+            //   - This call (`persistRuntimeToolCallTrace`) is the
+            //     per-tool-call audit ledger for offline runs and MUST
+            //     complete before the loop continues (the next dispatch
+            //     would race the row write).
+            //   - chat-stream.ts:1283 `writeTrace(...)` is the end-of-
+            //     stream RAC observability trace and is best-effort per
+            //     L4-c5; awaiting it would couple chat-turn latency to
+            //     ASDB write speed (regression on every turn).
+            // Future PRs that add end-of-stream RAC trace persistence to
+            // chat.ts MUST replicate the M6-c8 doc-block from
+            // chat-stream.ts (lockstep: m6-c8-trace-fire-and-forget-doc.test.ts).
             await persistRuntimeToolCallTrace({
               workspaceId: input.workspaceId,
               agentId: input.agentId,

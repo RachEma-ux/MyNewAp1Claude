@@ -1250,6 +1250,33 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     // RAC P7 — best-effort trace persistence at end-of-stream. We
     // already have the assistantMessageId via pathResult; the
     // orchestrator captured the trace metrics + per-source detail.
+    //
+    // M6-c8 (cycle-8 audit closure §M6-c8) — FIRE-AND-FORGET CONTRACT:
+    // The trace write below uses `.then().catch()` WITHOUT `await`.
+    // This is INTENTIONAL per L4-c5's trace-vs-audit asymmetry:
+    //   - audit (`agsRuntimePolicyEvents`, dispatcher receipts) is the
+    //     governance ledger and MUST block the response — the dispatcher
+    //     awaits its audit writes synchronously.
+    //   - trace (`agsRuntimeSourceTraces`, this call) is observability
+    //     and is best-effort — a slow ASDB write must NOT couple chat-
+    //     turn latency to trace-write latency.
+    //
+    // ⚠ DO NOT add `await` here. A future reader who thinks this is a
+    // missed `await` would convert the chat turn from "respond fast,
+    // observability lands when it lands" to "respond no faster than
+    // ASDB can flush a multi-row trace + context-blocks insert" — that's
+    // a user-visible regression on every chat turn.
+    //
+    // The .catch() is a leaf-level breadcrumb: trace-write failures log
+    // a single line (operators grep `[chat-stream/trace] write failed`)
+    // and the user-visible chat turn is unaffected. This mirrors cycle-7
+    // H9-c7's trace-warn shape (best-effort observability with a quiet
+    // failure path).
+    //
+    // Lockstep: pinned by tests/agent-studio/m6-c8-trace-fire-and-forget-doc.test.ts
+    // (source-scans for this doc-block above the writeTrace call; absence
+    // OR an `await` keyword on the writeTrace expression fails the test
+    // before the latency regression reaches prod).
     if (racBuilt) {
       const t = racBuilt.context.trace;
       const st = racBuilt.context.sourceTrace;
