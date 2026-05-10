@@ -220,6 +220,15 @@ function approvalResumeTimeoutMs(): number {
   return Math.max(1, seconds) * 1000;
 }
 
+/**
+ * Phase 3.1 (Roadmap V3) — periodic SSE keepalive interval.
+ *
+ * 20 s lands inside the typical idle-connection-drop windows of common
+ * reverse proxies / mobile networks (60 s default for nginx, 300 s for
+ * many cloud LBs) without flooding the wire on long tool loops.
+ */
+const SSE_HEARTBEAT_INTERVAL_MS = 20_000;
+
 function setupSse(res: Response): SseSend {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -227,7 +236,29 @@ function setupSse(res: Response): SseSend {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
+  // Phase 3.1 — periodic SSE keepalive comment to prevent proxies and
+  // mobile networks from dropping idle long-running streams. SSE
+  // comments (`:` prefix) are NOT delivered to EventSource onmessage
+  // handlers, so the client needs zero awareness of them — they exist
+  // only to keep the TCP connection warm. The interval clears
+  // automatically when the response closes (any path: normal end,
+  // error, or client disconnect).
+  const heartbeat = setInterval(() => {
+    if (!res.writable) return;
+    try {
+      res.write(`: heartbeat ${Date.now()}\n\n`);
+    } catch {
+      // Connection dropped between the writable check and the write;
+      // the next "close" event will run clearInterval.
+    }
+  }, SSE_HEARTBEAT_INTERVAL_MS);
+  // Don't keep the Node event loop alive on this interval alone —
+  // important for graceful shutdown.
+  heartbeat.unref?.();
+  res.on("close", () => clearInterval(heartbeat));
+
   return (data: unknown) => {
+    if (!res.writable) return;
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 }
