@@ -139,6 +139,38 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-promotion] adapter wiring skipped — ${message}`);
   }
 
+  // Step 2e: Native Graph Workspace Phase 11.5 — graph change proposal adapter wiring.
+  //
+  // Injects the Drizzle-backed GraphChangeProposalAdapter into the graph
+  // change proposals router so submit/approve/reject/withdraw procedures
+  // stop returning PRECONDITION_FAILED. Skipped (logged) when getAsDb()
+  // returns null — router will continue to surface the precondition
+  // error until the next boot succeeds against ASDB.
+  try {
+    const { getAsDb } = await import("./db/connection");
+    const db = getAsDb();
+    if (db) {
+      const { AsdbGraphChangeProposalAdapter } = await import(
+        "./services/graph-change-proposals/adapter-asdb"
+      );
+      const { _setGraphChangeProposalAdapter } = await import(
+        "./services/graph-change-proposals/router"
+      );
+      _setGraphChangeProposalAdapter(
+        new AsdbGraphChangeProposalAdapter({ db }),
+      );
+    } else {
+      console.warn(
+        "[ags-graph-change-proposals] adapter wiring skipped — no asdb connection",
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-change-proposals] adapter wiring skipped — ${message}`,
+    );
+  }
+
   // Step 3: Phase 10 scheduler — formalized boot path
   try {
     const { ensureSchedulerStarted } = await import("./services/scheduler");
