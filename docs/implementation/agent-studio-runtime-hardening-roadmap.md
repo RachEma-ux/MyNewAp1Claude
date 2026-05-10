@@ -370,21 +370,23 @@ Add `schemaVersion` to runtime config blocks: `runtimeConfig`, `providerConfig`,
 { "schemaVersion": "1.0.0", "data": { ... } }
 ```
 
-### Phase 7 — RAC Adapter Reality Matrix + Prior Audit Reconciliation
+### Phase 7 — RAC Adapter Reality Matrix + Prior Audit Reconciliation — **CLOSED**
+
+**Status:** Shipped. Full audit at `docs/evidence/runtime-hardening/2026-05-10-phase-7/01-rac-adapter-reality-matrix.md`. Three sources READY for staging (`knowledge_unit`, `tool_knowledge`, `vector_index`); three NOT READY (`document_collection`, `graph_index`, `external_connector`); `cag_pack` is by-design out of RAC scope (rendered by CAG resolver). Five genuinely unverified items (G1–G5) filed as follow-ups, NOT shipped in Phase 7 per Principle 5 scope discipline. Phase 7.5 verdict: **partial — IS needed** (narrow scope: extend `ModelAccessStreamChunk` → discriminated `ModelAccessStreamEvent` union with `text_delta` / `tool_call_delta` / `tool_call_complete` variants).
 
 **Scope discipline** (per Principle 5): consume cycle-5/6/7/8 RAC audits + Phase 1 boundary integrity matrix; **deep-audit only adapter-level gaps** for the seven source types.
 
-| Source type | Adapter | Implemented | Tested | Runtime wired | Citation support | Permission filtering | Production-ready | Gaps |
+| Source type | Adapter | Implemented | Tested | Runtime wired | Citation | Permission | Production-ready | Gaps |
 |---|---|---|---|---|---|---|---|---|
-| `document_collection` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `vector_index` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `graph_index` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `knowledge_unit` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `tool_knowledge` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `external_connector` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| `cag_pack` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| `document_collection` | (none) | No | No | No | N/A | N/A | NO | Qdrant adapter undefined; no dispatcher binding. → G1 |
+| `vector_index` | `local-pgvector-adapter.ts` | Partial | Yes | Yes | Yes | Partial | Partial | pgvector optional; dim locked to 1536; per-unit ACL deferred. |
+| `graph_index` | `graphrag-adapter.ts` | Interface-only | Yes (gap stubs) | Yes | No | No | NO | Backend unavailable; `data-analysis.graphrag.retrieve` contract missing. → G4 |
+| `knowledge_unit` | `knowledge-unit-adapter.ts` | Yes | Yes | Yes | Yes | Partial | Partial | MVP full-text scoring (deterministic, not hybrid); per-unit ACL deferred. → G2 |
+| `tool_knowledge` | reuses `knowledge-unit-adapter.ts` | Yes | Yes (inherited) | Yes | Yes | Partial | Partial | Materialized via D-NKU-6; same constraints as `knowledge_unit`. |
+| `external_connector` | (none) | No | No | No | N/A | N/A | NO | No registration mechanism. → G5 |
+| `cag_pack` | (N/A — CAG resolver) | N/A | N/A | Not via RAC (CAG owns) | Yes (via CAG) | Yes (via CAG) | By design | Source-type for profile config only. |
 
-(Initial classifications come from Phase 1's boundary integrity matrix; Phase 7 only deep-audits items still labeled `Unverified`.)
+(Initial classifications came from Phase 1's boundary integrity matrix; Phase 7 only deep-audited items still labeled `Unverified`.)
 
 ### Phase 7.5 — OpenRouter Model Access Streaming Primitive (conditional)
 
