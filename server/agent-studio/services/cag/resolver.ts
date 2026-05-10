@@ -53,6 +53,102 @@ import { CagRequiredError } from "../runtime/system-prompt-composer";
 import { withTimeout, isTimeoutError } from "../runtime/with-timeout";
 
 /**
+ * M8-c8 (cycle-8 audit closure §M8-c8) — durable fallback breadcrumb
+ * for CAG event-log write failures.
+ *
+ * Pre-cycle-8 every `appendPackEvent(...).catch(console.warn)` site
+ * dropped the event row from the audit trail and left only a stdout
+ * line. Operators chasing "why did this CAG validation fire" had to
+ * grep stdout — a process-local signal that doesn't survive container
+ * restart and isn't queryable from the audit ledger.
+ *
+ * Cycle-8 closure mirrors cycle-7 H9-c7's pattern: when the primary
+ * audit write fails, write a structured fallback row to a different
+ * table (here `agsRuntimePolicyEvents` via `appendRuntimePolicyEvent`)
+ * with a discriminator policyKey so operators can query the audit
+ * ledger for the persistence failure itself. Two requirements forced
+ * the runId-optional path below:
+ *
+ *   1. `appendRuntimePolicyEvent` requires a non-null `runId` — the
+ *      table is keyed by run. CAG resolution can happen outside any
+ *      specific run (e.g., orchestrator background recompile), so the
+ *      helper accepts `runtimeRunId: number | null | undefined` and
+ *      falls back to a structured-JSON stdout line when missing.
+ *   2. The fallback row write itself can fail (ASDB outage). The
+ *      helper catches that too and falls back to structured stdout.
+ *      "Defense in depth" — the ledger is the primary surface but
+ *      stdout is the last-resort breadcrumb.
+ *
+ * Stdout shape: `[ags-cag] cag_event_persistence_failed: <JSON>` —
+ * the JSON carries the original event metadata + the underlying
+ * error so operators can reconstruct what was supposed to be
+ * persisted.
+ *
+ * Lockstep test (`tests/agent-studio/m8-c8-cag-event-log-audit-fallback.test.ts`)
+ * pins the helper's signature, the policyKey discriminator, and that
+ * all three resolver call sites use the helper instead of inline
+ * `console.warn`.
+ */
+async function recordCagEventFallback(
+  runtimeRunId: number | null | undefined,
+  ctx: {
+    eventType: string;
+    workspaceId: number;
+    agentDraftId: number;
+    packId?: number | null;
+    metadata?: Record<string, unknown>;
+  },
+  originalError: unknown,
+): Promise<void> {
+  const errMsg =
+    originalError instanceof Error
+      ? originalError.message
+      : String(originalError);
+  const payload = {
+    cagEventType: ctx.eventType,
+    workspaceId: ctx.workspaceId,
+    agentDraftId: ctx.agentDraftId,
+    packId: ctx.packId ?? null,
+    cagMetadata: ctx.metadata ?? null,
+    originalError: errMsg,
+  };
+
+  // Path 1 — runId is available, write the durable audit row.
+  if (typeof runtimeRunId === "number") {
+    try {
+      await repo.appendRuntimePolicyEvent({
+        runId: runtimeRunId,
+        policyKey: "cag_event_persistence_failed",
+        decision: "warn",
+        reason: `cag/${ctx.eventType} event log write failed`,
+        payload,
+      });
+      // Audit row written. Single-line breadcrumb so operators
+      // tracing the failure see the audit-row pointer too.
+      console.warn(
+        `[ags-cag] cag_event_persistence_failed audited (run=${runtimeRunId} cag-event=${ctx.eventType}): ${errMsg}`,
+      );
+      return;
+    } catch (auditErr) {
+      // Path 1 failed too — fall through to Path 2's structured stdout.
+      const auditMsg =
+        auditErr instanceof Error ? auditErr.message : String(auditErr);
+      console.warn(
+        `[ags-cag] cag_event_persistence_failed: audit fallback ALSO failed (run=${runtimeRunId}): primary=${errMsg} fallback=${auditMsg} payload=${JSON.stringify(payload)}`,
+      );
+      return;
+    }
+  }
+
+  // Path 2 — no runId, structured stdout is the only durable surface.
+  // JSON-encoded so operators can grep `cag_event_persistence_failed`
+  // and parse the line into a structured row.
+  console.warn(
+    `[ags-cag] cag_event_persistence_failed: ${JSON.stringify(payload)}`,
+  );
+}
+
+/**
  * H2-c8: per-operation timeout ceilings for the CAG-resolve chain.
  * The two ceilings target operationally-distinct hazards:
  *   - `CAG_BUILD_TIMEOUT_MS` (default 10s): wraps the MCP-snapshot
@@ -98,6 +194,16 @@ export interface ResolveCagInput {
   agentDraftId: number;
   actorId: number;
   mode: ComposerMode;
+  /**
+   * M8-c8: optional runtime run id (chat session id). When present,
+   * CAG event-log write failures fall back to writing a structured
+   * row in `agsRuntimePolicyEvents` (durable audit ledger). When
+   * absent (e.g., direct unit tests, future background-recompile
+   * paths), the fallback is structured stdout. Threaded from
+   * chat-stream.ts / chat.ts via the orchestrator's
+   * `ResolveContextInput.runtimeRunId`.
+   */
+  runtimeRunId?: number | null;
 }
 
 export interface ResolveCagResult {
@@ -142,12 +248,23 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
         actorType: "system",
         createdBy: input.actorId,
         metadata: { violations },
-      }).catch((err) => {
-        // Best-effort event log — surface failures to operators
-        // instead of swallowing silently (review-polish PR).
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[ags-cag] pack event log failed: ${msg}`);
-      });
+      }).catch((err) =>
+        // M8-c8: durable fallback breadcrumb — writes a structured
+        // row to agsRuntimePolicyEvents (when runId is available) so
+        // operators can query the audit ledger for
+        // policyKey="cag_event_persistence_failed" instead of
+        // grepping stdout.
+        recordCagEventFallback(
+          input.runtimeRunId,
+          {
+            eventType: "pack_validation_failed",
+            workspaceId: input.workspaceId,
+            agentDraftId: input.agentDraftId,
+            metadata: { violations },
+          },
+          err,
+        ),
+      );
       if (input.mode === "strict") {
         throw new CagRequiredError(
           `CAG validation failed: ${violations.slice(0, 3).join("; ")}`,
@@ -222,12 +339,20 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
           actorType: "system",
           packVersion: latest.packVersion,
           createdBy: input.actorId,
-        }).catch((err) => {
-        // Best-effort event log — surface failures to operators
-        // instead of swallowing silently (review-polish PR).
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[ags-cag] pack event log failed: ${msg}`);
-      });
+        }).catch((err) =>
+          // M8-c8: durable fallback breadcrumb (see recordCagEventFallback).
+          recordCagEventFallback(
+            input.runtimeRunId,
+            {
+              eventType: "pack_marked_stale",
+              workspaceId: input.workspaceId,
+              agentDraftId: input.agentDraftId,
+              packId: latest.id,
+              metadata: { reason: "source_drift", packVersion: latest.packVersion },
+            },
+            err,
+          ),
+        );
       }
     }
 
@@ -261,10 +386,20 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
       packVersion: pack.packVersion,
       createdBy: input.actorId,
       metadata: { reused, useCount },
-    }).catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[ags-cag] pack_used event log failed: ${msg}`);
-    });
+    }).catch((err) =>
+      // M8-c8: durable fallback breadcrumb (see recordCagEventFallback).
+      recordCagEventFallback(
+        input.runtimeRunId,
+        {
+          eventType: "pack_used",
+          workspaceId: input.workspaceId,
+          agentDraftId: input.agentDraftId,
+          packId: pack.id,
+          metadata: { reused, useCount, packVersion: pack.packVersion },
+        },
+        err,
+      ),
+    );
 
     return { section, pack, warnings };
   } catch (err) {
