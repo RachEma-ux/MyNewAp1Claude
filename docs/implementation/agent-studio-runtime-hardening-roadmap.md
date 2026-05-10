@@ -334,7 +334,9 @@ function checkAllowedTools(agentDraftId, fullToolName, runtimeContext) {
 
 ---
 
-### Phase 5c — Simulation lane governance (NEW, R2)
+### Phase 5c — Simulation lane governance (NEW, R2) — **CLOSED**
+
+**Status:** Shipped via Option A. `simulation.ts` now mirrors the chat-stream lane: `validateRuntimeToolCall` → `gateRuntimeDispatch` → `dispatchMcpToolCall`, with `persistRuntimeToolCallTrace` on both rejection and post-dispatch paths. Simulation does NOT await approval (dry-run surfaces approval-required as a `warning` step verdict; operators see which tools would have required approval without simulation blocking on operator action). `runtimeContext` is forwarded so Phase 5b's published-fail-closed default applies uniformly across lanes (per pre-flight #6). The Phase 4.5 boundary scanner's R2/R4 rules now treat `simulation.ts` as a peer of the chat lanes (`TOOL_DISPATCH_LANE_FILES`).
 
 **Goal:** Close H1 surfaced by Phase 1a/1c — `simulation.ts:439` calls `dispatchMcpToolCall` without ProposedToolCall validator or approval gate.
 

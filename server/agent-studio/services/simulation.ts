@@ -20,6 +20,19 @@
 
 import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
+// Phase 5c (Roadmap V3) — simulation lane now mirrors chat-stream's
+// validate → gate → dispatch chain. Closes H1 from the Phase 1a/1c
+// audit (simulation previously dispatched without ProposedToolCall
+// validator or approval gate). Imports kept colocated with the
+// existing `mcpManager` / `dispatchMcpToolCall` block so a future
+// reader sees the four runtime-governance entry points together.
+import {
+  validateRuntimeToolCall,
+  gateRuntimeDispatch,
+  persistRuntimeToolCallTrace,
+} from "./runtime/proposed-tool-call-runtime";
+import { buildRuntimeContext } from "./runtime/runtime-context";
+import { getSnapshot } from "./mcp/registry";
 // H1-c6 (cycle-6 audit closure §H1-c6): system-driven timeout flip
 // migrated from `repo.decidePendingPermissionRequest` to
 // `decideApprovalRequest` so the audit ledger records the system's
@@ -61,6 +74,26 @@ import {
  *
  * Case-sensitive — openllm tool names are PascalCase by convention.
  */
+/**
+ * Phase 5c (Roadmap V3) — strict 3-component parser for the runtime
+ * dispatch-key shape `mcp__SERVER__TOOL`. Mirrors registry.ts's
+ * `findToolByGlobalNameAsync` parser so lane-vs-registry behavior
+ * stays in lockstep. SERVER may not contain `__`; tool names CAN
+ * contain `__` (some MCP servers do this). Returns null on any
+ * malformed input.
+ */
+function parseMcpDispatchKey(
+  key: string,
+): { serverName: string; remoteToolName: string } | null {
+  if (typeof key !== "string" || !key.startsWith("mcp__")) return null;
+  const rest = key.slice("mcp__".length);
+  const sep = rest.indexOf("__");
+  if (sep <= 0) return null;
+  const remoteToolName = rest.slice(sep + 2);
+  if (remoteToolName.length === 0) return null;
+  return { serverName: rest.slice(0, sep), remoteToolName };
+}
+
 function matchesToolPattern(toolName: string, pattern: string): boolean {
   if (!toolName || !pattern) return false;
   if (pattern === "*") return true;
@@ -159,6 +192,27 @@ export async function runSimulation(input: {
   const toggles: SimulationToggles = { ...DEFAULT_TOGGLES, ...(input.toggles ?? {}) };
   const draft = await repo.getCurrentDraft(input.agentId);
   if (!draft) throw new Error(`No draft found for agent ${input.agentId}`);
+
+  // Phase 5c (Roadmap V3) — load the agent row so we can derive the
+  // runtime lifecycle state for parallel-flow lockstep with
+  // chat-stream.ts + chat.ts (Phase 5a/5b). Pre-flight #6 of the
+  // roadmap: the published-fail-closed gate is agent-level, not
+  // lane-level, so simulation of a published agent must enforce the
+  // same default as production.
+  const agent = await repo.getAgentById(input.agentId);
+  if (!agent) throw new Error(`No agent found for id ${input.agentId}`);
+  const runtimeContext = buildRuntimeContext({
+    agentLifecycleState: (agent as { lifecycleState?: string }).lifecycleState ?? null,
+  });
+  // Same sentinel-fallback pattern as chat-stream.ts:1316 — the
+  // ags_agents Drizzle schema doesn't expose `workspace_id` (the
+  // column exists at the DB level for `listPublishedAgents`'s raw SQL
+  // but the typed select() doesn't project it). Trace rows accept the
+  // sentinel `1` until the schema rebase carries the column over.
+  const workspaceId =
+    typeof (agent as { workspaceId?: number }).workspaceId === "number"
+      ? ((agent as { workspaceId?: number }).workspaceId as number)
+      : 1;
 
   const scenario = input.scenarioId
     ? await repo.getSimulationScenarioById(input.scenarioId)
@@ -431,24 +485,122 @@ export async function runSimulation(input: {
           verdict = "warning";
         }
       } else if (isMcpTool && !toggles.mockedTools) {
-        // Phase 19a: Route through the dispatcher (the single chokepoint
-        // for ALL MCP tool invocations). The dispatcher does parsing,
-        // server lookup, allowedTools check, governance pre/post-invoke,
-        // and writes the audit row to agsRuntimePolicyEvents itself.
-        // We just collect the result + error for the trace event below.
-        const dispatchResult = await dispatchMcpToolCall({
-          agentDraftId: draft.id,
-          runtimeRunId: runtimeRun.id,
-          toolName: t.toolKey,
-          args: {},
-          source: "simulation",
-        });
-        mcpDurationMs = dispatchResult.durationMs;
-        if (dispatchResult.ok) {
-          mcpResult = dispatchResult.result;
-        } else {
-          mcpError = dispatchResult.error?.message ?? "MCP dispatch failed";
+        // Phase 5c (Roadmap V3) — simulation lane now goes through the
+        // same `validate → gate → dispatch` chain as the chat lanes.
+        // Closes H1 from the Phase 1a/1c audit (simulation previously
+        // skipped both ProposedToolCall validation and the approval
+        // gate). After this phase, every production lane writes
+        // identical audit + trace evidence.
+        //
+        // Lockstep with chat-stream.ts:758-822 — same four steps:
+        //   1. resolve serverRow + liveTool (skip with warning when
+        //      not connected)
+        //   2. validateRuntimeToolCall (records validator_rejected)
+        //   3. gateRuntimeDispatch (records approval_required;
+        //      simulation does NOT await — dry-run surfaces the gate
+        //      verdict in the trace + step verdict and moves on)
+        //   4. dispatchMcpToolCall with approvalRequestId +
+        //      runtimeContext (the latter activates Phase 5b's fail-
+        //      closed for published agents)
+        const parsed = parseMcpDispatchKey(t.toolKey);
+        const draftServers = await repo.listMcpServers(draft.id);
+        const serverRow = parsed
+          ? draftServers.find((s) => s.name === parsed.serverName)
+          : undefined;
+        const snap = serverRow ? getSnapshot(serverRow.id) : undefined;
+        const liveTool = snap?.tools.find(
+          (tt) => tt.name === parsed?.remoteToolName,
+        );
+
+        if (!parsed || !serverRow || !liveTool) {
+          // Same shape as chat-stream's `spec_lookup_failed` branch:
+          // tool isn't connected to this draft right now → warn and
+          // skip dispatch. Trace not persisted (no validation row to
+          // anchor it to).
+          mcpError = `tool ${t.toolKey} not connected to draft (server or live tool unavailable)`;
+          mcpDurationMs = 0;
           verdict = "warning";
+        } else {
+          const runtimeValidation = await validateRuntimeToolCall({
+            mcpServerId: serverRow.name,
+            toolName: liveTool.name,
+            liveTool,
+            arguments: {},
+          });
+          // Approval gate. Simulation does NOT await the resume loop —
+          // dry-run surfaces approval_required as a "warning" step
+          // verdict. Operators see which tools would have required
+          // approval without simulation blocking on operator action.
+          const runtimeVerdict = await gateRuntimeDispatch({
+            validation: runtimeValidation,
+            agentDraftId: draft.id,
+            runtimeRunId: runtimeRun.id,
+            description: `simulation run ${runtimeRun.id} · tool ${t.toolKey}`,
+          });
+
+          if (!runtimeVerdict.ok) {
+            await persistRuntimeToolCallTrace({
+              workspaceId: workspaceId,
+              agentId: input.agentId,
+              agentDraftId: draft.id,
+              runtimeRunId: runtimeRun.id,
+              runtimeTraceId: null,
+              messageId: null,
+              verdict: runtimeVerdict,
+              validation: runtimeValidation,
+              dispatchResult: null,
+              governanceVerdict: null,
+            });
+            mcpError = `${runtimeVerdict.reason}: ${runtimeVerdict.message ?? "blocked"}`;
+            mcpDurationMs = 0;
+            // Validator rejection blocks; approval-required surfaces
+            // as a warning so the simulation continues to gather
+            // signal on subsequent tools.
+            verdict =
+              runtimeVerdict.reason === "validator_rejected"
+                ? "blocked"
+                : "warning";
+          } else {
+            const dispatchResult = await dispatchMcpToolCall({
+              agentDraftId: draft.id,
+              runtimeRunId: runtimeRun.id,
+              toolName: t.toolKey,
+              args: {},
+              source: "simulation",
+              approvalRequestId:
+                runtimeVerdict.approvalRequestId ?? undefined,
+              // Phase 5b: forward the runtime context so the dispatcher
+              // can apply the fail-closed default for published agents
+              // with zero enabled permission rules. Pre-flight #6 —
+              // simulation of a published agent enforces fail-closed.
+              runtimeContext,
+            });
+            mcpDurationMs = dispatchResult.durationMs;
+            if (dispatchResult.ok) {
+              mcpResult = dispatchResult.result;
+            } else {
+              mcpError = dispatchResult.error?.message ?? "MCP dispatch failed";
+              verdict = "warning";
+            }
+            await persistRuntimeToolCallTrace({
+              workspaceId: workspaceId,
+              agentId: input.agentId,
+              agentDraftId: draft.id,
+              runtimeRunId: runtimeRun.id,
+              runtimeTraceId: null,
+              messageId: null,
+              verdict: runtimeVerdict,
+              validation: runtimeValidation,
+              dispatchResult: {
+                ok: dispatchResult.ok,
+                error: dispatchResult.error
+                  ? { message: dispatchResult.error.message }
+                  : undefined,
+                durationMs: dispatchResult.durationMs,
+              },
+              governanceVerdict: dispatchResult.governanceVerdict ?? null,
+            });
+          }
         }
       }
 
