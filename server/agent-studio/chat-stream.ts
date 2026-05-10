@@ -71,6 +71,12 @@ import { awaitApprovalDecision } from "./services/runtime/approval-resume-loop";
 // before each model.execute() call. Bounded by MAX_CONTEXT_TOKENS env
 // var (default 32000). Pre-cycle-7 long sessions grew unbounded.
 import { windowChatHistory } from "./services/runtime/context-window";
+// H5-c8 (cycle-8 audit closure §H5-c8): strict tool-row reconstructor.
+// Replaces the legacy `tp?.toolCallId ?? ""` fallback that masked
+// drift in the persistence-shape contract. Helper drops malformed
+// rows + emits a rate-limited breadcrumb so chatty sessions don't
+// flood stdout.
+import { reconstructToolHistoryMessageOrLog } from "./services/runtime/chat-history-shape";
 import {
   CagRequiredError,
   type ComposerMode,
@@ -414,24 +420,27 @@ async function runStreamingToolLoop(args: {
           messagesForModelAccess.push({ role: "assistant", content: m.content });
         }
       } else if (m.role === "tool") {
-        // M9-c7 (cycle-7 audit closure §M9-c7): the persisted shape
-        // contract for tool-role rows is documented in
-        // `runtime/chat-history-shape.ts`. The strict
-        // reconstruction (`reconstructToolHistoryMessage`) returns
-        // null when toolCallId is missing/empty — but live sessions
-        // pre-dating the contract may still carry rows without the
-        // field, so we keep the legacy `?? ""` fallback here for
-        // in-flight compatibility. New writes go through the
-        // canonical `{ toolCallId, name }` shape (see write sites
-        // ~lines 574/614/644/753/832). The lockstep test pins both
-        // sides; future drift on EITHER fails the test before this
-        // empty-string fallback can hide it.
-        const tp = (m.toolPayload ?? null) as any;
-        messagesForModelAccess.push({
-          role: "tool",
-          content: m.content,
-          toolCallId: String(tp?.toolCallId ?? ""),
+        // H5-c8 (cycle-8 audit closure §H5-c8): use the strict
+        // reconstructor (M9-c7's helper) — drops the row when
+        // toolCallId is missing/empty so the malformed shape doesn't
+        // reach windowChatHistory + the model. Pre-cycle-8 the
+        // legacy `tp?.toolCallId ?? ""` fallback was a temporary
+        // in-flight-compat concession; cycle-8 retires it because
+        // the silent empty-string violates the OpenAI / Anthropic
+        // tool-loop protocol downstream.
+        //
+        // Drop policy: the helper logs a rate-limited breadcrumb
+        // (one warn per session per 60s) so a single corrupt row
+        // in a chatty session doesn't flood stdout. Operators
+        // tracing a "model didn't see my tool result" report should
+        // grep for `dropped malformed tool history row session=N`.
+        const reconstructed = reconstructToolHistoryMessageOrLog(m, {
+          sessionId,
+          flow: "chat-stream",
         });
+        if (reconstructed !== null) {
+          messagesForModelAccess.push(reconstructed);
+        }
       }
     }
 

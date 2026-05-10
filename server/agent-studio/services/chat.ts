@@ -54,6 +54,11 @@ import { awaitApprovalDecision } from "./runtime/approval-resume-loop";
 // H8-c7 (cycle-7 audit closure §H8-c7): conversation-context windowing
 // before each model.execute() call. Mirrors chat-stream.ts wire-up.
 import { windowChatHistory } from "./runtime/context-window";
+// H5-c8 (cycle-8 audit closure §H5-c8): strict tool-row reconstructor.
+// Mirrors chat-stream.ts's import; the helper drops malformed rows +
+// emits a rate-limited breadcrumb so chatty sessions don't flood
+// stdout. Cross-flow lockstep pins both flows.
+import { reconstructToolHistoryMessageOrLog } from "./runtime/chat-history-shape";
 
 function approvalResumeTimeoutMs(): number {
   // C1-c6: same env var as chat-stream.ts uses (APPROVAL_RESUME_TIMEOUT_SEC,
@@ -440,24 +445,22 @@ async function runChatWithToolsViaBinding(input: {
           messages.push({ role: "assistant", content: m.content });
         }
       } else if (m.role === "tool") {
-        // M9-c7 (cycle-7 audit closure §M9-c7): the persisted
-        // shape contract for tool-role rows is documented in
-        // `runtime/chat-history-shape.ts`. The strict
-        // reconstruction (`reconstructToolHistoryMessage`) returns
-        // null when toolCallId is missing/empty — but live sessions
-        // pre-dating the contract may still carry rows without the
-        // field, so we keep the legacy `?? ""` fallback here for
-        // in-flight compatibility. New writes go through the
-        // canonical `{ toolCallId, name }` shape (see write sites
-        // ~lines 542/570/589/687/755). The lockstep test pins both
-        // sides; future drift on EITHER fails the test before this
-        // empty-string fallback can hide it.
-        const tp = (m.toolPayload ?? null) as any;
-        messages.push({
-          role: "tool",
-          content: m.content,
-          toolCallId: tp?.toolCallId ?? "",
+        // H5-c8 (cycle-8 audit closure §H5-c8): use the strict
+        // reconstructor (M9-c7's helper) — drops the row when
+        // toolCallId is missing/empty so the malformed shape
+        // doesn't reach windowChatHistory + the model. Mirrors
+        // chat-stream.ts (cross-flow lockstep). Pre-cycle-8 the
+        // legacy `tp?.toolCallId ?? ""` fallback was a temporary
+        // in-flight-compat concession; cycle-8 retires it because
+        // the silent empty-string violates the OpenAI / Anthropic
+        // tool-loop protocol downstream.
+        const reconstructed = reconstructToolHistoryMessageOrLog(m, {
+          sessionId: input.sessionId,
+          flow: "chat",
         });
+        if (reconstructed !== null) {
+          messages.push(reconstructed);
+        }
       }
     }
 
