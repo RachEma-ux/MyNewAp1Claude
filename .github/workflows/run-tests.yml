@@ -92,6 +92,14 @@ jobs:
         run: npx vitest run tests/integration/agent-studio/runtime-governance-e2e.integration.test.ts --pool=forks --poolOptions.forks.singleFork --reporter=verbose
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+          # In production Agent Studio runs against a dedicated `asdb`
+          # database (Phase 12.5). CI only stands up one Postgres
+          # container — `testdb` already has the agent-studio schema
+          # because `drizzle/schema.ts` barrel-re-exports the
+          # `agent-studio` tables, so `drizzle-kit push --force`
+          # against testdb covers them. Point ASDB at the same testdb
+          # so the integration test's `getAsDb()` resolves correctly.
+          DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/testdb
           TEST_MODE: staging-integration
 
       # ── Layer 4: UI Selector Tests ─────────────────────────────────
