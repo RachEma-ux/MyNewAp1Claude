@@ -173,6 +173,178 @@ describe("composer mode=strict", () => {
   });
 });
 
+// ── M5-c8 — strict-mode error shape + pre-throw guarantees ────────────
+//
+// Cycle-8 audit (§M5-c8) flagged that the strict + null branch had only a
+// type-level toThrow assertion — the .code field (which the SSE mapper keys
+// off), the .name (used in error logs), the message content (operator
+// breadcrumb), and the pre-throw guarantee (throw happens before any section
+// composition, so partial state never leaks) had no test signal. A future PR
+// that "simplified" the throw could silently shift behavior.
+//
+// This block pins all four. Source-scan lockstep at the bottom keeps the
+// throw site itself from drifting (cycle-7 lesson: regex ignores comments).
+
+describe("M5-c8 — composer strict-mode error-shape pinning", () => {
+  it("error has code='cag_required' for SSE mapping", () => {
+    let caught: unknown;
+    try {
+      composeSystemPrompt({
+        mode: "strict",
+        draft: baseDraft,
+        capabilityPack: null,
+        retrievalEvidence: null,
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(CagRequiredError);
+    // .code is the discriminator the chat flows + SSE mapper key off.
+    // Hardcoding-test prevents a silent rename.
+    expect((caught as CagRequiredError).code).toBe("cag_required");
+  });
+
+  it("error has name='CagRequiredError' for log breadcrumbs", () => {
+    let caught: unknown;
+    try {
+      composeSystemPrompt({
+        mode: "strict",
+        draft: baseDraft,
+        capabilityPack: null,
+        retrievalEvidence: null,
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error).name).toBe("CagRequiredError");
+  });
+
+  it("error message names the missing pack so operators can grep", () => {
+    let caught: unknown;
+    try {
+      composeSystemPrompt({
+        mode: "strict",
+        draft: baseDraft,
+        capabilityPack: null,
+        retrievalEvidence: null,
+      });
+    } catch (e) {
+      caught = e;
+    }
+    const msg = (caught as Error).message;
+    expect(msg.length).toBeGreaterThan(0);
+    expect(msg.toLowerCase()).toMatch(/cag|capability pack/);
+  });
+
+  it("throws BEFORE composing any section — retrievalEvidence presence is irrelevant", () => {
+    const fakeRetrieval: SystemPromptSection = {
+      id: "retrieval-evidence",
+      text: "## Retrieval Evidence\nThis should never appear in the output.",
+      tokenEstimate: 20,
+      contentHash: "b".repeat(64),
+      warnings: [],
+    };
+    expect(() =>
+      composeSystemPrompt({
+        mode: "strict",
+        draft: baseDraft,
+        capabilityPack: null,
+        retrievalEvidence: fakeRetrieval,
+      }),
+    ).toThrow(CagRequiredError);
+  });
+
+  it("throws regardless of draft completeness — null pack is the sole condition", () => {
+    const emptyDraft = {
+      name: null,
+      role: null,
+      scope: null,
+      mission: null,
+      systemInstructions: null,
+      roleInstructions: null,
+      policyInstructions: null,
+      successCriteria: null,
+      escalationRules: null,
+    };
+    expect(() =>
+      composeSystemPrompt({
+        mode: "strict",
+        draft: emptyDraft,
+        capabilityPack: null,
+        retrievalEvidence: null,
+      }),
+    ).toThrow(CagRequiredError);
+  });
+});
+
+// ── M5-c8 — source-scan lockstep (throw site pin) ─────────────────────
+//
+// If a future PR removes the strict + null check (or moves it after section
+// composition), the property-shape tests above still pass on the wrong
+// behavior because they only observe the throw, not its position. This
+// source-scan asserts the throw is at the TOP of composeSystemPrompt
+// (before any local arrays are constructed) and uses the canonical
+// CagRequiredError class, not a string throw. Mirrors cycle-7 / cycle-8
+// source-scan lockstep shape (regex ignores comments per cycle-7 lessons).
+
+describe("M5-c8 — strict-mode throw site source-scan", () => {
+  const composerSrc = (() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require("fs") as typeof import("fs");
+    const { join } = require("path") as typeof import("path");
+    return readFileSync(
+      join(process.cwd(), "server/agent-studio/services/runtime/system-prompt-composer.ts"),
+      "utf8",
+    );
+  })();
+
+  it("composeSystemPrompt opens with the strict + null guard before any local state", () => {
+    // Match: function signature → { → optional whitespace/comments →
+    //        if (input.mode === "strict" && input.capabilityPack === null)
+    // The `[\s\S]*?` is intentionally non-greedy so a guard buried after
+    // local-state construction would NOT match.
+    const re =
+      /export\s+function\s+composeSystemPrompt\s*\([^)]*\)\s*:[^{]*\{\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*if\s*\(\s*input\.mode\s*===\s*["']strict["']\s*&&\s*input\.capabilityPack\s*===\s*null\s*\)/;
+    expect(
+      composerSrc,
+      "M5-c8 (cycle-8 audit §M5-c8): the strict + null guard must be the " +
+        "FIRST statement in composeSystemPrompt. Moving it after section " +
+        "composition risks partial-output leaks before the throw.",
+    ).toMatch(re);
+  });
+
+  it("the strict-mode guard throws CagRequiredError (not a string or generic Error)", () => {
+    // Pin the throw class so a refactor that swaps to `throw new Error(...)`
+    // breaks the test before the SSE mapper breaks in prod.
+    const re =
+      /if\s*\(\s*input\.mode\s*===\s*["']strict["']\s*&&\s*input\.capabilityPack\s*===\s*null\s*\)\s*\{\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*throw\s+new\s+CagRequiredError\s*\(/;
+    expect(
+      composerSrc,
+      "M5-c8: the typed CagRequiredError class is what the SSE mapper / " +
+        "chat flows pattern-match on. A string throw or generic Error " +
+        "would silently break the cag_required SSE error code.",
+    ).toMatch(re);
+  });
+
+  it("CagRequiredError class declares the readonly code='cag_required' field", () => {
+    // The .code field is the discriminator. If a future PR drops `readonly`
+    // or renames `code`, both this test AND the property-shape tests above
+    // catch it — defense in depth.
+    const re =
+      /class\s+CagRequiredError\s+extends\s+Error\s*\{\s*readonly\s+code\s*=\s*["']cag_required["']/;
+    expect(composerSrc).toMatch(re);
+  });
+
+  it("M5-c8 closure marker is present in the composer module", () => {
+    expect(
+      composerSrc,
+      "M5-c8 closure marker missing from system-prompt-composer.ts. " +
+        "Future audits read the closure marker to confirm the audit item " +
+        "was addressed; a missing marker means the audit is still open.",
+    ).toMatch(/M5-c8/);
+  });
+});
+
 // ── Cache key (D-PRM-5) ───────────────────────────────────────────────
 
 describe("composer cache key (D-PRM-5)", () => {
