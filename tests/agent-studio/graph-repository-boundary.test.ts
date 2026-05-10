@@ -72,12 +72,20 @@ describe("Phase 1.2 — GraphRepository boundary (forbidden imports)", () => {
     expect(violations, `neo4j-driver imported outside repository:\n${violations.join("\n")}`).toEqual([]);
   });
 
-  it("no `bolt://` raw connection string outside repository / KGIA / config", () => {
+  it("no `bolt://` raw connection string outside repository / KGIA / KGIA frontend / config", () => {
+    // KGIA frontend pages (client/src/pages/kgia/, client/src/pages/workspace/Kgia*)
+    // legitimately display connection URIs to users for source registration UX.
+    // Adapter wiring stays under server/modules/kgia/ which is already allowed.
+    const FRONTEND_KGIA_ALLOWED = [
+      "client/src/pages/kgia",
+      "client/src/pages/workspace/Kgia",
+    ];
     const violations: string[] = [];
     for (const file of allFiles) {
       if (isAllowedPath(file, ALLOWED_NEO4J_DRIVER_PATHS)) continue;
-      // also allow config/env-loader files
       const rel = relative(REPO_ROOT, file).replace(/\\/g, "/");
+      if (FRONTEND_KGIA_ALLOWED.some((p) => rel.startsWith(p))) continue;
+      // also allow config/env-loader files
       if (rel.includes("env") || rel.includes("config")) continue;
       const content = readFileSync(file, "utf8");
       if (/bolt:\/\//.test(content)) violations.push(rel);
