@@ -1094,6 +1094,68 @@ export async function sendChatMessage(
     );
   }
 
+  // Phase 11b-2 (Roadmap V3) — observability writers, blocking lane.
+  // Parallel-flow lockstep with chat-stream.ts:1234 (Phase 11b-1).
+  // Creates an `agsRuntimeRuns` row keyed by triggerType="chat" so
+  // run-level errorReason + durationMs land on the canonical
+  // observability column. Best-effort: insert/update failures are
+  // logged but never propagate into the chat call's return value.
+  //
+  // Scope note: chat.ts uses Result-typed returns (`{ok:false,
+  // error}`) rather than throws for validation failures, so the
+  // catch-block here only captures THROWN errors as `errorReason`.
+  // Observing Result.ok=false from internal returns requires a
+  // result-introspection wrapper; deferred to a future PR if a
+  // dashboard surfaces a meaningful gap.
+  const chatStartedAt = Date.now();
+  let chatRunId: number | null = null;
+  try {
+    const row = await repo.appendRuntimeRun({
+      agentId: session.agentId,
+      environment: "draft",
+      triggerType: "chat",
+      status: "running",
+      triggeredBy:
+        typeof (session as { userId?: number }).userId === "number"
+          ? (session as { userId: number }).userId
+          : undefined,
+      inputPayload: { sessionId: input.sessionId, userMessage: input.userMessage.slice(0, 200) },
+    });
+    chatRunId = row.id;
+  } catch (e) {
+    console.warn(
+      `[chat/observability] appendRuntimeRun failed (session=${input.sessionId}): ` +
+        `${e instanceof Error ? e.message : String(e)} — run-level metrics will be missing for this session`,
+    );
+  }
+  const finalizeChatBlockingRun = async (terminal: {
+    status: "completed" | "failed";
+    errorReason?: string;
+  }): Promise<void> => {
+    if (chatRunId === null) return;
+    try {
+      await repo.updateRuntimeRun(chatRunId, {
+        status: terminal.status,
+        durationMs: Date.now() - chatStartedAt,
+        errorReason: terminal.errorReason,
+        finishedAt: new Date(),
+      });
+    } catch (e) {
+      console.warn(
+        `[chat/observability] updateRuntimeRun failed ` +
+          `(runId=${chatRunId} session=${input.sessionId}): ` +
+          `${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
+
+  // Phase 11b-2 — observability try/catch/finally wraps the rest
+  // of the function. `try` body holds the existing implementation;
+  // `catch` captures thrown errors as `errorReason`; `finally`
+  // writes the terminal row state. Internal `return` statements
+  // inside `try` correctly trigger the finally before yielding.
+  let _chatErrorReason: string | undefined;
+  try {
   // 2. Persist the user message FIRST so it's saved even if the LLM
   //    call fails afterward
   await repo.appendChatMessage({
@@ -1303,4 +1365,13 @@ export async function sendChatMessage(
       "from the AI Types catalog before sending a chat message.",
     code: "binding_required",
   } as SendChatMessageResult;
+  } catch (e) {
+    _chatErrorReason = e instanceof Error ? e.message : String(e);
+    throw e;
+  } finally {
+    await finalizeChatBlockingRun({
+      status: _chatErrorReason ? "failed" : "completed",
+      errorReason: _chatErrorReason,
+    });
+  }
 }
