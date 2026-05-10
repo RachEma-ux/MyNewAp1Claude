@@ -137,19 +137,38 @@ export default function AgentOverviewPage({ agentId }: { agentId: number }) {
             <SectionLabel icon={<ShieldCheck className="h-3 w-3 text-emerald-500" />}>
               Governance
             </SectionLabel>
-            <VerdictBadge verdict={governance.verdict} showIcon size="md" />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Risk score{" "}
-              <span className="font-mono text-foreground/70">
-                {governance.riskScore}/100
-              </span>
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              Readiness{" "}
-              <span className="font-mono text-foreground/70">
-                {readiness.score}/100
-              </span>
-            </p>
+            {/* The shell summary contract returns null for governance /
+                readiness when the underlying service throws (e.g.,
+                ASDB blip). The shell renders a structured warning
+                banner; here we just show the unavailable state instead
+                of crashing on `governance.verdict`. */}
+            {governance ? (
+              <>
+                <VerdictBadge verdict={governance.verdict} showIcon size="md" />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Risk score{" "}
+                  <span className="font-mono text-foreground/70">
+                    {governance.riskScore}/100
+                  </span>
+                </p>
+              </>
+            ) : (
+              <p className="text-[10px] text-muted-foreground italic">
+                Governance unavailable
+              </p>
+            )}
+            {readiness ? (
+              <p className="text-[10px] text-muted-foreground">
+                Readiness{" "}
+                <span className="font-mono text-foreground/70">
+                  {readiness.score}/100
+                </span>
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground italic">
+                Readiness unavailable
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -250,8 +269,10 @@ export default function AgentOverviewPage({ agentId }: { agentId: number }) {
         </CardContent>
       </Card>
 
-      {/* Alerts / blockers */}
-      {(readiness.blockers.length > 0 || readiness.warnings.length > 0) && (
+      {/* Alerts / blockers — only renders when readiness loaded;
+          if it failed we show its unavailable state in the
+          governance card above. */}
+      {readiness && (readiness.blockers.length > 0 || readiness.warnings.length > 0) && (
         <Card>
           <CardContent className="p-4 space-y-2">
             <SectionLabel icon={<AlertTriangle className="h-3 w-3 text-yellow-500" />}>

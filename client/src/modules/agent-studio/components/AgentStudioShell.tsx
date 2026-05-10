@@ -29,6 +29,7 @@ import AgentStudioSidebar, { type AgentStudioView } from "./AgentStudioSidebar";
 import AgentStudioTopBar from "./AgentStudioTopBar";
 import AgentStudioOversightDrawer from "./AgentStudioOversightDrawer";
 import AgentStudioStatusBar from "./AgentStudioStatusBar";
+import { parseRoute } from "./agent-studio-route";
 
 const AgentStudioHomePage = lazy(() => import("../pages/AgentStudioHomePage"));
 const AgentStudioNewPage = lazy(() => import("../pages/AgentStudioNewPage"));
@@ -67,169 +68,10 @@ const AgentMcpManagerPage = lazy(() => import("../pages/AgentMcpManagerPage"));
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
-interface ParsedRoute {
-  agentId: number | null;
-  view: AgentStudioView;
-  /** When view is "runs" and a specific run is selected via /runs/:runId */
-  runId: number | null;
-  /** When view is "versions" and the user is on /versions/compare */
-  versionsSubview: "list" | "compare" | null;
-  /** When view is "home" and the user requested templates or import landing */
-  homeMode: "list" | "templates" | "import" | null;
-  /**
-   * True when the URL was bare `/agent-studio/:id` (no /section). The shell
-   * uses this to push a redirect to /overview so the URL is always canonical
-   * and shareable.
-   */
-  needsOverviewRedirect: boolean;
-  /**
-   * True when the URL had an `/agent-studio/:something/...` segment but
-   * `:something` was not a valid numeric agent id. The shell renders a
-   * not-found message instead of silently routing to home.
-   */
-  invalidAgentSegment: boolean;
-}
-
-const VALID_AGENT_VIEWS: AgentStudioView[] = [
-  "overview",
-  "identity",
-  "behavior",
-  "prompts",
-  "tools",
-  "knowledge",
-  "memory",
-  "workflows",
-  "governance",
-  "simulation",
-  "testing",
-  "runs",
-  "versions",
-  "publish",
-  // Phase 0d-f: openllm-agent2 native parity views
-  "runtime",
-  "hooks",
-  "mcp",
-  "subagents",
-  // RAC P11
-  "rac",
-  // Retrofit P12
-  "retrofit",
-];
-
-function parseRoute(path: string): ParsedRoute {
-  const empty: ParsedRoute = {
-    agentId: null,
-    view: "home",
-    runId: null,
-    versionsSubview: null,
-    homeMode: null,
-    needsOverviewRedirect: false,
-    invalidAgentSegment: false,
-  };
-
-  // /agent-studio
-  if (path === "/agent-studio" || path === "/agent-studio/") {
-    return { ...empty, homeMode: "list" };
-  }
-  // Literal home-mode sub-routes (no agent context)
-  if (path.startsWith("/agent-studio/new")) {
-    return { ...empty, view: "new", homeMode: null };
-  }
-  if (path.startsWith("/agent-studio/templates")) {
-    return { ...empty, homeMode: "templates" };
-  }
-  if (path.startsWith("/agent-studio/import")) {
-    return { ...empty, homeMode: "import" };
-  }
-  // ── Phase 13e: Catalog (global, no agent context) ──
-  if (path.startsWith("/agent-studio/catalog/skills")) {
-    return { ...empty, view: "catalog-skills" as any, homeMode: null };
-  }
-  if (path.startsWith("/agent-studio/catalog/tools")) {
-    return { ...empty, view: "catalog-tools" as any, homeMode: null };
-  }
-  if (path.startsWith("/agent-studio/catalog")) {
-    // Bare /catalog → redirect to skills as the default landing
-    return { ...empty, view: "catalog-skills" as any, homeMode: null };
-  }
-  // ── Phase 14c: Marketplace (global, no agent context) ──
-  if (path.startsWith("/agent-studio/marketplace")) {
-    return { ...empty, view: "marketplace" as any, homeMode: null };
-  }
-  // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
-  if (path.startsWith("/agent-studio/mcp-manager")) {
-    return { ...empty, view: "mcp-manager" as any, homeMode: null };
-  }
-
-  // /agent-studio/:id[/<section>[/<extra>]]
-  const m = path.match(/^\/agent-studio\/(\d+)(?:\/([a-z-]+))?(?:\/([a-zA-Z0-9-]+))?/);
-  if (!m) {
-    // Path doesn't match the numeric-id pattern but is under /agent-studio/.
-    // Could be /agent-studio/abc — surface as "agent not found".
-    if (/^\/agent-studio\/[^/]+/.test(path)) {
-      return { ...empty, invalidAgentSegment: true };
-    }
-    return empty;
-  }
-
-  const id = parseInt(m[1], 10);
-  const sectionRaw = m[2];
-  const extra = m[3];
-  // When section was missing from the URL, we render overview but flag the
-  // redirect so the shell pushes /overview into the URL bar.
-  const sectionFromUrl = sectionRaw ?? "overview";
-  const section = VALID_AGENT_VIEWS.includes(sectionFromUrl as AgentStudioView)
-    ? (sectionFromUrl as AgentStudioView)
-    : "overview";
-  const needsOverviewRedirect = sectionRaw === undefined;
-
-  // /agent-studio/:id/runs/:runId
-  if (section === "runs" && extra && /^\d+$/.test(extra)) {
-    return {
-      agentId: id,
-      view: "runs",
-      runId: parseInt(extra, 10),
-      versionsSubview: null,
-      homeMode: null,
-      needsOverviewRedirect: false,
-      invalidAgentSegment: false,
-    };
-  }
-
-  // /agent-studio/:id/versions/compare
-  if (section === "versions" && extra === "compare") {
-    return {
-      agentId: id,
-      view: "versions",
-      runId: null,
-      versionsSubview: "compare",
-      homeMode: null,
-      needsOverviewRedirect: false,
-      invalidAgentSegment: false,
-    };
-  }
-  if (section === "versions") {
-    return {
-      agentId: id,
-      view: "versions",
-      runId: null,
-      versionsSubview: "list",
-      homeMode: null,
-      needsOverviewRedirect: false,
-      invalidAgentSegment: false,
-    };
-  }
-
-  return {
-    agentId: id,
-    view: section,
-    runId: null,
-    versionsSubview: null,
-    homeMode: null,
-    needsOverviewRedirect,
-    invalidAgentSegment: false,
-  };
-}
+// `parseRoute` + `ParsedRoute` are imported from
+// `./agent-studio-route` so the URL grammar can be unit-tested
+// without dragging in React, wouter, tRPC, or the lazy-loaded page
+// modules. See `agent-studio-route.ts` for the canonical rules.
 
 export default function AgentStudioShell() {
   const [location, navigate] = useLocation();
@@ -328,19 +170,44 @@ export default function AgentStudioShell() {
         </div>
       );
     }
-    // Shell summary query returned NOT_FOUND (agent id is numeric but the
-    // row doesn't exist).
+    // Shell summary query failed. We distinguish between:
+    //   - NOT_FOUND: the agent row truly does not exist. Show "Agent not
+    //     found" — this is the only case where that label is honest.
+    //   - any other error code (INTERNAL_SERVER_ERROR, network FetchError,
+    //     zod parse, etc.): the row may well exist, the call just failed.
+    //     Surface the underlying TRPC error code + message so the user
+    //     gets a specific diagnostic rather than a misleading banner.
     if (agentContext && shellQuery.error) {
+      const trpcCode = shellQuery.error.data?.code;
+      const isNotFound = trpcCode === "NOT_FOUND";
+      const title = isNotFound ? "Agent not found" : "Failed to load agent shell";
       return (
         <div className="p-12 text-center space-y-2">
-          <h2 className="text-base font-semibold">Agent not found</h2>
-          <p className="text-xs text-muted-foreground">{shellQuery.error.message}</p>
-          <button
-            onClick={() => navigate("/agent-studio")}
-            className="text-xs underline text-primary"
-          >
-            ← Back to all agents
-          </button>
+          <h2 className="text-base font-semibold">{title}</h2>
+          <p className="text-xs text-muted-foreground">
+            {shellQuery.error.message}
+          </p>
+          {!isNotFound && trpcCode && (
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+              code · {trpcCode}
+            </p>
+          )}
+          <div className="flex items-center justify-center gap-3 pt-2">
+            {!isNotFound && (
+              <button
+                onClick={() => shellQuery.refetch()}
+                className="text-xs underline text-primary"
+              >
+                Retry
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/agent-studio")}
+              className="text-xs underline text-primary"
+            >
+              ← Back to all agents
+            </button>
+          </div>
         </div>
       );
     }
@@ -472,6 +339,31 @@ export default function AgentStudioShell() {
             }}
             onPublish={handlePublish}
           />
+        )}
+
+        {/* Partial-failure banner — agent loaded but a subcomponent
+            (draft / readiness / governance / latest sim / latest test)
+            threw. We render the page anyway with whatever data we did
+            get, and surface a specific diagnostic so the user sees the
+            real failure instead of a generic "Failed to fetch". */}
+        {agentContext && shell?.warnings && shell.warnings.length > 0 && (
+          <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-2 text-[11px]">
+            <div className="font-semibold text-yellow-700 dark:text-yellow-400">
+              Partial shell data — {shell.warnings.length} subcomponent
+              {shell.warnings.length === 1 ? "" : "s"} failed
+            </div>
+            <ul className="mt-1 space-y-0.5 text-muted-foreground">
+              {shell.warnings.map((w, i) => (
+                <li key={i} className="font-mono">
+                  <span className="uppercase tracking-wider text-yellow-700/80 dark:text-yellow-400/80">
+                    {w.subcomponent}
+                  </span>
+                  {" — "}
+                  {w.message}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="flex-1 min-h-0 overflow-auto">
