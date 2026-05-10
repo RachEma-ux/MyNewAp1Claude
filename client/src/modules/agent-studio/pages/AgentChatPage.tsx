@@ -26,10 +26,33 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, Wrench, Check, X, Plus, Trash2, Pencil, ChevronDown, ChevronUp, Clock } from "lucide-react";
+
+/**
+ * Phase 3.3 (Roadmap V3) — MVP reconnect policy for the standalone chat page.
+ *
+ * The page does NOT attempt to resume a partial assistant stream after a
+ * connection drop. Behavior on EventSource error:
+ *   1. Browser would auto-reconnect by default. We explicitly call
+ *      `es.close()` in `es.onerror` to suppress that — combined with
+ *      Phase 3.2's `idempotency_conflict` server response, an
+ *      uncontrolled reconnect can no longer duplicate user messages or
+ *      tool dispatches. Belt + suspenders: the client closes; the
+ *      server refuses duplicates.
+ *   2. Partial `streamingText` is discarded — persisted assistant rows
+ *      are the source of truth.
+ *   3. The persisted message list is re-fetched so the operator sees
+ *      the row that survived (the user message always persists per
+ *      Phase 1b §2 — it's written before the model call).
+ *   4. The user can retry safely. If they re-send the same text, a
+ *      NEW `clientMessageId` is generated so the new request runs.
+ *      Only retries that re-use the SAME id (e.g. an EventSource
+ *      auto-reconnect we missed) hit `idempotency_conflict`.
+ */
 
 export default function AgentChatPage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
@@ -252,7 +275,20 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
             setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
-            console.error("Chat stream error:", data.error);
+            // Phase 3.3 — discriminate on the stable `code` field so
+            // `idempotency_conflict` produces a friendly "duplicate
+            // request, your original is still running" message rather
+            // than a generic error. Other codes fall through to the
+            // generic path; Phase 3.4 will expand this lattice.
+            if (data.code === "idempotency_conflict") {
+              toast.info(
+                "Duplicate send detected — your original request is still running. " +
+                  "Refresh to see the persisted state.",
+              );
+            } else {
+              console.error("Chat stream error:", data.error);
+              toast.error(data.error ?? "Chat stream error");
+            }
             utils.agentStudio.chat.listMessages.invalidate({
               sessionId: activeSessionId!,
             });
