@@ -437,7 +437,10 @@ Add `tool_delta` SSE event for long-running tools. Optional + protocol-versioned
 ### Phase 10 — Advanced Reconnect / Resume Strategy
 **Stretch goal.** Implement only if production telemetry shows frequent disconnects. MVP reconnect (Phase 3.3) is sufficient otherwise. Advanced fields: `streamId`, `lastEventSeq`, `lastPersistedMessageId`, `lastToolCallHash`, `runtimeTraceId`, `Last-Event-ID` resume.
 
-### Phase 11a — Runtime Observability Data Model
+### Phase 11a — Runtime Observability Data Model — **CLOSED (schema frozen)**
+
+**Status:** Shipped. Audit at `docs/evidence/runtime-hardening/2026-05-10-phase-11a/01-runtime-observability-coverage.md` maps every §11a metric to existing storage; 14 of 19 are covered (real columns or SQL aggregates), 5 are truly missing and added as new columns on `agsRuntimeRuns`: `sseFirstTokenMs`, `sseDurationMs`, `errorReason`, `clientDisconnected`, `idempotencyConflicts`. Drizzle reconciler auto-applies `ALTER TABLE ADD COLUMN IF NOT EXISTS` on boot — no manual migration. Writers deferred to Phase 11b alongside the UI per the roadmap's schema-freeze-vs-UI-build separation.
+
 Define + capture metrics: stream id, session id, agent id, runtime state, SSE duration, first-token latency, token latency, tool-call count, tool dispatch latency, approval wait time, RAC retrieval latency, context blocks included, trace/audit write status, error reason, client disconnects, model gateway errors, dispatcher failures, validation rejection count, idempotency conflict count.
 
 **Storage decision:** reuse existing trace/audit tables (`agsRuntimeRuns`, `agsRacTraces`, `agsToolCallTraces`, `agsApprovalAudit`) where columns suffice. New columns or tables only when reuse is impossible. Phase 11a freezes schema **before** 11b builds UI.
