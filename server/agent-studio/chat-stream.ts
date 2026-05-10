@@ -1210,7 +1210,10 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     return;
   }
 
-  const sendEvent = setupSse(res);
+  // Phase 11b: declared `let` (was `const`) so the observability
+  // wrapper can swap in a tracking proxy that captures first-token
+  // timestamp without touching the three emission sites.
+  let sendEvent = setupSse(res);
 
   // Phase 3.4 — client-disconnect detection. AbortController is wired
   // to BOTH `req.on("close")` (HTTP-level disconnect) and
@@ -1262,6 +1265,88 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     const runtimeContext = buildRuntimeContext({
       agentLifecycleState: lifecycleState,
     });
+
+    // Phase 11b (Roadmap V3) — observability writers. Create an
+    // `agsRuntimeRuns` row for this chat-stream invocation so the
+    // five Phase 11a columns (sseFirstTokenMs, sseDurationMs,
+    // errorReason, clientDisconnected, idempotencyConflicts) have
+    // somewhere to land. Pre-Phase-11b chat-stream used `sessionId`
+    // as a runtimeRunId surrogate (cycle-5 C1-c5 pattern) — that
+    // surrogate is preserved for trace + audit purposes; this new
+    // row is a distinct lifecycle anchor for run-level metrics.
+    //
+    // Best-effort: if the row insert fails (ASDB hiccup, transient
+    // FK violation), the stream continues. Operators see a stdout
+    // breadcrumb; the run-level metric is missing for this session
+    // but the chat works.
+    const sseStartedAt = Date.now();
+    let chatRunId: number | null = null;
+    let firstTokenAt: number | null = null;
+    let idempotencyConflictCount = 0;
+    try {
+      const row = await repo.appendRuntimeRun({
+        agentId: session.agentId,
+        environment: "draft",
+        triggerType: "chat-stream",
+        status: "running",
+        triggeredBy:
+          typeof (session as { createdBy?: number }).createdBy === "number"
+            ? (session as { createdBy: number }).createdBy
+            : undefined,
+        inputPayload: { sessionId, userMessage: userMessage.slice(0, 200) },
+      });
+      chatRunId = row.id;
+    } catch (e) {
+      console.warn(
+        `[chat-stream/observability] appendRuntimeRun failed (session=${sessionId}): ` +
+          `${e instanceof Error ? e.message : String(e)} — run-level metrics will be missing for this session`,
+      );
+    }
+    // Wrap sendEvent so the FIRST `token` event captures a timestamp
+    // for sseFirstTokenMs without touching the three emission sites.
+    const _rawSendEvent = sendEvent;
+    const trackingSendEvent: SseSend = (data: unknown) => {
+      if (
+        firstTokenAt === null &&
+        typeof data === "object" &&
+        data !== null &&
+        (data as { type?: string }).type === "token"
+      ) {
+        firstTokenAt = Date.now();
+      }
+      _rawSendEvent(data);
+    };
+    sendEvent = trackingSendEvent;
+    // Helper to terminate the run row with the current observability
+    // snapshot. Idempotent — best-effort; never throws back into the
+    // stream path.
+    const finalizeChatRun = async (terminal: {
+      status: "completed" | "failed";
+      errorReason?: string;
+      clientDisconnected?: boolean;
+    }): Promise<void> => {
+      if (chatRunId === null) return;
+      const sseDurationMs = Date.now() - sseStartedAt;
+      const sseFirstTokenMs =
+        firstTokenAt !== null ? firstTokenAt - sseStartedAt : null;
+      try {
+        await repo.updateRuntimeRun(chatRunId, {
+          status: terminal.status,
+          sseDurationMs,
+          sseFirstTokenMs: sseFirstTokenMs ?? undefined,
+          errorReason: terminal.errorReason,
+          clientDisconnected: terminal.clientDisconnected ?? false,
+          idempotencyConflicts: idempotencyConflictCount,
+          finishedAt: new Date(),
+        });
+      } catch (e) {
+        console.warn(
+          `[chat-stream/observability] updateRuntimeRun failed ` +
+            `(runId=${chatRunId} session=${sessionId}): ` +
+            `${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    };
     if (process.env.AGS_RUNTIME_CONTEXT_LOG === "1") {
       console.info(
         `[chat-stream/runtime] session=${sessionId} agent=${session.agentId} ` +
@@ -1334,6 +1419,9 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       clientMessageId,
     });
     if (!userPersist.created) {
+      // Phase 11b — count this run's idempotency conflict before the
+      // terminal write so the observability column captures it.
+      idempotencyConflictCount += 1;
       sendEvent({
         type: "error",
         error:
@@ -1342,6 +1430,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
           "see the persisted state.",
         code: "idempotency_conflict",
       });
+      await finalizeChatRun({ status: "completed" });
       res.end();
       return;
     }
@@ -1583,6 +1672,8 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       } catch {
         /* connection's gone — best effort */
       }
+      // Phase 11b — capture clientDisconnected on the run-level row.
+      await finalizeChatRun({ status: "completed", clientDisconnected: true });
       try {
         res.end();
       } catch {
@@ -1602,6 +1693,9 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       durationMs: pathResult.stats.durationMs,
       costMicrocents: pathResult.stats.costMicrocents,
     });
+    // Phase 11b — clean termination; sseFirstTokenMs + sseDurationMs
+    // captured by finalizeChatRun via the wrapped sendEvent.
+    await finalizeChatRun({ status: "completed" });
     res.end();
   } catch (error: any) {
     console.error("[AgentStudioChatStream] Error:", error);
@@ -1620,6 +1714,13 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     } catch {
       /* headers already sent, ignore */
     }
+    // Phase 11b — capture errorReason on the run-level row before
+    // closing the stream. finalizeChatRun is best-effort; never
+    // throws back into the stream path.
+    await finalizeChatRun({
+      status: "failed",
+      errorReason: error?.message ?? String(error),
+    });
     try {
       res.end();
     } catch {
