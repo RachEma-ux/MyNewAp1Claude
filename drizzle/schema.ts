@@ -46,5 +46,14 @@ export * from './tables/data-acquisition';
 export * from './tables/ai-types';
 export * from './tables/data-warehouse';
 export * from './tables/agent-studio';
+// Native Graph Workspace tables (Phase 0.5 / 1.6 / 1.7 / 7 / 11 / 12 / 13).
+export * from './tables/agent-studio-vault';
+export * from './tables/agent-studio-graph';
+export * from './tables/agent-studio-graph-projection';
+export * from './tables/agent-studio-graph-promotion';
+export * from './tables/agent-studio-graph-skill';
+export * from './tables/agent-studio-graph-agent';
+export * from './tables/agent-studio-graph-rag';
+export * from './tables/agent-studio-graph-quality';
 export * from '../server/modules/kgia/schema';
 export * from '../server/openrouter/schema';
