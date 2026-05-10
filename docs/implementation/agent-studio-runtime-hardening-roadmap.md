@@ -445,7 +445,14 @@ Define + capture metrics: stream id, session id, agent id, runtime state, SSE du
 
 **Storage decision:** reuse existing trace/audit tables (`agsRuntimeRuns`, `agsRacTraces`, `agsToolCallTraces`, `agsApprovalAudit`) where columns suffice. New columns or tables only when reuse is impossible. Phase 11a freezes schema **before** 11b builds UI.
 
-### Phase 11b — Runtime Observability UI
+### Phase 11b — Runtime Observability UI — **PARTIAL CLOSED (writers shipped)**
+
+**Status (Phase 11b-1):** chat-stream lane wired to populate the 5 Phase 11a columns on `agsRuntimeRuns`. Pre-Phase-11b chat-stream used `sessionId` as a runtimeRunId surrogate (cycle-5 C1-c5) and never created a real run row — so Phase 11a's columns had nowhere to land. This phase creates the row + populates: `sseFirstTokenMs` (from a tracking sendEvent proxy that captures the first `token` event), `sseDurationMs` (Date.now delta), `errorReason` (catch-block only), `clientDisconnected` (Phase 3.4 abort signal), `idempotencyConflicts` (Phase 3.2 counter). Best-effort writes (DB hiccup → warn-only, no stream crash). 17 source-scan invariants in `runtime-observability-writers.test.ts` (Layer 8).
+
+**Phase 11b-2 (deferred):** chat.ts (blocking lane) + simulation `errorReason` wiring (parallel-flow lockstep with chat-stream). chat.ts has different error-return shape (Result-typed vs throw); deserves its own focused PR. Track B follow-up.
+
+**Phase 11b-3 (deferred):** UI surfaces on Runtime / RAC / Governance pages + trace detail + chat diagnostics panel. Multi-week work; non-blocking for Gate 7 closure (already achieved via 11a + 11c + 12 with the assessor pattern).
+
 Add focused observability surfaces on Runtime / RAC / Governance pages + trace detail + chat diagnostics panel. Reuses Phase 11a data; no external APM clone.
 
 ### Phase 11c — Runtime Alerts + SLOs — **CLOSED**
