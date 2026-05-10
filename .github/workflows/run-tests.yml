@@ -193,6 +193,7 @@ jobs:
             tests/agent-studio/sse-heartbeat.test.ts \
             tests/agent-studio/client-message-id-idempotency.test.ts \
             tests/agent-studio/mvp-reconnect.test.ts \
+            tests/agent-studio/stream-error-codes.test.ts \
             server/agent-studio/services/mcp/__tests__/dispatcher.test.ts \
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
