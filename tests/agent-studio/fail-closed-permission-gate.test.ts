@@ -115,6 +115,19 @@ describe("Phase 5b — fail-closed permission gate (Gate 5)", () => {
         /enabled\.length\s*===\s*0[\s\S]{0,800}return\s*\{\s*verdict:\s*["']skip["']\s*\}/,
       );
     });
+
+    it("DB-read failure still fails closed (preserved from cycle-8)", () => {
+      // Carry-forward of the Phase 2 permission-default invariant
+      // (the file deleted alongside Phase 5b ship). When
+      // `repo.listPermissionRules` throws, the dispatcher must NOT
+      // fall through to the lattice — it short-circuits to deny so
+      // a transient ASDB outage can't be exploited to bypass the
+      // gate. Reason key `deny_permission_rules_read_failed` lets
+      // operators alert on the distinct failure mode.
+      expect(DISPATCHER).toMatch(
+        /catch\s*\{[\s\S]{0,200}\/\/\s*DB read failed[\s\S]{0,400}return\s*\{\s*verdict:\s*["']deny["'][\s\S]{0,200}reason:\s*REASON_DENY_DB_ERROR/,
+      );
+    });
   });
 
   describe("DispatchMcpToolCallInput shape", () => {
