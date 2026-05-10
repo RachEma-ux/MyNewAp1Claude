@@ -65,6 +65,16 @@ const RUNTIME_POLICY = Object.freeze({
 
 export type ComposerMode = "disabled" | "safe_degraded" | "strict";
 
+/**
+ * Thrown by `composeSystemPrompt` when `mode === "strict"` and
+ * `capabilityPack === null`. The chat flows + SSE mapper pattern-match on
+ * `instanceof CagRequiredError` (preferred) and on `.code === "cag_required"`
+ * (the discriminated-union path). Both surfaces are pinned by
+ * `system-prompt-composer.test.ts` (M5-c8 — strengthens the type-only
+ * assertion the cycle-8 audit flagged: now also covers `.code`, `.name`,
+ * message-shape, pre-throw guarantee, source-scan throw-site, and the
+ * canonical class declaration shape).
+ */
 export class CagRequiredError extends Error {
   readonly code = "cag_required";
   constructor(message = "CAG capability pack required but missing") {
