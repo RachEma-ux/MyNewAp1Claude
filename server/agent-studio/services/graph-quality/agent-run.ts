@@ -36,7 +36,10 @@ import {
   type QualityScannerRegistration,
   type RunQualityScanResult,
 } from "./scan-orchestrator.js";
-import { convertFindingToProposal } from "./finding-to-proposal.js";
+import {
+  convertFindingToProposal,
+  FindingAlreadyConvertedError,
+} from "./finding-to-proposal.js";
 import type { GraphRepository } from "../graph/repository/index.js";
 import { pushAgentRunNotifications } from "./agent-run-notifications.js";
 import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
@@ -132,6 +135,62 @@ async function listFindingIdsForScan(
   return rows.map((r) => Number(r.id));
 }
 
+/**
+ * Inner loop for the autoConvertFindings path. Walks the finding ids
+ * for a completed scan and runs `convertFindingToProposal` on each.
+ * Returns the count of successful conversions.
+ *
+ * Conversion failures are NOT fatal for the agent run (per-finding
+ * skip-and-continue), but expected failures (`FindingAlreadyConvertedError`,
+ * the idempotent re-run case) are filtered out before observability
+ * capture so the dashboard doesn't fill with benign duplicate-id noise.
+ * Unexpected failures (ASDB unavailable, malformed finding row, etc.)
+ * land in `ags_workspace_error_events` for the operator to triage.
+ *
+ * Exported for direct unit-testing — the agent-run integration test
+ * exercises the orchestration; this helper covers the per-finding
+ * skip/capture decision matrix in isolation.
+ */
+export async function convertFindingsBatch(
+  findingIds: readonly number[],
+  ctx: {
+    readonly agentRunId: number;
+    readonly scanKind: string;
+    readonly proposedByAgentId?: number;
+    readonly getDb?: typeof getAsDb;
+  },
+): Promise<number> {
+  let converted = 0;
+  for (const findingId of findingIds) {
+    try {
+      await convertFindingToProposal(
+        {
+          findingId,
+          proposedByAgentId: ctx.proposedByAgentId,
+        },
+        { getDb: ctx.getDb },
+      );
+      converted += 1;
+    } catch (err) {
+      if (!(err instanceof FindingAlreadyConvertedError)) {
+        void captureUnexpectedTrpcError(
+          "graphQuality.agentRun.convertFinding",
+          err,
+          {
+            sourceId: String(findingId),
+            metadata: {
+              findingId,
+              agentRunId: ctx.agentRunId,
+              scanKind: ctx.scanKind,
+            },
+          },
+        );
+      }
+    }
+  }
+  return converted;
+}
+
 export async function runQualityAgent(
   input: RunQualityAgentInput,
   options: RunQualityAgentOptions,
@@ -180,21 +239,12 @@ export async function runQualityAgent(
             db,
             result.scanId,
           );
-          for (const findingId of findingIds) {
-            try {
-              await convertFindingToProposal(
-                {
-                  findingId,
-                  proposedByAgentId: input.proposedByAgentId,
-                },
-                { getDb: options.getDb },
-              );
-              proposalsCreated += 1;
-            } catch {
-              // Conversion failures (already-converted, etc.) are
-              // not fatal for the agent run — skip and continue.
-            }
-          }
+          proposalsCreated += await convertFindingsBatch(findingIds, {
+            agentRunId,
+            scanKind,
+            proposedByAgentId: input.proposedByAgentId,
+            getDb: options.getDb,
+          });
         }
       } else if (result.status !== "failed") {
         allFailed = false;
