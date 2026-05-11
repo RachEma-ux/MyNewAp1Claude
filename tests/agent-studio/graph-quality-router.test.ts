@@ -33,6 +33,7 @@ describe("graphQualityRouter", () => {
     expect(procedures.listFindings).toBeDefined();
     expect(procedures.getFinding).toBeDefined();
     expect(procedures.listAgentRuns).toBeDefined();
+    expect(procedures.listAppliedProposals).toBeDefined();
     expect(procedures.listRegisteredScanKinds).toBeDefined();
   });
 
@@ -48,6 +49,7 @@ describe("graphQualityRouter", () => {
       "listFindings",
       "getFinding",
       "listAgentRuns",
+      "listAppliedProposals",
       "listRegisteredScanKinds",
     ]);
     for (const name of Object.keys(procedures)) {

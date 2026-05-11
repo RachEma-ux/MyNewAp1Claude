@@ -34,13 +34,15 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, isNotNull, inArray } from "drizzle-orm";
 import { router, protectedProcedure } from "../../../_core/trpc.js";
 import { getAsDb } from "../../db/connection.js";
 import {
   agsGraphQualityScans,
   agsGraphQualityFindings,
   agsGraphQualityAgentRuns,
+  agsGraphCorrectionProposals,
+  agsGraphCorrectionAuditEvents,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import { getGraphRepository } from "../graph/repository/index.js";
 import {
@@ -292,6 +294,8 @@ export const graphQualityRouter = router({
           scanId: z.number().int().positive().optional(),
           findingClass: z.string().min(1).max(100).optional(),
           severity: SeverityEnum.optional(),
+          untriagedOnly: z.boolean().optional(),
+          triagedOnly: z.boolean().optional(),
           limit: z.number().int().min(1).max(500).optional(),
         })
         .optional(),
@@ -299,7 +303,8 @@ export const graphQualityRouter = router({
     .query(async ({ input }) => {
       const db = getAsDb();
       if (!db) return [];
-      const filters = [] as ReturnType<typeof eq>[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const filters = [] as any[];
       if (input?.scanId) {
         filters.push(eq(agsGraphQualityFindings.scanId, input.scanId));
       }
@@ -310,6 +315,11 @@ export const graphQualityRouter = router({
       }
       if (input?.severity) {
         filters.push(eq(agsGraphQualityFindings.severity, input.severity));
+      }
+      if (input?.untriagedOnly) {
+        filters.push(isNull(agsGraphQualityFindings.proposalId));
+      } else if (input?.triagedOnly) {
+        filters.push(isNotNull(agsGraphQualityFindings.proposalId));
       }
       const rows = await db
         .select()
@@ -324,6 +334,66 @@ export const graphQualityRouter = router({
         .orderBy(desc(agsGraphQualityFindings.createdAt))
         .limit(input?.limit ?? 100);
       return rows;
+    }),
+
+  listAppliedProposals: protectedProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(500).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const db = getAsDb();
+      if (!db) return [];
+      // First, fetch the proposalIds with an "applied" audit event.
+      const appliedAuditRows = await db
+        .select({
+          proposalId: agsGraphCorrectionAuditEvents.proposalId,
+          appliedAt: agsGraphCorrectionAuditEvents.createdAt,
+          metadata: agsGraphCorrectionAuditEvents.metadata,
+        })
+        .from(agsGraphCorrectionAuditEvents)
+        .where(
+          eq(agsGraphCorrectionAuditEvents.eventKind, "applied"),
+        )
+        .orderBy(desc(agsGraphCorrectionAuditEvents.createdAt))
+        .limit(input?.limit ?? 100);
+
+      if (appliedAuditRows.length === 0) return [];
+
+      const proposalIds = appliedAuditRows.map((r) => Number(r.proposalId));
+      const proposalRows = await db
+        .select()
+        .from(agsGraphCorrectionProposals)
+        .where(inArray(agsGraphCorrectionProposals.id, proposalIds));
+
+      // Build a proposal-id → audit-row map for the join. If an
+      // operator-side retry path produces multiple "applied" rows for the
+      // same proposal id, the first one wins (most-recent ordering).
+      const auditByProposal = new Map<number, { appliedAt: Date; metadata: unknown }>();
+      for (const a of appliedAuditRows) {
+        const pid = Number(a.proposalId);
+        if (auditByProposal.has(pid)) continue;
+        auditByProposal.set(pid, {
+          appliedAt: a.appliedAt as Date,
+          metadata: a.metadata,
+        });
+      }
+
+      return proposalRows
+        .map((p) => {
+          const audit = auditByProposal.get(Number(p.id));
+          if (!audit) return null;
+          return { ...p, appliedAt: audit.appliedAt, appliedMetadata: audit.metadata };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null)
+        .sort((a, b) => {
+          const at = (a.appliedAt as Date).getTime();
+          const bt = (b.appliedAt as Date).getTime();
+          return bt - at;
+        });
     }),
 
   getFinding: protectedProcedure
