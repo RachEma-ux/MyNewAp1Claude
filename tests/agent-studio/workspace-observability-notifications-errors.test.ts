@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   pushNotification,
   listNotifications,
+  countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
@@ -216,6 +217,59 @@ describe("user-notifications — Phase 22", () => {
     await expect(
       markAllNotificationsRead(1, { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("countUnreadNotifications returns zero-state on ASDB-null (fail-soft)", async () => {
+    const result = await countUnreadNotifications(1, {
+      getDb: () => null as never,
+    });
+    expect(result).toEqual({ total: 0, byKind: {} });
+  });
+
+  it("countUnreadNotifications aggregates unread rows by kind", async () => {
+    function makeGroupByFakeDb(rows: { kind: string; count: number }[]) {
+      const select = vi.fn(() => ({
+        from: () => ({
+          where: () => ({
+            groupBy: async () =>
+              rows.map((r) => ({ notificationKind: r.kind, count: r.count })),
+          }),
+        }),
+      }));
+      return { select } as unknown;
+    }
+    const db = makeGroupByFakeDb([
+      { kind: "graph_quality_run_completed", count: 3 },
+      { kind: "graph_quality_proposals_created", count: 2 },
+      { kind: "graph_quality_proposal_applied", count: 5 },
+    ]);
+    const result = await countUnreadNotifications(7, {
+      getDb: () => db as never,
+    });
+    expect(result.total).toBe(10);
+    expect(result.byKind).toEqual({
+      graph_quality_run_completed: 3,
+      graph_quality_proposals_created: 2,
+      graph_quality_proposal_applied: 5,
+    });
+  });
+
+  it("countUnreadNotifications returns empty byKind when no unread rows", async () => {
+    function makeEmptyDb() {
+      return {
+        select: vi.fn(() => ({
+          from: () => ({
+            where: () => ({
+              groupBy: async () => [],
+            }),
+          }),
+        })),
+      } as unknown;
+    }
+    const result = await countUnreadNotifications(7, {
+      getDb: () => makeEmptyDb() as never,
+    });
+    expect(result).toEqual({ total: 0, byKind: {} });
   });
 });
 

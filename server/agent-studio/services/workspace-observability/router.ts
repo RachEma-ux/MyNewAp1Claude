@@ -24,6 +24,7 @@ import {
 } from "./background-jobs.js";
 import {
   listNotifications,
+  countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
 } from "./user-notifications.js";
@@ -138,6 +139,20 @@ export const workspaceObservabilityRouter = router({
         }));
       }
     }),
+
+  getMyUnreadNotificationCount: protectedProcedure.query(async ({ ctx }) => {
+    const ctxAny = ctx as unknown as { user?: { id?: number } };
+    const userId = ctxAny.user?.id;
+    if (userId == null) return { total: 0, byKind: {} };
+    try {
+      return await countUnreadNotifications(userId);
+    } catch (e) {
+      throwTrpcAndCapture(new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: e instanceof Error ? e.message : String(e),
+      }));
+    }
+  }),
 
   markNotificationRead: protectedProcedure
     .input(z.object({ notificationId: z.number().int().positive() }))
