@@ -311,6 +311,7 @@ describe("exportTraceToNote — Phase 14 §5", () => {
     expect(exporter).toHaveBeenCalledWith(7, {
       title: undefined,
       redact: false,
+      actorUserId: 42,
     });
     expect(state.versions[0].frontmatter?.redacted).toBe(false);
   });
@@ -453,6 +454,7 @@ describe("exportTraceToNote — Phase 14 §5", () => {
     expect(exporter).toHaveBeenCalledWith(7, {
       title: "Investigation",
       redact: true,
+      actorUserId: 42,
     });
     expect(state.notes[0].title).toBe("Investigation #7");
   });

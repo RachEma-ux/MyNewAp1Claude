@@ -19,7 +19,7 @@
  *     with the decision-trace adapter.
  */
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import {
   agsGraphAgentRuns,
@@ -50,6 +50,17 @@ export interface GraphAgentExplanation {
 
 export interface GetExplanationOptions {
   readonly getDb?: typeof getAsDb;
+  /**
+   * Phase 14 §7 — when set, restricts the explain read to runs owned
+   * by this user (`ags_graph_agent_runs.user_id === actorUserId`).
+   * Mismatched-owner runs read as "not found" (returns `null`),
+   * matching the existing API for missing rows. Callers with admin
+   * privileges (or other roles that legitimately need cross-user
+   * visibility) leave this undefined to bypass the filter. The tRPC
+   * layer is responsible for that policy decision; this reader only
+   * applies the filter when asked.
+   */
+  readonly actorUserId?: number;
 }
 
 export async function getExplanationForRun(
@@ -59,6 +70,14 @@ export async function getExplanationForRun(
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) return null;
+
+  const runWhere =
+    options.actorUserId !== undefined
+      ? and(
+          eq(agsGraphAgentRuns.runtimeRunId, runtimeRunId),
+          eq(agsGraphAgentRuns.userId, options.actorUserId),
+        )
+      : eq(agsGraphAgentRuns.runtimeRunId, runtimeRunId);
 
   const runRows = await db
     .select({
@@ -72,7 +91,7 @@ export async function getExplanationForRun(
       completedAt: agsGraphAgentRuns.completedAt,
     })
     .from(agsGraphAgentRuns)
-    .where(eq(agsGraphAgentRuns.runtimeRunId, runtimeRunId))
+    .where(runWhere)
     .limit(1);
 
   if (runRows.length === 0) return null;

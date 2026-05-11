@@ -109,16 +109,29 @@ export const graphAgentRouter = router({
         redact: z.boolean().optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Phase 14 §1 — Markdown export of the decision-trace ledger.
       // Returns `{ exported: null }` when the runId has no graph-
       // agent run row (engine ran without §2 decision-trace adapter
       // wired, or ASDB is unavailable). Caller decides whether to
       // map null to a 404 or render a "no trace available" UI.
+      //
+      // Phase 14 §7 — `actorUserId` enforces per-user permission on
+      // the underlying explain-reader so users cannot export
+      // someone else's trace.
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const actorUserId = ctxAny.user?.id;
+      if (actorUserId == null) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "exportTraceMarkdown requires an authenticated user",
+        });
+      }
       try {
         const exported = await exportDecisionTraceAsMarkdown(input.runId, {
           title: input.title,
           redact: input.redact,
+          actorUserId,
         });
         return { runId: input.runId, exported };
       } catch (e) {
@@ -131,13 +144,26 @@ export const graphAgentRouter = router({
 
   explain: protectedProcedure
     .input(z.object({ runId: z.number().int().positive() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Phase 13 §3 — read-side of the decision-trace ledger written
       // by §2. `runId` is the top-level `agsRuntimeRuns.id` returned
       // from `engine.run()`; the reader joins the graph-agent run
       // row via the `runtime_run_id` FK column.
+      //
+      // Phase 14 §7 — `actorUserId` ensures users only see their own
+      // run traces. Mismatched-owner reads as null (404-shaped).
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const actorUserId = ctxAny.user?.id;
+      if (actorUserId == null) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "explain requires an authenticated user",
+        });
+      }
       try {
-        const explanation = await getExplanationForRun(input.runId);
+        const explanation = await getExplanationForRun(input.runId, {
+          actorUserId,
+        });
         return {
           runId: input.runId,
           explanation,

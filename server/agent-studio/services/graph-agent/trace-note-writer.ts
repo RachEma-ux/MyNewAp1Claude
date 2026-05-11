@@ -88,7 +88,7 @@ export interface ExportTraceToNoteOptions {
   readonly getDb?: typeof getAsDb;
   readonly exporter?: (
     runtimeRunId: number,
-    options: { title?: string; redact?: boolean },
+    options: { title?: string; redact?: boolean; actorUserId?: number },
   ) => Promise<DecisionTraceMarkdown | null>;
 }
 
@@ -111,9 +111,14 @@ export async function exportTraceToNote(
   if (!db) throw new AsdbUnavailableError();
 
   const redact = input.redact !== false;
+  // Phase 14 §7 — a writer can only export traces it owns. The
+  // `createdByUserId` doubles as the actor: a user cannot persist
+  // someone else's trace into their own vault note. Admin-side bulk
+  // exports route through a different surface, not this writer.
   const exported = await exporter(input.runtimeRunId, {
     title: input.title,
     redact,
+    actorUserId: input.createdByUserId,
   });
   if (!exported) return null;
 
