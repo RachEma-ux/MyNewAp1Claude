@@ -110,6 +110,42 @@ export interface GraphRetrievalInput {
   readonly eligibility?: EligibilityResult;
   readonly packTemplates?: PackTemplateMap;
   readonly preferTemplateKeys?: ReadonlyArray<string>;
+  /**
+   * Phase 12.5 §4 — runtime-run id threaded from the orchestrator so
+   * the usage recorder can FK back to `ags_runtime_runs`. Optional —
+   * direct router callers (tests, simulation harness) typically omit it.
+   */
+  readonly runtimeRunId?: number;
+}
+
+/**
+ * Phase 12.5 §4 — runtime-usage recorder port. Fired by the router
+ * after a successful template execution that came from a resolved
+ * Skill Pack (i.e., `resolvedSkill` is set on the output). Caller
+ * (chat-stream / simulation orchestrator) is responsible for resolving
+ * `packKey` → `packVersionId` and writing the
+ * `ags_graph_skill_runtime_usages` row; the router itself stays
+ * stateless and DB-free.
+ *
+ * Errors thrown from the recorder are swallowed and emitted as a
+ * `safetyEvents`-shaped trace breadcrumb. A flaky usage write must
+ * not fail the retrieval call.
+ */
+export interface GraphRetrievalUsageEvent {
+  readonly packKey: string;
+  readonly templateKey: string;
+  readonly reason: "first_template_in_top_pack" | "preferred_key_matched";
+  readonly mode: RetrievalMode;
+  readonly runtimeRunId?: number;
+  readonly workspaceId?: number;
+}
+
+export type GraphRetrievalUsageRecorder = (
+  event: GraphRetrievalUsageEvent,
+) => void | Promise<void>;
+
+export interface GraphRetrievalRouterOptions {
+  readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
 }
 
 export interface GraphRetrievalOutput {
@@ -136,7 +172,14 @@ export interface GraphRetrievalOutput {
 }
 
 export class GraphRetrievalRouter {
-  constructor(private readonly repository: GraphRepository) {}
+  private readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
+
+  constructor(
+    private readonly repository: GraphRepository,
+    options: GraphRetrievalRouterOptions = {},
+  ) {
+    this.recordRuntimeUsage = options.recordRuntimeUsage;
+  }
 
   async retrieve(input: GraphRetrievalInput): Promise<GraphRetrievalOutput> {
     const startedAt = Date.now();
@@ -244,10 +287,42 @@ export class GraphRetrievalRouter {
 
     const filtered = filterContextBlocks(rawBlocks, input.runtime);
     const citations = filtered.blocks.map((b) => b.citation);
+
+    // Phase 12.5 §4 — fire the runtime-usage recorder when the request
+    // produced output via a resolved Skill Pack. Errors from the
+    // recorder are swallowed and surfaced as a synthetic safety event
+    // so the retrieval call never fails because of a usage-log issue.
+    const safetyEvents = [...filtered.events];
+    if (resolvedSkill && filtered.blocks.length > 0 && this.recordRuntimeUsage) {
+      try {
+        const maybePromise = this.recordRuntimeUsage({
+          packKey: resolvedSkill.packKey,
+          templateKey: resolvedSkill.templateKey,
+          reason: resolvedSkill.reason,
+          mode: input.mode,
+          runtimeRunId: input.runtimeRunId,
+          workspaceId: input.runtime.workspaceId,
+        });
+        // Fire-and-forget if Promise — don't block the retrieval call.
+        if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
+          (maybePromise as Promise<void>).catch(() => {
+            // Swallow async recorder failures silently. Sync surface
+            // already records a safety event for sync throws.
+          });
+        }
+      } catch {
+        safetyEvents.push({
+          blockId: "__recorder__",
+          reason: "missing_citation",
+          details: { note: "graphrag_runtime_usage_recorder_threw" },
+        });
+      }
+    }
+
     return {
       mode: input.mode,
       contextBlocks: filtered.blocks,
-      safetyEvents: filtered.events,
+      safetyEvents,
       citations,
       truncated,
       durationMs: Date.now() - startedAt,
