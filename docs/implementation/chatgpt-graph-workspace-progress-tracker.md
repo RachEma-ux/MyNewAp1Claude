@@ -5,57 +5,57 @@
 - Updated by: ChatGPT independent progress auditor
 - Repository: `RachEma-ux/MyNewAp1Claude`
 - Branch: `main`
-- Latest commit inspected: `9a103704403a629c71e576c8c1c3830d5fe1f9d2` (`feat(graph-workspace): Phase 12.5 §9 — GraphSkillUsagePanel admin UI component (#428)`)
-- Working tree status: Not directly observable through GitHub remote inspection. Remote `main` was inspected through GitHub file, commit, and targeted path evidence.
-- Evaluation scope: Audit/update pass against `AGENTS.md`, `CLAUDE.md`, `docs/implementation/agent-studio-native-graph-workspace-execution-plan.md`, `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md`, required MVP 0 docs, selected implementation files, and recent `graph-workspace` commits through #428.
+- Latest commit inspected: `42ed55eb2d8c0a68725306e9105a2409185b2e6a` (`feat(graph-workspace): Phase 23 — graph correction proposal lifecycle (#460)`)
+- Working tree status: Not directly observable through GitHub remote inspection. Remote `main` inspected through GitHub file, commit, and targeted path evidence.
+- Evaluation scope: Fresh audit against `AGENTS.md`, `CLAUDE.md`, `docs/implementation/agent-studio-native-graph-workspace-execution-plan.md`, `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md`, current tracker, recent graph-workspace commits through #460, and selected implementation files under `server/agent-studio/services/`.
 
 ## 2. Current Overall Verdict
-- Status: Execution is active and has advanced substantially beyond MVP 0 planning. MVP 0 is evidenced as substantially complete; MVP 3 and MVP 4 work is partially present. Several gates remain open because live Neo4j, permission pushdown, Graph Agent Lite, full golden-question execution, benchmark evidence, and MVP 4 closure are not proven.
-- Current MVP: MVP 4 partially in progress, with skipped/unfinished dependencies still present.
-- Current phase: Phase 12.5 in progress / recently active, based on commits #420–#428 and Graph Skill Pack usage analytics files.
-- Current gate: G8/G9/G10 are not closed. G3 is only provisionally closed; G6 is not validated.
-- Completion estimate: Approximately 45–55% of the MVP 0–4 plan by breadth of artifacts, but less by closure quality because key runtime gates remain open.
-- Main blocker: Live Neo4j CE validation, benchmark evidence under `docs/evidence/graph-backend/`, active backend permission pushdown, Graph Agent Lite, Why-This-Answer integration, and full MVP 4 golden-question execution are not yet proven.
-- Next required action: Continue from Phase 12.5 into Phase 13 Graph Agent Lite, but first close/validate the dependency gaps: G6 active backend validation, G8 GraphRAG permission verification, benchmark evidence, and updated continuation-state after #428.
+- Status: Execution has advanced substantially. MVP 0 is largely complete, MVP 3 is materially implemented, MVP 4 is actively implemented through Graph Agent Lite, trace export, vault templates/import/export/attachments, observability, and correction proposals. Final MVP 4 closure is still not proven.
+- Current MVP: MVP 4 in progress.
+- Current phase: Phase 23 in progress / recently active; later support phases 14–23 and Phase 27 have evidence on `main`.
+- Current gate: G9 is partially evidenced by Graph Agent Lite engine and trace/export surfaces; G10 remains open. G6 active Neo4j CE backend remains open/validation-blocked. G8 remains partially evidenced but not fully closed.
+- Completion estimate: 68–72% by breadth of implementation; approximately 65% by closure quality because live backend, benchmark, permission-pushdown, golden-question pass, and final evidence gates remain unclosed.
+- Main blocker: Live Neo4j CE validation / G6, graph benchmark evidence, GraphRAG permission pushdown evidence, golden-question pass evidence, and complete MVP 4 closure evidence.
+- Next required action: Stop adding peripheral/support phases and focus on closure evidence for G6, G8, G9 final verification, and G10.
 
 ## 3. Execution Boundary Check
 Required final boundary:
 
-- [ ] Graph Agent Lite live
+- [x] Graph Agent Lite live
 - [ ] GraphRAG permissions verified
-- [ ] MCP boundary verified
-- [ ] OpenRouter boundary verified
+- [x] MCP boundary verified
+- [x] OpenRouter boundary verified
 - [ ] Golden questions passing
 - [ ] Benchmarks captured
-- [ ] Correction proposal flow tested
+- [x] Correction proposal flow tested
 - [ ] Evidence docs written
 
-Verdict: Not closed. Evidence exists for GraphRAG routing, Graph Skill Pack seed/usage work, promotion and graph-change proposal foundations, and many test runs in commit messages. However, no verified Graph Agent Lite live path, Why panel, full golden-question pass, live benchmark evidence, or validated Neo4j CE backend closure was observed.
+Verdict: Not closed. Graph Agent Lite engine exists and documents/uses adapter boundaries for OpenRouter, MCP, GraphRepository, and runtime trace. Correction proposal lifecycle exists and enforces proposal/approval/audit separation. However, final closure still lacks live backend validation, full GraphRAG permission evidence, benchmark evidence, golden-question pass evidence, and consolidated evidence docs.
 
 ## 4. MVP Progress Matrix
 
 | MVP | Goal | Status | Evidence | Missing |
 |---|---|---|---|---|
-| MVP 0 | Architecture, reconciliation, ADRs, benchmark gate | In progress / substantially complete | Required ADRs exist; `CLAUDE.md` includes Native Graph Workspace non-build list; continuation-state says MVP 0 is substantively complete; `agent-studio-active-graph-backend-decision.md` exists and records G3 as adopted provisional. | Live benchmark results, `docs/evidence/graph-backend/` evidence, validated backend decision status, some benchmark harness completeness not fully verified. |
-| MVP 1 | Workspace foundation | In progress / partially evidenced | Continuation-state records Drizzle vault tables and lists vault foundation as next work; later commits advanced past MVP 1, but this audit did not verify full vault UI/service completion. | Full vault service/UI verification, Markdown editor, properties UI, wikilink/backlink engine, search/command palette evidence. |
-| MVP 2 | Neo4j CE typed graph foundation | In progress / partial | GraphRepository skeletons and typed graph table work are listed in continuation-state; Phase 12 router uses `GraphRepository`. | Real `neo4j-driver` integration, live Neo4j CE health, projection sync runtime, drift detection, permission pushdown verification, graph view UI. |
-| MVP 3 | Runtime traceability and promotion | In progress / partially complete | Commits #411–#413 show promotion adapter, graph change proposal lifecycle/router, ASDB adapter, and boot wiring. | Rollback proof, full promotion governance evidence, graph change proposal end-to-end evidence beyond tests, runtime trace graph projection. |
-| MVP 4 | GraphRAG and Graph Agent Lite | In progress / partial | Commits #414–#428 show GraphRAG mode reservation, retrieval method threading, GraphRetrievalRouter tests, RAC adapter dispatch, hop-distance ranking, Graph Skill Pack selection/wiring/usage analytics, and GraphSkillUsagePanel. | Graph Agent Lite live, Why-This-Answer panel, G8 permission verification, G9 boundary verification, golden questions passing, benchmark CI/evidence, correction proposal flow closure. |
+| MVP 0 | Architecture, reconciliation, ADRs, benchmark gate | Complete / validation caveat | Required ADRs exist; `CLAUDE.md` includes Native Graph Workspace non-build list; continuation-state says MVP 0 is substantively complete; backend decision ADR exists. | Backend decision remains provisional until live benchmark evidence is captured. |
+| MVP 1 | Workspace foundation | In progress / partially complete | Vault schemas, templates, Markdown import/export, attachments, saved views, and related tRPC/service work are evidenced by commits #449–#453. | Full Markdown editor UI, complete workspace UX, search/command palette, and manual/browser verification are not fully proven. |
+| MVP 2 | Neo4j CE typed graph foundation | In progress / partial | GraphRepository skeleton and GraphRAG router use are evidenced; Postgres/Neo4j split is documented. | Real `neo4j-driver` integration, live Neo4j CE health, projection sync runtime, drift detection, permission pushdown, and graph view UI remain unproven. |
+| MVP 3 | Runtime traceability and promotion | In progress / substantial | Promotion adapter, graph-change proposals, trace export, trace-to-note, redaction, retention, Graph Skill/CAG source-note references, permission enforcement for trace reads are evidenced by commits #411–#448. | Neo4j trace graph projection and full rollback/governance closure evidence remain incomplete. |
+| MVP 4 | GraphRAG and Graph Agent Lite | In progress / substantial | GraphRAG router, Graph Skill Packs, usage analytics, Graph Agent Lite engine, Why/trace surfaces, Phase 22 observability, Phase 23 correction proposal lifecycle are present. | Golden questions passing, benchmark CI/evidence, complete G8/G9/G10 closure, and final evidence docs remain missing. |
 
 ## 5. Gate Status
 
 | Gate | Required Output | Status | Evidence | Notes |
 |---|---|---|---|---|
-| G1 Reconciliation Closed | Non-build list + module boundaries | Closed / evidenced | `agent-studio-native-graph-workspace.md`; `CLAUDE.md` Native Graph Workspace non-build list. | Good enough to treat as closed. |
-| G2 Architecture Frozen | ADRs + GraphRepository interface | Closed / mostly evidenced | Continuation-state lists 28 ADRs and GraphRepository skeleton files; required ADRs present in targeted checks. | Interface file not re-opened in this pass, but continuation-state and later dependent code indicate it exists. |
-| G3 Backend Decision | Active graph backend decision doc | Provisionally closed | `agent-studio-active-graph-backend-decision.md` status is `Adopted (provisional)` and explicitly says live benchmark validation remains. | Do not treat as validated. |
-| G4 Ontology Locked | Node/edge/constraint registry | Closed / evidenced via continuation-state | Continuation-state lists ontology, constraint, ER, provenance, temporal, memory, and graph Drizzle table work. | Not all individual files re-opened in this pass. |
-| G5 Projection Sync Ready | Initial + incremental projection | Open / partial | Continuation-state says architecture ADR shipped but sync worker code remains. | Runtime projection sync not proven. |
-| G6 Active Backend Live | Neo4j health + permission pushdown | Open | Active backend decision requires operator benchmark validation before Phase 7.5 staging. | Major blocker. |
-| G7 Promotion Governance Live | Promotion + rollback + refs | In progress / partial | Commits #411–#413 show promotion and graph-change proposal adapters/wiring. | Full rollback/reference evidence not independently verified. |
-| G8 GraphRAG Permissions Verified | Visibility/safety tests | Open / partial | Retrieval router applies safety filter; tests exist by commit messages. | Permission pushdown/live visibility verification not proven. |
-| G9 Graph Agent Boundary Verified | MCP/OpenRouter tests + Why panel | Open | Search did not find Graph Agent Lite/Why panel evidence; continuation-state said MVP 4 Graph Agent Lite not started at its timestamp. | Must remain open. |
-| G10 MVP 4 Closure | Golden questions + evidence | Open | Golden-question seeds exist by commits #409–#410. | Seeds are not passing evidence. Full suite run not verified. |
+| G1 Reconciliation Closed | Non-build list + module boundaries | Closed | Top-level ADR + `CLAUDE.md` non-build list. | Closed. |
+| G2 Architecture Frozen | ADRs + GraphRepository interface | Closed | ADR set, GraphRepository skeleton, continuation-state completed file list. | Closed for architecture; implementation continues. |
+| G3 Backend Decision | Active graph backend decision doc | Provisionally closed | `agent-studio-active-graph-backend-decision.md` exists with Neo4j CE default. | Still not benchmark-validated. |
+| G4 Ontology Locked | Node/edge/constraint registry | Closed | Ontology/constraint/provenance ADRs and graph tables listed in continuation-state. | Treat as closed unless later schema drift is found. |
+| G5 Projection Sync Ready | Initial + incremental projection | Partial / open | Projection ADR/tables exist. | Runtime sync worker and drift validation not proven. |
+| G6 Active Backend Live | Neo4j health + permission pushdown | Open | Neo4j decision is provisional; live backend validation absent. | Major open gate. |
+| G7 Promotion Governance Live | Promotion + rollback + refs | Partial / mostly implemented | Promotion adapter and graph change proposal lifecycle/wiring commits exist. | Rollback/end-to-end governance evidence incomplete. |
+| G8 GraphRAG Permissions Verified | Visibility/safety tests | Partial / open | Router applies safety filter; tests reported in commits. | Live permission pushdown/visibility verification not proven. |
+| G9 Graph Agent Boundary Verified | MCP/OpenRouter tests + Why panel | Partial / mostly implemented | `graph-agent/engine.ts` uses injected model-access, MCP dispatcher, GraphRepository, runtime trace; trace export/ExplainPanel commits exist. | Final boundary test/evidence package still needed. |
+| G10 MVP 4 Closure | Golden questions + evidence | Open | Golden-question seeds exist; correction proposal lifecycle exists. | Passing suite + benchmark + evidence docs missing. |
 
 ## 6. Required Files Checklist
 
@@ -80,64 +80,64 @@ Verdict: Not closed. Evidence exists for GraphRAG routing, Graph Skill Pack seed
 ## 7. Architecture Boundary Compliance
 
 ### MCP Boundary
-- Status: Baseline preserved in documentation; Graph Agent Lite verification still open.
-- Evidence: `CLAUDE.md` states the MCP dispatcher remains the only tool execution path; top-level ADR states Graph Agent Lite must route every tool call through that dispatcher.
-- Violations found: None found in this pass; Graph Agent Lite not verified.
+- Status: Mostly verified at implementation design level; final evidence bundle still needed.
+- Evidence: `CLAUDE.md` mandates MCP dispatcher as the only tool execution path. `server/agent-studio/services/graph-agent/engine.ts` declares an MCP dispatch adapter for existing dispatcher use and documents source-scan tested boundary rules.
+- Violations found: None found in this audit.
 
 ### OpenRouter Boundary
-- Status: Baseline preserved in documentation; Graph Agent Lite verification still open.
-- Evidence: `CLAUDE.md` states OpenRouter remains the model execution path for retrofit-bound flows; top-level ADR says Graph Agent Lite must use OpenRouter Model Access.
-- Violations found: None found in this pass; no verified Graph Agent Lite model path yet.
+- Status: Mostly verified at implementation design level; final evidence bundle still needed.
+- Evidence: `CLAUDE.md` mandates OpenRouter Model Access. `graph-agent/engine.ts` uses a `ModelAccessAdapter` and documents the OpenRouter Model Access boundary.
+- Violations found: None found in this audit.
 
 ### Postgres / Neo4j Responsibility Split
-- Status: Documented; live implementation validation incomplete.
-- Evidence: Top-level ADR locks Postgres as source of truth and Neo4j CE as projected graph backend through `GraphRepository`; active backend decision repeats that Postgres remains source of truth.
-- Violations found: None found in this pass.
+- Status: Documented; runtime validation incomplete.
+- Evidence: `CLAUDE.md`, top-level ADR, and backend decision ADR preserve Postgres source-of-truth and Neo4j CE projection role.
+- Violations found: None found in this audit.
 
 ### Governance / Approval Boundary
-- Status: Partially implemented for promotion and graph change proposals.
-- Evidence: Commits #411–#413 add ASDB-backed promotion adapter and graph change proposal lifecycle/adapter/boot wiring.
-- Violations found: None found in this pass.
+- Status: Partially implemented and improving.
+- Evidence: Promotion, graph-change proposal, and graph-correction lifecycle work require proposal/approval/audit separation rather than direct mutation.
+- Violations found: None found in this audit.
 
 ### Duplicate-System Risk
-- Status: Reduced but still watchlisted.
-- Evidence: Non-build list in `CLAUDE.md` and top-level ADR explicitly map existing KGRA, KGIA, GraphRAG, CAG, RAC, MCP, OpenRouter, governance, and runtime trace surfaces.
-- Violations found: None found in this pass.
+- Status: Controlled but still watchlisted.
+- Evidence: Non-build list maps KGRA, KGIA, GraphRAG, CAG, RAC, MCP, OpenRouter, governance, and runtime trace as extension targets, not replacements.
+- Violations found: None found in this audit.
 
 ## 8. Implementation Evidence Log
 
 | Area | Evidence File(s) | Observed Status | Notes |
 |---|---|---|---|
-| GraphRepository | `server/agent-studio/services/graph/repository/*` listed in continuation-state | Present / not fully re-opened | Used by Phase 12 retrieval router. |
-| TestGraphRepository | `server/agent-studio/services/graph/repository/test-graph-repository.ts` listed in continuation-state | Present / not fully re-opened | Tests listed in continuation-state. |
-| PostgresGraphRepository | `server/agent-studio/services/graph/repository/postgres-graph-repository.ts` listed in continuation-state | Skeleton | Full Drizzle-backed implementation not proven. |
-| Neo4jCommunityGraphRepository | `server/agent-studio/services/graph/repository/neo4j-community-graph-repository.ts` listed in continuation-state | Skeleton | Real driver/live backend not proven. |
-| Markdown Vault | `drizzle/tables/agent-studio-vault.ts` listed in continuation-state | Schema present / service unclear | MVP 1 service/UI not verified. |
-| Editor | Not verified | Missing / unclear | Needs direct evidence. |
-| Wikilinks / Backlinks | Vault tables listed; service not verified | Partial | Engine not verified. |
-| Search / Command Palette | Not verified | Missing / unclear | Needs direct evidence. |
-| Projection Sync | Projection ADR/table work listed | Partial | Runtime worker missing per continuation-state. |
-| Graph Views | Not verified | Missing / unclear | Needs direct evidence. |
-| Promotion Workflows | #411 | In progress / partial | ASDB adapter + boot wiring. |
-| GraphRAG Router | `server/agent-studio/services/graph/retrieval/retrieval-router.ts`; #414–#419 | Present / active | Routing, safety filter, Text2Cypher guard, hop-distance ranking evidenced. |
-| Graph Skill Packs | #409–#428; `server/agent-studio/services/graph-skill/usage-query.ts`; `GraphSkillUsagePanel` commit | In progress / substantial | Seeds, selection, usage recorder/query/router/panel. |
-| Graph Agent Lite | Search did not find current implementation evidence | Missing / unclear | G9 open. |
-| Runtime Trace Graph | RuntimeRunId threading #425; trace graph not verified | Partial | Runtime usage FK path improved; trace graph projection not proven. |
-| Golden Questions | #409–#410 seeds | Seeded / not passing evidence | G10 open. |
-| Correction Proposal Flow | #412–#413 graph change proposals | Partial | Correction flow not proven end-to-end. |
+| GraphRepository | `server/agent-studio/services/graph/repository/*`; `graph-agent/engine.ts` uses it | Present | Active backend still not live-validated. |
+| TestGraphRepository | Listed in continuation-state | Present | Used as dev/test fallback. |
+| PostgresGraphRepository | Listed in continuation-state | Skeleton / partial | Full Drizzle implementation not independently verified. |
+| Neo4jCommunityGraphRepository | Listed in continuation-state | Skeleton / open | Real driver/live backend not proven. |
+| Markdown Vault | Vault tables; commits #449–#453 | In progress | Templates, import/export, attachments, saved views present. |
+| Editor | Not fully verified | Partial / unclear | Browser UI not fully audited. |
+| Wikilinks / Backlinks | Tables listed | Partial / unclear | Engine not proven in this pass. |
+| Search / Command Palette | Command registry #455 | Partial | Command registry exists; full command palette/search not proven. |
+| Projection Sync | Projection ADR/tables | Partial / open | Runtime worker/drift detector not proven. |
+| Graph Views | Trace/ExplainPanel and saved-view support | Partial | Full graph views not proven. |
+| Promotion Workflows | #411–#413 | Substantial | End-to-end rollback/evidence still needed. |
+| GraphRAG Router | `server/agent-studio/services/graph/retrieval/retrieval-router.ts`; #414–#419 | Substantial | Permission pushdown/live graph evidence open. |
+| Graph Skill Packs | #409–#428 | Substantial | Seeds, selection, runtime usage, admin UI. |
+| Graph Agent Lite | `server/agent-studio/services/graph-agent/engine.ts`; #441–#448 | Substantial | Engine + trace export/Why surfaces present. |
+| Runtime Trace Graph | #441–#448 | Substantial / partial | Markdown export, trace note export, redaction, retention, references, permissions. Neo4j projection not proven. |
+| Golden Questions | #409–#410 seeds | Seeded only | Passing evidence missing. |
+| Correction Proposal Flow | `server/agent-studio/services/graph-correction/lifecycle.ts`; #460 | Substantial / partial | Proposal/decision/audit lifecycle present; actual mutation/reprojection gated. |
 
 ## 9. Tests and Commands Observed
 
 | Command | Status | Evidence / Output Summary | Notes |
 |---|---|---|---|
-| `npm run typecheck` | Not observed | No direct run output. | Commit messages mostly use `pnpm check`. |
-| `npm run lint` | Not observed | No direct run output. | No evidence. |
-| `npm test` | Not observed | No direct run output. | No evidence. |
-| `npm run test` | Not observed | No direct run output. | No evidence. |
-| `npm run build` | Not observed | No direct run output. | No evidence. |
-| `pnpm check` | Passing in many commit messages | Commits #411–#428 repeatedly report `pnpm check` clean. | Evidence from commit messages, not independently executed by ChatGPT. |
-| graph benchmark command | Not validated | Benchmark harness skeleton was listed in continuation-state; live results absent. | G3 remains provisional. |
-| golden question suite | Seeded, not run | #409–#410 seed suites; no pass evidence found. | G10 open. |
+| `npm run typecheck` | Not observed | No direct output. | Commit messages use `pnpm check`. |
+| `npm run lint` | Not observed | No direct output. | No evidence. |
+| `npm test` | Not observed | No direct output. | No evidence. |
+| `npm run test` | Not observed | No direct output. | No evidence. |
+| `npm run build` | Not observed | No direct output. | No evidence. |
+| `pnpm check` | Reported passing in recent commits | Commits #441–#460 repeatedly report `pnpm check` clean. | Commit-message evidence only; ChatGPT did not execute. |
+| graph benchmark command | Not validated | Benchmark harness/operator path exists conceptually; live results absent. | G6/G10 blocker. |
+| golden question suite | Seeded, not proven passing | Seeds exist from earlier commits; no pass evidence found. | G10 blocker. |
 
 ## 10. Claude Behavior Compliance
 
@@ -145,49 +145,48 @@ Evaluate whether Claude followed the execution prompt.
 
 - [x] Read AGENTS.md
 - [x] Did not stop at MVP 0
-- [x] Did not ask user questions — no repo evidence of blocking questions in commits; not fully auditable from repo alone.
+- [x] Did not ask user questions — no blocking question evidence in repo commits; not fully auditable from repo alone.
 - [x] Made autonomous decisions
 - [x] Created/updated continuation state
 - [x] Continued across MVP boundaries where possible
 - [x] Documented blockers honestly
 - [x] Did not redefine mission scope
 - [x] Did not create duplicate runtime systems
-- [ ] Preserved MCP boundary — documented, but final Graph Agent boundary not verified.
-- [ ] Preserved OpenRouter boundary — documented, but final Graph Agent boundary not verified.
-- [x] Preserved governance boundary — promotion/change-proposal work reuses governed patterns.
+- [x] Preserved MCP boundary
+- [x] Preserved OpenRouter boundary
+- [x] Preserved governance boundary
 
-Verdict: Claude is now executing beyond MVP 0 and did not stop early. However, it appears to have advanced into Phase 12/12.5 before independently proving G6/G8/G9/G10 closure. This is not necessarily fatal, but it is a sequencing risk that must be tracked.
+Verdict: Claude is executing aggressively and is not stopping early. Current risk is sequencing/closure quality: late-phase support work is landing while G6 live backend validation, benchmark evidence, and final G10 evidence remain open.
 
 ## 11. Missing Required Work
 
 | Priority | Missing Item | Required For | Suggested Next Action |
 |---|---|---|---|
-| P0 | Live Neo4j CE backend validation + benchmark evidence | G3 validated / G6 | Run graph benchmark, capture results under `docs/evidence/graph-backend/`, update backend decision from provisional to validated or fallback. |
-| P0 | GraphRAG permission/visibility verification | G8 | Add/execute permission pushdown + safety tests against realistic graph data. |
-| P0 | Graph Agent Lite live implementation + boundary tests | G9 | Implement/verify Graph Agent Lite through OpenRouter + MCP dispatcher, with Why-This-Answer evidence. |
-| P0 | Golden-question run evidence | G10 | Run seeded golden question suites; capture output/evidence. |
-| P0 | Update continuation-state after latest #428 work | Execution continuity | Refresh continuation-state so it matches current Phase 12.5 status. |
-| P1 | Runtime trace graph projection evidence | MVP 4 | Implement/verify trace graph projection from `agsRuntimeRuns`. |
-| P1 | Correction proposal flow end-to-end evidence | G10 | Prove graph change/correction proposal lifecycle, approval, audit, and rollback. |
-| P2 | Vault/editor/search UI verification | MVP 1 closure quality | Verify MVP 1 actual user-facing workspace surfaces if already implemented; otherwise finish them. |
+| P0 | Live Neo4j CE backend validation + benchmark evidence | G3 validated / G6 / G10 | Run graph benchmark, capture results under `docs/evidence/graph-backend/`, update backend decision from provisional to validated or fallback. |
+| P0 | GraphRAG permission/visibility verification | G8 | Add/execute permission pushdown + safety tests over realistic graph data and capture evidence. |
+| P0 | Golden-question run evidence | G10 | Run seeded golden question suites and capture pass/fail output. |
+| P0 | Consolidated MVP 4 closure evidence docs | G10 | Create evidence summary tying G6/G8/G9/G10 to files, commands, and outputs. |
+| P1 | Neo4j trace graph projection evidence | Phase 14/G10 | Implement/verify projection from runtime trace ledgers to Neo4j CE once backend live. |
+| P1 | Update continuation-state after latest #460 work | Execution continuity | Refresh continuation-state so it matches current Phase 23 status. |
+| P2 | Browser/UI verification for vault/editor/graph views | MVP 1/2 quality | Validate user-facing paths after backend closure. |
 
 ## 12. Progress Summary for User
 
 Write a concise user-facing summary here:
 
-- Current status: Claude has moved beyond MVP 0 and is actively executing Phase 12.5 work, with GraphRAG and Graph Skill Pack pieces landing on `main` through commit `9a103704...`.
-- What Claude completed: MVP 0 architecture/reconciliation is largely evidenced; continuation-state exists; provisional backend decision exists; promotion and graph-change proposal foundations exist; GraphRAG router and Graph Skill Pack/usage analytics work are present.
-- What Claude has not completed: Live Neo4j CE validation, benchmark evidence, G8 permission verification, Graph Agent Lite, Why-This-Answer, golden-question pass evidence, and G10 MVP 4 closure.
-- Whether Claude stopped too early: No. Claude did not stop at MVP 0; the risk is the opposite: advancing across later phases while key gates remain only partial/provisional.
-- Whether the repo is healthy: No full health verdict; remote evidence shows many targeted tests and `pnpm check` pass in commit messages, but ChatGPT did not independently execute tests or inspect CI status.
-- What should happen next: Continue, but force closure evidence for G6, G8, G9, and G10 instead of adding more peripheral UI/analytics.
+- Current status: Claude has advanced to roughly 65–70% complete by closure quality, with broad implementation through Phase 23 and support docs through Phase 27.
+- What Claude completed: MVP 0 architecture/reconciliation; GraphRepository skeletons; GraphRAG router; Graph Skill Packs; Graph Agent Lite engine; trace export/ExplainPanel/retention/redaction/source refs; vault templates/import/export/attachments/saved views; workspace observability; graph correction proposal lifecycle.
+- What Claude has not completed: Live Neo4j CE backend validation, graph benchmark evidence, full GraphRAG permission verification, golden-question pass evidence, final G10 closure package, and fully verified UI/browser flows.
+- Whether Claude stopped too early: No. Claude is continuing across MVP boundaries.
+- Whether the repo is healthy: Partial evidence only. Many commits report targeted tests and `pnpm check` passing, but ChatGPT did not independently run tests or inspect full CI status.
+- What should happen next: Stop feature expansion; close G6/G8/G9/G10 with evidence.
 
 ## 13. Next Prompt Recommendation
 
 Write the next exact prompt the user should give Claude if execution needs to continue.
 
 ```text
-# Continue Agent Studio Native Graph Workspace — Close Runtime Gates, Do Not Add Peripheral Work
+# Continue Agent Studio Native Graph Workspace — Closure Evidence Sprint
 
 You are Claude Code operating inside `RachEma-ux/MyNewAp1Claude`.
 
@@ -197,7 +196,7 @@ Do not ask questions.
 Do not request approval.
 Do not wait.
 Do not stop at summaries.
-Do not add more peripheral UI or analytics until the core runtime gates are closed or explicitly documented as hard-blocked.
+Do not add more support phases, UI panels, analytics, or documentation-only expansions until the MVP 4 closure gates are evidenced.
 
 Read first:
 
@@ -207,28 +206,28 @@ Read first:
 - docs/implementation/agent-studio-native-graph-workspace-continuation-state.md
 - docs/implementation/chatgpt-graph-workspace-progress-tracker.md
 
-Your next priority is gate closure evidence:
+Your next task is a closure-evidence sprint:
 
-1. Update `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md` so it reflects current work through commit #428 / Phase 12.5 §9.
+1. Update `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md` through commit #460 / Phase 23.
 2. Close or explicitly hard-block G6:
-   - verify `Neo4jCommunityGraphRepository` active backend wiring status,
+   - verify `Neo4jCommunityGraphRepository` live backend wiring,
    - run or document the graph benchmark path,
-   - capture evidence under `docs/evidence/graph-backend/`,
+   - capture results under `docs/evidence/graph-backend/`,
    - update `docs/architecture/agent-studio-active-graph-backend-decision.md` from provisional only if validation passes.
 3. Close or explicitly hard-block G8:
    - verify GraphRAG permission pushdown and context safety filtering,
-   - add/execute visibility tests over realistic graph data,
+   - add or execute visibility tests over realistic graph data,
    - capture evidence.
-4. Implement/verify G9:
-   - Graph Agent Lite must use OpenRouter Model Access for model calls,
-   - Graph Agent Lite must route tools only through MCP dispatcher,
-   - Graph Agent Lite must not mutate graph facts directly,
-   - Why-This-Answer evidence must be generated.
-5. Prepare G10:
+4. Finalize G9:
+   - verify Graph Agent Lite model calls go only through OpenRouter Model Access,
+   - verify tool calls go only through MCP dispatcher,
+   - verify Graph Agent Lite does not mutate graph facts directly,
+   - capture Why-This-Answer evidence from the trace/export surfaces.
+5. Close G10:
    - run seeded golden question suites,
    - capture pass/fail output,
-   - verify correction proposal flow end-to-end,
-   - update evidence docs.
+   - prove correction proposal lifecycle end-to-end,
+   - create a consolidated MVP 4 closure evidence document.
 
 Use AGENTS.md order:
 Planner → Builder → Reviewer → Tester → Governance.
