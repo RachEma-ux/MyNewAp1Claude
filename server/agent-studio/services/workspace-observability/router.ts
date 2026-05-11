@@ -28,6 +28,19 @@ import {
   markAllNotificationsRead,
 } from "./user-notifications.js";
 import { listErrorEvents } from "./error-events.js";
+import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
+
+/**
+ * Self-instrumentation: this router OWNS the error_events table,
+ * and uses the same capture helper as graph-quality (#490) and
+ * graph-correction (#491) to record its own failures. The recorder
+ * is fail-soft, so a recording-the-failure-of-listing-errors loop
+ * cannot escalate — it just silently returns null.
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("workspaceObservability.router", trpcErr);
+  throw trpcErr;
+}
 
 const JobStatusEnum = z.enum([
   "pending",
@@ -56,10 +69,10 @@ export const workspaceObservabilityRouter = router({
       try {
         return await listJobs(input ?? {});
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -68,10 +81,10 @@ export const workspaceObservabilityRouter = router({
     .query(async ({ input }) => {
       const job = await getJobById(input.jobId);
       if (!job) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Background job ${input.jobId} not found`,
-        });
+        }));
       }
       return job;
     }),
@@ -83,12 +96,12 @@ export const workspaceObservabilityRouter = router({
         return await markJobCancelled(input.jobId);
       } catch (e) {
         if (e instanceof JobNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -118,10 +131,10 @@ export const workspaceObservabilityRouter = router({
           limit: input?.limit,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -132,10 +145,10 @@ export const workspaceObservabilityRouter = router({
         await markNotificationRead(input.notificationId);
         return { ok: true };
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -143,19 +156,19 @@ export const workspaceObservabilityRouter = router({
     const ctxAny = ctx as unknown as { user?: { id?: number } };
     const userId = ctxAny.user?.id;
     if (userId == null) {
-      throw new TRPCError({
+      throwTrpcAndCapture(new TRPCError({
         code: "UNAUTHORIZED",
         message: "markAllNotificationsRead requires an authenticated user",
-      });
+      }));
     }
     try {
       await markAllNotificationsRead(userId);
       return { ok: true };
     } catch (e) {
-      throw new TRPCError({
+      throwTrpcAndCapture(new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: e instanceof Error ? e.message : String(e),
-      });
+      }));
     }
   }),
 
@@ -178,10 +191,10 @@ export const workspaceObservabilityRouter = router({
       try {
         return await listErrorEvents(input ?? {});
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 });
