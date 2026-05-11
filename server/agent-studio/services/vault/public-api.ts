@@ -56,6 +56,18 @@ export type {
   TemplateServiceOptions,
 } from "./templates.js";
 
+export {
+  parseMarkdownBlob,
+  renderNoteAsMarkdown,
+  exportNoteAsMarkdown,
+} from "./markdown-import-export.js";
+export type {
+  ParsedMarkdownBlob,
+  RenderNoteInput,
+  ExportNoteAsMarkdownResult,
+  ExportNoteAsMarkdownOptions,
+} from "./markdown-import-export.js";
+
 /**
  * Vault Phase 5b note-version creation pipeline.
  *

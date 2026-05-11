@@ -77,6 +77,11 @@ describe("Vault router", () => {
     expect(src).toMatch(/createNoteFromTemplate:\s*protectedProcedure/);
   });
 
+  it("declares Phase 15 Markdown import + export procedures", () => {
+    expect(src).toMatch(/exportNote:\s*protectedProcedure/);
+    expect(src).toMatch(/importNoteFromMarkdown:\s*protectedProcedure/);
+  });
+
   it("selects repository via env (stub vs ASDB)", () => {
     expect(src).toMatch(/AGS_VAULT_REPO/);
     expect(src).toMatch(/VaultRepositoryStub/);
