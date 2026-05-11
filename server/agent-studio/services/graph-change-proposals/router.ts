@@ -17,6 +17,19 @@ import {
   type GraphChangeProposalAdapter,
   type GraphChangeProposalRequest,
 } from "./lifecycle.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * Same pattern as graph-quality (#490), graph-correction (#491),
+ * workspace-observability self-instrument (#492). The classifier
+ * inside `captureUnexpectedTrpcError` skips expected operator-side
+ * codes; only INTERNAL_SERVER_ERROR + raw Errors persist.
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("graphChangeProposals.router", trpcErr);
+  throw trpcErr;
+}
 
 let cachedLifecycle: GraphChangeProposalLifecycle | null = null;
 
@@ -28,11 +41,11 @@ export function _setGraphChangeProposalAdapter(
 
 function lifecycle(): GraphChangeProposalLifecycle {
   if (!cachedLifecycle) {
-    throw new TRPCError({
+    throwTrpcAndCapture(new TRPCError({
       code: "PRECONDITION_FAILED",
       message:
         "Graph change proposal adapter not yet wired. Operator must inject the Drizzle-backed GraphChangeProposalAdapter at boot.",
-    });
+    }));
   }
   return cachedLifecycle;
 }
@@ -71,10 +84,10 @@ export const graphChangeProposalsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "Submitting a graph change proposal requires authentication",
-        });
+        }));
       }
       const request: GraphChangeProposalRequest = {
         proposalKind: input.proposalKind,
@@ -97,10 +110,10 @@ export const graphChangeProposalsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "Approval requires authentication",
-        });
+        }));
       }
       return await lifecycle().approve(
         input.proposalId,
@@ -119,10 +132,10 @@ export const graphChangeProposalsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "Rejection requires authentication",
-        });
+        }));
       }
       return await lifecycle().reject(
         input.proposalId,
@@ -136,10 +149,10 @@ export const graphChangeProposalsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "Withdrawing a proposal requires authentication",
-        });
+        }));
       }
       return await lifecycle().withdraw(input.proposalId, userId);
     }),
