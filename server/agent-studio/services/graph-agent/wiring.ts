@@ -18,6 +18,7 @@ import { execute as openRouterExecute } from "../../../openrouter/model-access/e
 import { dispatchMcpToolCall } from "../mcp/dispatcher.js";
 import * as repo from "../../repository.js";
 import { GraphAgentEngine, type GraphAgentEngineOptions, type McpDispatchAdapter, type ModelAccessAdapter, type RuntimeTraceAdapter } from "./engine.js";
+import { createGraphAgentDecisionTraceWriter } from "./decision-trace-writer.js";
 import { GraphRetrievalRouter } from "../graph/retrieval/retrieval-router.js";
 import { getGraphRepository } from "../graph/repository/index.js";
 import {
@@ -233,6 +234,7 @@ export function wireGraphAgentLite(input: GraphAgentLiteWiringInput): GraphAgent
   });
 
   const runtimeTrace = new RuntimeTraceWriterAdapter();
+  const decisionTrace = createGraphAgentDecisionTraceWriter();
 
   const options: GraphAgentEngineOptions = {
     repository,
@@ -240,6 +242,7 @@ export function wireGraphAgentLite(input: GraphAgentLiteWiringInput): GraphAgent
     modelAccess,
     mcpDispatcher,
     runtimeTrace,
+    decisionTrace,
   };
   return new GraphAgentEngine(options);
 }

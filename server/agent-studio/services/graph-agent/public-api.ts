@@ -18,4 +18,10 @@ export type {
   ModelAccessAdapter,
   McpDispatchAdapter,
   RuntimeTraceAdapter,
+  GraphAgentDecisionTraceAdapter,
 } from "./engine.js";
+export {
+  createGraphAgentDecisionTraceWriter,
+  GraphAgentDecisionTraceUnavailableError,
+} from "./decision-trace-writer.js";
+export type { CreateGraphAgentDecisionTraceWriterOptions } from "./decision-trace-writer.js";
