@@ -45,7 +45,48 @@
  * ∈ {no_retrieval, cag_only}) before invoking the executor.
  */
 
-import type { RetrievalPlan } from "./retrieval-planner";
+import type { RetrievalPlan, RetrievalPlanItem } from "./retrieval-planner";
+
+/**
+ * Phase 12 — GraphRAG retrieval methods. Carried on a `graph_index`
+ * source's `metadataJson.retrievalMethod` field. When absent, the source
+ * is treated as legacy generic retrieval (today's behavior — routes
+ * through `knowledge_retrieval` / `hybrid_cag_rag`).
+ *
+ * Persisted via the existing `metadataJson` jsonb column on
+ * `ags_rac_sources` so this Phase 12 increment does not require a
+ * schema migration. A future increment may promote the field to a
+ * dedicated column once usage patterns settle.
+ */
+export const GRAPHRAG_RETRIEVAL_METHODS = [
+  "local",
+  "global",
+  "traversal",
+  "text2cypher",
+  "algorithm",
+] as const;
+export type GraphragRetrievalMethod = (typeof GRAPHRAG_RETRIEVAL_METHODS)[number];
+
+/**
+ * Extract the GraphRAG retrieval method from a plan item's underlying
+ * source, returning `null` if the source is not a `graph_index` or the
+ * `metadataJson.retrievalMethod` value is missing/invalid. The check
+ * is intentionally permissive about unknown strings — unrecognized
+ * methods fall through to legacy generic retrieval so an operator
+ * misconfiguration does not block the request.
+ */
+export function readGraphragRetrievalMethod(
+  item: RetrievalPlanItem,
+): GraphragRetrievalMethod | null {
+  if (item.source.sourceType !== "graph_index") return null;
+  const meta = item.source.metadataJson;
+  if (!meta || typeof meta !== "object") return null;
+  const raw = (meta as Record<string, unknown>).retrievalMethod;
+  if (typeof raw !== "string") return null;
+  return (GRAPHRAG_RETRIEVAL_METHODS as readonly string[]).includes(raw)
+    ? (raw as GraphragRetrievalMethod)
+    : null;
+}
 
 export const RAC_PLANNER_MODES = [
   "no_retrieval",
@@ -124,13 +165,27 @@ export interface DerivePlannerModeOutput {
  *   3. Runnable sources contain a multimodal hint  → multimodal_hybrid_retrieval
  *      (regardless of CAG; multimodal subsumes the other modes for
  *       MVP routing — refinement is a follow-up)
- *   4. Runnable sources are exclusively tool_knowledge:
+ *   4. Runnable sources include a graph_index source carrying a
+ *      Phase-12 `metadataJson.retrievalMethod` discriminator:
+ *        a. Only graph_index sources contribute, no CAG → graphrag_<method>
+ *        b. Only graph_index sources contribute, with CAG → hybrid_cag_graphrag
+ *        c. graph_index + other knowledge sources, no CAG → hybrid_rac_graphrag
+ *        d. graph_index + other knowledge sources, with CAG → hybrid_cag_graphrag
+ *           (CAG presence wins because the CAG pack and GraphRAG share
+ *            the same operator UX surface — the trace tag describes the
+ *            dominant compositional intent rather than the source mix)
+ *      When multiple graph_index sources carry methods, the lowest-priority
+ *      (i.e., first registered) method wins so that operator intent is
+ *      stable; mixed methods collapse to graphrag_local conservatively.
+ *      Graph sources without a `retrievalMethod` discriminator fall
+ *      through to the legacy knowledge / tool_knowledge buckets below.
+ *   5. Runnable sources are exclusively tool_knowledge:
  *        a. With CAG pack          → hybrid_cag_tool_knowledge
  *        b. Without CAG pack       → tool_knowledge_retrieval
- *   5. Runnable sources are exclusively knowledge:
+ *   6. Runnable sources are exclusively knowledge:
  *        a. With CAG pack          → hybrid_cag_rag
  *        b. Without CAG pack       → knowledge_retrieval
- *   6. Mix of knowledge + tool_knowledge:
+ *   7. Mix of knowledge + tool_knowledge:
  *        a. With CAG pack          → hybrid_cag_rag_tool_knowledge
  *        b. Without CAG pack       → knowledge_retrieval
  *           (tool_knowledge alongside knowledge sources collapses to
@@ -167,6 +222,44 @@ export function derivePlannerMode(
     return {
       mode: "multimodal_hybrid_retrieval",
       reason: `multimodal source detected: types=[${[...types].join(",")}]`,
+    };
+  }
+
+  // Phase 12 — GraphRAG-flavored routing.
+  const graphragMethods = runnable
+    .map((it) => readGraphragRetrievalMethod(it))
+    .filter((m): m is GraphragRetrievalMethod => m !== null);
+
+  if (graphragMethods.length > 0) {
+    const onlyGraphSources = runnable.every(
+      (it) => it.source.sourceType === "graph_index",
+    );
+    const distinctMethods = new Set(graphragMethods);
+    const chosenMethod: GraphragRetrievalMethod =
+      distinctMethods.size === 1
+        ? graphragMethods[0]
+        : "local";
+
+    if (input.hasCagPack) {
+      return {
+        mode: "hybrid_cag_graphrag",
+        reason: onlyGraphSources
+          ? `CAG pack + graphrag_${chosenMethod} (${graphragMethods.length} graph source(s))`
+          : `CAG pack + graphrag_${chosenMethod} + ${runnable.length - graphragMethods.length} other source(s)`,
+      };
+    }
+    if (!onlyGraphSources) {
+      return {
+        mode: "hybrid_rac_graphrag",
+        reason: `graphrag_${chosenMethod} + ${runnable.length - graphragMethods.length} non-graph source(s)`,
+      };
+    }
+    return {
+      mode: `graphrag_${chosenMethod}` as RacPlannerMode,
+      reason:
+        distinctMethods.size === 1
+          ? `graph_index source(s) with retrievalMethod=${chosenMethod}`
+          : `graph_index sources with mixed methods=[${[...distinctMethods].join(",")}] — collapsed to graphrag_local`,
     };
   }
 
