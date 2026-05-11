@@ -38,6 +38,24 @@ export {
 export type { SearchHit, VaultSearchService } from "./search.js";
 export { VaultSearchServiceStub } from "./search.js";
 
+export {
+  createTemplate,
+  listTemplates,
+  getTemplateById,
+  renderTemplate,
+  AsdbUnavailableError as VaultTemplatesAsdbUnavailableError,
+  TemplateNotFoundError,
+} from "./templates.js";
+export type {
+  CreateTemplateInput,
+  ListTemplatesInput,
+  RenderTemplateInput,
+  RenderedTemplate,
+  VaultTemplateRow,
+  VaultTemplateListing,
+  TemplateServiceOptions,
+} from "./templates.js";
+
 /**
  * Vault Phase 5b note-version creation pipeline.
  *

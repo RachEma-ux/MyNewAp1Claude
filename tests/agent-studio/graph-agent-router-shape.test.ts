@@ -71,6 +71,12 @@ describe("Vault router", () => {
     }
   });
 
+  it("declares Phase 15 template procedures", () => {
+    expect(src).toMatch(/createTemplate:\s*protectedProcedure/);
+    expect(src).toMatch(/listTemplates:\s*protectedProcedure/);
+    expect(src).toMatch(/createNoteFromTemplate:\s*protectedProcedure/);
+  });
+
   it("selects repository via env (stub vs ASDB)", () => {
     expect(src).toMatch(/AGS_VAULT_REPO/);
     expect(src).toMatch(/VaultRepositoryStub/);
