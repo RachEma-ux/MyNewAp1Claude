@@ -65,7 +65,11 @@ export class GraphRetrievalRouter {
       }
       const validation = validateCypherReadOnly(input.generatedCypher);
       if (!validation.ok) {
-        return this.emptyResult(input.mode, startedAt, `text2cypher_${validation.reason}`);
+        // Manual narrow — `strictNullChecks: false` in tsconfig.json
+        // prevents the discriminated-union narrowing from kicking in,
+        // so we use `in` to surface `reason` safely.
+        const reason = "reason" in validation ? validation.reason : "unknown";
+        return this.emptyResult(input.mode, startedAt, `text2cypher_${reason}`);
       }
     }
 
