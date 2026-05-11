@@ -535,6 +535,10 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   // disabling the pack or publishing a fixed version label.
   "agentStudio.graphSkill.createPack": "agentStudio.graphSkill.createPack",
   "agentStudio.graphSkill.publishVersion": "agentStudio.graphSkill.publishVersion",
+  // Phase 14 §3 — operator-triggered prune of runtime-trace ledgers.
+  // R3 because it permanently deletes audit rows (one tier above the
+  // R2 createPack / publishVersion shape).
+  "agentStudio.graphAgent.pruneTraces": "agentStudio.graphAgent.pruneTraces",
   "dataAnalysis.graphRag.registerSource": "dataAnalysis.graphRag.registerSource",
   "dataAnalysis.graphRag.syncSource": "dataAnalysis.graphRag.syncSource",
   "dataAnalysis.graphRag.buildIndex": "dataAnalysis.graphRag.buildIndex",

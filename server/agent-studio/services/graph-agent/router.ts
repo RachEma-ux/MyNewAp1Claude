@@ -15,12 +15,13 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, governedProcedure } from "../../../_core/trpc.js";
 import { GraphAgentRunInput } from "./contracts.js";
 import { wireGraphAgentLite } from "./wiring.js";
 import { getExplanationForRun } from "./explain-reader.js";
 import { getPromptSafeSchemaSummary } from "./schema-summary.js";
 import { exportDecisionTraceAsMarkdown } from "./trace-export.js";
+import { pruneRuntimeTraces } from "./retention.js";
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -129,6 +130,37 @@ export const graphAgentRouter = router({
           runId: input.runId,
           explanation,
         };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  pruneTraces: governedProcedure
+    .input(
+      z.object({
+        // Cap at 1 year — anything past that should be handled by an
+        // operations playbook + ADR, not a one-off button click.
+        olderThanMs: z
+          .number()
+          .int()
+          .positive()
+          .min(60 * 60 * 1000) // 1 hour floor — guardrail against accidental "purge everything"
+          .max(365 * 24 * 60 * 60 * 1000)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      // Phase 14 §3 — operator-triggered prune across the four
+      // trace ledgers (Skill Pack usage rows, query template runs,
+      // graph-agent steps, graph-agent runs). Governed because it
+      // permanently deletes audit rows.
+      try {
+        return await pruneRuntimeTraces({
+          olderThanMs: input.olderThanMs,
+        });
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
