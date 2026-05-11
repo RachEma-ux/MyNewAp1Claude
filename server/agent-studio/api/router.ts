@@ -155,6 +155,20 @@ import {
   validatePluginSchema,
   withdrawPublishRequestSchema,
 } from "../shared/schemas";
+import { captureUnexpectedTrpcError } from "../services/workspace-observability/public-api";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * 8th router on the trpc-error-capture chain (top-level agentStudio.*
+ * surface; the leaf service routers wired in #490–#511 cover the
+ * sub-routers — this one covers the home/identity/behavior/prompts/
+ * tools/knowledge/memory/workflows/governance/simulation/testing/runs/
+ * versions/publish lanes).
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("agentStudio.api.router", trpcErr);
+  throw trpcErr;
+}
 
 // ── Home ────────────────────────────────────────────────────────────────────
 
@@ -180,15 +194,15 @@ function translateCreateError(err: unknown): never {
     /unique constraint/i.test(msg) ||
     /uniq_ags_agents_key/i.test(msg)
   ) {
-    throw new TRPCError({
+    throwTrpcAndCapture(new TRPCError({
       code: "CONFLICT",
       message: "An agent with that internal key already exists. Pick a unique key.",
-    });
+    }));
   }
-  throw new TRPCError({
+  throwTrpcAndCapture(new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: msg,
-  });
+  }));
 }
 
 const creationRouter = router({
@@ -210,10 +224,10 @@ const creationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const template = await templateRegistry.getTemplateByKey(input.templateKey);
       if (!template) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Template not found: ${input.templateKey}`,
-        });
+        }));
       }
       let result;
       try {
@@ -320,7 +334,7 @@ const creationRouter = router({
 const shellRouter = router({
   getShellSummary: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
     const agent = await repo.getAgentById(input.agentId);
-    if (!agent) throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+    if (!agent) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
     const draft = await repo.getCurrentDraft(input.agentId);
     const readiness = await readinessSvc.computeReadiness(input.agentId);
     const governance = await govSvc.evaluateGovernance(input.agentId);
@@ -337,7 +351,7 @@ const shellRouter = router({
   }),
   getOverview: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
     const agent = await repo.getAgentById(input.agentId);
-    if (!agent) throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+    if (!agent) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
     const draft = await repo.getCurrentDraft(input.agentId);
     const readiness = await readinessSvc.computeReadiness(input.agentId);
     const governance = await govSvc.evaluateGovernance(input.agentId);
@@ -361,14 +375,14 @@ const shellRouter = router({
 const identityRouter = router({
   get: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
     const agent = await repo.getAgentById(input.agentId);
-    if (!agent) throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+    if (!agent) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
     const draft = await repo.getCurrentDraft(input.agentId);
     return { agent, draft };
   }),
   update: protectedProcedure.input(updateIdentitySchema).mutation(async ({ input }) => {
     const agent = await repo.getAgentById(input.agentId);
     if (!agent) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+      throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
     }
 
     // 1. Update agent core fields (name/desc/class/visibility/etc.) so the
@@ -477,7 +491,7 @@ const toolsRouter = router({
   }),
   attach: protectedProcedure.input(attachToolSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     return repo.attachToolBinding({
       draftId: draft.id,
       toolKey: input.toolKey,
@@ -515,7 +529,7 @@ const toolsRouter = router({
       // tool-aware result. Does NOT call the real tool.
       const binding = await repo.getToolBindingById(input.bindingId);
       if (!binding) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Binding not found" }));
       }
       const entry = await toolCatalog.getToolCatalogEntry(binding.toolKey);
       return {
@@ -548,7 +562,7 @@ const knowledgeRouter = router({
     .input(updateKnowledgeConfigSchema)
     .mutation(async ({ input }) => {
       const draft = await repo.getCurrentDraft(input.agentId);
-      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
       await repo.updateDraft(input.agentId, { knowledgeConfig: input.config });
       if (input.bindings) {
         await repo.replaceKnowledgeBindings(draft.id, input.bindings);
@@ -594,7 +608,7 @@ const memoryRouter = router({
   }),
   update: protectedProcedure.input(updateMemoryConfigSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     await repo.replaceMemoryConfigs(draft.id, input.configs);
     return { success: true };
   }),
@@ -612,7 +626,7 @@ const workflowsRouter = router({
   }),
   update: protectedProcedure.input(updateWorkflowConfigSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     await repo.updateDraft(input.agentId, { workflowConfig: input.config });
     if (input.nodes !== undefined && input.edges !== undefined) {
       await repo.replaceWorkflowGraph(draft.id, input.nodes, input.edges);
@@ -683,7 +697,7 @@ const simulationRouter = router({
   }),
   getRun: protectedProcedure.input(getSimulationRunSchema).query(async ({ input }) => {
     const run = await repo.getSimulationRun(input.runId);
-    if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Simulation run not found" });
+    if (!run) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Simulation run not found" }));
     const steps = await repo.listSimulationRunSteps(input.runId);
     return { run, steps };
   }),
@@ -694,7 +708,7 @@ const simulationRouter = router({
     .input(promoteSimulationToTestSchema)
     .mutation(async ({ ctx, input }) => {
       const run = await repo.getSimulationRun(input.runId);
-      if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Simulation run not found" });
+      if (!run) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Simulation run not found" }));
 
       // Resolve target suite — create a default one if not provided
       let suiteId = input.suiteId;
@@ -748,7 +762,7 @@ const testingRouter = router({
     .input(z.object({ suiteId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const suite = await repo.getTestSuite(input.suiteId);
-      if (!suite) throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
+      if (!suite) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Suite not found" }));
       const cases = await repo.listTestCases(input.suiteId);
       return { suite, cases };
     }),
@@ -794,7 +808,7 @@ const testingRouter = router({
     .query(async ({ input }) => {
       const run = await repo.getTestRunById(input.runId);
       if (!run) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Test run not found" });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Test run not found" }));
       }
       const results = await repo.listTestRunResults(input.runId);
       return { run, results };
@@ -815,7 +829,7 @@ const runsRouter = router({
   }),
   getDetail: protectedProcedure.input(getRunDetailSchema).query(async ({ input }) => {
     const run = await repo.getRuntimeRunById(input.runId);
-    if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Runtime run not found" });
+    if (!run) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Runtime run not found" }));
     // Phase 4: include hook executions in the trace
     const [steps, toolCalls, memoryEvents, policyEvents, hookExecutions] =
       await Promise.all([
@@ -868,7 +882,7 @@ const runsRouter = router({
     .query(async ({ input }) => {
       const tree = await getRunTree(input.runId);
       if (!tree) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Run not found" }));
       }
       return tree;
     }),
@@ -912,12 +926,12 @@ const versionsRouter = router({
       } catch (err: any) {
         const msg = err?.message ?? "Rollback failed";
         if (/not found/i.test(msg)) {
-          throw new TRPCError({ code: "NOT_FOUND", message: msg });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: msg }));
         }
         if (/does not belong/i.test(msg)) {
-          throw new TRPCError({ code: "FORBIDDEN", message: msg });
+          throwTrpcAndCapture(new TRPCError({ code: "FORBIDDEN", message: msg }));
         }
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+        throwTrpcAndCapture(new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg }));
       }
     }),
 });
@@ -988,25 +1002,25 @@ const publishRouter = router({
       // 1. Verify the version exists AND belongs to this agent
       const version = await repo.getVersionById(input.versionId);
       if (!version) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Version ${input.versionId} not found`,
-        });
+        }));
       }
       if (version.agentId !== input.agentId) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "FORBIDDEN",
           message: `Version ${input.versionId} does not belong to agent ${input.agentId}`,
-        });
+        }));
       }
 
       // 2. Readiness gate
       const readiness = await readinessSvc.computeReadiness(input.agentId);
       if (!readiness.publishReady) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "PRECONDITION_FAILED",
           message: `Agent not ready to publish — score=${readiness.score}, blockers=${readiness.blockers.length}`,
-        });
+        }));
       }
 
       // 3. Governance verdict gate — preserved from the old
@@ -1015,10 +1029,10 @@ const publishRouter = router({
       // downgraded.
       const governance = await govSvc.evaluateGovernance(input.agentId);
       if (governance.verdict === "blocked") {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "FORBIDDEN",
           message: "Governance verdict is BLOCKED — cannot publish",
-        });
+        }));
       }
 
       // 4. Persist the release
@@ -1069,13 +1083,13 @@ const publishRouter = router({
       const audit = getAuditLogger();
       const step = await repo.getApprovalStepById(input.stepId);
       if (!step) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Approval step not found" });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Approval step not found" }));
       }
       if (step.state !== "pending") {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "CONFLICT",
           message: `Step already decided (state=${step.state})`,
-        });
+        }));
       }
       const updated = await repo.decideApprovalStep({
         stepId: input.stepId,
@@ -1084,7 +1098,7 @@ const publishRouter = router({
         decisionNote: input.note,
       });
       if (!updated) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Decision failed" });
+        throwTrpcAndCapture(new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Decision failed" }));
       }
 
       // Roll up to the publish request
@@ -1205,7 +1219,7 @@ const hooksRouter = router({
   }),
   save: protectedProcedure.input(saveHookSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     return repo.saveHook({
       hookId: input.hookId,
       draftId: draft.id,
@@ -1233,7 +1247,7 @@ const mcpRouter = router({
   }),
   save: protectedProcedure.input(saveMcpServerSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     return repo.saveMcpServer({
       serverId: input.serverId,
       draftId: draft.id,
@@ -1258,7 +1272,7 @@ const mcpRouter = router({
     .mutation(async ({ input }) => {
       const server = await repo.getMcpServerById(input.serverId);
       if (!server) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "MCP server not found" });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "MCP server not found" }));
       }
       return {
         ok: true,
@@ -1422,10 +1436,10 @@ const mcpRouter = router({
       // production deployments.
       const server = await repo.getMcpServerById(input.serverId);
       if (!server) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `MCP server ${input.serverId} not found`,
-        });
+        }));
       }
       await repo.updateMcpServerOAuth(input.serverId, {
         oauthConfig: input.config as Record<string, unknown>,
@@ -1442,10 +1456,10 @@ const mcpRouter = router({
       const { exchangeCodeForTokens } = await import("../services/mcp/auth");
       const server = await repo.getMcpServerById(input.serverId);
       if (!server) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `MCP server ${input.serverId} not found`,
-        });
+        }));
       }
       const config = (server as any).oauthConfig as
         | Record<string, unknown>
@@ -1454,19 +1468,19 @@ const mcpRouter = router({
         | Record<string, unknown>
         | null;
       if (!config || !state) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message:
             "OAuth flow not initiated for this server — call oauthInitiate first",
-        });
+        }));
       }
       // Defeat CSRF: the state from the provider must match what we
       // generated at initiate time.
       if (input.state !== (state as any).state) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: "OAuth state mismatch — possible CSRF attempt",
-        });
+        }));
       }
       let tokens;
       try {
@@ -1476,10 +1490,10 @@ const mcpRouter = router({
           codeVerifier: (state as any).codeVerifier,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
       // Phase 17c: encrypt tokens at rest using the platform helper.
       // This is the documented cross-module import exception (the plan
@@ -1538,7 +1552,7 @@ const skillsRouter = router({
     .input(attachSkillSchema)
     .mutation(async ({ input }) => {
       const draft = await repo.getCurrentDraft(input.agentId);
-      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
       return repo.attachSkill({
         draftId: draft.id,
         packKey: input.packKey,
@@ -1570,7 +1584,7 @@ const subagentsRouter = router({
     .input(saveSubagentSchema)
     .mutation(async ({ input }) => {
       const draft = await repo.getCurrentDraft(input.agentId);
-      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
       return repo.saveSubagent({
         subagentId: input.subagentId,
         draftId: draft.id,
@@ -1607,7 +1621,7 @@ const pluginsRouter = router({
   }),
   save: protectedProcedure.input(savePluginSchema).mutation(async ({ input }) => {
     const draft = await repo.getCurrentDraft(input.agentId);
-    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
     return repo.savePlugin({
       pluginId: input.pluginId,
       draftId: draft.id,
@@ -1659,7 +1673,7 @@ const permissionRulesRouter = router({
     .input(savePermissionRuleSchema)
     .mutation(async ({ input }) => {
       const draft = await repo.getCurrentDraft(input.agentId);
-      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      if (!draft) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "No draft" }));
       return repo.savePermissionRule({
         ruleId: input.ruleId,
         draftId: draft.id,
@@ -1780,10 +1794,10 @@ const permissionsRouter = router({
       // service's `{ok, status, expiresAt, reason}` projection).
       const row = await repo.getPendingPermissionRequestById(input.requestId);
       if (!row) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Permission request ${input.requestId} not found`,
-        });
+        }));
       }
       return row;
     }),
@@ -1852,10 +1866,10 @@ const catalogSkillsRouter = router({
           source: "db",
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   update: protectedProcedure
@@ -1865,18 +1879,18 @@ const catalogSkillsRouter = router({
       try {
         const updated = await catalogSkillsService.updateCatalogSkill(id, patch);
         if (!updated) {
-          throw new TRPCError({
+          throwTrpcAndCapture(new TRPCError({
             code: "NOT_FOUND",
             message: `catalog skill ${id} not found`,
-          });
+          }));
         }
         return updated;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   remove: protectedProcedure
@@ -1884,10 +1898,10 @@ const catalogSkillsRouter = router({
     .mutation(async ({ input }) => {
       const result = await catalogSkillsService.removeCatalogSkill(input.id);
       if (!result.ok) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: result.error ?? "remove failed",
-        });
+        }));
       }
       return { success: true };
     }),
@@ -1944,10 +1958,10 @@ const catalogToolsRouter = router({
           createdBy: ctx.user.id,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   update: governedProcedure
@@ -1957,18 +1971,18 @@ const catalogToolsRouter = router({
       try {
         const updated = await catalogToolsService.updateCatalogTool(id, patch);
         if (!updated) {
-          throw new TRPCError({
+          throwTrpcAndCapture(new TRPCError({
             code: "NOT_FOUND",
             message: `catalog tool ${id} not found`,
-          });
+          }));
         }
         return updated;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   remove: governedProcedure
@@ -1976,10 +1990,10 @@ const catalogToolsRouter = router({
     .mutation(async ({ input }) => {
       const result = await catalogToolsService.removeCatalogTool(input.id);
       if (!result.ok) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: result.error ?? "remove failed",
-        });
+        }));
       }
       return { success: true };
     }),
@@ -2103,10 +2117,10 @@ const marketplaceRouter = router({
           createdBy: ctx.user.id,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   unpublish: protectedProcedure
@@ -2114,10 +2128,10 @@ const marketplaceRouter = router({
     .mutation(async ({ input }) => {
       const result = await marketplaceService.unpublishLocalItem(input.itemId);
       if (!result.ok) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: result.error ?? "unpublish failed",
-        });
+        }));
       }
       return { success: true };
     }),
@@ -2127,10 +2141,10 @@ const marketplaceRouter = router({
       try {
         return await marketplaceService.refreshFromRegistry(input?.registryUrl);
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   listCollections: protectedProcedure.query(async () => {
@@ -2149,10 +2163,10 @@ const marketplaceRouter = router({
           installedBy: ctx.user.id,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
   uninstall: protectedProcedure
@@ -2161,10 +2175,10 @@ const marketplaceRouter = router({
       try {
         return await uninstallMarketplaceItem(input.installId);
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 });
