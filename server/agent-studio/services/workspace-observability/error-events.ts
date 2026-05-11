@@ -1,0 +1,148 @@
+/**
+ * Workspace Observability — Error events service.
+ *
+ * Phase 22. Wires the dormant `ags_workspace_error_events` table.
+ * Operators see a per-event audit of workspace-level errors —
+ * promotion validation rejections, Neo4j projection sync failures,
+ * Cypher template gate denials, retrieval safety-filter blocks.
+ *
+ * The recorder is a write-only surface for service code. Readers
+ * surface the events in an admin diagnostics panel.
+ *
+ * ADR: docs/architecture/agent-studio-native-graph-workspace.md
+ */
+
+import { and, desc, eq } from "drizzle-orm";
+import { getAsDb } from "../../db/connection.js";
+import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
+
+export class AsdbUnavailableError extends Error {
+  constructor() {
+    super("ASDB connection unavailable");
+    this.name = "AsdbUnavailableError";
+  }
+}
+
+export interface RecordErrorEventInput {
+  readonly sourceKind: string;
+  readonly sourceId?: string | null;
+  readonly userId?: number | null;
+  readonly errorClass: string;
+  readonly errorMessage: string;
+  readonly metadata?: Record<string, unknown> | null;
+}
+
+export interface ErrorEventRow {
+  readonly id: number;
+  readonly sourceKind: string;
+  readonly sourceId: string | null;
+  readonly userId: number | null;
+  readonly errorClass: string;
+  readonly errorMessage: string;
+  readonly metadata: Record<string, unknown> | null;
+  readonly createdAt: Date;
+}
+
+export interface ServiceOptions {
+  readonly getDb?: typeof getAsDb;
+}
+
+function rowToEvent(r: Record<string, unknown>): ErrorEventRow {
+  return {
+    id: Number(r.id),
+    sourceKind: String(r.sourceKind),
+    sourceId: r.sourceId == null ? null : String(r.sourceId),
+    userId: r.userId == null ? null : Number(r.userId),
+    errorClass: String(r.errorClass),
+    errorMessage: String(r.errorMessage),
+    metadata:
+      (r.metadata as Record<string, unknown> | null | undefined) ?? null,
+    createdAt: r.createdAt as Date,
+  };
+}
+
+export async function recordErrorEvent(
+  input: RecordErrorEventInput,
+  options: ServiceOptions = {},
+): Promise<ErrorEventRow | null> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  // Fail-soft on ASDB-null. Error event recording is observability,
+  // not the operational hot path — losing an event row is preferable
+  // to throwing inside an already-failing flow.
+  if (!db) return null;
+
+  const inserted = await db
+    .insert(agsWorkspaceErrorEvents)
+    .values({
+      sourceKind: input.sourceKind,
+      sourceId: input.sourceId ?? null,
+      userId: input.userId ?? null,
+      errorClass: input.errorClass,
+      errorMessage: input.errorMessage,
+      metadata: input.metadata ?? null,
+    })
+    .returning({
+      id: agsWorkspaceErrorEvents.id,
+      sourceKind: agsWorkspaceErrorEvents.sourceKind,
+      sourceId: agsWorkspaceErrorEvents.sourceId,
+      userId: agsWorkspaceErrorEvents.userId,
+      errorClass: agsWorkspaceErrorEvents.errorClass,
+      errorMessage: agsWorkspaceErrorEvents.errorMessage,
+      metadata: agsWorkspaceErrorEvents.metadata,
+      createdAt: agsWorkspaceErrorEvents.createdAt,
+    });
+  const row = inserted[0];
+  if (!row) return null;
+  return rowToEvent(row);
+}
+
+export interface ListErrorEventsInput {
+  readonly sourceKind?: string;
+  readonly errorClass?: string;
+  readonly userId?: number;
+  readonly limit?: number;
+}
+
+export async function listErrorEvents(
+  input: ListErrorEventsInput = {},
+  options: ServiceOptions = {},
+): Promise<ErrorEventRow[]> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const filters = [];
+  if (input.sourceKind !== undefined) {
+    filters.push(eq(agsWorkspaceErrorEvents.sourceKind, input.sourceKind));
+  }
+  if (input.errorClass !== undefined) {
+    filters.push(eq(agsWorkspaceErrorEvents.errorClass, input.errorClass));
+  }
+  if (input.userId !== undefined) {
+    filters.push(eq(agsWorkspaceErrorEvents.userId, input.userId));
+  }
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceErrorEvents.id,
+      sourceKind: agsWorkspaceErrorEvents.sourceKind,
+      sourceId: agsWorkspaceErrorEvents.sourceId,
+      userId: agsWorkspaceErrorEvents.userId,
+      errorClass: agsWorkspaceErrorEvents.errorClass,
+      errorMessage: agsWorkspaceErrorEvents.errorMessage,
+      metadata: agsWorkspaceErrorEvents.metadata,
+      createdAt: agsWorkspaceErrorEvents.createdAt,
+    })
+    .from(agsWorkspaceErrorEvents)
+    .where(
+      filters.length === 0
+        ? undefined
+        : filters.length === 1
+          ? filters[0]
+          : and(...filters),
+    )
+    .orderBy(desc(agsWorkspaceErrorEvents.createdAt))
+    .limit(input.limit ?? 100);
+  return rows.map(rowToEvent);
+}
