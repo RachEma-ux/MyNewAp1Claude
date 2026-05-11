@@ -26,6 +26,18 @@ import {
   exportTraceToNote,
   TraceNoteAlreadyExistsError,
 } from "./trace-note-writer.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * 7th router on the trpc-error-capture chain (after #490 graph-quality,
+ * #491 graph-correction, #492 workspace-observability, #493
+ * graph-change-proposals, #509 vault, #510 promotion).
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("graphAgent.router", trpcErr);
+  throw trpcErr;
+}
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -41,10 +53,10 @@ export const graphAgentRouter = router({
       const userId = input.userId ?? ctxAny.user?.id;
       const workspaceId = input.workspaceId ?? ctxAny.user?.workspaceId ?? 1;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "Graph Agent Lite requires an authenticated user",
-        });
+        }));
       }
       const engine = wireGraphAgentLite({
         workspaceId,
@@ -58,10 +70,10 @@ export const graphAgentRouter = router({
         });
         return answer;
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -88,10 +100,10 @@ export const graphAgentRouter = router({
           descriptionBudget: input?.descriptionBudget,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -122,10 +134,10 @@ export const graphAgentRouter = router({
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const actorUserId = ctxAny.user?.id;
       if (actorUserId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "exportTraceMarkdown requires an authenticated user",
-        });
+        }));
       }
       try {
         const exported = await exportDecisionTraceAsMarkdown(input.runId, {
@@ -135,10 +147,10 @@ export const graphAgentRouter = router({
         });
         return { runId: input.runId, exported };
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -155,10 +167,10 @@ export const graphAgentRouter = router({
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const actorUserId = ctxAny.user?.id;
       if (actorUserId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "explain requires an authenticated user",
-        });
+        }));
       }
       try {
         const explanation = await getExplanationForRun(input.runId, {
@@ -169,10 +181,10 @@ export const graphAgentRouter = router({
           explanation,
         };
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -198,10 +210,10 @@ export const graphAgentRouter = router({
       };
       const userId = ctxAny.user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "exportTraceToNote requires an authenticated user",
-        });
+        }));
       }
       try {
         const result = await exportTraceToNote({
@@ -216,15 +228,15 @@ export const graphAgentRouter = router({
         return { runId: input.runId, exported: result };
       } catch (e) {
         if (e instanceof TraceNoteAlreadyExistsError) {
-          throw new TRPCError({
+          throwTrpcAndCapture(new TRPCError({
             code: "CONFLICT",
             message: e.message,
-          });
+          }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -252,10 +264,10 @@ export const graphAgentRouter = router({
           olderThanMs: input.olderThanMs,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 });
