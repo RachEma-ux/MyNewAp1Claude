@@ -224,3 +224,28 @@ export const agsRuntimeNoteReferences = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
 );
+
+/**
+ * Phase 14 §6/§7. Per-run record of which CAG capability packs were
+ * used during a runtime run. Parallels `ags_graph_skill_runtime_usages`
+ * on the Skill Pack side. The Phase 14 projection layer reads this to
+ * emit `(:RuntimeTrace)-[:USED_CAG_BLOCK]->(:CAGBlock)` edges.
+ *
+ * `cagPackId` references `ags_cag_capability_packs.id`. `packVersion`
+ * mirrors the pack's `pack_version` at use-time so the trace
+ * faithfully records which version flowed through the run, even if
+ * the pack is mutated later.
+ *
+ * The CAG resolver-side writer that inserts these rows is a separate
+ * follow-up — this PR ships the projection-side reader + expander only.
+ */
+export const agsCagBlockRuntimeUsages = pgTable(
+  "ags_cag_block_runtime_usages",
+  {
+    id: serial("id").primaryKey(),
+    cagPackId: integer("cag_pack_id").notNull(),
+    packVersion: integer("pack_version").notNull(),
+    runtimeRunId: integer("runtime_run_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+);
