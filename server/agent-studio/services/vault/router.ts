@@ -20,6 +20,12 @@ import { VaultRepositoryStub } from "./repository.js";
 import { AsdbVaultRepository } from "./repository-asdb.js";
 import type { VaultRepository } from "./repository.js";
 import { extractLinksFromMarkdown } from "./links.js";
+import {
+  createTemplate,
+  listTemplates,
+  getTemplateById,
+  renderTemplate,
+} from "./templates.js";
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -128,6 +134,115 @@ export const vaultRouter = router({
       // Phase 6 wires the tsvector search via AsdbVaultRepository.
       // MVP returns empty until then.
       return [] as Array<{ noteId: number; title: string; snippet: string; score: number }>;
+    }),
+
+  // ============================================================
+  // Phase 15 §1 + §2 — Templates
+  // ============================================================
+
+  createTemplate: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive().optional(),
+        templateKey: z.string().min(1).max(100),
+        name: z.string().min(1).max(255),
+        contentMd: z.string().max(200_000),
+        frontmatterDefaults: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await createTemplate({
+          vaultId: input.vaultId,
+          templateKey: input.templateKey,
+          name: input.name,
+          contentMd: input.contentMd,
+          frontmatterDefaults: input.frontmatterDefaults,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  listTemplates: protectedProcedure
+    .input(
+      z
+        .object({
+          vaultId: z.number().int().positive().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await listTemplates({ vaultId: input?.vaultId });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  createNoteFromTemplate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.number().int().positive(),
+        vaultId: z.number().int().positive(),
+        folderId: z.number().int().positive().optional(),
+        slug: z.string().min(1).max(255),
+        title: z.string().min(1).max(500),
+        variables: z
+          .record(
+            z.string(),
+            z.union([
+              z.string(),
+              z.number(),
+              z.boolean(),
+              z.null(),
+            ]),
+          )
+          .optional(),
+        frontmatterOverrides: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id ?? 1;
+
+      const template = await getTemplateById(input.templateId);
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Template ${input.templateId} not found`,
+        });
+      }
+
+      const rendered = renderTemplate({
+        contentMd: template.contentMd,
+        frontmatterDefaults: template.frontmatterDefaults,
+        variables: input.variables,
+        frontmatterOverrides: input.frontmatterOverrides,
+      });
+
+      const note = await getRepo().createNote(
+        {
+          vaultId: input.vaultId,
+          folderId: input.folderId,
+          slug: input.slug,
+          title: input.title,
+          contentMd: rendered.contentMd,
+          frontmatter: rendered.frontmatter,
+        },
+        userId,
+      );
+      return {
+        noteId: note.id,
+        versionId: note.versionId,
+        templateKey: template.templateKey,
+      };
     }),
 });
 
