@@ -76,6 +76,7 @@ import {
   FindingNotFoundError as DismissFindingNotFound,
   FindingAlreadyResolvedError,
 } from "./dismiss-finding.js";
+import { getGraphQualityStats } from "./stats.js";
 import {
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
@@ -527,6 +528,10 @@ export const graphQualityRouter = router({
 
   listRegisteredScanKinds: protectedProcedure.query(() => {
     return QUALITY_SCANNER_REGISTRY.map((r) => r.scanKind);
+  }),
+
+  getStats: protectedProcedure.query(async () => {
+    return await getGraphQualityStats();
   }),
 
   getFindingAuditTrail: protectedProcedure

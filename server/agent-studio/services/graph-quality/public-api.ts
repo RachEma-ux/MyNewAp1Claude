@@ -114,6 +114,12 @@ export type {
   BulkDismissFindingsResult,
 } from "./dismiss-finding.js";
 
+export { getGraphQualityStats } from "./stats.js";
+export type {
+  GraphQualityStats,
+  GraphQualityStatsOptions,
+} from "./stats.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";

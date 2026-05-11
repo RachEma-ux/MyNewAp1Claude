@@ -38,6 +38,7 @@ describe("graphQualityRouter", () => {
     expect(procedures.listAppliedProposals).toBeDefined();
     expect(procedures.listRegisteredScanKinds).toBeDefined();
     expect(procedures.getFindingAuditTrail).toBeDefined();
+    expect(procedures.getStats).toBeDefined();
   });
 
   it("does not leak un-routed scratch procedures", () => {
@@ -57,6 +58,7 @@ describe("graphQualityRouter", () => {
       "listAppliedProposals",
       "listRegisteredScanKinds",
       "getFindingAuditTrail",
+      "getStats",
     ]);
     for (const name of Object.keys(procedures)) {
       expect(known.has(name)).toBe(true);
