@@ -12,6 +12,19 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../_core/trpc.js";
 import { PromotionLifecycle, type PromotionAdapter, type PromotionRequest } from "./lifecycle.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * Same pattern as #491 (graph-correction) / #492 (workspace-observability) /
+ * #493 (graph-change-proposals) / #509 (vault). The classifier filters
+ * out expected operator-side codes (PRECONDITION_FAILED on no-adapter,
+ * NOT_FOUND, etc.) and only persists INTERNAL_SERVER_ERROR + raw Errors.
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("promotion.router", trpcErr);
+  throw trpcErr;
+}
 
 let cachedAdapter: PromotionAdapter | null = null;
 let cachedLifecycle: PromotionLifecycle | null = null;
@@ -28,10 +41,10 @@ export function _setPromotionAdapter(adapter: PromotionAdapter): void {
 
 function lifecycle(): PromotionLifecycle {
   if (!cachedLifecycle) {
-    throw new TRPCError({
+    throwTrpcAndCapture(new TRPCError({
       code: "PRECONDITION_FAILED",
       message: "Promotion adapter not yet wired. Operator must inject the Drizzle-backed PromotionAdapter at boot.",
-    });
+    }));
   }
   return cachedLifecycle;
 }
@@ -60,7 +73,7 @@ export const promotionRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Promotion requires authenticated user" });
+        throwTrpcAndCapture(new TRPCError({ code: "UNAUTHORIZED", message: "Promotion requires authenticated user" }));
       }
       const request: PromotionRequest = {
         noteId: input.noteId,
@@ -77,7 +90,7 @@ export const promotionRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Approval requires authenticated user" });
+        throwTrpcAndCapture(new TRPCError({ code: "UNAUTHORIZED", message: "Approval requires authenticated user" }));
       }
       return await lifecycle().approve(input.promotionId, userId);
     }),
@@ -87,7 +100,7 @@ export const promotionRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Rejection requires authenticated user" });
+        throwTrpcAndCapture(new TRPCError({ code: "UNAUTHORIZED", message: "Rejection requires authenticated user" }));
       }
       return await lifecycle().reject(input.promotionId, userId);
     }),
@@ -97,7 +110,7 @@ export const promotionRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id;
       if (userId == null) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Rollback requires authenticated user" });
+        throwTrpcAndCapture(new TRPCError({ code: "UNAUTHORIZED", message: "Rollback requires authenticated user" }));
       }
       return await lifecycle().rollback(input.promotionId, userId);
     }),
