@@ -14,7 +14,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceUserNotifications } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -138,6 +138,55 @@ export async function markNotificationRead(
     .update(agsWorkspaceUserNotifications)
     .set({ read: true })
     .where(eq(agsWorkspaceUserNotifications.id, notificationId));
+}
+
+export interface UnreadNotificationCount {
+  readonly total: number;
+  readonly byKind: Record<string, number>;
+}
+
+/**
+ * Aggregate unread notification count for a single user. Returns `total`
+ * and a per-`notificationKind` breakdown — the dashboard renders the
+ * total as a badge and the per-kind map as filter chips.
+ *
+ * Fail-soft: when ASDB is unavailable returns the zero-state instead of
+ * throwing, matching the listNotifications contract. A failed read of
+ * the badge count is preferable to a blocked dashboard render.
+ */
+export async function countUnreadNotifications(
+  userId: number,
+  options: ServiceOptions = {},
+): Promise<UnreadNotificationCount> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return { total: 0, byKind: {} };
+
+  const rows = (await db
+    .select({
+      notificationKind: agsWorkspaceUserNotifications.notificationKind,
+      count: count(),
+    })
+    .from(agsWorkspaceUserNotifications)
+    .where(
+      and(
+        eq(agsWorkspaceUserNotifications.userId, userId),
+        eq(agsWorkspaceUserNotifications.read, false),
+      ),
+    )
+    .groupBy(agsWorkspaceUserNotifications.notificationKind)) as {
+    notificationKind: string;
+    count: number;
+  }[];
+
+  let total = 0;
+  const byKind: Record<string, number> = {};
+  for (const r of rows) {
+    const c = Number(r.count);
+    byKind[r.notificationKind] = c;
+    total += c;
+  }
+  return { total, byKind };
 }
 
 export async function markAllNotificationsRead(

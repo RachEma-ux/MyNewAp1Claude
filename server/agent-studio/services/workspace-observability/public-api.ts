@@ -29,6 +29,7 @@ export type {
 export {
   pushNotification,
   listNotifications,
+  countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   AsdbUnavailableError as UserNotificationsAsdbUnavailableError,
@@ -37,6 +38,7 @@ export type {
   PushNotificationInput,
   ListNotificationsInput,
   NotificationRow,
+  UnreadNotificationCount,
 } from "./user-notifications.js";
 
 export {
