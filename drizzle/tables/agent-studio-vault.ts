@@ -214,6 +214,13 @@ export const agsVaultAttachments = pgTable(
     storageUri: text("storage_uri").notNull(),
     contentHash: varchar("content_hash", { length: 64 }).notNull(),
     createdByUserId: integer("created_by_user_id"),
+    // Phase 15 — flagging an attachment as a source artifact makes it
+    // eligible for the Universal Ingestion / RAC source-registry
+    // pipeline. The flag lives here so a single operator action can
+    // toggle it without standing up a separate registry row; the
+    // ingestion pipeline reads this column when scanning the vault
+    // for new source candidates.
+    isSourceArtifact: boolean("is_source_artifact").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
