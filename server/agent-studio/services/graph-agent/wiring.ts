@@ -19,6 +19,7 @@ import { dispatchMcpToolCall } from "../mcp/dispatcher.js";
 import * as repo from "../../repository.js";
 import { GraphAgentEngine, type GraphAgentEngineOptions, type McpDispatchAdapter, type ModelAccessAdapter, type RuntimeTraceAdapter } from "./engine.js";
 import { createGraphAgentDecisionTraceWriter } from "./decision-trace-writer.js";
+import { recordTraceProjectionIntent } from "./projection-events.js";
 import { GraphRetrievalRouter } from "../graph/retrieval/retrieval-router.js";
 import { getGraphRepository } from "../graph/repository/index.js";
 import {
@@ -141,7 +142,28 @@ export class McpDispatcherAdapter implements McpDispatchAdapter {
  * needing to know the exact column shape — the existing repository
  * already validates inputs against the Drizzle schema.
  */
+export interface RuntimeTraceWriterAdapterOptions {
+  /**
+   * Phase 14 §6/§7. When true (default) the adapter records a
+   * `runtime_trace` projection intent into `ags_runtime_graph_events` on
+   * finalize so a future Phase 7.5 Neo4j worker can project the run +
+   * its decision-trace + skill-pack edges into the graph.
+   */
+  readonly recordProjectionIntent?: boolean;
+  /** Test seam for the projection-intent writer. */
+  readonly projectionIntentWriter?: typeof recordTraceProjectionIntent;
+}
+
 export class RuntimeTraceWriterAdapter implements RuntimeTraceAdapter {
+  private readonly projectionIntentEnabled: boolean;
+  private readonly projectionIntentWriter: typeof recordTraceProjectionIntent;
+
+  constructor(options: RuntimeTraceWriterAdapterOptions = {}) {
+    this.projectionIntentEnabled = options.recordProjectionIntent !== false;
+    this.projectionIntentWriter =
+      options.projectionIntentWriter ?? recordTraceProjectionIntent;
+  }
+
   async startRun(input: {
     agentKey: string;
     userId?: number;
@@ -182,6 +204,26 @@ export class RuntimeTraceWriterAdapter implements RuntimeTraceAdapter {
         errorReason,
         completedAt: new Date(),
       });
+    }
+
+    if (!this.projectionIntentEnabled || runId <= 0) return;
+    // Phase 14 §6/§7 — record the Postgres-side projection intent. Non-
+    // fatal: the authoritative `ags_runtime_runs` row has already been
+    // updated; the worker (Phase 7.5) will catch up via the pending
+    // queue. Payload is pointer-shaped — the worker fetches the
+    // decision-trace + skill-pack rows when draining.
+    try {
+      await this.projectionIntentWriter({
+        eventKind: "runtime_trace",
+        runtimeRunId: runId,
+        payload: {
+          status,
+          durationMs,
+          errorReason: errorReason ?? null,
+        },
+      });
+    } catch {
+      // Swallow — projection-intent is bookkeeping.
     }
   }
 }
