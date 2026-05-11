@@ -52,6 +52,7 @@ export type {
 
 export {
   runQualityAgent,
+  convertFindingsBatch,
   AsdbUnavailableError as QualityAgentAsdbUnavailableError,
 } from "./agent-run.js";
 export type {
