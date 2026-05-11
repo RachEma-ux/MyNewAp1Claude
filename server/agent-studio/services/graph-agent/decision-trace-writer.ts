@@ -23,6 +23,7 @@ import {
   agsGraphAgentSteps,
 } from "../../../../drizzle/tables/agent-studio-graph-agent.js";
 import type { GraphAgentDecisionTraceAdapter } from "./engine.js";
+import { recordTraceProjectionIntent } from "./projection-events.js";
 
 export class GraphAgentDecisionTraceUnavailableError extends Error {
   constructor() {
@@ -33,12 +34,25 @@ export class GraphAgentDecisionTraceUnavailableError extends Error {
 
 export interface CreateGraphAgentDecisionTraceWriterOptions {
   readonly getDb?: typeof getAsDb;
+  /**
+   * Phase 14 §6/§7. When set, the writer records a `decision_trace`
+   * projection intent into `ags_runtime_graph_events` on finalize so a
+   * future Phase 7.5 Neo4j worker can project the trace into the graph.
+   * Defaults to true; tests pass `false` to keep the writer focused on
+   * the run/step rows.
+   */
+  readonly recordProjectionIntent?: boolean;
+  /** Test seam for the projection-intent writer (defaults to the real one). */
+  readonly projectionIntentWriter?: typeof recordTraceProjectionIntent;
 }
 
 export function createGraphAgentDecisionTraceWriter(
   options: CreateGraphAgentDecisionTraceWriterOptions = {},
 ): GraphAgentDecisionTraceAdapter {
   const getDb = options.getDb ?? getAsDb;
+  const projectionIntentEnabled = options.recordProjectionIntent !== false;
+  const projectionIntentWriter =
+    options.projectionIntentWriter ?? recordTraceProjectionIntent;
 
   function db() {
     const handle = getDb();
@@ -76,7 +90,7 @@ export function createGraphAgentDecisionTraceWriter(
     },
 
     async finalizeGraphAgentRun(input) {
-      await db()
+      const updated = await db()
         .update(agsGraphAgentRuns)
         .set({
           status: input.status,
@@ -84,7 +98,43 @@ export function createGraphAgentDecisionTraceWriter(
           durationMs: input.durationMs,
           errorMessage: input.errorMessage ?? null,
         })
-        .where(eq(agsGraphAgentRuns.id, input.graphAgentRunId));
+        .where(eq(agsGraphAgentRuns.id, input.graphAgentRunId))
+        .returning({
+          id: agsGraphAgentRuns.id,
+          agentKey: agsGraphAgentRuns.agentKey,
+          runtimeRunId: agsGraphAgentRuns.runtimeRunId,
+        });
+
+      if (!projectionIntentEnabled) return;
+      const row = updated[0];
+      if (!row?.runtimeRunId) return;
+
+      // Phase 14 §6/§7 — record the Postgres-side projection intent. The
+      // worker (Phase 7.5) drains pending rows and writes the graph
+      // nodes/edges to Neo4j. We don't materialise step rows in the
+      // payload; the worker SELECTs them when draining. A failed insert
+      // here is non-fatal — the decision-trace row itself has already
+      // landed; a backfill job can re-derive intent rows from
+      // `ags_graph_agent_runs` if needed.
+      try {
+        await projectionIntentWriter(
+          {
+            eventKind: "decision_trace",
+            runtimeRunId: row.runtimeRunId,
+            graphAgentRunId: row.id,
+            payload: {
+              agentKey: row.agentKey,
+              status: input.status,
+              durationMs: input.durationMs,
+              errorMessage: input.errorMessage ?? null,
+            },
+          },
+          { getDb },
+        );
+      } catch {
+        // Swallow — projection-intent is bookkeeping; the authoritative
+        // run row is already persisted.
+      }
     },
   };
 }
