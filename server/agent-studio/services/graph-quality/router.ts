@@ -66,6 +66,7 @@ import {
   InvalidProposalPayloadError,
 } from "./mutation-worker.js";
 import { approveAndApplyProposal } from "./approve-and-apply.js";
+import { getFindingAuditTrail } from "./finding-audit-trail.js";
 import {
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
@@ -388,6 +389,19 @@ export const graphQualityRouter = router({
   listRegisteredScanKinds: protectedProcedure.query(() => {
     return QUALITY_SCANNER_REGISTRY.map((r) => r.scanKind);
   }),
+
+  getFindingAuditTrail: protectedProcedure
+    .input(z.object({ findingId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const trail = await getFindingAuditTrail(input.findingId);
+      if (!trail) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Finding ${input.findingId} not found`,
+        });
+      }
+      return trail;
+    }),
 });
 
 export type GraphQualityRouter = typeof graphQualityRouter;
