@@ -65,6 +65,14 @@ export const agsGraphQualityFindings = pgTable(
     sourceId: text("source_id"),
     details: json("details").$type<Record<string, unknown>>(),
     proposalId: integer("proposal_id"),
+    // Per-finding lifecycle:
+    //   open       — initial state after the scanner emits the finding.
+    //   triaged    — operator (or auto-agent) converted it to a proposal.
+    //   applied    — mutation worker successfully applied the linked
+    //                proposal.
+    //   dismissed  — operator marked it not-applicable without
+    //                creating a proposal.
+    status: varchar("status", { length: 50 }).notNull().default("open"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

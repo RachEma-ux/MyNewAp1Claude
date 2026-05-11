@@ -70,6 +70,12 @@ import {
 import { approveAndApplyProposal } from "./approve-and-apply.js";
 import { getFindingAuditTrail } from "./finding-audit-trail.js";
 import {
+  dismissFinding,
+  AsdbUnavailableError as DismissFindingAsdbUnavailable,
+  FindingNotFoundError as DismissFindingNotFound,
+  FindingAlreadyResolvedError,
+} from "./dismiss-finding.js";
+import {
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
 } from "../graph-correction/public-api.js";
@@ -78,6 +84,7 @@ import { QUALITY_SCANNER_REGISTRY } from "./public-api.js";
 const ScanStatusEnum = z.enum(["pending", "running", "completed", "failed"]);
 const AgentRunStatusEnum = z.enum(["running", "completed", "failed"]);
 const SeverityEnum = z.enum(["low", "medium", "high", "critical"]);
+const FindingStatusEnum = z.enum(["open", "triaged", "applied", "dismissed"]);
 
 function unwrapError(e: unknown): never {
   if (e instanceof UnknownScanKindError) {
@@ -86,8 +93,17 @@ function unwrapError(e: unknown): never {
   if (e instanceof InvalidProposalPayloadError) {
     throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
-  if (e instanceof FindingNotFoundError) {
+  if (e instanceof FindingNotFoundError || e instanceof DismissFindingNotFound) {
     throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+  }
+  if (e instanceof FindingAlreadyResolvedError) {
+    throw new TRPCError({ code: "CONFLICT", message: e.message });
+  }
+  if (e instanceof DismissFindingAsdbUnavailable) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: e.message,
+    });
   }
   if (
     e instanceof ProposalNotFoundError ||
@@ -200,6 +216,27 @@ export const graphQualityRouter = router({
       }
     }),
 
+  dismissFinding: protectedProcedure
+    .input(
+      z.object({
+        findingId: z.number().int().positive(),
+        reason: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      try {
+        return await dismissFinding({
+          findingId: input.findingId,
+          reason: input.reason,
+          dismissedByUserId: userId,
+        });
+      } catch (e) {
+        unwrapError(e);
+      }
+    }),
+
   approveAndApply: protectedProcedure
     .input(
       z.object({
@@ -295,6 +332,7 @@ export const graphQualityRouter = router({
           scanId: z.number().int().positive().optional(),
           findingClass: z.string().min(1).max(100).optional(),
           severity: SeverityEnum.optional(),
+          status: FindingStatusEnum.optional(),
           proposalId: z.number().int().positive().optional(),
           untriagedOnly: z.boolean().optional(),
           triagedOnly: z.boolean().optional(),
@@ -317,6 +355,9 @@ export const graphQualityRouter = router({
       }
       if (input?.severity) {
         filters.push(eq(agsGraphQualityFindings.severity, input.severity));
+      }
+      if (input?.status) {
+        filters.push(eq(agsGraphQualityFindings.status, input.status));
       }
       if (input?.proposalId) {
         filters.push(eq(agsGraphQualityFindings.proposalId, input.proposalId));

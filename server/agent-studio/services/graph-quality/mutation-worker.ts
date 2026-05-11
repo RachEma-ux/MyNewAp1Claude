@@ -30,6 +30,7 @@ import { getAsDb } from "../../db/connection.js";
 import {
   agsGraphCorrectionProposals,
   agsGraphCorrectionAuditEvents,
+  agsGraphQualityFindings,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import type { ProposalPayload } from "./proposal-payload-builder.js";
 
@@ -267,6 +268,25 @@ export async function applyApprovedProposal(
       details: result.details ?? null,
     },
   });
+
+  // Back-patch the source finding's lifecycle if we can resolve it from
+  // the proposal payload. The converter (PR #475) carries
+  // proposedChange.finding.id; the mutation-worker stub doesn't take a
+  // hard dependency on that shape — if the id is missing/unparseable,
+  // we silently skip the finding update.
+  if (result.applied && proposal.proposedChange) {
+    const findingBlob = (proposal.proposedChange as Record<string, unknown>)
+      .finding;
+    if (findingBlob && typeof findingBlob === "object") {
+      const findingId = (findingBlob as Record<string, unknown>).id;
+      if (typeof findingId === "number") {
+        await db
+          .update(agsGraphQualityFindings)
+          .set({ status: "applied" })
+          .where(eq(agsGraphQualityFindings.id, findingId));
+      }
+    }
+  }
 
   return {
     proposalId: input.proposalId,

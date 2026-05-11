@@ -208,10 +208,10 @@ export async function convertFindingToProposal(
     submitOptions,
   );
 
-  // Back-link the finding to the proposal.
+  // Back-link the finding to the proposal + advance lifecycle.
   await db
     .update(agsGraphQualityFindings)
-    .set({ proposalId: proposal.id })
+    .set({ proposalId: proposal.id, status: "triaged" })
     .where(eq(agsGraphQualityFindings.id, input.findingId));
 
   return {

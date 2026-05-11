@@ -200,7 +200,7 @@ describe("convertFindingToProposal", () => {
     );
 
     expect(state.updates).toHaveLength(1);
-    expect(state.updates[0]).toEqual({ proposalId: 101 });
+    expect(state.updates[0]).toEqual({ proposalId: 101, status: "triaged" });
   });
 
   it("uses the unknown-kind fallback for a scanner kind without a mapping", async () => {

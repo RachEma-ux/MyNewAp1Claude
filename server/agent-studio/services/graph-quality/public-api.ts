@@ -99,6 +99,18 @@ export type {
   GetFindingAuditTrailOptions,
 } from "./finding-audit-trail.js";
 
+export {
+  dismissFinding,
+  AsdbUnavailableError as DismissFindingAsdbUnavailableError,
+  FindingNotFoundError as DismissFindingNotFoundError,
+  FindingAlreadyResolvedError,
+} from "./dismiss-finding.js";
+export type {
+  DismissFindingInput,
+  DismissFindingOptions,
+  DismissFindingResult,
+} from "./dismiss-finding.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
