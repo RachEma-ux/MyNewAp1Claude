@@ -96,6 +96,13 @@ export const graphAgentRouter = router({
       z.object({
         runId: z.number().int().positive(),
         title: z.string().min(1).max(200).optional(),
+        /**
+         * Phase 14 §4 — opt out of redaction. Default `true` scrubs
+         * emails, JWTs, API keys, etc. from step inputs/outputs
+         * before rendering. Operators with the relevant role can
+         * disable when debugging.
+         */
+        redact: z.boolean().optional(),
       }),
     )
     .query(async ({ input }) => {
@@ -107,6 +114,7 @@ export const graphAgentRouter = router({
       try {
         const exported = await exportDecisionTraceAsMarkdown(input.runId, {
           title: input.title,
+          redact: input.redact,
         });
         return { runId: input.runId, exported };
       } catch (e) {

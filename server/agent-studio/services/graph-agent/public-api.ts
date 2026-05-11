@@ -48,3 +48,7 @@ export type {
   RetentionPruneSummary,
   PruneRuntimeTraceOptions,
 } from "./retention.js";
+export {
+  redactSensitivePayload,
+  redactExplanationSteps,
+} from "./redaction.js";

@@ -26,6 +26,7 @@ import {
   type GraphAgentExplanation,
   type GraphAgentExplanationStep,
 } from "./explain-reader.js";
+import { redactExplanationSteps } from "./redaction.js";
 
 export interface DecisionTraceMarkdown {
   readonly runtimeRunId: number;
@@ -36,6 +37,14 @@ export interface DecisionTraceMarkdown {
 export interface ExportDecisionTraceOptions extends GetExplanationOptions {
   /** Heading prefix; defaults to "Graph Agent Run". */
   readonly title?: string;
+  /**
+   * Phase 14 §4 — apply sensitive-payload redaction to step
+   * inputs/outputs before rendering. Defaults to `true` because the
+   * primary consumer (vault-note exports) leaves the trace in
+   * operator-readable form for sharing. Callers that need raw
+   * payloads (deep debugging) can set this to `false`.
+   */
+  readonly redact?: boolean;
 }
 
 function formatDate(d: Date | null): string {
@@ -118,12 +127,16 @@ export async function exportDecisionTraceAsMarkdown(
   const explanation = await getExplanationForRun(runtimeRunId, options);
   if (!explanation) return null;
 
+  // Phase 14 §4 — redact-by-default. Operators who want raw
+  // payloads (deep debugging) explicitly opt out via redact: false.
+  const shouldRedact = options.redact !== false;
+  const renderInput: GraphAgentExplanation = shouldRedact
+    ? { ...explanation, steps: redactExplanationSteps(explanation.steps) }
+    : explanation;
+
   return {
     runtimeRunId: explanation.runtimeRunId,
     graphAgentRunId: explanation.graphAgentRunId,
-    markdown: renderMarkdown(
-      explanation,
-      options.title ?? "Graph Agent Run",
-    ),
+    markdown: renderMarkdown(renderInput, options.title ?? "Graph Agent Run"),
   };
 }
