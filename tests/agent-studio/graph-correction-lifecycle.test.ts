@@ -11,6 +11,7 @@ import {
   approveCorrectionProposal,
   rejectCorrectionProposal,
   requestRevisionForProposal,
+  bulkApproveCorrectionProposals,
   listAuditEvents,
   listProposals,
   getProposalById,
@@ -469,5 +470,235 @@ describe("listAuditEvents — Phase 23", () => {
   it("returns [] on ASDB-null", async () => {
     const result = await listAuditEvents(7, { getDb: () => null as never });
     expect(result).toEqual([]);
+  });
+});
+
+/**
+ * Sequenced fake-DB for bulk-approve testing. Each approve call inside
+ * the bulk loop does two byId selects (status check + post-update read);
+ * `proposalIdSequence` is a pre-populated queue that pops one id per
+ * byId select so the same fake DB can serve multiple sequential
+ * approves without per-call state.active manipulation.
+ */
+function makeBulkFakeDb(initial: {
+  proposals: ProposalRow[];
+  proposalIdSequence: number[];
+}) {
+  const state = {
+    proposals: initial.proposals,
+    decisions: [] as DecisionRow[],
+    audits: [] as AuditRow[],
+    nextDecisionId: 2000,
+    nextAuditId: 3000,
+    proposalIdSequence: [...initial.proposalIdSequence],
+  };
+
+  function tableName(t: unknown): string {
+    if (!t) return "?";
+    const sym = Object.getOwnPropertySymbols(t).find(
+      (s) => s.description === "drizzle:Name",
+    );
+    if (sym) return String((t as Record<symbol, unknown>)[sym] ?? "?");
+    return "?";
+  }
+
+  let lastUpdateId: number | null = null;
+
+  const select = vi.fn(() => {
+    const chain: Record<string, unknown> = {
+      from: () => chain,
+      where: () => chain,
+      orderBy: () => chain,
+      limit: async () => {
+        const id = state.proposalIdSequence.shift();
+        if (id == null) return [];
+        const found = state.proposals.find((p) => p.id === id);
+        return found ? [found] : [];
+      },
+    };
+    return chain;
+  });
+
+  const insert = vi.fn((table: unknown) => {
+    const name = tableName(table);
+    return {
+      values: (vals: Record<string, unknown>) => {
+        if (name === "ags_graph_correction_decisions") {
+          state.decisions.push({
+            id: state.nextDecisionId++,
+            proposalId: Number(vals.proposalId),
+            decision: String(vals.decision),
+            decidedByUserId:
+              vals.decidedByUserId == null
+                ? null
+                : Number(vals.decidedByUserId),
+            rationale: vals.rationale == null ? null : String(vals.rationale),
+            decidedAt: new Date(),
+          });
+        }
+        if (name === "ags_graph_correction_audit_events") {
+          state.audits.push({
+            id: state.nextAuditId++,
+            proposalId: Number(vals.proposalId),
+            eventKind: String(vals.eventKind),
+            metadata:
+              (vals.metadata as Record<string, unknown> | null | undefined) ??
+              null,
+            createdAt: new Date(),
+          });
+        }
+        return {
+          returning: async () => [],
+          then: (resolve: (v: void) => unknown) => resolve(undefined),
+        };
+      },
+    };
+  });
+
+  const update = vi.fn((_table: unknown) => ({
+    set: (vals: Record<string, unknown>) => ({
+      where: async () => {
+        // Mutation target is the proposal whose next byId select would
+        // return it — we mutate by peeking at the head of the id
+        // sequence (the post-update read uses the same id).
+        const id = state.proposalIdSequence[0] ?? lastUpdateId;
+        if (id == null) return;
+        lastUpdateId = id;
+        const target = state.proposals.find((p) => p.id === id);
+        if (!target) return;
+        if ("status" in vals) target.status = String(vals.status);
+      },
+    }),
+  }));
+
+  return { db: { select, insert, update } as unknown, state };
+}
+
+describe("bulkApproveCorrectionProposals — Phase 23", () => {
+  it("returns empty result for empty input", async () => {
+    const { db } = makeBulkFakeDb({ proposals: [], proposalIdSequence: [] });
+    const result = await bulkApproveCorrectionProposals(
+      { proposalIds: [], decidedByUserId: 42 },
+      { getDb: () => db as never },
+    );
+    expect(result.approved).toEqual([]);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("approves a single pending proposal", async () => {
+    const now = new Date();
+    const { db, state } = makeBulkFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+      proposalIdSequence: [7, 7],
+    });
+    const result = await bulkApproveCorrectionProposals(
+      { proposalIds: [7], decidedByUserId: 42, rationale: "looks good" },
+      { getDb: () => db as never },
+    );
+    expect(result.approved).toHaveLength(1);
+    expect(result.approved[0].id).toBe(7);
+    expect(result.approved[0].status).toBe("approved");
+    expect(result.skipped).toEqual([]);
+    expect(state.decisions[0].decision).toBe("approved");
+  });
+
+  it("dedups duplicate ids in input list", async () => {
+    const now = new Date();
+    const { db } = makeBulkFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+      proposalIdSequence: [7, 7],
+    });
+    const result = await bulkApproveCorrectionProposals(
+      { proposalIds: [7, 7, 7], decidedByUserId: 42 },
+      { getDb: () => db as never },
+    );
+    expect(result.approved).toHaveLength(1);
+  });
+
+  it("collects skipped entries for not-found and already-decided", async () => {
+    const now = new Date();
+    const { db } = makeBulkFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+        {
+          id: 8,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "approved",
+          createdAt: now,
+        },
+      ],
+      // 7 pending → 2 selects; 8 already-decided → 1 select; 999 not-found → 1 select.
+      proposalIdSequence: [7, 7, 8, 999],
+    });
+    const result = await bulkApproveCorrectionProposals(
+      { proposalIds: [7, 8, 999], decidedByUserId: 42 },
+      { getDb: () => db as never },
+    );
+    expect(result.approved).toHaveLength(1);
+    expect(result.approved[0].id).toBe(7);
+    expect(result.skipped).toHaveLength(2);
+    const skippedByReason = Object.fromEntries(
+      result.skipped.map((s) => [s.proposalId, s.reason]),
+    );
+    expect(skippedByReason).toEqual({
+      8: "already_decided",
+      999: "not_found",
+    });
+  });
+
+  it("bubbles out AsdbUnavailable instead of swallowing", async () => {
+    await expect(
+      bulkApproveCorrectionProposals(
+        { proposalIds: [7], decidedByUserId: 42 },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
   });
 });
