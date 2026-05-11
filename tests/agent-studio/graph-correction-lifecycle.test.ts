@@ -12,6 +12,7 @@ import {
   rejectCorrectionProposal,
   requestRevisionForProposal,
   bulkApproveCorrectionProposals,
+  bulkRejectCorrectionProposals,
   listAuditEvents,
   listProposals,
   getProposalById,
@@ -696,6 +697,107 @@ describe("bulkApproveCorrectionProposals — Phase 23", () => {
   it("bubbles out AsdbUnavailable instead of swallowing", async () => {
     await expect(
       bulkApproveCorrectionProposals(
+        { proposalIds: [7], decidedByUserId: 42 },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+});
+
+describe("bulkRejectCorrectionProposals — Phase 23", () => {
+  it("returns empty result for empty input", async () => {
+    const { db } = makeBulkFakeDb({ proposals: [], proposalIdSequence: [] });
+    const result = await bulkRejectCorrectionProposals(
+      { proposalIds: [], decidedByUserId: 42 },
+      { getDb: () => db as never },
+    );
+    expect(result.rejected).toEqual([]);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("rejects a single pending proposal", async () => {
+    const now = new Date();
+    const { db, state } = makeBulkFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+      proposalIdSequence: [7, 7],
+    });
+    const result = await bulkRejectCorrectionProposals(
+      { proposalIds: [7], decidedByUserId: 42, rationale: "stale finding" },
+      { getDb: () => db as never },
+    );
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0].id).toBe(7);
+    expect(result.rejected[0].status).toBe("rejected");
+    expect(result.skipped).toEqual([]);
+    expect(state.decisions[0].decision).toBe("rejected");
+  });
+
+  it("collects skipped entries for not-found and already-decided", async () => {
+    const now = new Date();
+    const { db } = makeBulkFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+        {
+          id: 8,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: null,
+          status: "approved",
+          createdAt: now,
+        },
+      ],
+      proposalIdSequence: [7, 7, 8, 999],
+    });
+    const result = await bulkRejectCorrectionProposals(
+      { proposalIds: [7, 8, 999], decidedByUserId: 42 },
+      { getDb: () => db as never },
+    );
+    expect(result.rejected).toHaveLength(1);
+    expect(result.rejected[0].id).toBe(7);
+    expect(result.skipped).toHaveLength(2);
+    const skippedByReason = Object.fromEntries(
+      result.skipped.map((s) => [s.proposalId, s.reason]),
+    );
+    expect(skippedByReason).toEqual({
+      8: "already_decided",
+      999: "not_found",
+    });
+  });
+
+  it("bubbles out AsdbUnavailable instead of swallowing", async () => {
+    await expect(
+      bulkRejectCorrectionProposals(
         { proposalIds: [7], decidedByUserId: 42 },
         { getDb: () => null as never },
       ),

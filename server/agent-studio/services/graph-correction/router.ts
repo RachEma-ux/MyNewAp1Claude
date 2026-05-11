@@ -24,6 +24,7 @@ import {
   rejectCorrectionProposal,
   requestRevisionForProposal,
   bulkApproveCorrectionProposals,
+  bulkRejectCorrectionProposals,
   listAuditEvents,
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
@@ -248,6 +249,39 @@ export const graphCorrectionRouter = router({
       }
       try {
         return await bulkApproveCorrectionProposals({
+          proposalIds: input.proposalIds,
+          decidedByUserId: userId,
+          rationale: input.rationale,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  bulkReject: protectedProcedure
+    .input(
+      z.object({
+        proposalIds: z
+          .array(z.number().int().positive())
+          .min(1)
+          .max(500),
+        rationale: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "bulkReject requires an authenticated user",
+        }));
+      }
+      try {
+        return await bulkRejectCorrectionProposals({
           proposalIds: input.proposalIds,
           decidedByUserId: userId,
           rationale: input.rationale,

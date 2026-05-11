@@ -416,6 +416,68 @@ export async function bulkApproveCorrectionProposals(
   return { approved, skipped };
 }
 
+// ---------- bulk reject ----------
+
+export interface BulkRejectCorrectionProposalsInput {
+  readonly proposalIds: readonly number[];
+  readonly decidedByUserId: number;
+  readonly rationale?: string;
+}
+
+export interface BulkRejectCorrectionProposalsResult {
+  readonly rejected: readonly ProposalRow[];
+  readonly skipped: readonly {
+    readonly proposalId: number;
+    readonly reason: "not_found" | "already_decided";
+    readonly currentStatus?: string;
+  }[];
+}
+
+/**
+ * Reject many correction proposals in one call. Shape-symmetric to
+ * `bulkApproveCorrectionProposals` — same dedup, same skip-vs-bail
+ * policy, same returned-skipped shape.
+ *
+ * Operators use this to dismiss a batch of low-quality findings'
+ * proposals (e.g. orphan-node findings on intentionally-disconnected
+ * sentinel nodes that the autonomous scanner can't recognize).
+ */
+export async function bulkRejectCorrectionProposals(
+  input: BulkRejectCorrectionProposalsInput,
+  options: ServiceOptions = {},
+): Promise<BulkRejectCorrectionProposalsResult> {
+  const uniqueIds = Array.from(new Set(input.proposalIds));
+  const rejected: ProposalRow[] = [];
+  const skipped: BulkRejectCorrectionProposalsResult["skipped"][number][] = [];
+
+  for (const proposalId of uniqueIds) {
+    try {
+      const result = await rejectCorrectionProposal(
+        proposalId,
+        input.decidedByUserId,
+        input.rationale ?? null,
+        options,
+      );
+      rejected.push(result);
+    } catch (err) {
+      if (err instanceof CorrectionProposalNotFoundError) {
+        skipped.push({ proposalId, reason: "not_found" });
+      } else if (err instanceof ProposalAlreadyDecidedError) {
+        skipped.push({
+          proposalId,
+          reason: "already_decided",
+          currentStatus: err.currentStatus,
+        });
+      } else {
+        // AsdbUnavailable etc. — bubble out.
+        throw err;
+      }
+    }
+  }
+
+  return { rejected, skipped };
+}
+
 export interface AuditEventRow {
   readonly id: number;
   readonly proposalId: number;

@@ -13,6 +13,7 @@ export {
   rejectCorrectionProposal,
   requestRevisionForProposal,
   bulkApproveCorrectionProposals,
+  bulkRejectCorrectionProposals,
   listAuditEvents,
   AsdbUnavailableError as GraphCorrectionAsdbUnavailableError,
   CorrectionProposalNotFoundError,
@@ -27,4 +28,6 @@ export type {
   ServiceOptions,
   BulkApproveCorrectionProposalsInput,
   BulkApproveCorrectionProposalsResult,
+  BulkRejectCorrectionProposalsInput,
+  BulkRejectCorrectionProposalsResult,
 } from "./lifecycle.js";
