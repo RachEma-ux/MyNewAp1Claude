@@ -118,10 +118,11 @@ export type {
   BulkDismissFindingsResult,
 } from "./dismiss-finding.js";
 
-export { getGraphQualityStats } from "./stats.js";
+export { getGraphQualityStats, zeroFillTrend } from "./stats.js";
 export type {
   GraphQualityStats,
   GraphQualityStatsOptions,
+  FindingsTrendBucket,
 } from "./stats.js";
 
 export {

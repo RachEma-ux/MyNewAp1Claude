@@ -21,12 +21,25 @@ import {
   agsGraphQualityAgentRuns,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
+export interface FindingsTrendBucket {
+  /** Day boundary as YYYY-MM-DD (UTC). */
+  readonly date: string;
+  readonly count: number;
+}
+
 export interface GraphQualityStats {
   readonly findingsByStatus: Record<string, number>;
   readonly findingsBySeverity: Record<string, number>;
   readonly findingsByClass: Record<string, number>;
   readonly scansByStatus: Record<string, number>;
   readonly agentRunsByStatus: Record<string, number>;
+  /**
+   * Per-day count of findings created in the last 14 days (UTC),
+   * oldest-first. Days with zero findings are included (zero-filled)
+   * so the dashboard can render a continuous sparkline without
+   * client-side date arithmetic.
+   */
+  readonly findingsCreatedByDay: readonly FindingsTrendBucket[];
   readonly totals: {
     readonly findings: number;
     readonly scans: number;
@@ -38,14 +51,44 @@ export interface GraphQualityStatsOptions {
   readonly getDb?: typeof getAsDb;
 }
 
+const TREND_DAYS = 14;
+
 const EMPTY_STATS: GraphQualityStats = {
   findingsByStatus: {},
   findingsBySeverity: {},
   findingsByClass: {},
   scansByStatus: {},
   agentRunsByStatus: {},
+  findingsCreatedByDay: [],
   totals: { findings: 0, scans: 0, agentRuns: 0 },
 };
+
+/**
+ * Zero-fill a day-bucket sparse map into an ordered `[{date, count}]`
+ * array covering the last `windowDays` days (oldest-first, UTC).
+ *
+ * Exported for direct unit-testing — the SQL path can vary between
+ * sqlite/postgres test harnesses; the zero-fill logic is exercised
+ * in isolation.
+ */
+export function zeroFillTrend(
+  rawBuckets: Record<string, number>,
+  windowDays: number,
+  now: Date = new Date(),
+): FindingsTrendBucket[] {
+  const filled: FindingsTrendBucket[] = [];
+  const utcMidnight = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date(utcMidnight - i * 86_400_000);
+    const date = d.toISOString().slice(0, 10);
+    filled.push({ date, count: rawBuckets[date] ?? 0 });
+  }
+  return filled;
+}
 
 function bucketize<T extends { count: unknown }>(
   rows: readonly T[],
@@ -79,6 +122,7 @@ export async function getGraphQualityStats(
     findingsByClassRows,
     scansByStatusRows,
     agentRunsByStatusRows,
+    findingsTrendRows,
   ] = await Promise.all([
     db
       .select({
@@ -115,6 +159,16 @@ export async function getGraphQualityStats(
       })
       .from(agsGraphQualityAgentRuns)
       .groupBy(agsGraphQualityAgentRuns.status),
+    db
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsGraphQualityFindings.createdAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsGraphQualityFindings)
+      .where(
+        sql`${agsGraphQualityFindings.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsGraphQualityFindings.createdAt}) AT TIME ZONE 'UTC'`),
   ]);
 
   const findingsByStatus = bucketize(findingsByStatusRows, "status");
@@ -122,6 +176,8 @@ export async function getGraphQualityStats(
   const findingsByClass = bucketize(findingsByClassRows, "findingClass");
   const scansByStatus = bucketize(scansByStatusRows, "status");
   const agentRunsByStatus = bucketize(agentRunsByStatusRows, "status");
+  const findingsTrendMap = bucketize(findingsTrendRows, "day");
+  const findingsCreatedByDay = zeroFillTrend(findingsTrendMap, TREND_DAYS);
 
   return {
     findingsByStatus,
@@ -129,6 +185,7 @@ export async function getGraphQualityStats(
     findingsByClass,
     scansByStatus,
     agentRunsByStatus,
+    findingsCreatedByDay,
     totals: {
       findings: sumBuckets(findingsByStatus),
       scans: sumBuckets(scansByStatus),
