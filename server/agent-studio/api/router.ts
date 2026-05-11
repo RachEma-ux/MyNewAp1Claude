@@ -71,6 +71,7 @@ import { toolApprovalsRouter } from "./tool-approvals-router";
 import { graphSkillRouter } from "./graph-skill-router";
 import { graphAgentRouter } from "../services/graph-agent/router";
 import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
+import { graphCorrectionRouter } from "../services/graph-correction/router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2234,4 +2235,7 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 22: workspace observability (background jobs,
   // user notifications, error events)
   workspaceObservability: workspaceObservabilityRouter,
+  // Native Graph Workspace Phase 23: graph correction proposal lifecycle
+  // (submit / approve / reject / list / audit)
+  graphCorrection: graphCorrectionRouter,
 });
