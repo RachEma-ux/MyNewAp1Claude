@@ -185,14 +185,23 @@ export const graphQualityRouter = router({
         autoConvertFindings: z.boolean().optional(),
         agentKey: z.string().min(1).max(100).optional(),
         proposedByAgentId: z.number().int().positive().optional(),
+        notifyMe: z.boolean().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
       try {
-        return await runQualityAgent(input, {
-          registry: QUALITY_SCANNER_REGISTRY,
-          repository: getGraphRepository(),
-        });
+        return await runQualityAgent(
+          {
+            ...input,
+            notifyUserId: input.notifyMe && userId != null ? userId : undefined,
+          },
+          {
+            registry: QUALITY_SCANNER_REGISTRY,
+            repository: getGraphRepository(),
+          },
+        );
       } catch (e) {
         unwrapError(e);
       }
