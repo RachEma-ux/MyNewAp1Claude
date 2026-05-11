@@ -9,6 +9,8 @@
  *   - graph-quality-finding-to-proposal.test.ts
  *   - graph-quality-stale-node-scanner.test.ts
  *   - graph-quality-duplicate-entity-scanner.test.ts
+ *   - graph-quality-mutation-worker.test.ts
+ *   - graph-quality-approve-and-apply.test.ts
  */
 
 import { describe, it, expect } from "vitest";
@@ -22,6 +24,7 @@ describe("graphQualityRouter", () => {
     expect(procedures.runAgent).toBeDefined();
     expect(procedures.convertFindingToProposal).toBeDefined();
     expect(procedures.applyApprovedProposal).toBeDefined();
+    expect(procedures.approveAndApply).toBeDefined();
   });
 
   it("exposes the expected query surface", () => {
@@ -34,13 +37,12 @@ describe("graphQualityRouter", () => {
   });
 
   it("does not leak un-routed scratch procedures", () => {
-    // Sanity: every procedure exposed should be a meaningful operator
-    // surface (no test scaffolding leaked).
     const known = new Set([
       "runScan",
       "runAgent",
       "convertFindingToProposal",
       "applyApprovedProposal",
+      "approveAndApply",
       "listScans",
       "getScan",
       "listFindings",
