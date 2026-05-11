@@ -116,3 +116,11 @@ export type {
   RuntimeNoteReferenceRow,
   LoadRuntimeNoteReferencesOptions,
 } from "./projection-note-version-expander.js";
+export {
+  expandRuntimeCagBlockEdges,
+  loadRuntimeCagBlockUsagesForRun,
+} from "./projection-cag-block-expander.js";
+export type {
+  RuntimeCagBlockUsageRow,
+  LoadRuntimeCagBlockUsagesOptions,
+} from "./projection-cag-block-expander.js";
