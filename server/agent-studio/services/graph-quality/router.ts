@@ -82,6 +82,7 @@ import {
   ProposalAlreadyDecidedError,
 } from "../graph-correction/public-api.js";
 import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+import { getOperatorDashboard } from "./operator-dashboard.js";
 import { QUALITY_SCANNER_REGISTRY } from "./public-api.js";
 
 const ScanStatusEnum = z.enum(["pending", "running", "completed", "failed"]);
@@ -566,6 +567,18 @@ export const graphQualityRouter = router({
 
   getStats: protectedProcedure.query(async () => {
     return await getGraphQualityStats();
+  }),
+
+  /**
+   * Single-round-trip dashboard payload: bundles graph-quality stats,
+   * workspace-observability stats, and the caller's unread notification
+   * count so the operator dashboard renders all three summary cards
+   * from one tRPC call. See `operator-dashboard.ts` for the
+   * composition.
+   */
+  getOperatorDashboard: protectedProcedure.query(async ({ ctx }) => {
+    const ctxAny = ctx as unknown as { user?: { id?: number } };
+    return await getOperatorDashboard(ctxAny.user?.id ?? null);
   }),
 
   getFindingAuditTrail: protectedProcedure

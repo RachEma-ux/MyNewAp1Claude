@@ -125,6 +125,12 @@ export type {
   FindingsTrendBucket,
 } from "./stats.js";
 
+export { getOperatorDashboard } from "./operator-dashboard.js";
+export type {
+  OperatorDashboardPayload,
+  OperatorDashboardOptions,
+} from "./operator-dashboard.js";
+
 export {
   pushAgentRunNotifications,
   pushApplyProposalNotification,
