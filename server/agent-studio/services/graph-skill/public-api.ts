@@ -26,3 +26,20 @@ export type {
   ListUsageCountsInput,
   ListUsageCountsOptions,
 } from "./usage-query.js";
+export {
+  createPack,
+  publishVersion,
+  listPackVersions,
+  AsdbUnavailableError,
+  DuplicateVersionError,
+  PackNotFoundError,
+} from "./pack-mutations.js";
+export type {
+  CreatePackInput,
+  PackRow,
+  PublishVersionInput,
+  PackVersionRow,
+  ListPackVersionsInput,
+  PackVersionListing,
+  RiskLevel,
+} from "./pack-mutations.js";

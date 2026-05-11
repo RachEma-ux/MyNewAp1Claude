@@ -527,6 +527,14 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "pmCentral.handoff.accept": "pmCentral.handoff.accept",
   "pmCentral.handoff.reject": "pmCentral.handoff.reject",
   "pmCentral.handoff.convert": "pmCentral.handoff.convert",
+  // Native Graph Workspace Phase 12.5 §10 — Graph Skill Pack governed
+  // mutations. createPack is idempotent on skillKey (returns existing
+  // row when present); publishVersion enforces unique (packId, version).
+  // R2 mirrors agentStudio.cag.refreshPack: pack-level metadata + new
+  // version row, blast radius is one row per call, reversible by
+  // disabling the pack or publishing a fixed version label.
+  "agentStudio.graphSkill.createPack": "agentStudio.graphSkill.createPack",
+  "agentStudio.graphSkill.publishVersion": "agentStudio.graphSkill.publishVersion",
   "dataAnalysis.graphRag.registerSource": "dataAnalysis.graphRag.registerSource",
   "dataAnalysis.graphRag.syncSource": "dataAnalysis.graphRag.syncSource",
   "dataAnalysis.graphRag.buildIndex": "dataAnalysis.graphRag.buildIndex",

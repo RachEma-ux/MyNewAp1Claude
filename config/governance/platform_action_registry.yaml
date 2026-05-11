@@ -675,6 +675,28 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # Phase 12.5 §10 — Graph Skill Pack governed mutations. createPack is
+  # idempotent on skillKey (returns the existing row when present);
+  # publishVersion enforces the unique (pack_id, version) index. R2
+  # mirrors agentStudio.cag.refreshPack: pack-level metadata + new
+  # version row, blast radius is one row per call, reversible by
+  # disabling the pack or publishing a corrected version label.
+  agentStudio.graphSkill.createPack:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agentStudio.graphSkill.publishVersion:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ─────────────────────────────────────────────────────────────────
   # R2-c2 — pre-existing damage discovered by the systemic
   # governance-coverage audit. The 9 entries below were all declared as
