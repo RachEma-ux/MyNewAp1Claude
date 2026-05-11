@@ -108,3 +108,11 @@ export type {
   RuntimeSkillPackUsageRow,
   LoadRuntimeSkillPackUsagesOptions,
 } from "./projection-skill-pack-expander.js";
+export {
+  expandRuntimeNoteVersionEdges,
+  loadRuntimeNoteReferencesForRun,
+} from "./projection-note-version-expander.js";
+export type {
+  RuntimeNoteReferenceRow,
+  LoadRuntimeNoteReferencesOptions,
+} from "./projection-note-version-expander.js";
