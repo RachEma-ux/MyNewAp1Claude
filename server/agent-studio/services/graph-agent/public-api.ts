@@ -31,3 +31,10 @@ export type {
   GraphAgentExplanationStep,
   GetExplanationOptions,
 } from "./explain-reader.js";
+export { getPromptSafeSchemaSummary } from "./schema-summary.js";
+export type {
+  SchemaSummary,
+  SchemaSummaryNodeType,
+  SchemaSummaryEdgeType,
+  GetSchemaSummaryOptions,
+} from "./schema-summary.js";
