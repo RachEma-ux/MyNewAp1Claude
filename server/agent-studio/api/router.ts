@@ -72,6 +72,7 @@ import { graphSkillRouter } from "./graph-skill-router";
 import { graphAgentRouter } from "../services/graph-agent/router";
 import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
 import { graphCorrectionRouter } from "../services/graph-correction/router";
+import { graphQualityRouter } from "../services/graph-quality/router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2238,4 +2239,7 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 23: graph correction proposal lifecycle
   // (submit / approve / reject / list / audit)
   graphCorrection: graphCorrectionRouter,
+  // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
+  // findings + finding→proposal conversion surface for operator UI.
+  graphQuality: graphQualityRouter,
 });
