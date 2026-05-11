@@ -86,14 +86,21 @@ function readFilterNumber(
  *     sample, algorithm placeholder), score falls back to 1.0 —
  *     caller-side ranking has no graph-distance signal to use anyway.
  */
-function blockToChunk(block: {
-  id: string;
-  sourceKind: string;
-  sourceId: string;
-  sourceVersionId?: string;
-  payload: Record<string, unknown>;
-  citation: { sourceKind: string; sourceId: string; sourceVersionId?: string };
-}): RacRetrievalChunk {
+function blockToChunk(
+  block: {
+    id: string;
+    sourceKind: string;
+    sourceId: string;
+    sourceVersionId?: string;
+    payload: Record<string, unknown>;
+    citation: { sourceKind: string; sourceId: string; sourceVersionId?: string };
+  },
+  resolvedSkill?: {
+    readonly packKey: string;
+    readonly templateKey: string;
+    readonly reason: string;
+  },
+): RacRetrievalChunk {
   const hopRaw = block.payload["hopDistance"];
   const hopDistance =
     typeof hopRaw === "number" && Number.isFinite(hopRaw) && hopRaw >= 0
@@ -114,6 +121,8 @@ function blockToChunk(block: {
       sourceId: block.sourceId,
       sourceVersionId: block.sourceVersionId,
       hopDistance,
+      resolvedSkillPack: resolvedSkill?.packKey,
+      resolvedSkillTemplate: resolvedSkill?.templateKey,
     },
   };
 }
@@ -133,6 +142,22 @@ async function dispatchToRouter(
   const router = new GraphRetrievalRouter(repo);
   const filters = input.filters as Record<string, unknown> | undefined;
 
+  // Phase 12.5 §3 — pass-through eligibility / packTemplates /
+  // preferTemplateKeys when the caller stuffed them into `filters`.
+  // Loose typing on the request side (filters: Record<string,
+  // unknown>) means we accept whatever shape the caller supplied and
+  // the router validates internally.
+  const eligibility = filters?.eligibility as
+    | Parameters<typeof router.retrieve>[0]["eligibility"]
+    | undefined;
+  const packTemplates = filters?.packTemplates as
+    | Parameters<typeof router.retrieve>[0]["packTemplates"]
+    | undefined;
+  const preferRaw = filters?.preferTemplateKeys;
+  const preferTemplateKeys = Array.isArray(preferRaw)
+    ? (preferRaw as ReadonlyArray<string>)
+    : undefined;
+
   const result = await router.retrieve({
     mode: methodToReservedMode(method),
     query: input.query,
@@ -144,6 +169,9 @@ async function dispatchToRouter(
     generatedCypher: readFilterString(filters, "generatedCypher"),
     maxDepth: readFilterNumber(filters, "maxDepth"),
     maxResults: readFilterNumber(filters, "maxResults") ?? input.topK,
+    eligibility,
+    packTemplates,
+    preferTemplateKeys,
     runtime: {
       workspaceId: input.workspaceId,
       // userId / role / allowedWorkspaces are propagated by future
@@ -169,9 +197,20 @@ async function dispatchToRouter(
       `graphrag_safety_event: block=${evt.blockId} reason=${evt.reason}`,
     );
   }
+  // Phase 12.5 §3 — surface the resolved Skill Pack in the trace so
+  // operators can answer "why did this template fire?" without diffing
+  // eligibility output. Stamped on every chunk's metadata + emitted as
+  // a structured warning line.
+  if (result.resolvedSkill) {
+    warnings.push(
+      `graphrag_resolved_skill: source=${input.sourceId} pack=${result.resolvedSkill.packKey} template=${result.resolvedSkill.templateKey} reason=${result.resolvedSkill.reason}`,
+    );
+  }
 
   return {
-    chunks: result.contextBlocks.map(blockToChunk),
+    chunks: result.contextBlocks.map((b) =>
+      blockToChunk(b, result.resolvedSkill),
+    ),
     latencyMs: Date.now() - start,
     warnings,
   };

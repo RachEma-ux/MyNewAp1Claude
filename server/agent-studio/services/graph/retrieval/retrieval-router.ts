@@ -120,6 +120,19 @@ export interface GraphRetrievalOutput {
   readonly truncated: boolean;
   readonly durationMs: number;
   readonly rejectionReason?: string;
+  /**
+   * Phase 12.5 §3 — when the router resolved a `templateKey` from
+   * eligibility output (rather than the caller supplying one directly),
+   * record which pack + reason produced the choice. Useful for trace
+   * surfacing and "why did this template fire?" debugging. Undefined
+   * when the caller supplied `templateKey` directly OR when no template
+   * was selected at all.
+   */
+  readonly resolvedSkill?: {
+    readonly packKey: string;
+    readonly templateKey: string;
+    readonly reason: "first_template_in_top_pack" | "preferred_key_matched";
+  };
 }
 
 export class GraphRetrievalRouter {
@@ -145,6 +158,7 @@ export class GraphRetrievalRouter {
 
     let rawBlocks: ContextBlockInput[] = [];
     let truncated = false;
+    let resolvedSkill: GraphRetrievalOutput["resolvedSkill"];
 
     switch (input.mode) {
       case "graphrag_local": {
@@ -178,11 +192,18 @@ export class GraphRetrievalRouter {
       }
       case "graphrag_traversal":
       case "graphrag_text2cypher": {
-        // Phase 12.5 §2: when the caller didn't supply a templateKey
+        // Phase 12.5 §2-§3: when the caller didn't supply a templateKey
         // directly but did provide eligibility output, resolve one
-        // from the highest-ranked eligible Skill Pack.
-        const resolvedKey =
-          input.templateKey ?? this.resolveTemplateKeyFromEligibility(input);
+        // from the highest-ranked eligible Skill Pack and record the
+        // resolution in `resolvedSkill` for trace surfacing.
+        let resolvedKey: string | undefined = input.templateKey;
+        if (!resolvedKey) {
+          const resolution = this.resolveFromEligibility(input);
+          if (resolution) {
+            resolvedKey = resolution.templateKey;
+            resolvedSkill = resolution;
+          }
+        }
         if (resolvedKey) {
           const r = await this.repository.executeTemplate({
             templateKey: resolvedKey,
@@ -230,6 +251,7 @@ export class GraphRetrievalRouter {
       citations,
       truncated,
       durationMs: Date.now() - startedAt,
+      ...(resolvedSkill ? { resolvedSkill } : {}),
     };
   }
 
@@ -264,22 +286,26 @@ export class GraphRetrievalRouter {
   }
 
   /**
-   * Phase 12.5 §2 — resolve a templateKey from eligibility output.
-   * Returns `undefined` (not `null`) so the caller's `??` falls through
-   * to the existing no-template-supplied behavior. Requires BOTH
+   * Phase 12.5 §2 / §3 — resolve a templateKey from eligibility output
+   * and report which pack + reason produced the choice. Requires BOTH
    * `eligibility` and `packTemplates` to be present; either alone is a
    * no-op so partial wiring doesn't silently change semantics.
    */
-  private resolveTemplateKeyFromEligibility(
+  private resolveFromEligibility(
     input: GraphRetrievalInput,
-  ): string | undefined {
+  ): { packKey: string; templateKey: string; reason: "first_template_in_top_pack" | "preferred_key_matched" } | undefined {
     if (!input.eligibility || !input.packTemplates) return undefined;
     const r = selectTemplateForEligiblePacks({
       eligibility: input.eligibility,
       packTemplates: input.packTemplates,
       preferTemplateKeys: input.preferTemplateKeys,
     });
-    return r?.templateKey;
+    if (!r) return undefined;
+    return {
+      packKey: r.pack.skillKey,
+      templateKey: r.templateKey,
+      reason: r.reason,
+    };
   }
 
   private emptyResult(mode: RetrievalMode, startedAt: number, reason: string): GraphRetrievalOutput {
