@@ -42,6 +42,17 @@ export type {
   ConvertFindingOptions,
 } from "./finding-to-proposal.js";
 
+export {
+  runQualityAgent,
+  AsdbUnavailableError as QualityAgentAsdbUnavailableError,
+} from "./agent-run.js";
+export type {
+  RunQualityAgentInput,
+  RunQualityAgentOptions,
+  RunQualityAgentResult,
+  ScannerInvocationSummary,
+} from "./agent-run.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
