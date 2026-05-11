@@ -5,6 +5,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   dismissFinding,
+  bulkDismissFindings,
   AsdbUnavailableError,
   FindingNotFoundError,
   FindingAlreadyResolvedError,
@@ -124,5 +125,70 @@ describe("dismissFinding", () => {
     const patch = state.updates[0].patch.details as Record<string, unknown>;
     expect(patch.dismissedReason).toBeNull();
     expect(patch.dismissedByUserId).toBeNull();
+  });
+});
+
+describe("bulkDismissFindings", () => {
+  it("dismisses a single open finding (1-element batch)", async () => {
+    const { db } = makeFakeDb([{ id: 1, status: "open", details: null }]);
+    const result = await bulkDismissFindings(
+      { findingIds: [1] },
+      { getDb: () => db as never },
+    );
+    expect(result.dismissed).toHaveLength(1);
+    expect(result.dismissed[0]).toEqual({ findingId: 1, priorStatus: "open" });
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("collects not-found findings into skipped[] instead of throwing", async () => {
+    // Seed nothing — every id resolves to not-found.
+    const { db } = makeFakeDb([]);
+    const result = await bulkDismissFindings(
+      { findingIds: [10, 20, 30] },
+      { getDb: () => db as never },
+    );
+    expect(result.dismissed).toEqual([]);
+    expect(result.skipped).toHaveLength(3);
+    for (const s of result.skipped) {
+      expect(s.reason).toBe("not_found");
+    }
+  });
+
+  it("collects already-resolved findings into skipped[] with currentStatus", async () => {
+    const { db } = makeFakeDb([
+      { id: 5, status: "dismissed", details: null },
+    ]);
+    const result = await bulkDismissFindings(
+      { findingIds: [5] },
+      { getDb: () => db as never },
+    );
+    expect(result.dismissed).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      findingId: 5,
+      reason: "already_resolved",
+      currentStatus: "dismissed",
+    });
+  });
+
+  it("deduplicates input ids so the same id appears at most once", async () => {
+    const { db } = makeFakeDb([{ id: 7, status: "open", details: null }]);
+    const result = await bulkDismissFindings(
+      { findingIds: [7, 7, 7] },
+      { getDb: () => db as never },
+    );
+    // First pass dismisses; the de-duplicated input never sees the
+    // second/third call. dismissed: 1 / skipped: 0.
+    expect(result.dismissed).toHaveLength(1);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("bubbles AsdbUnavailableError instead of skipping (whole batch aborts)", async () => {
+    await expect(
+      bulkDismissFindings(
+        { findingIds: [1, 2] },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
   });
 });
