@@ -90,6 +90,15 @@ export type {
   ApproveAndApplyResult,
 } from "./approve-and-apply.js";
 
+export { getFindingAuditTrail } from "./finding-audit-trail.js";
+export type {
+  FindingAuditTrail,
+  FindingAuditTrailAuditRow,
+  FindingAuditTrailFindingRow,
+  FindingAuditTrailProposalRow,
+  GetFindingAuditTrailOptions,
+} from "./finding-audit-trail.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
