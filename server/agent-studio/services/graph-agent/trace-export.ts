@@ -27,6 +27,10 @@ import {
   type GraphAgentExplanationStep,
 } from "./explain-reader.js";
 import { redactExplanationSteps } from "./redaction.js";
+import {
+  getGraphSkillSourceNoteRefsForRun,
+  type GraphSkillSourceNoteRef,
+} from "./graph-skill-source-note-refs-reader.js";
 
 export interface DecisionTraceMarkdown {
   readonly runtimeRunId: number;
@@ -45,6 +49,16 @@ export interface ExportDecisionTraceOptions extends GetExplanationOptions {
    * payloads (deep debugging) can set this to `false`.
    */
   readonly redact?: boolean;
+  /**
+   * Phase 14 §6 — read Graph Skill source-note refs for the trace
+   * (via `ags_graph_skill_runtime_usages` → pack versions →
+   * `sourceNoteVersionId` → vault note). Defaults to `true`; the
+   * resolver is injectable for unit tests.
+   */
+  readonly includeGraphSkillRefs?: boolean;
+  readonly getGraphSkillRefs?: (
+    runtimeRunId: number,
+  ) => Promise<GraphSkillSourceNoteRef[]>;
 }
 
 function formatDate(d: Date | null): string {
@@ -79,9 +93,25 @@ function renderStep(step: GraphAgentExplanationStep): string {
   return lines.join("\n");
 }
 
+function renderGraphSkillRefs(refs: GraphSkillSourceNoteRef[]): string[] {
+  if (refs.length === 0) return [];
+  const lines: string[] = ["## Graph Skill References", ""];
+  for (const r of refs) {
+    const noteSegment =
+      r.sourceNoteId !== null && r.sourceNoteTitle !== null
+        ? ` — source note: \`${r.sourceNoteSlug ?? "(no-slug)"}\` "${r.sourceNoteTitle}"${r.sourceNoteVersion !== null ? ` v${r.sourceNoteVersion}` : ""}`
+        : " — _no source note attached_";
+    lines.push(
+      `- **${r.packName}** (\`${r.packKey}\` v${r.packVersion}, packVersionId=${r.packVersionId})${noteSegment}`,
+    );
+  }
+  return lines;
+}
+
 function renderMarkdown(
   explanation: GraphAgentExplanation,
   titlePrefix: string,
+  graphSkillRefs: GraphSkillSourceNoteRef[],
 ): string {
   const sections: string[] = [
     `# ${titlePrefix} #${explanation.runtimeRunId}`,
@@ -99,6 +129,11 @@ function renderMarkdown(
 
   if (explanation.errorMessage) {
     sections.push("", `> ⚠️ **Error:** ${explanation.errorMessage}`);
+  }
+
+  const skillRefLines = renderGraphSkillRefs(graphSkillRefs);
+  if (skillRefLines.length > 0) {
+    sections.push("", ...skillRefLines);
   }
 
   sections.push("", "## Decision Trace", "");
@@ -134,9 +169,23 @@ export async function exportDecisionTraceAsMarkdown(
     ? { ...explanation, steps: redactExplanationSteps(explanation.steps) }
     : explanation;
 
+  // Phase 14 §6 — Graph Skill source-note refs. Default on; reader
+  // returns [] when ASDB is unavailable or the trace touched no skill
+  // packs, so the resulting markdown simply omits the section.
+  const includeRefs = options.includeGraphSkillRefs !== false;
+  const refResolver =
+    options.getGraphSkillRefs ?? getGraphSkillSourceNoteRefsForRun;
+  const graphSkillRefs = includeRefs
+    ? await refResolver(explanation.runtimeRunId)
+    : [];
+
   return {
     runtimeRunId: explanation.runtimeRunId,
     graphAgentRunId: explanation.graphAgentRunId,
-    markdown: renderMarkdown(renderInput, options.title ?? "Graph Agent Run"),
+    markdown: renderMarkdown(
+      renderInput,
+      options.title ?? "Graph Agent Run",
+      graphSkillRefs,
+    ),
   };
 }
