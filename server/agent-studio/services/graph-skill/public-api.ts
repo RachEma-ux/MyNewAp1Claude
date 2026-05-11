@@ -18,3 +18,5 @@ export type {
   SelectTemplateInput,
   SelectTemplateResult,
 } from "./template-selection.js";
+export { createRuntimeUsageRecorder } from "./runtime-usage.js";
+export type { CreateRuntimeUsageRecorderOptions } from "./runtime-usage.js";
