@@ -25,6 +25,7 @@ describe("graphQualityRouter", () => {
     expect(procedures.convertFindingToProposal).toBeDefined();
     expect(procedures.applyApprovedProposal).toBeDefined();
     expect(procedures.approveAndApply).toBeDefined();
+    expect(procedures.dismissFinding).toBeDefined();
   });
 
   it("exposes the expected query surface", () => {
@@ -45,6 +46,7 @@ describe("graphQualityRouter", () => {
       "convertFindingToProposal",
       "applyApprovedProposal",
       "approveAndApply",
+      "dismissFinding",
       "listScans",
       "getScan",
       "listFindings",
