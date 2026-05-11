@@ -26,6 +26,10 @@ import {
   getTemplateById,
   renderTemplate,
 } from "./templates.js";
+import {
+  exportNoteAsMarkdown,
+  parseMarkdownBlob,
+} from "./markdown-import-export.js";
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -184,6 +188,77 @@ export const vaultRouter = router({
           message: e instanceof Error ? e.message : String(e),
         });
       }
+    }),
+
+  // ============================================================
+  // Phase 15 — Markdown import / export
+  // ============================================================
+
+  exportNote: protectedProcedure
+    .input(z.object({ noteId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      try {
+        const result = await exportNoteAsMarkdown(input.noteId, {
+          repository: getRepo(),
+        });
+        if (!result) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: `Note ${input.noteId} not found`,
+          });
+        }
+        return result;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  importNoteFromMarkdown: protectedProcedure
+    .input(
+      z.object({
+        rawMd: z.string().min(1).max(2_000_000),
+        vaultId: z.number().int().positive(),
+        slug: z.string().min(1).max(255),
+        title: z.string().min(1).max(500).optional(),
+        folderId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id ?? 1;
+      const parsed = parseMarkdownBlob(input.rawMd);
+      // Prefer the caller-supplied title; fall back to frontmatter.title;
+      // finally fall back to the slug. The fallback chain mirrors the
+      // pasted-from-Obsidian flow operators expect.
+      const title =
+        input.title ??
+        (typeof parsed.frontmatter.title === "string"
+          ? parsed.frontmatter.title
+          : input.slug);
+      // Strip the title field from frontmatter we persist — the note
+      // row's title column is the source of truth.
+      const { title: _omitTitle, ...persistedFrontmatter } =
+        parsed.frontmatter;
+      const note = await getRepo().createNote(
+        {
+          vaultId: input.vaultId,
+          folderId: input.folderId,
+          slug: input.slug,
+          title,
+          contentMd: parsed.contentMd,
+          frontmatter: persistedFrontmatter,
+        },
+        userId,
+      );
+      return {
+        noteId: note.id,
+        versionId: note.versionId,
+        frontmatterKeyCount: Object.keys(persistedFrontmatter).length,
+      };
     }),
 
   createNoteFromTemplate: protectedProcedure
