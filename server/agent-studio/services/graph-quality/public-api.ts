@@ -27,6 +27,21 @@ export {
   duplicateEntityScanner,
 } from "./scanners/duplicate-entity-scanner.js";
 
+export {
+  convertFindingToProposal,
+  proposalKindForFinding,
+  severityToConfidence,
+  FINDING_CLASS_TO_PROPOSAL_KIND,
+  AsdbUnavailableError as FindingConversionAsdbUnavailableError,
+  FindingNotFoundError,
+  FindingAlreadyConvertedError,
+} from "./finding-to-proposal.js";
+export type {
+  ConvertFindingToProposalInput,
+  ConvertFindingToProposalResult,
+  ConvertFindingOptions,
+} from "./finding-to-proposal.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
