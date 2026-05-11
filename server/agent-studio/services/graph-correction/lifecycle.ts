@@ -348,6 +348,74 @@ export async function requestRevisionForProposal(
   );
 }
 
+// ---------- bulk approve ----------
+
+export interface BulkApproveCorrectionProposalsInput {
+  readonly proposalIds: readonly number[];
+  readonly decidedByUserId: number;
+  readonly rationale?: string;
+}
+
+export interface BulkApproveCorrectionProposalsResult {
+  readonly approved: readonly ProposalRow[];
+  readonly skipped: readonly {
+    readonly proposalId: number;
+    readonly reason: "not_found" | "already_decided";
+    readonly currentStatus?: string;
+  }[];
+}
+
+/**
+ * Approve many correction proposals in one call. Per-proposal failures
+ * (not-found, already-decided) are collected into `skipped` instead of
+ * aborting the batch — operators clearing a triage queue want partial
+ * success over all-or-nothing.
+ *
+ * Shape-symmetric to `bulkDismissFindings` (graph-quality §1) — same
+ * deduplication + same skip-vs-bail policy. AsdbUnavailable and other
+ * fatal errors bubble out: the whole batch can't proceed if the DB
+ * is gone.
+ *
+ * `proposalIds` is deduplicated server-side; the same id twice in the
+ * input list approves once (the second pass falls into already-decided
+ * and skips).
+ */
+export async function bulkApproveCorrectionProposals(
+  input: BulkApproveCorrectionProposalsInput,
+  options: ServiceOptions = {},
+): Promise<BulkApproveCorrectionProposalsResult> {
+  const uniqueIds = Array.from(new Set(input.proposalIds));
+  const approved: ProposalRow[] = [];
+  const skipped: BulkApproveCorrectionProposalsResult["skipped"][number][] = [];
+
+  for (const proposalId of uniqueIds) {
+    try {
+      const result = await approveCorrectionProposal(
+        proposalId,
+        input.decidedByUserId,
+        input.rationale ?? null,
+        options,
+      );
+      approved.push(result);
+    } catch (err) {
+      if (err instanceof CorrectionProposalNotFoundError) {
+        skipped.push({ proposalId, reason: "not_found" });
+      } else if (err instanceof ProposalAlreadyDecidedError) {
+        skipped.push({
+          proposalId,
+          reason: "already_decided",
+          currentStatus: err.currentStatus,
+        });
+      } else {
+        // AsdbUnavailable etc. — bubble out.
+        throw err;
+      }
+    }
+  }
+
+  return { approved, skipped };
+}
+
 export interface AuditEventRow {
   readonly id: number;
   readonly proposalId: number;
