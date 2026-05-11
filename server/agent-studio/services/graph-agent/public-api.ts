@@ -25,3 +25,9 @@ export {
   GraphAgentDecisionTraceUnavailableError,
 } from "./decision-trace-writer.js";
 export type { CreateGraphAgentDecisionTraceWriterOptions } from "./decision-trace-writer.js";
+export { getExplanationForRun } from "./explain-reader.js";
+export type {
+  GraphAgentExplanation,
+  GraphAgentExplanationStep,
+  GetExplanationOptions,
+} from "./explain-reader.js";

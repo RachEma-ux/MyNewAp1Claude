@@ -18,6 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../_core/trpc.js";
 import { GraphAgentRunInput } from "./contracts.js";
 import { wireGraphAgentLite } from "./wiring.js";
+import { getExplanationForRun } from "./explain-reader.js";
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -58,15 +59,24 @@ export const graphAgentRouter = router({
     }),
 
   explain: protectedProcedure
-    .input(z.object({ runId: z.number().int() }))
+    .input(z.object({ runId: z.number().int().positive() }))
     .query(async ({ input }) => {
-      // Phase 13.5 wires this through the runtime trace + Why-This-Answer
-      // accumulator. MVP returns a placeholder pending the full repository
-      // query layer (ags_graph_agent_explanations).
-      return {
-        runId: input.runId,
-        explanation: null,
-      };
+      // Phase 13 §3 — read-side of the decision-trace ledger written
+      // by §2. `runId` is the top-level `agsRuntimeRuns.id` returned
+      // from `engine.run()`; the reader joins the graph-agent run
+      // row via the `runtime_run_id` FK column.
+      try {
+        const explanation = await getExplanationForRun(input.runId);
+        return {
+          runId: input.runId,
+          explanation,
+        };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
     }),
 });
 
