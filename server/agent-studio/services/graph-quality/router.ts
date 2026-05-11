@@ -300,6 +300,7 @@ export const graphQualityRouter = router({
       z.object({
         proposalId: z.number().int().positive(),
         rationale: z.string().max(2000).optional(),
+        notifyMe: z.boolean().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -316,6 +317,7 @@ export const graphQualityRouter = router({
           proposalId: input.proposalId,
           decidedByUserId: userId,
           rationale: input.rationale,
+          notifyUserId: input.notifyMe ? userId : undefined,
         });
       } catch (e) {
         unwrapError(e);

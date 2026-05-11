@@ -102,6 +102,38 @@ describe("approveAndApplyProposal", () => {
     expect(applyMock).toHaveBeenCalledTimes(1);
   });
 
+  it("threads notifyUserId through to applyApprovedProposal", async () => {
+    approveMock.mockResolvedValueOnce({ id: 1, status: "approved" });
+    applyMock.mockResolvedValueOnce({
+      proposalId: 1,
+      payloadKind: "archive_node",
+      result: { applied: true },
+    });
+
+    await approveAndApplyProposal({
+      proposalId: 1,
+      decidedByUserId: 2,
+      notifyUserId: 99,
+    });
+
+    expect(applyMock.mock.calls[0][0]).toMatchObject({
+      proposalId: 1,
+      notifyUserId: 99,
+    });
+  });
+
+  it("omits notifyUserId when not provided", async () => {
+    approveMock.mockResolvedValueOnce({ id: 1, status: "approved" });
+    applyMock.mockResolvedValueOnce({
+      proposalId: 1,
+      payloadKind: "archive_node",
+      result: { applied: true },
+    });
+
+    await approveAndApplyProposal({ proposalId: 1, decidedByUserId: 2 });
+    expect(applyMock.mock.calls[0][0].notifyUserId).toBeUndefined();
+  });
+
   it("passes through custom applier registry", async () => {
     approveMock.mockResolvedValueOnce({ id: 1, status: "approved" });
     applyMock.mockResolvedValueOnce({
