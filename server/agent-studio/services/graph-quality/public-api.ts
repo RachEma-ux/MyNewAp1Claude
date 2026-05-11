@@ -66,6 +66,23 @@ export type {
   FindingForPayload,
 } from "./proposal-payload-builder.js";
 
+export {
+  applyApprovedProposal,
+  DEFAULT_APPLIER_REGISTRY,
+  AsdbUnavailableError as MutationWorkerAsdbUnavailableError,
+  ProposalNotFoundError,
+  ProposalNotApprovedError,
+  ProposalAlreadyAppliedError,
+  InvalidProposalPayloadError,
+} from "./mutation-worker.js";
+export type {
+  ApplierRegistry,
+  ApplierResult,
+  ApplyApprovedProposalInput,
+  ApplyApprovedProposalResult,
+  ApplyApprovedProposalOptions,
+} from "./mutation-worker.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
