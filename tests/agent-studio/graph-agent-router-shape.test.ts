@@ -30,6 +30,12 @@ describe("Graph Agent Lite router", () => {
     expect(src).toMatch(/explain:\s*protectedProcedure/);
   });
 
+  it("declares Phase 14 trace-export procedures (markdown blob + note write + prune)", () => {
+    expect(src).toMatch(/exportTraceMarkdown:\s*protectedProcedure/);
+    expect(src).toMatch(/exportTraceToNote:\s*protectedProcedure/);
+    expect(src).toMatch(/pruneTraces:\s*governedProcedure/);
+  });
+
   it("`run` uses GraphAgentRunInput contract", () => {
     expect(src).toMatch(/\.input\(GraphAgentRunInput\)/);
   });

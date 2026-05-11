@@ -22,6 +22,10 @@ import { getExplanationForRun } from "./explain-reader.js";
 import { getPromptSafeSchemaSummary } from "./schema-summary.js";
 import { exportDecisionTraceAsMarkdown } from "./trace-export.js";
 import { pruneRuntimeTraces } from "./retention.js";
+import {
+  exportTraceToNote,
+  TraceNoteAlreadyExistsError,
+} from "./trace-note-writer.js";
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -139,6 +143,58 @@ export const graphAgentRouter = router({
           explanation,
         };
       } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  exportTraceToNote: protectedProcedure
+    .input(
+      z.object({
+        runId: z.number().int().positive(),
+        vaultId: z.number().int().positive(),
+        folderId: z.number().int().positive().optional(),
+        title: z.string().min(1).max(200).optional(),
+        redact: z.boolean().optional(),
+        overwrite: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Phase 14 §5 — persist the §1 markdown export as a vault note
+      // so operators can drop a run's "Why This Answer?" report into
+      // their note vault for sharing / investigation threads /
+      // postmortem attachment without copy-pasting Markdown out of
+      // the UI.
+      const ctxAny = ctx as unknown as {
+        user?: { id?: number };
+      };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "exportTraceToNote requires an authenticated user",
+        });
+      }
+      try {
+        const result = await exportTraceToNote({
+          runtimeRunId: input.runId,
+          vaultId: input.vaultId,
+          createdByUserId: userId,
+          folderId: input.folderId,
+          title: input.title,
+          redact: input.redact,
+          overwrite: input.overwrite,
+        });
+        return { runId: input.runId, exported: result };
+      } catch (e) {
+        if (e instanceof TraceNoteAlreadyExistsError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: e.message,
+          });
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),

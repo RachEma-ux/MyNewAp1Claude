@@ -52,3 +52,13 @@ export {
   redactSensitivePayload,
   redactExplanationSteps,
 } from "./redaction.js";
+export {
+  exportTraceToNote,
+  AsdbUnavailableError as TraceNoteWriterAsdbUnavailableError,
+  TraceNoteAlreadyExistsError,
+} from "./trace-note-writer.js";
+export type {
+  ExportTraceToNoteInput,
+  ExportTraceToNoteResult,
+  ExportTraceToNoteOptions,
+} from "./trace-note-writer.js";
