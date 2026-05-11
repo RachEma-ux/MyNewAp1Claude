@@ -29,6 +29,7 @@ import {
 } from "./user-notifications.js";
 import { listErrorEvents } from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
+import { getWorkspaceObservabilityStats } from "./stats.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -197,6 +198,17 @@ export const workspaceObservabilityRouter = router({
         }));
       }
     }),
+
+  getStats: protectedProcedure.query(async () => {
+    try {
+      return await getWorkspaceObservabilityStats();
+    } catch (e) {
+      throwTrpcAndCapture(new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: e instanceof Error ? e.message : String(e),
+      }));
+    }
+  }),
 });
 
 export type WorkspaceObservabilityRouter = typeof workspaceObservabilityRouter;
