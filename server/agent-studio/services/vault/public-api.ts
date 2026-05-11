@@ -106,6 +106,13 @@ export type {
   SavedViewServiceOptions,
 } from "./saved-views.js";
 
+export {
+  VIEW_KIND_BLUEPRINTS,
+  getViewKindBlueprint,
+  listViewKindBlueprints,
+} from "./view-kind-blueprints.js";
+export type { ViewKindBlueprint } from "./view-kind-blueprints.js";
+
 /**
  * Vault Phase 5b note-version creation pipeline.
  *
