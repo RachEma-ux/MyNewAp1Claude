@@ -79,6 +79,7 @@ export class GraphAgentEngine {
         mode: retrievalMode,
         query: input.query,
         runtime,
+        runtimeRunId: runId,
       });
 
       // 3. Assemble context blocks for model

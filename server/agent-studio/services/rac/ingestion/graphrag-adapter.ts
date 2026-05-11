@@ -138,8 +138,13 @@ async function dispatchToRouter(
   const { GraphRetrievalRouter } = await import(
     "../../graph/retrieval/retrieval-router"
   );
+  const { createRuntimeUsageRecorder } = await import(
+    "../../graph-skill/public-api"
+  );
   const repo = getGraphRepository();
-  const router = new GraphRetrievalRouter(repo);
+  const router = new GraphRetrievalRouter(repo, {
+    recordRuntimeUsage: createRuntimeUsageRecorder(),
+  });
   const filters = input.filters as Record<string, unknown> | undefined;
 
   // Phase 12.5 §3 — pass-through eligibility / packTemplates /

@@ -20,6 +20,7 @@ import * as repo from "../../repository.js";
 import { GraphAgentEngine, type GraphAgentEngineOptions, type McpDispatchAdapter, type ModelAccessAdapter, type RuntimeTraceAdapter } from "./engine.js";
 import { GraphRetrievalRouter } from "../graph/retrieval/retrieval-router.js";
 import { getGraphRepository } from "../graph/repository/index.js";
+import { createRuntimeUsageRecorder } from "../graph-skill/public-api.js";
 
 /**
  * Real ModelAccessAdapter delegating to the existing OpenRouter
@@ -208,7 +209,9 @@ export function wireGraphAgentLite(input: GraphAgentLiteWiringInput): GraphAgent
   const modelRef = input.modelRef ?? process.env.GRAPH_AGENT_MODEL_REF ?? "anthropic/claude-3-5-haiku-20250101";
 
   const repository = getGraphRepository();
-  const retrievalRouter = new GraphRetrievalRouter(repository);
+  const retrievalRouter = new GraphRetrievalRouter(repository, {
+    recordRuntimeUsage: createRuntimeUsageRecorder(),
+  });
 
   const modelAccess = new OpenRouterModelAccessAdapter({
     providerConnectionId,
