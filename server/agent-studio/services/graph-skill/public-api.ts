@@ -20,3 +20,9 @@ export type {
 } from "./template-selection.js";
 export { createRuntimeUsageRecorder } from "./runtime-usage.js";
 export type { CreateRuntimeUsageRecorderOptions } from "./runtime-usage.js";
+export { listUsageCounts } from "./usage-query.js";
+export type {
+  UsageCount,
+  ListUsageCountsInput,
+  ListUsageCountsOptions,
+} from "./usage-query.js";
