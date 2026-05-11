@@ -37,6 +37,7 @@ import { appendPackEvent } from "./events";
 import { renderCapabilityPack } from "./renderer";
 import { validatePackContent } from "./validator";
 import { manifestToHashMap, hashMapsEqual } from "./hashing";
+import { recordCagBlockRuntimeUsage } from "./runtime-usage";
 import type {
   CagCapabilityPack,
   CapabilityPackContent,
@@ -400,6 +401,18 @@ export async function resolveCagPack(input: ResolveCagInput): Promise<ResolveCag
         err,
       ),
     );
+
+    // Phase 14 §6/§7: record this pack-use as a CAG block runtime
+    // usage row so the projection layer can emit
+    // (:RuntimeTrace)-[:USED_CAG_BLOCK]->(:CAGBlock) for this run.
+    // Best-effort — failures are non-fatal and logged inside the recorder.
+    if (typeof input.runtimeRunId === "number") {
+      await recordCagBlockRuntimeUsage({
+        runtimeRunId: input.runtimeRunId,
+        cagPackId: pack.id,
+        packVersion: pack.packVersion,
+      });
+    }
 
     return { section, pack, warnings };
   } catch (err) {
