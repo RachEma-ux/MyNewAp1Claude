@@ -32,6 +32,7 @@ export const agentStudioRoutes: AgentStudioRouteEntry[] = [
   { path: "/agent-studio/catalog/:section", component: AgentStudioShell, label: "Catalog Section" },
   { path: "/agent-studio/catalog", component: AgentStudioShell, label: "Catalog" },
   { path: "/agent-studio/marketplace", component: AgentStudioShell, label: "Marketplace" },
+  { path: "/agent-studio/graph-workspace", component: AgentStudioShell, label: "Graph Workspace" },
   { path: "/agent-studio/:agentId/runs/:runId", component: AgentStudioShell, label: "Agent Run Detail" },
   { path: "/agent-studio/:agentId/versions/compare", component: AgentStudioShell, label: "Versions Compare" },
   { path: "/agent-studio/:agentId/:section", component: AgentStudioShell, label: "Agent Section" },

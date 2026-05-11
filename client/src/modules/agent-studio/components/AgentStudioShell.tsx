@@ -64,6 +64,7 @@ const AgentToolCatalogPage = lazy(() => import("../pages/AgentToolCatalogPage"))
 const AgentMarketplacePage = lazy(() => import("../pages/AgentMarketplacePage"));
 // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
 const AgentMcpManagerPage = lazy(() => import("../pages/AgentMcpManagerPage"));
+const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
@@ -159,6 +160,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
   if (path.startsWith("/agent-studio/mcp-manager")) {
     return { ...empty, view: "mcp-manager" as any, homeMode: null };
+  }
+  // ── Phase 13 §7: Native Graph Workspace observability (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-workspace")) {
+    return { ...empty, view: "graph-workspace" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -359,6 +364,9 @@ export default function AgentStudioShell() {
         // ── Phase 19 follow-up: MCP Manager (global) ──
         case "mcp-manager" as any:
           return <AgentMcpManagerPage />;
+        // ── Phase 13 §7: Native Graph Workspace observability ──
+        case "graph-workspace" as any:
+          return <GraphWorkspacePage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
