@@ -125,6 +125,19 @@ export const PHASE_12_RESERVED_MODES = [
   "hybrid_rac_graphrag",
 ] as const satisfies ReadonlyArray<(typeof RAC_PLANNER_MODES)[number]>;
 
+/**
+ * Phase 12 §5 — map a `GraphragRetrievalMethod` string to the matching
+ * `graphrag_<method>` literal from `PHASE_12_RESERVED_MODES`. Used by
+ * the RAC ingestion adapter to translate the method string carried on
+ * a source's `metadataJson` into the typed mode the
+ * `GraphRetrievalRouter` consumes.
+ */
+export function methodToReservedMode(
+  method: GraphragRetrievalMethod,
+): "graphrag_local" | "graphrag_global" | "graphrag_traversal" | "graphrag_text2cypher" | "graphrag_algorithm" {
+  return `graphrag_${method}` as const;
+}
+
 export type RacPlannerMode = (typeof RAC_PLANNER_MODES)[number];
 
 /** Source-type families used to bucket runnable plan items. */

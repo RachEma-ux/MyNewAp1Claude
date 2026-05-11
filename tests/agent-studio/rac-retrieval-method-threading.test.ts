@@ -162,17 +162,20 @@ describe("Phase 12 §3 — retrievalMethod threading", () => {
     expect(calls[0].retrievalMethod).toBe("made_up_value");
   });
 
-  it("graphragAdapter surfaces the retrievalMethod in its source_unavailable warning", async () => {
+  it("graphragAdapter surfaces the retrievalMethod when method is unrecognized (stub fallback)", async () => {
+    // Phase 12 §5 dispatches recognized methods through the router; the
+    // stub remains for unrecognized strings so operator misconfiguration
+    // doesn't silently route somewhere unexpected.
     const result = await graphragAdapter.search({
       workspaceId: 1,
       sourceId: 42,
       query: "test",
       topK: 5,
-      retrievalMethod: "traversal",
+      retrievalMethod: "made_up_method",
     });
     expect(result.chunks).toEqual([]);
     expect(result.warnings[0]).toContain("source=42");
-    expect(result.warnings[0]).toContain("method=traversal");
+    expect(result.warnings[0]).toContain("method=made_up_method");
     expect(result.warnings[0]).toContain("source_unavailable");
   });
 
