@@ -48,6 +48,10 @@ import {
   deleteSavedView,
   SavedViewNotFoundError,
 } from "./saved-views.js";
+import {
+  getViewKindBlueprint,
+  listViewKindBlueprints,
+} from "./view-kind-blueprints.js";
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -522,6 +526,27 @@ export const vaultRouter = router({
           message: e instanceof Error ? e.message : String(e),
         });
       }
+    }),
+
+  // ============================================================
+  // Phase 16 §5-§7 — View-kind blueprints (UI starting shapes)
+  // ============================================================
+
+  listViewKindBlueprints: protectedProcedure.query(() => {
+    return listViewKindBlueprints();
+  }),
+
+  getViewKindBlueprint: protectedProcedure
+    .input(z.object({ viewKind: z.string().min(1).max(50) }))
+    .query(({ input }) => {
+      const blueprint = getViewKindBlueprint(input.viewKind);
+      if (!blueprint) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `No blueprint registered for viewKind="${input.viewKind}"`,
+        });
+      }
+      return blueprint;
     }),
 
   createNoteFromTemplate: protectedProcedure

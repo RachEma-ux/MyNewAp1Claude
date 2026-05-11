@@ -99,6 +99,11 @@ describe("Vault router", () => {
     expect(src).toMatch(/deleteSavedView:\s*protectedProcedure/);
   });
 
+  it("declares Phase 16 §5-§7 view-kind blueprint procedures", () => {
+    expect(src).toMatch(/listViewKindBlueprints:\s*protectedProcedure/);
+    expect(src).toMatch(/getViewKindBlueprint:\s*protectedProcedure/);
+  });
+
   it("selects repository via env (stub vs ASDB)", () => {
     expect(src).toMatch(/AGS_VAULT_REPO/);
     expect(src).toMatch(/VaultRepositoryStub/);
