@@ -189,3 +189,45 @@ export const agsGraphProjectionRebuilds = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
 );
+
+// ============================================================================
+// Phase 14 — runtime graph projection events (intent layer)
+// ============================================================================
+
+/**
+ * Postgres-side intent rows for the Phase 14 trace-graph projection.
+ *
+ * Each row captures "the projection layer should write these graph
+ * nodes + edges to Neo4j for trace X." Until Phase 7.5 wires the
+ * Neo4j worker, the rows accumulate as pending; once the worker
+ * lands it drains them and flips `applied=true`.
+ *
+ * Source-of-truth invariant: Postgres rows are authoritative. A
+ * catastrophic Neo4j loss is recovered by replaying pending +
+ * applied rows from this table.
+ */
+export const agsRuntimeGraphEvents = pgTable(
+  "ags_runtime_graph_events",
+  {
+    id: serial("id").primaryKey(),
+    /** "runtime_trace" | "decision_trace" — picks the projection shape. */
+    eventKind: varchar("event_kind", { length: 50 }).notNull(),
+    /** FK into `ags_runtime_runs.id` (the top-level run). */
+    runtimeRunId: integer("runtime_run_id").notNull(),
+    /** FK into `ags_graph_agent_runs.id` when the trace is from Graph Agent Lite. */
+    graphAgentRunId: integer("graph_agent_run_id"),
+    /** The graph-shaped payload the worker will write to Neo4j. */
+    payload: json("payload").$type<Record<string, unknown>>().notNull(),
+    /** True once the projection worker has written the corresponding Neo4j rows. */
+    applied: boolean("applied").notNull().default(false),
+    /** Neo4j relationship/node IDs the worker created — for drift detection. */
+    neo4jRefs: json("neo4j_refs").$type<Record<string, unknown> | null>(),
+    appliedAt: timestamp("applied_at"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    runtimeIdx: index("idx_ags_runtime_graph_events_runtime").on(t.runtimeRunId),
+    pendingIdx: index("idx_ags_runtime_graph_events_pending").on(t.applied),
+  }),
+);

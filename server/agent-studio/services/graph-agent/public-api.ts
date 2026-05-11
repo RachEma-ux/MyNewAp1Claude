@@ -72,3 +72,18 @@ export type {
   CagSourceNoteRef,
   GetCagSourceNoteRefsOptions,
 } from "./cag-source-note-refs-reader.js";
+export {
+  recordTraceProjectionIntent,
+  listPendingProjectionEvents,
+  markEventApplied,
+  markEventFailed,
+  AsdbUnavailableError as ProjectionEventsAsdbUnavailableError,
+  ProjectionEventNotFoundError,
+} from "./projection-events.js";
+export type {
+  RuntimeGraphEvent,
+  RuntimeGraphEventKind,
+  RecordTraceProjectionIntentInput,
+  ListPendingProjectionEventsInput,
+  ProjectionEventsOptions,
+} from "./projection-events.js";
