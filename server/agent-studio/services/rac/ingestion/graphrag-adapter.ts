@@ -31,11 +31,14 @@ const SOURCE_UNAVAILABLE_REASON =
 export const graphragAdapter: RacIngestionAdapter = {
   async search(input: RacRetrievalRequest): Promise<RacRetrievalResult> {
     const start = Date.now();
+    const methodTag = input.retrievalMethod
+      ? ` method=${input.retrievalMethod}`
+      : "";
     return {
       chunks: [],
       latencyMs: Date.now() - start,
       warnings: [
-        `source_unavailable: source=${input.sourceId} type=graph_index — ${SOURCE_UNAVAILABLE_REASON}`,
+        `source_unavailable: source=${input.sourceId} type=graph_index${methodTag} — ${SOURCE_UNAVAILABLE_REASON}`,
       ],
     };
   },

@@ -55,6 +55,17 @@ export interface RacRetrievalRequest {
     embeddingModelRef: string;
     embeddingModelDim: number;
   } | null;
+  /**
+   * Phase 12 — when the source row's `metadataJson.retrievalMethod` is
+   * one of `"local" | "global" | "traversal" | "text2cypher" |
+   * "algorithm"`, the executor threads it through to the adapter so
+   * GraphRAG-capable adapters can dispatch to the right backend
+   * routine. Unknown / missing → `undefined`, and the adapter falls
+   * back to its default search shape. Typed as `string` here (not the
+   * `GraphragRetrievalMethod` literal union from `../planner-mode`) to
+   * avoid an import cycle between the request shape and the planner.
+   */
+  retrievalMethod?: string;
 }
 
 export interface RacRetrievalChunk {

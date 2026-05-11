@@ -142,6 +142,7 @@ async function runItem(
             embeddingModelDim: item.embedding.dim,
           }
         : null,
+    retrievalMethod: readPhase12RetrievalMethod(item),
   };
 
   try {
@@ -227,6 +228,25 @@ function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
       },
     );
   });
+}
+
+/**
+ * Phase 12 — extract `metadataJson.retrievalMethod` from a `graph_index`
+ * source so the executor can thread it into the adapter request without
+ * pulling in `planner-mode`'s `GraphragRetrievalMethod` union (which
+ * would create an import cycle: planner-mode → ingestion → executor →
+ * planner-mode). Returns `undefined` for non-graph sources, missing
+ * metadata, or non-string values; the strict five-method whitelist is
+ * applied in `planner-mode.readGraphragRetrievalMethod`, not here —
+ * the executor just passes the raw string through, and adapters are
+ * responsible for validating + falling back.
+ */
+function readPhase12RetrievalMethod(item: RetrievalPlanItem): string | undefined {
+  if (item.source.sourceType !== "graph_index") return undefined;
+  const meta = item.source.metadataJson;
+  if (!meta || typeof meta !== "object") return undefined;
+  const raw = (meta as Record<string, unknown>).retrievalMethod;
+  return typeof raw === "string" ? raw : undefined;
 }
 
 // Re-export for callers that want to assemble custom executors over
