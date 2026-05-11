@@ -238,6 +238,99 @@ describe("getExplanationForRun — Phase 13 §3", () => {
     expect(result!.steps).toEqual([]);
   });
 
+  describe("Phase 14 §7 — actorUserId permission filter", () => {
+    it("returns null when the underlying filter rejects the run (mismatched owner)", async () => {
+      // Fake DB returns [] for the runs query — same shape the DB
+      // would produce when the WHERE (userId = $actor) clause filters
+      // the row out. The reader maps empty → null, identical to the
+      // "no row exists" path.
+      const { db, state } = makeFakeDb({});
+      state.queue.push("run");
+      state.activeRuntimeRunId = undefined; // simulate filter exclusion
+      const result = await getExplanationForRun(7, {
+        getDb: () => db as never,
+        actorUserId: 99,
+      });
+      expect(result).toBeNull();
+    });
+
+    it("returns the run when the underlying filter accepts the row (matching owner)", async () => {
+      const startedAt = new Date("2026-05-11T10:00:00Z");
+      const { db, state } = makeFakeDb({
+        runsByRuntimeRunId: {
+          7: {
+            id: 100,
+            agentKey: "graph_agent_lite",
+            userQuery: "q",
+            status: "completed",
+            durationMs: 1,
+            errorMessage: null,
+            startedAt,
+            completedAt: startedAt,
+          },
+        },
+        stepsByGraphAgentRunId: { 100: [] },
+      });
+      state.queue.push("run", "steps");
+      state.activeRuntimeRunId = 7;
+      state.activeGraphAgentRunId = 100;
+      const result = await getExplanationForRun(7, {
+        getDb: () => db as never,
+        actorUserId: 42,
+      });
+      expect(result).not.toBeNull();
+      expect(result!.graphAgentRunId).toBe(100);
+    });
+
+    it("builds a different where clause when actorUserId is supplied (drizzle and() vs bare eq())", async () => {
+      // Spy on the where invocation by intercepting the select chain.
+      const whereCalls: unknown[] = [];
+      const select = vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: (clause: unknown) => {
+            whereCalls.push(clause);
+            return chain;
+          },
+          orderBy: () => Promise.resolve([]),
+          limit: async () => [] as Array<Record<string, unknown>>,
+        };
+        return chain;
+      });
+      const db = { select } as unknown;
+
+      await getExplanationForRun(7, { getDb: () => db as never });
+      await getExplanationForRun(7, {
+        getDb: () => db as never,
+        actorUserId: 42,
+      });
+
+      // First call (no actorUserId) builds `eq(runtimeRunId, ...)`.
+      // Second call (with actorUserId) builds `and(eq(...), eq(...))`.
+      // The two drizzle SQL objects differ in queryChunks length /
+      // composition; verifying they aren't strictly equal is enough
+      // to catch a regression where the actorUserId is dropped.
+      expect(whereCalls.length).toBeGreaterThanOrEqual(2);
+      // drizzle's SQL objects carry circular table refs so we can't
+      // JSON-stringify them. Comparing `queryChunks.length` is a
+      // structural signal that the `and(eq, eq)` form (2 chunks +
+      // separators) differs from the bare `eq` form. Identity check
+      // alone isn't enough — the same builder call site would still
+      // return distinct instances.
+      const chunks0 = (whereCalls[0] as { queryChunks?: unknown[] })
+        .queryChunks;
+      const chunks1 = (whereCalls[1] as { queryChunks?: unknown[] })
+        .queryChunks;
+      expect(Array.isArray(chunks0) && Array.isArray(chunks1)).toBe(true);
+      // The structural composition of `and(eq, eq)` vs bare `eq(...)`
+      // produces a different chunk shape; any length-or-content delta
+      // means the actorUserId was plumbed in.
+      expect((chunks0 as unknown[]).length).not.toBe(
+        (chunks1 as unknown[]).length,
+      );
+    });
+  });
+
   it("surfaces failed runs with errorMessage populated", async () => {
     const { db, state } = makeFakeDb({
       runsByRuntimeRunId: {
