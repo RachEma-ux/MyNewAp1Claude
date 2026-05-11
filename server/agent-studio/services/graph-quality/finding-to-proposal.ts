@@ -73,6 +73,7 @@ export const FINDING_CLASS_TO_PROPOSAL_KIND: Readonly<Record<string, string>> =
   {
     orphan_node: "link_or_archive_orphan_node",
     duplicate_entity: "merge_duplicate_entities",
+    stale_node: "re_promote_with_source_version",
   };
 
 export function proposalKindForFinding(findingClass: string): string {
