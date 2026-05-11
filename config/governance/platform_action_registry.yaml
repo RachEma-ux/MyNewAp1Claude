@@ -697,6 +697,21 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # Phase 14 §3 — operator-triggered prune of the runtime-trace
+  # ledgers (`ags_graph_skill_runtime_usages`, `ags_query_template_runs`,
+  # `ags_graph_agent_runs`, `ags_graph_agent_steps`). R3 because it
+  # permanently deletes audit rows — one tier above the R2
+  # create/publish shape. `approval: none` to match the §10 mutation
+  # baseline; a future tightening sub-arc can lift to `role_any` with
+  # an admin-only allowlist.
+  agentStudio.graphAgent.pruneTraces:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ─────────────────────────────────────────────────────────────────
   # R2-c2 — pre-existing damage discovered by the systemic
   # governance-coverage audit. The 9 entries below were all declared as

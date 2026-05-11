@@ -43,3 +43,8 @@ export type {
   DecisionTraceMarkdown,
   ExportDecisionTraceOptions,
 } from "./trace-export.js";
+export { pruneRuntimeTraces } from "./retention.js";
+export type {
+  RetentionPruneSummary,
+  PruneRuntimeTraceOptions,
+} from "./retention.js";
