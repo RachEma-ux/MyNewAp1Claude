@@ -1,13 +1,17 @@
 /**
  * Retrofit P6 — RAC planner mode derivation tests.
  *
- * Pure decision-table tests covering every branch of the 8-mode lattice.
+ * Pure decision-table tests covering every branch of the 8-mode lattice
+ * plus a Phase 12 reservation guard: the 7 graphrag-related modes added
+ * by `agent-studio-graphrag-retrieval-router.md` §1.3 are present in
+ * `RAC_PLANNER_MODES` but are not yet emitted by `derivePlannerMode`.
  */
 
 import { describe, it, expect } from "vitest";
 import {
   derivePlannerMode,
   RAC_PLANNER_MODES,
+  PHASE_12_RESERVED_MODES,
 } from "../../server/agent-studio/services/rac/planner-mode";
 import type { RetrievalPlan } from "../../server/agent-studio/services/rac/retrieval-planner";
 
@@ -66,7 +70,7 @@ function makePlan(types: string[]): RetrievalPlan {
 }
 
 describe("derivePlannerMode — D-RAC-PLANNER lattice", () => {
-  it("8 modes are stable strings", () => {
+  it("15 modes are stable strings (8 retrofit + 7 Phase 12 reserved)", () => {
     expect(RAC_PLANNER_MODES).toEqual([
       "no_retrieval",
       "cag_only",
@@ -76,7 +80,55 @@ describe("derivePlannerMode — D-RAC-PLANNER lattice", () => {
       "hybrid_cag_rag",
       "hybrid_cag_tool_knowledge",
       "hybrid_cag_rag_tool_knowledge",
+      "graphrag_local",
+      "graphrag_global",
+      "graphrag_traversal",
+      "graphrag_text2cypher",
+      "graphrag_algorithm",
+      "hybrid_cag_graphrag",
+      "hybrid_rac_graphrag",
     ]);
+  });
+
+  it("Phase 12 reserved modes are a subset of RAC_PLANNER_MODES", () => {
+    for (const m of PHASE_12_RESERVED_MODES) {
+      expect(RAC_PLANNER_MODES).toContain(m);
+    }
+  });
+
+  it("Phase 12 reserved modes are not yet emitted by derivePlannerMode", () => {
+    // Exhaustive coverage across the existing decision tree (graph_index
+    // explicitly included since it is the source-type that Phase 12 will
+    // eventually route to graphrag_* modes). With today's derivation,
+    // graph_index continues to route through knowledge_retrieval /
+    // hybrid_cag_rag.
+    const reserved = new Set<string>(PHASE_12_RESERVED_MODES);
+    const observed = new Set<string>();
+    const trials: Array<{ types: string[]; cag: boolean }> = [
+      { types: [], cag: false },
+      { types: [], cag: true },
+      { types: ["document_collection"], cag: false },
+      { types: ["document_collection"], cag: true },
+      { types: ["vector_index"], cag: false },
+      { types: ["vector_index"], cag: true },
+      { types: ["graph_index"], cag: false },
+      { types: ["graph_index"], cag: true },
+      { types: ["knowledge_unit"], cag: false },
+      { types: ["tool_knowledge"], cag: false },
+      { types: ["tool_knowledge"], cag: true },
+      { types: ["knowledge_unit", "tool_knowledge"], cag: false },
+      { types: ["knowledge_unit", "tool_knowledge"], cag: true },
+      { types: ["multimodal"], cag: false },
+    ];
+    for (const t of trials) {
+      const r = derivePlannerMode({ plan: makePlan(t.types), hasCagPack: t.cag });
+      observed.add(r.mode);
+      expect(reserved.has(r.mode)).toBe(false);
+    }
+    // Sanity: derivation actually exercises a non-empty subset of the
+    // active 8 modes (catches a future regression that accidentally
+    // collapses everything to one mode).
+    expect(observed.size).toBeGreaterThan(1);
   });
 
   it("no sources, no CAG → no_retrieval", () => {
