@@ -19,6 +19,7 @@ import { router, protectedProcedure } from "../../../_core/trpc.js";
 import { GraphAgentRunInput } from "./contracts.js";
 import { wireGraphAgentLite } from "./wiring.js";
 import { getExplanationForRun } from "./explain-reader.js";
+import { getPromptSafeSchemaSummary } from "./schema-summary.js";
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -50,6 +51,36 @@ export const graphAgentRouter = router({
           workspaceId,
         });
         return answer;
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  schemaSummary: protectedProcedure
+    .input(
+      z
+        .object({
+          nodeLimit: z.number().int().positive().max(200).optional(),
+          edgeLimit: z.number().int().positive().max(200).optional(),
+          descriptionBudget: z
+            .number()
+            .int()
+            .positive()
+            .max(2000)
+            .optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await getPromptSafeSchemaSummary({
+          nodeLimit: input?.nodeLimit,
+          edgeLimit: input?.edgeLimit,
+          descriptionBudget: input?.descriptionBudget,
+        });
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
