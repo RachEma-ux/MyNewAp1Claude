@@ -124,3 +124,8 @@ export type {
   RuntimeCagBlockUsageRow,
   LoadRuntimeCagBlockUsagesOptions,
 } from "./projection-cag-block-expander.js";
+export { buildProjectionWritesForEvent } from "./projection-drain.js";
+export type {
+  ProjectionDrainLoaders,
+  BuildProjectionWritesOptions,
+} from "./projection-drain.js";
