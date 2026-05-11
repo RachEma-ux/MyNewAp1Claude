@@ -33,6 +33,7 @@ export {
   AsdbUnavailableError,
   DuplicateVersionError,
   PackNotFoundError,
+  SourceNoteVersionNotFoundError,
 } from "./pack-mutations.js";
 export { createQueryTemplateRunRecorder } from "./template-run-recorder.js";
 export type { CreateQueryTemplateRunRecorderOptions } from "./template-run-recorder.js";

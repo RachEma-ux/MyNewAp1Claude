@@ -25,6 +25,7 @@ import {
   AsdbUnavailableError,
   DuplicateVersionError,
   PackNotFoundError,
+  SourceNoteVersionNotFoundError,
 } from "../services/graph-skill/public-api";
 
 const RISK_LEVELS = ["low", "medium", "high"] as const;
@@ -189,6 +190,15 @@ export const graphSkillRouter = router({
         if (err instanceof PackNotFoundError) {
           throw new TRPCError({
             code: "NOT_FOUND",
+            message: err.message,
+          });
+        }
+        if (err instanceof SourceNoteVersionNotFoundError) {
+          // The source-note id was supplied but doesn't resolve. This
+          // is a caller mistake (BAD_REQUEST), not a server problem —
+          // operators should fix the payload and retry.
+          throw new TRPCError({
+            code: "BAD_REQUEST",
             message: err.message,
           });
         }

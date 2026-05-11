@@ -35,6 +35,12 @@ const hoisted = vi.hoisted(() => {
       this.name = "PackNotFoundError";
     }
   }
+  class SourceNoteVersionNotFoundErrorMock extends Error {
+    constructor(id: number) {
+      super(`ags_vault_note_versions row with id=${id} does not exist`);
+      this.name = "SourceNoteVersionNotFoundError";
+    }
+  }
   return {
     listUsageCountsMock: vi.fn(),
     createPackMock: vi.fn(),
@@ -43,6 +49,7 @@ const hoisted = vi.hoisted(() => {
     AsdbUnavailableErrorMock,
     DuplicateVersionErrorMock,
     PackNotFoundErrorMock,
+    SourceNoteVersionNotFoundErrorMock,
   };
 });
 
@@ -54,6 +61,7 @@ const {
   AsdbUnavailableErrorMock,
   DuplicateVersionErrorMock,
   PackNotFoundErrorMock,
+  SourceNoteVersionNotFoundErrorMock,
 } = hoisted;
 
 vi.mock("../../server/agent-studio/services/graph-skill/public-api", () => ({
@@ -64,6 +72,7 @@ vi.mock("../../server/agent-studio/services/graph-skill/public-api", () => ({
   AsdbUnavailableError: hoisted.AsdbUnavailableErrorMock,
   DuplicateVersionError: hoisted.DuplicateVersionErrorMock,
   PackNotFoundError: hoisted.PackNotFoundErrorMock,
+  SourceNoteVersionNotFoundError: hoisted.SourceNoteVersionNotFoundErrorMock,
 }));
 
 // The standalone sub-router caller passes a bare procedure name as
@@ -364,6 +373,20 @@ describe("graphSkillRouter.publishVersion — Phase 12.5 §10", () => {
         manifest: {},
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("Phase 12.5 §14 — maps SourceNoteVersionNotFoundError to BAD_REQUEST", async () => {
+    publishVersionMock.mockRejectedValueOnce(
+      new SourceNoteVersionNotFoundErrorMock(99),
+    );
+    await expect(
+      makeCaller().publishVersion({
+        skillKey: "p",
+        version: "1.0",
+        manifest: {},
+        sourceNoteVersionId: 99,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("maps AsdbUnavailableError to SERVICE_UNAVAILABLE", async () => {

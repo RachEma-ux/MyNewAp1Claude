@@ -31,6 +31,7 @@ import {
   agsGraphSkillPacks,
   agsGraphSkillPackVersions,
 } from "../../../../drizzle/tables/agent-studio-graph-skill.js";
+import { agsVaultNoteVersions } from "../../../../drizzle/tables/agent-studio-vault.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -55,6 +56,15 @@ export class PackNotFoundError extends Error {
   constructor(public readonly skillKey: string) {
     super(`Graph Skill Pack with skillKey="${skillKey}" not found`);
     this.name = "PackNotFoundError";
+  }
+}
+
+export class SourceNoteVersionNotFoundError extends Error {
+  constructor(public readonly sourceNoteVersionId: number) {
+    super(
+      `ags_vault_note_versions row with id=${sourceNoteVersionId} does not exist`,
+    );
+    this.name = "SourceNoteVersionNotFoundError";
   }
 }
 
@@ -183,6 +193,26 @@ export async function publishVersion(
     .limit(1);
   if (dupCheck.length > 0) {
     throw new DuplicateVersionError(input.skillKey, input.version);
+  }
+
+  // Phase 12.5 §14 — validate the source-note FK before we write so
+  // operators get a clean error instead of a dangling reference. The
+  // schema doesn't carry a `.references()` constraint on this column
+  // (vault tables live in a separate per-module DB historically, so
+  // FKs would cross databases), so we enforce it at the service
+  // boundary instead.
+  if (
+    input.sourceNoteVersionId !== undefined &&
+    input.sourceNoteVersionId !== null
+  ) {
+    const noteCheck = await db
+      .select({ id: agsVaultNoteVersions.id })
+      .from(agsVaultNoteVersions)
+      .where(eq(agsVaultNoteVersions.id, input.sourceNoteVersionId))
+      .limit(1);
+    if (noteCheck.length === 0) {
+      throw new SourceNoteVersionNotFoundError(input.sourceNoteVersionId);
+    }
   }
 
   const inserted = await db
