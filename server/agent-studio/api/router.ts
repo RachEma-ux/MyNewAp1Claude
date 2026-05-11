@@ -70,6 +70,7 @@ import { mcpSchemaSyncRouter } from "./mcp-schema-sync-router";
 import { toolApprovalsRouter } from "./tool-approvals-router";
 import { graphSkillRouter } from "./graph-skill-router";
 import { graphAgentRouter } from "../services/graph-agent/router";
+import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2230,4 +2231,7 @@ export const agentStudioRouter = router({
   graphSkill: graphSkillRouter,
   // Native Graph Workspace Phase 13 §1: Graph Agent Lite runtime
   graphAgent: graphAgentRouter,
+  // Native Graph Workspace Phase 22: workspace observability (background jobs,
+  // user notifications, error events)
+  workspaceObservability: workspaceObservabilityRouter,
 });

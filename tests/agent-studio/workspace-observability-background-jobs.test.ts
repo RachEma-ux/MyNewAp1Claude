@@ -1,0 +1,334 @@
+/**
+ * Phase 22 — Workspace observability: background jobs service tests.
+ *
+ * Covers `services/workspace-observability/background-jobs.ts`.
+ * Uses the active-key fake-DB pattern.
+ */
+
+import { describe, it, expect, vi } from "vitest";
+import {
+  enqueueJob,
+  getJobById,
+  listJobs,
+  markJobStarted,
+  markJobCompleted,
+  markJobFailed,
+  markJobCancelled,
+  AsdbUnavailableError,
+  JobNotFoundError,
+} from "../../server/agent-studio/services/workspace-observability/background-jobs";
+
+interface FakeRow {
+  id: number;
+  jobKind: string;
+  payload: Record<string, unknown> | null;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface FakeState {
+  rows: FakeRow[];
+  nextId: number;
+  selectQueue: Array<"byId" | "list">;
+  active: { jobId?: number; status?: string; jobKind?: string };
+}
+
+function makeFakeDb(initial?: Partial<FakeState>) {
+  const state: FakeState = {
+    rows: initial?.rows ?? [],
+    nextId: initial?.nextId ?? 1000,
+    selectQueue: [],
+    active: {},
+  };
+
+  const select = vi.fn(() => {
+    const chain: Record<string, unknown> = {
+      from: () => chain,
+      where: () => chain,
+      orderBy: () => {
+        const op = state.selectQueue.shift();
+        if (op === "list") {
+          let rows = state.rows;
+          if (state.active.status !== undefined) {
+            rows = rows.filter((r) => r.status === state.active.status);
+          }
+          if (state.active.jobKind !== undefined) {
+            rows = rows.filter((r) => r.jobKind === state.active.jobKind);
+          }
+          return {
+            limit: async () =>
+              rows.sort(
+                (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+              ),
+          };
+        }
+        return chain;
+      },
+      limit: async () => {
+        const op = state.selectQueue.shift();
+        if (op === "byId") {
+          const found = state.rows.find((r) => r.id === state.active.jobId);
+          return found ? [found] : [];
+        }
+        return [];
+      },
+    };
+    return chain;
+  });
+
+  function tableName(t: unknown): string {
+    if (!t) return "?";
+    const sym = Object.getOwnPropertySymbols(t).find(
+      (s) => s.description === "drizzle:Name",
+    );
+    if (sym) return String((t as Record<symbol, unknown>)[sym] ?? "?");
+    return "?";
+  }
+
+  const insert = vi.fn((table: unknown) => {
+    const name = tableName(table);
+    return {
+      values: (vals: Record<string, unknown>) => ({
+        returning: async () => {
+          if (name !== "ags_workspace_background_jobs") return [];
+          const now = new Date();
+          const id = state.nextId++;
+          const row: FakeRow = {
+            id,
+            jobKind: String(vals.jobKind),
+            payload:
+              (vals.payload as Record<string, unknown> | null | undefined) ??
+              null,
+            status: String(vals.status ?? "pending"),
+            attempts: Number(vals.attempts ?? 0),
+            lastError: vals.lastError == null ? null : String(vals.lastError),
+            createdAt: now,
+            updatedAt: (vals.updatedAt as Date) ?? now,
+          };
+          state.rows.push(row);
+          return [row];
+        },
+      }),
+    };
+  });
+
+  const update = vi.fn((_table: unknown) => ({
+    set: (vals: Record<string, unknown>) => ({
+      where: async () => {
+        const id = state.active.jobId;
+        if (id == null) return;
+        const target = state.rows.find((r) => r.id === id);
+        if (!target) return;
+        if ("status" in vals) target.status = String(vals.status);
+        if ("attempts" in vals) target.attempts = Number(vals.attempts);
+        if ("lastError" in vals) {
+          target.lastError = vals.lastError == null ? null : String(vals.lastError);
+        }
+        if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+      },
+    }),
+  }));
+
+  const db = { select, insert, update } as unknown;
+  return { db, state };
+}
+
+describe("enqueueJob — Phase 22", () => {
+  it("throws AsdbUnavailableError on null DB", async () => {
+    await expect(
+      enqueueJob({ jobKind: "x" }, { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("inserts a pending job with attempts=0", async () => {
+    const { db, state } = makeFakeDb();
+    const job = await enqueueJob(
+      { jobKind: "projection.rebuild", payload: { vaultId: 1 } },
+      { getDb: () => db as never },
+    );
+    expect(job.status).toBe("pending");
+    expect(job.attempts).toBe(0);
+    expect(job.jobKind).toBe("projection.rebuild");
+    expect(state.rows.length).toBe(1);
+  });
+});
+
+describe("getJobById — Phase 22", () => {
+  it("returns null when ASDB-unavailable", async () => {
+    const result = await getJobById(7, { getDb: () => null as never });
+    expect(result).toBeNull();
+  });
+
+  it("returns the row when found", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await getJobById(7, { getDb: () => db as never });
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(7);
+  });
+});
+
+describe("listJobs — Phase 22", () => {
+  it("returns [] on ASDB-null", async () => {
+    const result = await listJobs({}, { getDb: () => null as never });
+    expect(result).toEqual([]);
+  });
+
+  it("filters by status when supplied", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 2,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.status = "running";
+    const result = await listJobs(
+      { status: "running" },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
+  });
+});
+
+describe("state transitions — Phase 22", () => {
+  it("markJobStarted bumps attempts + flips to running", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId", "byId");
+    state.active.jobId = 7;
+    const result = await markJobStarted(7, { getDb: () => db as never });
+    expect(result.status).toBe("running");
+    expect(result.attempts).toBe(1);
+  });
+
+  it("markJobCompleted clears lastError + flips to completed", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 2,
+          lastError: "previous boom",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await markJobCompleted(7, { getDb: () => db as never });
+    expect(result.status).toBe("completed");
+    expect(result.lastError).toBeNull();
+  });
+
+  it("markJobFailed sets lastError", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await markJobFailed(7, "model boom", {
+      getDb: () => db as never,
+    });
+    expect(result.status).toBe("failed");
+    expect(result.lastError).toBe("model boom");
+  });
+
+  it("markJobCancelled flips to cancelled", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await markJobCancelled(7, { getDb: () => db as never });
+    expect(result.status).toBe("cancelled");
+  });
+
+  it("transition throws JobNotFoundError when row is missing", async () => {
+    const { db, state } = makeFakeDb({});
+    state.selectQueue.push("byId");
+    state.active.jobId = 999;
+    await expect(
+      markJobCompleted(999, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+});
