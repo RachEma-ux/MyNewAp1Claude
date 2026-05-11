@@ -60,3 +60,9 @@ export type {
   CaptureDecision,
   CaptureOptions,
 } from "./trpc-error-capture.js";
+
+export { getWorkspaceObservabilityStats } from "./stats.js";
+export type {
+  WorkspaceObservabilityStats,
+  WorkspaceObservabilityStatsOptions,
+} from "./stats.js";
