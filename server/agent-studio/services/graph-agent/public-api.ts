@@ -92,3 +92,11 @@ export {
   translateRuntimeTraceIntent,
   translateDecisionTraceIntent,
 } from "./projection-event-translator.js";
+export {
+  expandDecisionTraceSteps,
+  loadDecisionTraceStepsForRun,
+} from "./projection-step-expander.js";
+export type {
+  DecisionTraceStepRow,
+  LoadDecisionTraceStepsOptions,
+} from "./projection-step-expander.js";
