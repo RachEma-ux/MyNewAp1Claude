@@ -20,6 +20,7 @@ import { GraphAgentRunInput } from "./contracts.js";
 import { wireGraphAgentLite } from "./wiring.js";
 import { getExplanationForRun } from "./explain-reader.js";
 import { getPromptSafeSchemaSummary } from "./schema-summary.js";
+import { exportDecisionTraceAsMarkdown } from "./trace-export.js";
 
 export const graphAgentRouter = router({
   health: protectedProcedure.query(async () => {
@@ -81,6 +82,32 @@ export const graphAgentRouter = router({
           edgeLimit: input?.edgeLimit,
           descriptionBudget: input?.descriptionBudget,
         });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  exportTraceMarkdown: protectedProcedure
+    .input(
+      z.object({
+        runId: z.number().int().positive(),
+        title: z.string().min(1).max(200).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      // Phase 14 §1 — Markdown export of the decision-trace ledger.
+      // Returns `{ exported: null }` when the runId has no graph-
+      // agent run row (engine ran without §2 decision-trace adapter
+      // wired, or ASDB is unavailable). Caller decides whether to
+      // map null to a 404 or render a "no trace available" UI.
+      try {
+        const exported = await exportDecisionTraceAsMarkdown(input.runId, {
+          title: input.title,
+        });
+        return { runId: input.runId, exported };
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

@@ -38,3 +38,8 @@ export type {
   SchemaSummaryEdgeType,
   GetSchemaSummaryOptions,
 } from "./schema-summary.js";
+export { exportDecisionTraceAsMarkdown } from "./trace-export.js";
+export type {
+  DecisionTraceMarkdown,
+  ExportDecisionTraceOptions,
+} from "./trace-export.js";
