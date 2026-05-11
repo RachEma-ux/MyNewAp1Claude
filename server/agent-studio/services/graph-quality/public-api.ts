@@ -101,6 +101,7 @@ export type {
 
 export {
   dismissFinding,
+  bulkDismissFindings,
   AsdbUnavailableError as DismissFindingAsdbUnavailableError,
   FindingNotFoundError as DismissFindingNotFoundError,
   FindingAlreadyResolvedError,
@@ -109,6 +110,8 @@ export type {
   DismissFindingInput,
   DismissFindingOptions,
   DismissFindingResult,
+  BulkDismissFindingsInput,
+  BulkDismissFindingsResult,
 } from "./dismiss-finding.js";
 
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";

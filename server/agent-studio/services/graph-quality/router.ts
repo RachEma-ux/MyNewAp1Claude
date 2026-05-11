@@ -71,6 +71,7 @@ import { approveAndApplyProposal } from "./approve-and-apply.js";
 import { getFindingAuditTrail } from "./finding-audit-trail.js";
 import {
   dismissFinding,
+  bulkDismissFindings,
   AsdbUnavailableError as DismissFindingAsdbUnavailable,
   FindingNotFoundError as DismissFindingNotFound,
   FindingAlreadyResolvedError,
@@ -229,6 +230,30 @@ export const graphQualityRouter = router({
       try {
         return await dismissFinding({
           findingId: input.findingId,
+          reason: input.reason,
+          dismissedByUserId: userId,
+        });
+      } catch (e) {
+        unwrapError(e);
+      }
+    }),
+
+  bulkDismissFindings: protectedProcedure
+    .input(
+      z.object({
+        findingIds: z
+          .array(z.number().int().positive())
+          .min(1)
+          .max(500),
+        reason: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      try {
+        return await bulkDismissFindings({
+          findingIds: input.findingIds,
           reason: input.reason,
           dismissedByUserId: userId,
         });

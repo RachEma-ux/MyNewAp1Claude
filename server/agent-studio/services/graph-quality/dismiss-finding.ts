@@ -115,3 +115,68 @@ export async function dismissFinding(
 
   return { findingId: input.findingId, priorStatus: finding.status };
 }
+
+// ---------- bulk dismiss ----------
+
+export interface BulkDismissFindingsInput {
+  readonly findingIds: readonly number[];
+  readonly reason?: string;
+  readonly dismissedByUserId?: number;
+}
+
+export interface BulkDismissFindingsResult {
+  readonly dismissed: readonly DismissFindingResult[];
+  readonly skipped: readonly {
+    readonly findingId: number;
+    readonly reason: "not_found" | "already_resolved";
+    readonly currentStatus?: string;
+  }[];
+}
+
+/**
+ * Dismiss many findings in one call. Per-finding failures (not-found,
+ * already-resolved) are collected into `skipped` instead of aborting
+ * the batch — the operator wants to clear a known list and prefers
+ * partial success over an all-or-nothing surface.
+ *
+ * `findingIds` is deduplicated server-side; the same id twice in the
+ * input list dismisses once (the second pass falls into
+ * already-resolved and skips).
+ */
+export async function bulkDismissFindings(
+  input: BulkDismissFindingsInput,
+  options: DismissFindingOptions = {},
+): Promise<BulkDismissFindingsResult> {
+  const uniqueIds = Array.from(new Set(input.findingIds));
+  const dismissed: DismissFindingResult[] = [];
+  const skipped: BulkDismissFindingsResult["skipped"][number][] = [];
+
+  for (const findingId of uniqueIds) {
+    try {
+      const result = await dismissFinding(
+        {
+          findingId,
+          reason: input.reason,
+          dismissedByUserId: input.dismissedByUserId,
+        },
+        options,
+      );
+      dismissed.push(result);
+    } catch (err) {
+      if (err instanceof FindingNotFoundError) {
+        skipped.push({ findingId, reason: "not_found" });
+      } else if (err instanceof FindingAlreadyResolvedError) {
+        skipped.push({
+          findingId,
+          reason: "already_resolved",
+          currentStatus: err.currentStatus,
+        });
+      } else {
+        // AsdbUnavailable etc. — bubble out (whole batch can't proceed).
+        throw err;
+      }
+    }
+  }
+
+  return { dismissed, skipped };
+}
