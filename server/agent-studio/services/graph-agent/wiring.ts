@@ -23,6 +23,7 @@ import { getGraphRepository } from "../graph/repository/index.js";
 import {
   createRuntimeUsageRecorder,
   createQueryTemplateRunRecorder,
+  createTemplateExecutionGate,
 } from "../graph-skill/public-api.js";
 
 /**
@@ -215,6 +216,7 @@ export function wireGraphAgentLite(input: GraphAgentLiteWiringInput): GraphAgent
   const retrievalRouter = new GraphRetrievalRouter(repository, {
     recordRuntimeUsage: createRuntimeUsageRecorder(),
     recordQueryTemplateRun: createQueryTemplateRunRecorder(),
+    templateExecutionGate: createTemplateExecutionGate(),
   });
 
   const modelAccess = new OpenRouterModelAccessAdapter({

@@ -138,12 +138,16 @@ async function dispatchToRouter(
   const { GraphRetrievalRouter } = await import(
     "../../graph/retrieval/retrieval-router"
   );
-  const { createRuntimeUsageRecorder, createQueryTemplateRunRecorder } =
-    await import("../../graph-skill/public-api");
+  const {
+    createRuntimeUsageRecorder,
+    createQueryTemplateRunRecorder,
+    createTemplateExecutionGate,
+  } = await import("../../graph-skill/public-api");
   const repo = getGraphRepository();
   const router = new GraphRetrievalRouter(repo, {
     recordRuntimeUsage: createRuntimeUsageRecorder(),
     recordQueryTemplateRun: createQueryTemplateRunRecorder(),
+    templateExecutionGate: createTemplateExecutionGate(),
   });
   const filters = input.filters as Record<string, unknown> | undefined;
 
