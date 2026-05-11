@@ -231,10 +231,20 @@ export const graphQualityRouter = router({
     }),
 
   applyApprovedProposal: protectedProcedure
-    .input(z.object({ proposalId: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
+    .input(
+      z.object({
+        proposalId: z.number().int().positive(),
+        notifyMe: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
       try {
-        return await applyApprovedProposal({ proposalId: input.proposalId });
+        return await applyApprovedProposal({
+          proposalId: input.proposalId,
+          notifyUserId: input.notifyMe && userId != null ? userId : undefined,
+        });
       } catch (e) {
         unwrapError(e);
       }

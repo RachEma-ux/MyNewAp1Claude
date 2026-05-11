@@ -26,6 +26,7 @@
 
 import { pushNotification } from "../workspace-observability/user-notifications.js";
 import type { RunQualityAgentResult } from "./agent-run.js";
+import type { ApplyApprovedProposalResult } from "./mutation-worker.js";
 
 export interface AgentRunNotifyInput {
   readonly userId: number;
@@ -95,4 +96,63 @@ export async function pushAgentRunNotifications(
   }
 
   return { runCompletedPushed, proposalsCreatedPushed, errors };
+}
+
+// ---------- apply-proposal notification ----------
+
+const PROPOSAL_APPLIED_KIND = "graph_quality_proposal_applied";
+const PROPOSAL_APPLY_FAILED_KIND = "graph_quality_proposal_apply_failed";
+
+export interface ApplyNotifyInput {
+  readonly userId: number;
+  readonly applyResult: ApplyApprovedProposalResult;
+}
+
+export interface ApplyNotifyOutcome {
+  readonly pushed: boolean;
+  readonly notificationKind: string | null;
+  readonly error: string | null;
+}
+
+/**
+ * Pushes a single notification reflecting the outcome of a mutation
+ * worker apply:
+ *   - `applied: true`  → `graph_quality_proposal_applied`
+ *   - `applied: false` → `graph_quality_proposal_apply_failed`
+ *
+ * Best-effort same as the run-completion bridge — push errors land
+ * in `outcome.error` instead of throwing. A failed notification
+ * cannot break the apply path.
+ */
+export async function pushApplyProposalNotification(
+  input: ApplyNotifyInput,
+  options: AgentRunNotifyOptions = {},
+): Promise<ApplyNotifyOutcome> {
+  const pusher = options.pushNotification ?? pushNotification;
+  const applied = input.applyResult.result.applied;
+  const notificationKind = applied
+    ? PROPOSAL_APPLIED_KIND
+    : PROPOSAL_APPLY_FAILED_KIND;
+
+  const payload: Record<string, unknown> = {
+    proposalId: input.applyResult.proposalId,
+    payloadKind: input.applyResult.payloadKind,
+    applied,
+    reason: input.applyResult.result.reason ?? null,
+  };
+
+  try {
+    await pusher({
+      userId: input.userId,
+      notificationKind,
+      payload,
+    });
+    return { pushed: true, notificationKind, error: null };
+  } catch (e) {
+    return {
+      pushed: false,
+      notificationKind,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }

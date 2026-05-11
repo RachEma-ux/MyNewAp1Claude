@@ -3,8 +3,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { pushAgentRunNotifications } from "../../server/agent-studio/services/graph-quality/agent-run-notifications";
+import {
+  pushAgentRunNotifications,
+  pushApplyProposalNotification,
+} from "../../server/agent-studio/services/graph-quality/agent-run-notifications";
 import type { RunQualityAgentResult } from "../../server/agent-studio/services/graph-quality/agent-run";
+import type { ApplyApprovedProposalResult } from "../../server/agent-studio/services/graph-quality/mutation-worker";
 
 function makeResult(
   overrides: Partial<RunQualityAgentResult> = {},
@@ -140,5 +144,74 @@ describe("pushAgentRunNotifications", () => {
     expect(outcome.runCompletedPushed).toBe(false);
     expect(outcome.proposalsCreatedPushed).toBe(false);
     expect(outcome.errors).toHaveLength(2);
+  });
+});
+
+function makeApplyResult(
+  overrides: Partial<ApplyApprovedProposalResult> = {},
+): ApplyApprovedProposalResult {
+  return {
+    proposalId: 42,
+    payloadKind: "archive_node",
+    result: { applied: true, details: { stub: true } },
+    ...overrides,
+  };
+}
+
+describe("pushApplyProposalNotification", () => {
+  let pusher: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    pusher = vi.fn();
+  });
+
+  it("pushes graph_quality_proposal_applied when applied=true", async () => {
+    pusher.mockResolvedValue({ id: 1 });
+    const outcome = await pushApplyProposalNotification(
+      { userId: 7, applyResult: makeApplyResult() },
+      { pushNotification: pusher as never },
+    );
+    expect(outcome.pushed).toBe(true);
+    expect(outcome.notificationKind).toBe("graph_quality_proposal_applied");
+    expect(outcome.error).toBeNull();
+    expect(pusher.mock.calls[0][0]).toMatchObject({
+      userId: 7,
+      notificationKind: "graph_quality_proposal_applied",
+      payload: expect.objectContaining({
+        proposalId: 42,
+        payloadKind: "archive_node",
+        applied: true,
+      }),
+    });
+  });
+
+  it("pushes graph_quality_proposal_apply_failed when applied=false", async () => {
+    pusher.mockResolvedValue({ id: 1 });
+    const outcome = await pushApplyProposalNotification(
+      {
+        userId: 1,
+        applyResult: makeApplyResult({
+          payloadKind: "manual_review",
+          result: { applied: false, reason: "manual" },
+        }),
+      },
+      { pushNotification: pusher as never },
+    );
+    expect(outcome.notificationKind).toBe(
+      "graph_quality_proposal_apply_failed",
+    );
+    expect(pusher.mock.calls[0][0].payload).toMatchObject({
+      applied: false,
+      reason: "manual",
+    });
+  });
+
+  it("returns error string + pushed=false when the pusher throws", async () => {
+    pusher.mockRejectedValue(new Error("push failed"));
+    const outcome = await pushApplyProposalNotification(
+      { userId: 1, applyResult: makeApplyResult() },
+      { pushNotification: pusher as never },
+    );
+    expect(outcome.pushed).toBe(false);
+    expect(outcome.error).toMatch(/push failed/);
   });
 });
