@@ -67,9 +67,21 @@ function makeFakeDb(initial: Partial<FakeDbState> = {}) {
     return chain;
   });
 
+  let nextInsertId = 5000;
   const insert = vi.fn(() => ({
-    values: async (vals: Record<string, unknown>) => {
+    values: (vals: Record<string, unknown>) => {
       state.inserted.push(vals);
+      const id = nextInsertId++;
+      // Older code paths await values() directly; newer code chains
+      // .returning(). Support both shapes.
+      const result = {
+        returning: async () => [{ id }],
+      };
+      // Make the values() return both a thenable (for `await
+      // db.insert().values(...)`) and a chainable returning().
+      return Object.assign(Promise.resolve(undefined), result) as unknown as Promise<void> & {
+        returning: () => Promise<Array<{ id: number }>>;
+      };
     },
   }));
 
@@ -77,19 +89,21 @@ function makeFakeDb(initial: Partial<FakeDbState> = {}) {
 }
 
 describe("createQueryTemplateRunRecorder — Phase 12.5 §11", () => {
-  it("skips silently when ASDB is unavailable", async () => {
+  it("returns null when ASDB is unavailable (no row written)", async () => {
     const recorder = createQueryTemplateRunRecorder({
       getDb: () => null as never,
     });
-    await expect(
-      recorder({
-        templateKey: "tpl",
-        parameters: {},
-        status: "success",
-        durationMs: 5,
-        resultCount: 0,
-      }),
-    ).resolves.toBeUndefined();
+    const result = await recorder({
+      templateKey: "tpl",
+      parameters: {},
+      status: "success",
+      durationMs: 5,
+      resultCount: 0,
+    });
+    // Phase 12.5 §12 changed the contract — recorder now returns the
+    // inserted row id (or null when nothing was written). Callers
+    // (router) treat null and undefined identically.
+    expect(result).toBeNull();
   });
 
   it("inserts a success row with resolved templateId + latest versionId", async () => {

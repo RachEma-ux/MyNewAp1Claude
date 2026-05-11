@@ -96,24 +96,32 @@ export function createQueryTemplateRunRecorder(
 
   return async (event) => {
     const db = getDb();
-    if (!db) return;
+    if (!db) return null;
 
     const { templateId, templateVersionId } = await resolveTemplateIds(
       event.templateKey,
     );
-    if (templateId === null) return;
+    if (templateId === null) return null;
 
-    await db.insert(agsQueryTemplateRuns).values({
-      templateId,
-      templateVersionId,
-      retrievalRunId: event.retrievalRunId ?? null,
-      parameters: event.parameters,
-      userId: event.userId ?? null,
-      durationMs: event.durationMs,
-      resultCount: event.status === "success" ? event.resultCount ?? null : null,
-      status: event.status,
-      errorMessage:
-        event.status === "error" ? event.errorMessage ?? null : null,
-    });
+    const inserted = await db
+      .insert(agsQueryTemplateRuns)
+      .values({
+        templateId,
+        templateVersionId,
+        retrievalRunId: event.retrievalRunId ?? null,
+        parameters: event.parameters,
+        userId: event.userId ?? null,
+        durationMs: event.durationMs,
+        resultCount: event.status === "success" ? event.resultCount ?? null : null,
+        status: event.status,
+        errorMessage:
+          event.status === "error" ? event.errorMessage ?? null : null,
+      })
+      .returning({ id: agsQueryTemplateRuns.id });
+
+    // Phase 12.5 §12 — surface the inserted row id so the §4 usage
+    // recorder can persist it on `ags_graph_skill_runtime_usages
+    // .query_template_run_ids`.
+    return inserted[0]?.id ?? null;
   };
 }
