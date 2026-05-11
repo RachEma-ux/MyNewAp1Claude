@@ -39,6 +39,7 @@ import {
 import { convertFindingToProposal } from "./finding-to-proposal.js";
 import type { GraphRepository } from "../graph/repository/index.js";
 import { pushAgentRunNotifications } from "./agent-run-notifications.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -207,6 +208,15 @@ export async function runQualityAgent(
           findingsCount: 0,
           errorMessage: err instanceof Error ? err.message : String(err),
         },
+      });
+      // Fire-and-forget observability capture per-scanner failure.
+      // The agent run is fail-open across scanners (one failing
+      // scanner doesn't kill the others), so capturing here surfaces
+      // each individual scanner break to the dashboard while the
+      // run summary keeps the per-kind detail in `summaries[]`.
+      void captureUnexpectedTrpcError("graphQuality.agentRun", err, {
+        sourceId: String(agentRunId),
+        metadata: { scanKind, agentRunId },
       });
     }
   }
