@@ -120,6 +120,13 @@ export type {
   GraphQualityStatsOptions,
 } from "./stats.js";
 
+export { pushAgentRunNotifications } from "./agent-run-notifications.js";
+export type {
+  AgentRunNotifyInput,
+  AgentRunNotifyOptions,
+  AgentRunNotifyOutcome,
+} from "./agent-run-notifications.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
