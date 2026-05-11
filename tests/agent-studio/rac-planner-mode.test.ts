@@ -15,7 +15,11 @@ import {
 } from "../../server/agent-studio/services/rac/planner-mode";
 import type { RetrievalPlan } from "../../server/agent-studio/services/rac/retrieval-planner";
 
-function makePlan(types: string[]): RetrievalPlan {
+type SourceSpec =
+  | string
+  | { type: string; metadataJson?: Record<string, unknown> | null };
+
+function makePlan(specs: SourceSpec[]): RetrievalPlan {
   return {
     workspaceId: 1,
     profile: {
@@ -32,33 +36,36 @@ function makePlan(types: string[]): RetrievalPlan {
       updatedAt: new Date(),
     },
     workspaceEmbeddingDefault: null,
-    items: types.map((sourceType, idx) => ({
-      source: {
-        id: idx + 1,
-        workspaceId: 1,
-        profileId: 1,
-        sourceType: sourceType as any,
-        ownerModule: "agentStudio",
-        externalRefId: null,
-        displayName: null,
-        enabled: true,
-        priority: 0,
-        embeddingProviderConnectionId: null,
-        embeddingModelRef: null,
-        embeddingModelDim: null,
-        embeddingModelVersion: null,
-        chunkSizeOverride: null,
-        chunkOverlapOverride: null,
-        metadataJson: null,
-        createdBy: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      adapter: {} as any,
-      embedding: null,
-      skipReason: null,
-    })),
-    runnableCount: types.length,
+    items: specs.map((spec, idx) => {
+      const s = typeof spec === "string" ? { type: spec } : spec;
+      return {
+        source: {
+          id: idx + 1,
+          workspaceId: 1,
+          profileId: 1,
+          sourceType: s.type as any,
+          ownerModule: "agentStudio",
+          externalRefId: null,
+          displayName: null,
+          enabled: true,
+          priority: 0,
+          embeddingProviderConnectionId: null,
+          embeddingModelRef: null,
+          embeddingModelDim: null,
+          embeddingModelVersion: null,
+          chunkSizeOverride: null,
+          chunkOverlapOverride: null,
+          metadataJson: s.metadataJson ?? null,
+          createdBy: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        adapter: {} as any,
+        embedding: null,
+        skipReason: null,
+      };
+    }),
+    runnableCount: specs.length,
     skipCounts: {
       disabled: 0,
       no_adapter: 0,
@@ -96,12 +103,12 @@ describe("derivePlannerMode — D-RAC-PLANNER lattice", () => {
     }
   });
 
-  it("Phase 12 reserved modes are not yet emitted by derivePlannerMode", () => {
-    // Exhaustive coverage across the existing decision tree (graph_index
-    // explicitly included since it is the source-type that Phase 12 will
-    // eventually route to graphrag_* modes). With today's derivation,
-    // graph_index continues to route through knowledge_retrieval /
-    // hybrid_cag_rag.
+  it("Phase 12 reserved modes are not emitted without retrievalMethod discriminator", () => {
+    // Exhaustive coverage across the decision tree using sources whose
+    // metadataJson does NOT carry a Phase 12 retrievalMethod
+    // discriminator. With no discriminator, graph_index continues to
+    // route through knowledge_retrieval / hybrid_cag_rag — the Phase 12
+    // modes stay reserved (type-level only).
     const reserved = new Set<string>(PHASE_12_RESERVED_MODES);
     const observed = new Set<string>();
     const trials: Array<{ types: string[]; cag: boolean }> = [
@@ -125,9 +132,6 @@ describe("derivePlannerMode — D-RAC-PLANNER lattice", () => {
       observed.add(r.mode);
       expect(reserved.has(r.mode)).toBe(false);
     }
-    // Sanity: derivation actually exercises a non-empty subset of the
-    // active 8 modes (catches a future regression that accidentally
-    // collapses everything to one mode).
     expect(observed.size).toBeGreaterThan(1);
   });
 
@@ -187,6 +191,131 @@ describe("derivePlannerMode — D-RAC-PLANNER lattice", () => {
       hasCagPack: false,
     });
     expect(r.mode).toBe("knowledge_retrieval");
+  });
+
+  // ── Phase 12 — GraphRAG retrievalMethod discrimination ──────────────
+
+  it.each([
+    ["local", "graphrag_local"],
+    ["global", "graphrag_global"],
+    ["traversal", "graphrag_traversal"],
+    ["text2cypher", "graphrag_text2cypher"],
+    ["algorithm", "graphrag_algorithm"],
+  ] as const)(
+    "graph_index with retrievalMethod=%s, no CAG → %s",
+    (method, expected) => {
+      const r = derivePlannerMode({
+        plan: makePlan([
+          { type: "graph_index", metadataJson: { retrievalMethod: method } },
+        ]),
+        hasCagPack: false,
+      });
+      expect(r.mode).toBe(expected);
+      expect(r.reason).toContain(method);
+    },
+  );
+
+  it.each([
+    "local",
+    "global",
+    "traversal",
+    "text2cypher",
+    "algorithm",
+  ] as const)(
+    "graph_index with retrievalMethod=%s + CAG → hybrid_cag_graphrag",
+    (method) => {
+      const r = derivePlannerMode({
+        plan: makePlan([
+          { type: "graph_index", metadataJson: { retrievalMethod: method } },
+        ]),
+        hasCagPack: true,
+      });
+      expect(r.mode).toBe("hybrid_cag_graphrag");
+      expect(r.reason).toContain(method);
+    },
+  );
+
+  it("graph_index (with method) + other knowledge sources, no CAG → hybrid_rac_graphrag", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        {
+          type: "graph_index",
+          metadataJson: { retrievalMethod: "traversal" },
+        },
+        "knowledge_unit",
+      ]),
+      hasCagPack: false,
+    });
+    expect(r.mode).toBe("hybrid_rac_graphrag");
+    expect(r.reason).toContain("traversal");
+  });
+
+  it("graph_index (with method) + other knowledge sources, with CAG → hybrid_cag_graphrag", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        {
+          type: "graph_index",
+          metadataJson: { retrievalMethod: "global" },
+        },
+        "knowledge_unit",
+      ]),
+      hasCagPack: true,
+    });
+    expect(r.mode).toBe("hybrid_cag_graphrag");
+  });
+
+  it("multiple graph_index sources with mixed methods, no CAG → graphrag_local (conservative collapse)", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        { type: "graph_index", metadataJson: { retrievalMethod: "traversal" } },
+        { type: "graph_index", metadataJson: { retrievalMethod: "global" } },
+      ]),
+      hasCagPack: false,
+    });
+    expect(r.mode).toBe("graphrag_local");
+    expect(r.reason).toContain("mixed methods");
+  });
+
+  it("unknown retrievalMethod string is ignored — falls back to legacy knowledge_retrieval", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        {
+          type: "graph_index",
+          metadataJson: { retrievalMethod: "made_up_value" },
+        },
+      ]),
+      hasCagPack: false,
+    });
+    expect(r.mode).toBe("knowledge_retrieval");
+  });
+
+  it("retrievalMethod on non-graph_index source is ignored", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        // vector_index sources don't qualify for graphrag routing
+        // even if metadataJson carries the discriminator.
+        {
+          type: "vector_index",
+          metadataJson: { retrievalMethod: "traversal" },
+        },
+      ]),
+      hasCagPack: false,
+    });
+    expect(r.mode).toBe("knowledge_retrieval");
+  });
+
+  it("multimodal hint trumps graphrag method (multimodal subsumes everything per existing precedence)", () => {
+    const r = derivePlannerMode({
+      plan: makePlan([
+        {
+          type: "graph_index",
+          metadataJson: { retrievalMethod: "traversal" },
+        },
+        "multimodal",
+      ]),
+      hasCagPack: false,
+    });
+    expect(r.mode).toBe("multimodal_hybrid_retrieval");
   });
 
   it("multimodal hint wins regardless of CAG", () => {
