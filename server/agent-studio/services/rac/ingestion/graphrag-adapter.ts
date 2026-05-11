@@ -75,9 +75,16 @@ function readFilterNumber(
  * so the executor and filter passes can consume it uniformly. The
  * content is a stable JSON serialization of the block's payload — the
  * router's safety filter has already stripped `governanceStatus !==
- * "active"` rows, so what remains is safe to surface. Score defaults
- * to 1.0 because router output is not similarity-ranked (Phase 12 §6
- * will introduce hybrid ranking).
+ * "active"` rows, so what remains is safe to surface.
+ *
+ * Score (Phase 12 §6 — hop-distance hybrid ranking):
+ *   - When `payload.hopDistance` is present (set by the router for
+ *     `graphrag_local` / `hybrid_*_graphrag` paths via BFS from
+ *     `seedNodeId`), score = `1 / (1 + hopDistance)`. Seed itself
+ *     scores 1.0; 1-hop neighbors 0.5; 2-hop 0.333; etc.
+ *   - When absent (template / subgraph results, `graphrag_global`
+ *     sample, algorithm placeholder), score falls back to 1.0 —
+ *     caller-side ranking has no graph-distance signal to use anyway.
  */
 function blockToChunk(block: {
   id: string;
@@ -87,9 +94,15 @@ function blockToChunk(block: {
   payload: Record<string, unknown>;
   citation: { sourceKind: string; sourceId: string; sourceVersionId?: string };
 }): RacRetrievalChunk {
+  const hopRaw = block.payload["hopDistance"];
+  const hopDistance =
+    typeof hopRaw === "number" && Number.isFinite(hopRaw) && hopRaw >= 0
+      ? hopRaw
+      : undefined;
+  const score = hopDistance !== undefined ? 1 / (1 + hopDistance) : 1;
   return {
     content: JSON.stringify(block.payload),
-    score: 1,
+    score,
     citation: `[${block.citation.sourceKind}:${block.citation.sourceId}${
       block.citation.sourceVersionId
         ? "§" + block.citation.sourceVersionId
@@ -100,6 +113,7 @@ function blockToChunk(block: {
       sourceKind: block.sourceKind,
       sourceId: block.sourceId,
       sourceVersionId: block.sourceVersionId,
+      hopDistance,
     },
   };
 }

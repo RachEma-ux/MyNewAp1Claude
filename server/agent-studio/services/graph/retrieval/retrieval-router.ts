@@ -17,9 +17,64 @@
  * ADR: docs/architecture/agent-studio-graphrag-retrieval-router.md
  */
 
-import type { GraphRepository, RuntimeContext, NodeIdentity } from "../repository/index.js";
+import type {
+  EdgeIdentity,
+  GraphRepository,
+  NodeIdentity,
+  RuntimeContext,
+} from "../repository/index.js";
 import { filterContextBlocks, type ContextBlockInput, type FilterResult } from "./safety-filter.js";
 import { validateCypherReadOnly } from "./text2cypher-validator.js";
+
+/**
+ * Phase 12 §6 — BFS hop distance from `seedNodeId` across the given
+ * `edges`. Edges are treated as undirected (a 1-hop neighbor is "close"
+ * regardless of edge direction). Disconnected nodes get `Infinity` so
+ * the caller can decide whether to keep them at a tail score or drop
+ * them. Pure function — exported for unit testing.
+ */
+export function computeHopDistances(
+  seedNodeId: string,
+  nodes: ReadonlyArray<NodeIdentity>,
+  edges: ReadonlyArray<EdgeIdentity>,
+): Map<string, number> {
+  const distances = new Map<string, number>();
+  for (const n of nodes) distances.set(n.id, Number.POSITIVE_INFINITY);
+  if (!distances.has(seedNodeId)) {
+    // Seed isn't in the node set — return all-infinity (caller decides
+    // how to score). This matches what callers see when localGraph
+    // returns 0 nodes (which is itself an empty-result path the router
+    // already short-circuits, but the helper stays usable in either
+    // direction so unit tests can call it standalone).
+    return distances;
+  }
+  distances.set(seedNodeId, 0);
+  // Adjacency list (undirected).
+  const adj = new Map<string, Set<string>>();
+  for (const n of nodes) adj.set(n.id, new Set());
+  for (const e of edges) {
+    const a = e.sourceNode.id;
+    const b = e.targetNode.id;
+    if (!adj.has(a)) adj.set(a, new Set());
+    if (!adj.has(b)) adj.set(b, new Set());
+    adj.get(a)!.add(b);
+    adj.get(b)!.add(a);
+  }
+  // Standard BFS.
+  const queue: string[] = [seedNodeId];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const curDist = distances.get(cur) ?? 0;
+    for (const nb of adj.get(cur) ?? []) {
+      const prev = distances.get(nb);
+      if (prev === undefined || curDist + 1 < prev) {
+        distances.set(nb, curDist + 1);
+        queue.push(nb);
+      }
+    }
+  }
+  return distances;
+}
 
 export type RetrievalMode =
   | "graphrag_local"
@@ -87,7 +142,14 @@ export class GraphRetrievalRouter {
           input.runtime,
         );
         truncated = r.truncated;
-        rawBlocks = r.nodes.map((n) => this.nodeToBlock(n));
+        const distances = computeHopDistances(
+          input.seedNodeId,
+          r.nodes,
+          r.edges,
+        );
+        rawBlocks = r.nodes.map((n) =>
+          this.nodeToBlock(n, distances.get(n.id)),
+        );
         break;
       }
       case "graphrag_global": {
@@ -126,7 +188,14 @@ export class GraphRetrievalRouter {
             input.runtime,
           );
           truncated = r.truncated;
-          rawBlocks = r.nodes.map((n) => this.nodeToBlock(n));
+          const distances = computeHopDistances(
+            input.seedNodeId,
+            r.nodes,
+            r.edges,
+          );
+          rawBlocks = r.nodes.map((n) =>
+            this.nodeToBlock(n, distances.get(n.id)),
+          );
         }
         break;
       }
@@ -144,7 +213,14 @@ export class GraphRetrievalRouter {
     };
   }
 
-  private nodeToBlock(n: NodeIdentity): ContextBlockInput {
+  private nodeToBlock(
+    n: NodeIdentity,
+    hopDistance?: number,
+  ): ContextBlockInput {
+    const payload: Record<string, unknown> = { node: n };
+    if (hopDistance !== undefined && Number.isFinite(hopDistance)) {
+      payload.hopDistance = hopDistance;
+    }
     return {
       id: n.id,
       kind: "text",
@@ -152,7 +228,7 @@ export class GraphRetrievalRouter {
       sourceId: n.sourceId ?? n.id,
       sourceVersionId: n.sourceVersionId,
       governanceStatus: "active",
-      payload: { node: n },
+      payload,
     };
   }
 
