@@ -12,3 +12,9 @@ export type {
   EligibilityInput,
   EligibilityResult,
 } from "./eligibility.js";
+export { selectTemplateForEligiblePacks } from "./template-selection.js";
+export type {
+  PackTemplateMap,
+  SelectTemplateInput,
+  SelectTemplateResult,
+} from "./template-selection.js";
