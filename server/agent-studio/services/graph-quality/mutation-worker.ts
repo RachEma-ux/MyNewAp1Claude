@@ -34,6 +34,7 @@ import {
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import type { ProposalPayload } from "./proposal-payload-builder.js";
 import { pushApplyProposalNotification } from "./agent-run-notifications.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -265,6 +266,15 @@ export async function applyApprovedProposal(
       applied: false,
       reason: err instanceof Error ? err.message : String(err),
     };
+    // Fire-and-forget observability capture. Applier throws are
+    // converted to applied=false results so the audit chain stays
+    // consistent; the operator dashboard also sees them via the
+    // error_events stream. Same pattern as #505 wired into scan-
+    // orchestrator + agent-run.
+    void captureUnexpectedTrpcError("graphQuality.mutationWorker", err, {
+      sourceId: String(input.proposalId),
+      metadata: { payloadKind: payload.kind, proposalId: input.proposalId },
+    });
   }
 
   await db.insert(agsGraphCorrectionAuditEvents).values({
