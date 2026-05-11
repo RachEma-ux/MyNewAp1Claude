@@ -295,6 +295,7 @@ export const graphQualityRouter = router({
           scanId: z.number().int().positive().optional(),
           findingClass: z.string().min(1).max(100).optional(),
           severity: SeverityEnum.optional(),
+          proposalId: z.number().int().positive().optional(),
           untriagedOnly: z.boolean().optional(),
           triagedOnly: z.boolean().optional(),
           limit: z.number().int().min(1).max(500).optional(),
@@ -317,7 +318,9 @@ export const graphQualityRouter = router({
       if (input?.severity) {
         filters.push(eq(agsGraphQualityFindings.severity, input.severity));
       }
-      if (input?.untriagedOnly) {
+      if (input?.proposalId) {
+        filters.push(eq(agsGraphQualityFindings.proposalId, input.proposalId));
+      } else if (input?.untriagedOnly) {
         filters.push(isNull(agsGraphQualityFindings.proposalId));
       } else if (input?.triagedOnly) {
         filters.push(isNotNull(agsGraphQualityFindings.proposalId));
