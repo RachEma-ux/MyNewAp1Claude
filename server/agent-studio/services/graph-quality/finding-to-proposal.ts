@@ -37,6 +37,7 @@ import {
   submitCorrectionProposal,
   type ServiceOptions as GraphCorrectionServiceOptions,
 } from "../graph-correction/public-api.js";
+import { buildProposalPayload } from "./proposal-payload-builder.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -189,6 +190,13 @@ export async function convertFindingToProposal(
           details: finding.details,
         },
         suggestedAction: proposalKind,
+        payload: buildProposalPayload({
+          findingClass: finding.findingClass,
+          severity: finding.severity,
+          sourceTypeKey: finding.sourceTypeKey,
+          sourceId: finding.sourceId,
+          details: finding.details,
+        }),
       },
       confidence: severityToConfidence(finding.severity),
       rationale:

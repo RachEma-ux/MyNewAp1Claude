@@ -57,6 +57,15 @@ export type {
   ScannerInvocationSummary,
 } from "./agent-run.js";
 
+export {
+  buildProposalPayload,
+  buildProposalPayloadFromQualityFinding,
+} from "./proposal-payload-builder.js";
+export type {
+  ProposalPayload,
+  FindingForPayload,
+} from "./proposal-payload-builder.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
