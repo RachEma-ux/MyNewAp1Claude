@@ -36,6 +36,8 @@ export {
 } from "./pack-mutations.js";
 export { createQueryTemplateRunRecorder } from "./template-run-recorder.js";
 export type { CreateQueryTemplateRunRecorderOptions } from "./template-run-recorder.js";
+export { createTemplateExecutionGate } from "./template-execution-gate.js";
+export type { CreateTemplateExecutionGateOptions } from "./template-execution-gate.js";
 export type {
   CreatePackInput,
   PackRow,

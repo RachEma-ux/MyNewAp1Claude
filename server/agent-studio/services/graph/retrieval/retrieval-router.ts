@@ -197,9 +197,41 @@ export type QueryTemplateRunRecorder = (
   | null
   | Promise<void | number | null>;
 
+/**
+ * Phase 12.5 §13 — pre-execution gate for registered query templates.
+ *
+ * Called by the router before `repository.executeTemplate(...)` is
+ * invoked. The gate enforces operator-defined constraints on the
+ * `ags_query_templates` row — `read_only`, `allowed_roles`,
+ * `risk_level` — so the router can deny a template execution before
+ * any Cypher hits the backend.
+ *
+ * Returning `{ allowed: false, reason }` makes the router short-
+ * circuit and surface a `template_gate_denied_<reason>` on the
+ * `rejectionReason` of the retrieval output. The §11 audit recorder
+ * is NOT fired in this case — no template ran, so there's no run row
+ * to write.
+ *
+ * Optional. When omitted, the router runs templates without the
+ * additional gate (matches the pre-§13 behavior).
+ */
+export interface TemplateExecutionGateInput {
+  readonly templateKey: string;
+  readonly runtime: RuntimeContext;
+}
+
+export type TemplateExecutionGateDecision =
+  | { readonly allowed: true }
+  | { readonly allowed: false; readonly reason: string };
+
+export type TemplateExecutionGate = (
+  input: TemplateExecutionGateInput,
+) => TemplateExecutionGateDecision | Promise<TemplateExecutionGateDecision>;
+
 export interface GraphRetrievalRouterOptions {
   readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
   readonly recordQueryTemplateRun?: QueryTemplateRunRecorder;
+  readonly templateExecutionGate?: TemplateExecutionGate;
 }
 
 export interface GraphRetrievalOutput {
@@ -228,6 +260,7 @@ export interface GraphRetrievalOutput {
 export class GraphRetrievalRouter {
   private readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
   private readonly recordQueryTemplateRun?: QueryTemplateRunRecorder;
+  private readonly templateExecutionGate?: TemplateExecutionGate;
 
   constructor(
     private readonly repository: GraphRepository,
@@ -235,6 +268,7 @@ export class GraphRetrievalRouter {
   ) {
     this.recordRuntimeUsage = options.recordRuntimeUsage;
     this.recordQueryTemplateRun = options.recordQueryTemplateRun;
+    this.templateExecutionGate = options.templateExecutionGate;
   }
 
   /**
@@ -397,6 +431,33 @@ export class GraphRetrievalRouter {
           }
         }
         if (resolvedKey) {
+          // Phase 12.5 §13 — pre-execution gate. The gate is the only
+          // place that loads `ags_query_templates.read_only` /
+          // `allowed_roles` / `risk_level` and decides whether to
+          // proceed. Failures short-circuit the call with a structured
+          // rejection reason so the operator can see why the template
+          // didn't fire.
+          if (this.templateExecutionGate) {
+            const decision = await Promise.resolve(
+              this.templateExecutionGate({
+                templateKey: resolvedKey,
+                runtime: input.runtime,
+              }),
+            );
+            if (!decision.allowed) {
+              // `strictNullChecks: false` blocks discriminated-union
+              // narrowing here — see project_native_graph_workspace_phase_12.md
+              // for the running list of `in`-check workarounds in this
+              // file.
+              const reason =
+                "reason" in decision ? decision.reason : "unknown";
+              return this.emptyResult(
+                input.mode,
+                startedAt,
+                `template_gate_denied_${reason}`,
+              );
+            }
+          }
           const { result: r, auditError, templateRunId } =
             await this.executeTemplateAudited(
               input,
