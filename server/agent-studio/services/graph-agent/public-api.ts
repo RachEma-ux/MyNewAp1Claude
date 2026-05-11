@@ -87,3 +87,8 @@ export type {
   ListPendingProjectionEventsInput,
   ProjectionEventsOptions,
 } from "./projection-events.js";
+export {
+  translateRuntimeGraphEvent,
+  translateRuntimeTraceIntent,
+  translateDecisionTraceIntent,
+} from "./projection-event-translator.js";
