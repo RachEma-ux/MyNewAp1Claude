@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Brain } from "lucide-react";
+import { Brain, Download } from "lucide-react";
 import {
   EmptyState,
   ErrorCallout,
@@ -76,6 +76,35 @@ export default function GraphAgentExplainPanel({ initialRunId }: Props = {}) {
 
   const explanation = query.data?.explanation ?? null;
 
+  // Phase 14 §2 — Markdown export download. The query fires
+  // on-demand (only when the operator clicks the button) so we don't
+  // pre-fetch markdown for every paste in the run-id field.
+  const utils = trpc.useUtils();
+  const [exportPending, setExportPending] = useState(false);
+  async function downloadMarkdown() {
+    if (validRunId === undefined) return;
+    setExportPending(true);
+    try {
+      const result = await utils.client.agentStudio.graphAgent.exportTraceMarkdown.query(
+        { runId: validRunId },
+      );
+      if (!result.exported) return;
+      const blob = new Blob([result.exported.markdown], {
+        type: "text/markdown;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `graph-agent-run-${result.runId}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportPending(false);
+    }
+  }
+
   return (
     <Card>
       <CardContent className="p-4 space-y-4">
@@ -103,6 +132,18 @@ export default function GraphAgentExplainPanel({ initialRunId }: Props = {}) {
             onClick={() => query.refetch()}
           >
             {query.isFetching ? "Loading…" : "Reload"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={
+              validRunId === undefined || !explanation || exportPending
+            }
+            onClick={downloadMarkdown}
+            title="Download decision-trace ledger as Markdown"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            {exportPending ? "Exporting…" : "Export .md"}
           </Button>
         </div>
 

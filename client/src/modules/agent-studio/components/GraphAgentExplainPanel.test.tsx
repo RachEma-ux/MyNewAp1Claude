@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   lastQueryInput: undefined as unknown,
   lastQueryOptions: undefined as unknown,
   refetch: vi.fn(),
+  exportQuery: vi.fn(),
   state: {
     isLoading: false,
     isError: false,
@@ -62,6 +63,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({
+      client: {
+        agentStudio: {
+          graphAgent: {
+            exportTraceMarkdown: {
+              query: (input: unknown) => mocks.exportQuery(input),
+            },
+          },
+        },
+      },
+    }),
     agentStudio: {
       graphAgent: {
         explain: {
@@ -83,6 +95,7 @@ beforeEach(() => {
   mocks.lastQueryInput = undefined;
   mocks.lastQueryOptions = undefined;
   mocks.refetch = vi.fn();
+  mocks.exportQuery = vi.fn();
   mocks.state = {
     isLoading: false,
     isError: false,
@@ -207,5 +220,82 @@ describe("GraphAgentExplainPanel — Phase 13 §5", () => {
     const btn = screen.getByRole("button", { name: /reload/i });
     fireEvent.click(btn);
     expect(mocks.refetch).toHaveBeenCalled();
+  });
+
+  it("Export .md button is disabled until an explanation is available", () => {
+    render(<GraphAgentExplainPanel initialRunId={1} />);
+    const btn = screen.getByRole("button", { name: /export \.md/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it("Export .md button calls the export tRPC query with the current runId", async () => {
+    mocks.state.data = {
+      runId: 7,
+      explanation: {
+        runtimeRunId: 7,
+        graphAgentRunId: 100,
+        agentKey: "graph_agent_lite",
+        userQuery: "q",
+        status: "completed",
+        durationMs: 100,
+        errorMessage: null,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        steps: [],
+      },
+    };
+    mocks.exportQuery.mockResolvedValueOnce({
+      runId: 7,
+      exported: {
+        runtimeRunId: 7,
+        graphAgentRunId: 100,
+        markdown: "# Graph Agent Run #7\n",
+      },
+    });
+    // Stub the URL+anchor APIs so the click doesn't crash the
+    // jsdom environment with "URL.createObjectURL is not a
+    // function".
+    const originalCreateObjectURL = global.URL.createObjectURL;
+    const originalRevokeObjectURL = global.URL.revokeObjectURL;
+    global.URL.createObjectURL = vi.fn(() => "blob:test");
+    global.URL.revokeObjectURL = vi.fn();
+    try {
+      render(<GraphAgentExplainPanel initialRunId={7} />);
+      const btn = screen.getByRole("button", { name: /export \.md/i });
+      fireEvent.click(btn);
+      // Wait for the async chain to settle.
+      await new Promise((r) => setImmediate(r));
+      expect(mocks.exportQuery).toHaveBeenCalledWith({ runId: 7 });
+    } finally {
+      global.URL.createObjectURL = originalCreateObjectURL;
+      global.URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
+  it("Export .md button does nothing when exported is null (no decision trace)", async () => {
+    mocks.state.data = {
+      runId: 7,
+      explanation: {
+        runtimeRunId: 7,
+        graphAgentRunId: 100,
+        agentKey: "graph_agent_lite",
+        userQuery: "q",
+        status: "completed",
+        durationMs: 100,
+        errorMessage: null,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        steps: [],
+      },
+    };
+    mocks.exportQuery.mockResolvedValueOnce({ runId: 7, exported: null });
+    render(<GraphAgentExplainPanel initialRunId={7} />);
+    const btn = screen.getByRole("button", { name: /export \.md/i });
+    fireEvent.click(btn);
+    await new Promise((r) => setImmediate(r));
+    expect(mocks.exportQuery).toHaveBeenCalled();
+    // No errors, no download triggered. Implicitly verified by the
+    // jsdom environment not crashing without the URL stubs the
+    // happy-path test installs.
   });
 });

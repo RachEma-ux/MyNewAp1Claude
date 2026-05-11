@@ -14,6 +14,15 @@ import GraphWorkspacePage from "./GraphWorkspacePage";
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({
+      client: {
+        agentStudio: {
+          graphAgent: {
+            exportTraceMarkdown: { query: vi.fn() },
+          },
+        },
+      },
+    }),
     agentStudio: {
       graphSkill: {
         listUsageCounts: {
