@@ -27,6 +27,19 @@ import {
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
 } from "./lifecycle.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * The classifier inside `captureUnexpectedTrpcError` filters out
+ * expected operator-side codes (BAD_REQUEST / NOT_FOUND / etc.) and
+ * only persists INTERNAL_SERVER_ERROR + raw Errors. Same pattern as
+ * the graph-quality router (PR #490).
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("graphCorrection.router", trpcErr);
+  throw trpcErr;
+}
 
 const ProposalStatusEnum = z.enum([
   "pending",
@@ -64,10 +77,10 @@ export const graphCorrectionRouter = router({
           proposedByAgentId: input.proposedByAgentId,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -85,10 +98,10 @@ export const graphCorrectionRouter = router({
       try {
         return await listProposals(input ?? {});
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -97,10 +110,10 @@ export const graphCorrectionRouter = router({
     .query(async ({ input }) => {
       const proposal = await getProposalById(input.proposalId);
       if (!proposal) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Graph correction proposal ${input.proposalId} not found`,
-        });
+        }));
       }
       return proposal;
     }),
@@ -116,10 +129,10 @@ export const graphCorrectionRouter = router({
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const userId = ctxAny.user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "approve requires an authenticated user",
-        });
+        }));
       }
       try {
         return await approveCorrectionProposal(
@@ -129,15 +142,15 @@ export const graphCorrectionRouter = router({
         );
       } catch (e) {
         if (e instanceof CorrectionProposalNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
         if (e instanceof ProposalAlreadyDecidedError) {
-          throw new TRPCError({ code: "CONFLICT", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "CONFLICT", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -152,10 +165,10 @@ export const graphCorrectionRouter = router({
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const userId = ctxAny.user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "reject requires an authenticated user",
-        });
+        }));
       }
       try {
         return await rejectCorrectionProposal(
@@ -165,15 +178,15 @@ export const graphCorrectionRouter = router({
         );
       } catch (e) {
         if (e instanceof CorrectionProposalNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
         if (e instanceof ProposalAlreadyDecidedError) {
-          throw new TRPCError({ code: "CONFLICT", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "CONFLICT", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -188,10 +201,10 @@ export const graphCorrectionRouter = router({
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const userId = ctxAny.user?.id;
       if (userId == null) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "UNAUTHORIZED",
           message: "requestRevision requires an authenticated user",
-        });
+        }));
       }
       try {
         return await requestRevisionForProposal(
@@ -201,15 +214,15 @@ export const graphCorrectionRouter = router({
         );
       } catch (e) {
         if (e instanceof CorrectionProposalNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
         if (e instanceof ProposalAlreadyDecidedError) {
-          throw new TRPCError({ code: "CONFLICT", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "CONFLICT", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
