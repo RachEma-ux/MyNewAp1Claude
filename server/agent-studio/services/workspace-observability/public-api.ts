@@ -49,3 +49,14 @@ export type {
   ListErrorEventsInput,
   ErrorEventRow,
 } from "./error-events.js";
+
+export {
+  captureUnexpectedTrpcError,
+  classifyTrpcErrorForCapture,
+  EXPECTED_TRPC_CODES,
+} from "./trpc-error-capture.js";
+export type {
+  CaptureContext,
+  CaptureDecision,
+  CaptureOptions,
+} from "./trpc-error-capture.js";
