@@ -31,6 +31,10 @@ import {
   getGraphSkillSourceNoteRefsForRun,
   type GraphSkillSourceNoteRef,
 } from "./graph-skill-source-note-refs-reader.js";
+import {
+  getCagSourceNoteRefsForRun,
+  type CagSourceNoteRef,
+} from "./cag-source-note-refs-reader.js";
 
 export interface DecisionTraceMarkdown {
   readonly runtimeRunId: number;
@@ -59,6 +63,18 @@ export interface ExportDecisionTraceOptions extends GetExplanationOptions {
   readonly getGraphSkillRefs?: (
     runtimeRunId: number,
   ) => Promise<GraphSkillSourceNoteRef[]>;
+  /**
+   * Phase 14 §8 — read CAG source-note refs for the trace from
+   * `ags_runtime_note_references` (kind="cag_block"). Defaults to
+   * `true`; the resolver is injectable for unit tests. Today the
+   * table is dormant in production (no writer wires it yet), so
+   * this almost always renders an empty section that is then
+   * omitted — but the chain is ready for the CAG runtime writer.
+   */
+  readonly includeCagRefs?: boolean;
+  readonly getCagRefs?: (
+    runtimeRunId: number,
+  ) => Promise<CagSourceNoteRef[]>;
 }
 
 function formatDate(d: Date | null): string {
@@ -93,6 +109,21 @@ function renderStep(step: GraphAgentExplanationStep): string {
   return lines.join("\n");
 }
 
+function renderCagRefs(refs: CagSourceNoteRef[]): string[] {
+  if (refs.length === 0) return [];
+  const lines: string[] = ["## CAG Source Note References", ""];
+  for (const r of refs) {
+    const noteSegment =
+      r.noteTitle !== null
+        ? ` — \`${r.noteSlug ?? "(no-slug)"}\` "${r.noteTitle}"${r.noteVersion !== null ? ` v${r.noteVersion}` : ""}`
+        : " — _note row unresolved_";
+    lines.push(
+      `- **${r.referenceKind}** (noteId=${r.noteId}, noteVersionId=${r.noteVersionId})${noteSegment}`,
+    );
+  }
+  return lines;
+}
+
 function renderGraphSkillRefs(refs: GraphSkillSourceNoteRef[]): string[] {
   if (refs.length === 0) return [];
   const lines: string[] = ["## Graph Skill References", ""];
@@ -112,6 +143,7 @@ function renderMarkdown(
   explanation: GraphAgentExplanation,
   titlePrefix: string,
   graphSkillRefs: GraphSkillSourceNoteRef[],
+  cagRefs: CagSourceNoteRef[],
 ): string {
   const sections: string[] = [
     `# ${titlePrefix} #${explanation.runtimeRunId}`,
@@ -134,6 +166,11 @@ function renderMarkdown(
   const skillRefLines = renderGraphSkillRefs(graphSkillRefs);
   if (skillRefLines.length > 0) {
     sections.push("", ...skillRefLines);
+  }
+
+  const cagRefLines = renderCagRefs(cagRefs);
+  if (cagRefLines.length > 0) {
+    sections.push("", ...cagRefLines);
   }
 
   sections.push("", "## Decision Trace", "");
@@ -179,6 +216,17 @@ export async function exportDecisionTraceAsMarkdown(
     ? await refResolver(explanation.runtimeRunId)
     : [];
 
+  // Phase 14 §8 — CAG source-note refs. Default on; reader returns
+  // [] when ASDB is unavailable or no `ags_runtime_note_references`
+  // row with kind="cag_block" exists. Today this is the common case
+  // — the CAG runtime writer lands in a follow-on phase. The render
+  // section is omitted on empty refs.
+  const includeCagRefs = options.includeCagRefs !== false;
+  const cagRefResolver = options.getCagRefs ?? getCagSourceNoteRefsForRun;
+  const cagRefs = includeCagRefs
+    ? await cagRefResolver(explanation.runtimeRunId)
+    : [];
+
   return {
     runtimeRunId: explanation.runtimeRunId,
     graphAgentRunId: explanation.graphAgentRunId,
@@ -186,6 +234,7 @@ export async function exportDecisionTraceAsMarkdown(
       renderInput,
       options.title ?? "Graph Agent Run",
       graphSkillRefs,
+      cagRefs,
     ),
   };
 }

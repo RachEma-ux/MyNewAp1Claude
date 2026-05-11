@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const hoisted = vi.hoisted(() => ({
   getExplanationMock: vi.fn(),
   getGraphSkillRefsMock: vi.fn(async () => []),
+  getCagRefsMock: vi.fn(async () => []),
 }));
 
 vi.mock("../../server/agent-studio/services/graph-agent/explain-reader", () => ({
@@ -25,12 +26,21 @@ vi.mock(
   }),
 );
 
+vi.mock(
+  "../../server/agent-studio/services/graph-agent/cag-source-note-refs-reader",
+  () => ({
+    getCagSourceNoteRefsForRun: hoisted.getCagRefsMock,
+  }),
+);
+
 import { exportDecisionTraceAsMarkdown } from "../../server/agent-studio/services/graph-agent/trace-export";
 
 beforeEach(() => {
   hoisted.getExplanationMock.mockReset();
   hoisted.getGraphSkillRefsMock.mockReset();
   hoisted.getGraphSkillRefsMock.mockResolvedValue([]);
+  hoisted.getCagRefsMock.mockReset();
+  hoisted.getCagRefsMock.mockResolvedValue([]);
 });
 
 const STARTED = new Date("2026-05-11T10:00:00Z");
@@ -254,6 +264,66 @@ describe("exportDecisionTraceAsMarkdown — Phase 14 §1", () => {
     });
     expect(refResolver).not.toHaveBeenCalled();
     expect(result!.markdown).not.toContain("## Graph Skill References");
+  });
+
+  it("Phase 14 §8 — renders CAG Source Note References section when refs are non-empty", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getCagRefs: async () => [
+        {
+          noteId: 200,
+          noteVersionId: 500,
+          referenceKind: "cag_block",
+          noteVersion: 3,
+          noteSlug: "cag-overview",
+          noteTitle: "CAG Overview",
+        },
+      ],
+    });
+    expect(result!.markdown).toContain("## CAG Source Note References");
+    expect(result!.markdown).toContain("**cag_block**");
+    expect(result!.markdown).toContain("noteId=200");
+    expect(result!.markdown).toContain("noteVersionId=500");
+    expect(result!.markdown).toContain("`cag-overview`");
+    expect(result!.markdown).toContain("CAG Overview");
+    expect(result!.markdown).toContain("v3");
+  });
+
+  it("Phase 14 §8 — renders 'note row unresolved' when ref has null note title", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getCagRefs: async () => [
+        {
+          noteId: 200,
+          noteVersionId: 500,
+          referenceKind: "cag_block",
+          noteVersion: null,
+          noteSlug: null,
+          noteTitle: null,
+        },
+      ],
+    });
+    expect(result!.markdown).toContain("## CAG Source Note References");
+    expect(result!.markdown).toContain("_note row unresolved_");
+  });
+
+  it("Phase 14 §8 — omits CAG Source Note References section when refs are empty", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getCagRefs: async () => [],
+    });
+    expect(result!.markdown).not.toContain("## CAG Source Note References");
+  });
+
+  it("Phase 14 §8 — `includeCagRefs: false` skips the resolver entirely", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const cagResolver = vi.fn(async () => []);
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      includeCagRefs: false,
+      getCagRefs: cagResolver,
+    });
+    expect(cagResolver).not.toHaveBeenCalled();
+    expect(result!.markdown).not.toContain("## CAG Source Note References");
   });
 
   it("Phase 14 §4 — `redact: false` opts out of redaction (raw payloads pass through)", async () => {
