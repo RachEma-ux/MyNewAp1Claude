@@ -81,6 +81,7 @@ import {
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
 } from "../graph-correction/public-api.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 import { QUALITY_SCANNER_REGISTRY } from "./public-api.js";
 
 const ScanStatusEnum = z.enum(["pending", "running", "completed", "failed"]);
@@ -88,21 +89,21 @@ const AgentRunStatusEnum = z.enum(["running", "completed", "failed"]);
 const SeverityEnum = z.enum(["low", "medium", "high", "critical"]);
 const FindingStatusEnum = z.enum(["open", "triaged", "applied", "dismissed"]);
 
-function unwrapError(e: unknown): never {
+function buildTrpcError(e: unknown): TRPCError {
   if (e instanceof UnknownScanKindError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+    return new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
   if (e instanceof InvalidProposalPayloadError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+    return new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
   if (e instanceof FindingNotFoundError || e instanceof DismissFindingNotFound) {
-    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+    return new TRPCError({ code: "NOT_FOUND", message: e.message });
   }
   if (e instanceof FindingAlreadyResolvedError) {
-    throw new TRPCError({ code: "CONFLICT", message: e.message });
+    return new TRPCError({ code: "CONFLICT", message: e.message });
   }
   if (e instanceof DismissFindingAsdbUnavailable) {
-    throw new TRPCError({
+    return new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: e.message,
     });
@@ -111,34 +112,46 @@ function unwrapError(e: unknown): never {
     e instanceof ProposalNotFoundError ||
     e instanceof CorrectionProposalNotFoundError
   ) {
-    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+    return new TRPCError({ code: "NOT_FOUND", message: e.message });
   }
   if (e instanceof ProposalNotApprovedError) {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+    return new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
   }
   if (e instanceof FindingAlreadyConvertedError) {
-    throw new TRPCError({ code: "CONFLICT", message: e.message });
+    return new TRPCError({ code: "CONFLICT", message: e.message });
   }
   if (e instanceof ProposalAlreadyAppliedError) {
-    throw new TRPCError({ code: "CONFLICT", message: e.message });
+    return new TRPCError({ code: "CONFLICT", message: e.message });
   }
   if (e instanceof ProposalAlreadyDecidedError) {
-    throw new TRPCError({ code: "CONFLICT", message: e.message });
+    return new TRPCError({ code: "CONFLICT", message: e.message });
   }
   if (
     e instanceof FindingConversionAsdbUnavailable ||
     e instanceof QualityAgentAsdbUnavailable ||
     e instanceof MutationWorkerAsdbUnavailable
   ) {
-    throw new TRPCError({
+    return new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: e.message,
     });
   }
-  throw new TRPCError({
+  return new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: e instanceof Error ? e.message : String(e),
   });
+}
+
+function unwrapError(e: unknown): never {
+  const trpcErr = buildTrpcError(e);
+  // Fire-and-forget observability capture. The classifier inside
+  // `captureUnexpectedTrpcError` skips expected operator-side codes
+  // (BAD_REQUEST / NOT_FOUND / CONFLICT / PRECONDITION_FAILED / ...)
+  // and only persists INTERNAL_SERVER_ERROR + raw Error instances.
+  // Awaiting would slow the error path and offer no value — if the
+  // recorder fails it's already fail-soft inside the helper.
+  void captureUnexpectedTrpcError("graphQuality.router", trpcErr);
+  throw trpcErr;
 }
 
 export const graphQualityRouter = router({
