@@ -59,6 +59,19 @@ export class CorrectionProposalNotFoundError extends Error {
   }
 }
 
+export class ProposalNotProposerError extends Error {
+  constructor(
+    public readonly proposalId: number,
+    public readonly proposedByUserId: number | null,
+    public readonly attemptedUserId: number,
+  ) {
+    super(
+      `Proposal ${proposalId} can only be withdrawn by the original proposer (proposedByUserId=${proposedByUserId ?? "<agent>"}); user ${attemptedUserId} is not authorized.`,
+    );
+    this.name = "ProposalNotProposerError";
+  }
+}
+
 export class ProposalAlreadyDecidedError extends Error {
   constructor(
     public readonly proposalId: number,
@@ -346,6 +359,69 @@ export async function requestRevisionForProposal(
     },
     options,
   );
+}
+
+// ---------- withdraw ----------
+
+/**
+ * Proposer-initiated retract. Different conceptual lane from
+ * approve/reject/requestRevision (which are reviewer decisions):
+ *   - only the original proposer (userId on the row) can withdraw —
+ *     agent-proposed rows cannot be withdrawn through this path
+ *   - the proposal must still be pending (a decided proposal is
+ *     locked; the operator must revert through the existing
+ *     approval/rejection paths)
+ *
+ * Writes a decision row with decision="withdrawn" and an audit event
+ * with eventKind="withdrawn" so the proposal's history stays linear.
+ */
+export async function withdrawCorrectionProposal(
+  proposalId: number,
+  withdrawerUserId: number,
+  rationale: string | null = null,
+  options: ServiceOptions = {},
+): Promise<ProposalRow> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const current = await getProposalById(proposalId, options);
+  if (!current) throw new CorrectionProposalNotFoundError(proposalId);
+  if (current.status !== "pending") {
+    throw new ProposalAlreadyDecidedError(proposalId, current.status);
+  }
+  if (current.proposedByUserId !== withdrawerUserId) {
+    throw new ProposalNotProposerError(
+      proposalId,
+      current.proposedByUserId,
+      withdrawerUserId,
+    );
+  }
+
+  await db
+    .update(agsGraphCorrectionProposals)
+    .set({ status: "withdrawn" })
+    .where(eq(agsGraphCorrectionProposals.id, proposalId));
+
+  await db.insert(agsGraphCorrectionDecisions).values({
+    proposalId,
+    decision: "withdrawn",
+    decidedByUserId: withdrawerUserId,
+    rationale: rationale ?? null,
+  });
+
+  await db.insert(agsGraphCorrectionAuditEvents).values({
+    proposalId,
+    eventKind: "withdrawn",
+    metadata: {
+      withdrawerUserId,
+      rationale: rationale ?? null,
+    },
+  });
+
+  const updated = await getProposalById(proposalId, options);
+  if (!updated) throw new CorrectionProposalNotFoundError(proposalId);
+  return updated;
 }
 
 // ---------- bulk approve ----------

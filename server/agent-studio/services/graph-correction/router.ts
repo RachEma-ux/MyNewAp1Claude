@@ -23,11 +23,13 @@ import {
   approveCorrectionProposal,
   rejectCorrectionProposal,
   requestRevisionForProposal,
+  withdrawCorrectionProposal,
   bulkApproveCorrectionProposals,
   bulkRejectCorrectionProposals,
   listAuditEvents,
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
+  ProposalNotProposerError,
 } from "./lifecycle.js";
 import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 
@@ -220,6 +222,45 @@ export const graphCorrectionRouter = router({
         }
         if (e instanceof ProposalAlreadyDecidedError) {
           throwTrpcAndCapture(new TRPCError({ code: "CONFLICT", message: e.message }));
+        }
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  withdraw: protectedProcedure
+    .input(
+      z.object({
+        proposalId: z.number().int().positive(),
+        rationale: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "withdraw requires an authenticated user",
+        }));
+      }
+      try {
+        return await withdrawCorrectionProposal(
+          input.proposalId,
+          userId,
+          input.rationale ?? null,
+        );
+      } catch (e) {
+        if (e instanceof CorrectionProposalNotFoundError) {
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
+        }
+        if (e instanceof ProposalAlreadyDecidedError) {
+          throwTrpcAndCapture(new TRPCError({ code: "CONFLICT", message: e.message }));
+        }
+        if (e instanceof ProposalNotProposerError) {
+          throwTrpcAndCapture(new TRPCError({ code: "FORBIDDEN", message: e.message }));
         }
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

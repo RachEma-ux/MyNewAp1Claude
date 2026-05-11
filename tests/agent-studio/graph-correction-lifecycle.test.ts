@@ -11,6 +11,7 @@ import {
   approveCorrectionProposal,
   rejectCorrectionProposal,
   requestRevisionForProposal,
+  withdrawCorrectionProposal,
   bulkApproveCorrectionProposals,
   bulkRejectCorrectionProposals,
   listAuditEvents,
@@ -19,6 +20,7 @@ import {
   AsdbUnavailableError,
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
+  ProposalNotProposerError,
 } from "../../server/agent-studio/services/graph-correction/lifecycle";
 
 interface ProposalRow {
@@ -801,6 +803,132 @@ describe("bulkRejectCorrectionProposals — Phase 23", () => {
         { proposalIds: [7], decidedByUserId: 42 },
         { getDb: () => null as never },
       ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+});
+
+describe("withdrawCorrectionProposal — Phase 23", () => {
+  it("flips status to withdrawn + writes decision + audit when proposer withdraws their own pending proposal", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: 42,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId", "byId");
+    state.active.proposalId = 7;
+    const result = await withdrawCorrectionProposal(7, 42, "Changed my mind", {
+      getDb: () => db as never,
+    });
+    expect(result.status).toBe("withdrawn");
+    expect(state.decisions.length).toBe(1);
+    expect(state.decisions[0].decision).toBe("withdrawn");
+    expect(state.audits.length).toBe(1);
+    expect(state.audits[0].eventKind).toBe("withdrawn");
+  });
+
+  it("throws CorrectionProposalNotFoundError on missing proposal", async () => {
+    const { db, state } = makeFakeDb({});
+    state.selectQueue.push("byId");
+    state.active.proposalId = 999;
+    await expect(
+      withdrawCorrectionProposal(999, 42, null, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(CorrectionProposalNotFoundError);
+  });
+
+  it("throws ProposalAlreadyDecidedError when proposal is not pending", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: 42,
+          proposedByAgentId: null,
+          status: "approved",
+          createdAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.proposalId = 7;
+    await expect(
+      withdrawCorrectionProposal(7, 42, null, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(ProposalAlreadyDecidedError);
+  });
+
+  it("throws ProposalNotProposerError when a different user tries to withdraw", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: 42,
+          proposedByAgentId: null,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.proposalId = 7;
+    await expect(
+      withdrawCorrectionProposal(7, 999, null, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(ProposalNotProposerError);
+  });
+
+  it("throws ProposalNotProposerError when the proposal was made by an agent (no proposer user)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      proposals: [
+        {
+          id: 7,
+          proposalKind: "merge",
+          targetTypeKey: null,
+          targetId: null,
+          proposedChange: {},
+          confidence: null,
+          rationale: null,
+          proposedByUserId: null,
+          proposedByAgentId: 5,
+          status: "pending",
+          createdAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.proposalId = 7;
+    await expect(
+      withdrawCorrectionProposal(7, 42, null, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(ProposalNotProposerError);
+  });
+
+  it("throws AsdbUnavailable on null DB", async () => {
+    await expect(
+      withdrawCorrectionProposal(1, 42, null, { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(AsdbUnavailableError);
   });
 });

@@ -12,12 +12,14 @@ export {
   approveCorrectionProposal,
   rejectCorrectionProposal,
   requestRevisionForProposal,
+  withdrawCorrectionProposal,
   bulkApproveCorrectionProposals,
   bulkRejectCorrectionProposals,
   listAuditEvents,
   AsdbUnavailableError as GraphCorrectionAsdbUnavailableError,
   CorrectionProposalNotFoundError,
   ProposalAlreadyDecidedError,
+  ProposalNotProposerError,
 } from "./lifecycle.js";
 export type {
   SubmitProposalInput,
