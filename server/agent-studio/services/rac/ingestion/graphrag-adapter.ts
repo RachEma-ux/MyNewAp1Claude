@@ -177,6 +177,9 @@ async function dispatchToRouter(
     eligibility,
     packTemplates,
     preferTemplateKeys,
+    // Phase 12.5 §6 — thread the orchestrator-supplied agent run id so
+    // the recorder writes a usage row with the correct FK target.
+    runtimeRunId: input.runtimeRunId,
     runtime: {
       workspaceId: input.workspaceId,
       // userId / role / allowedWorkspaces are propagated by future

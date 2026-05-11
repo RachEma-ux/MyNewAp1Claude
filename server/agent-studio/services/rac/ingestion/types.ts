@@ -66,6 +66,17 @@ export interface RacRetrievalRequest {
    * avoid an import cycle between the request shape and the planner.
    */
   retrievalMethod?: string;
+  /**
+   * Phase 12.5 §6 — the calling agent run id, threaded from the
+   * orchestrator (`ResolveContextInput.runtimeRunId`). GraphRAG-capable
+   * adapters forward it to `GraphRetrievalRouter` so the §4 runtime-
+   * usage recorder has the FK target (`ags_graph_skill_runtime_usages
+   * .runtime_run_id`) and can durably log "Skill Pack X served run Y".
+   *
+   * Optional: when absent (no agent run context, e.g. preview/test
+   * harness flows) the recorder silently no-ops.
+   */
+  runtimeRunId?: number;
 }
 
 export interface RacRetrievalChunk {

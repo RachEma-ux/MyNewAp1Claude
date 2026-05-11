@@ -412,6 +412,10 @@ export async function resolveAndAssembleContext(
     executed = await executeRetrieval({
       plan,
       query: input.query,
+      // Phase 12.5 §6 — thread the agent run id so GraphRAG-capable
+      // adapters can write the §4 runtime-usage row with the correct
+      // FK to `ags_runtime_runs`. Other adapters ignore it.
+      runtimeRunId: input.runtimeRunId ?? undefined,
     });
     trace.retrievalLatencyMs = executed.totalLatencyMs;
     trace.chunksReturned = executed.chunks.length;

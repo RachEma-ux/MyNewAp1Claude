@@ -52,6 +52,12 @@ export interface ExecuteRetrievalInput {
   topK?: number;
   /** Fed into `RacRetrievalRequest.filters` (adapter-defined). */
   filters?: Record<string, unknown>;
+  /**
+   * Phase 12.5 §6 — caller agent run id. Forwarded to every adapter's
+   * `RacRetrievalRequest.runtimeRunId` so GraphRAG-capable adapters
+   * can populate the FK on `ags_graph_skill_runtime_usages`.
+   */
+  runtimeRunId?: number;
 }
 
 export interface ExecutedRetrieval {
@@ -143,6 +149,7 @@ async function runItem(
           }
         : null,
     retrievalMethod: readPhase12RetrievalMethod(item),
+    runtimeRunId: input.runtimeRunId,
   };
 
   try {
