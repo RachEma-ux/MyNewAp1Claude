@@ -27,6 +27,7 @@ import {
   agsGraphQualityScans,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import type { GraphRepository } from "../graph/repository/index.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 import type {
   EdgeIdentity,
   NodeIdentity,
@@ -168,6 +169,15 @@ export async function runQualityScan(
         completedAt: new Date(),
       })
       .where(eq(agsGraphQualityScans.id, scanId));
+    // Fire-and-forget observability capture. Classifier passes any raw
+    // Error through; service-level catches don't produce TRPCErrors,
+    // so the expected-code filter doesn't apply. Fail-soft inside the
+    // helper — a failed observability write must not mask the scan
+    // failure or block the failed-status return path.
+    void captureUnexpectedTrpcError("graphQuality.scanOrchestrator", err, {
+      sourceId: String(scanId),
+      metadata: { scanKind: input.scanKind, scope: input.scope ?? null },
+    });
     return {
       scanId,
       status: "failed",
