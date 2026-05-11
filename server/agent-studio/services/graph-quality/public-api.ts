@@ -26,6 +26,10 @@ export {
   scanForDuplicateEntities,
   duplicateEntityScanner,
 } from "./scanners/duplicate-entity-scanner.js";
+export {
+  scanForStaleNodes,
+  staleNodeScanner,
+} from "./scanners/stale-node-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -44,14 +48,16 @@ export type {
 
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
+import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
  * Canonical registry: every scanner the orchestrator can dispatch on.
- * Additional scanners (missing_property, stale_node, projection_drift,
- * ...) extend this list in follow-up PRs.
+ * Additional scanners (missing_property, projection_drift, ...) extend
+ * this list in follow-up PRs.
  */
 export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   orphanNodeScanner,
   duplicateEntityScanner,
+  staleNodeScanner,
 ];
