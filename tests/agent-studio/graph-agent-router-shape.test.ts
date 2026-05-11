@@ -82,6 +82,15 @@ describe("Vault router", () => {
     expect(src).toMatch(/importNoteFromMarkdown:\s*protectedProcedure/);
   });
 
+  it("declares Phase 15 attachment procedures", () => {
+    expect(src).toMatch(/createAttachment:\s*protectedProcedure/);
+    expect(src).toMatch(/listAttachments:\s*protectedProcedure/);
+    expect(src).toMatch(/getAttachment:\s*protectedProcedure/);
+    expect(src).toMatch(/linkAttachmentToNote:\s*protectedProcedure/);
+    expect(src).toMatch(/unlinkAttachmentFromNote:\s*protectedProcedure/);
+    expect(src).toMatch(/markAttachmentAsSourceArtifact:\s*protectedProcedure/);
+  });
+
   it("selects repository via env (stub vs ASDB)", () => {
     expect(src).toMatch(/AGS_VAULT_REPO/);
     expect(src).toMatch(/VaultRepositoryStub/);

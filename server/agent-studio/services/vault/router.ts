@@ -30,6 +30,16 @@ import {
   exportNoteAsMarkdown,
   parseMarkdownBlob,
 } from "./markdown-import-export.js";
+import {
+  createAttachment,
+  getAttachmentById,
+  listAttachments,
+  linkAttachmentToNote,
+  unlinkAttachmentFromNote,
+  markAttachmentAsSourceArtifact,
+  buildAttachmentEmbedSnippet,
+  AttachmentNotFoundError,
+} from "./attachments.js";
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -259,6 +269,136 @@ export const vaultRouter = router({
         versionId: note.versionId,
         frontmatterKeyCount: Object.keys(persistedFrontmatter).length,
       };
+    }),
+
+  // ============================================================
+  // Phase 15 — Attachments
+  // ============================================================
+
+  createAttachment: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive(),
+        noteId: z.number().int().positive().optional(),
+        filename: z.string().min(1).max(500),
+        mimeType: z.string().min(1).max(100),
+        sizeBytes: z.number().int().nonnegative(),
+        storageUri: z.string().min(1),
+        contentHash: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id ?? 1;
+      try {
+        const attachment = await createAttachment(input, userId);
+        return {
+          ...attachment,
+          embedSnippet: buildAttachmentEmbedSnippet(attachment),
+        };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  listAttachments: protectedProcedure
+    .input(
+      z
+        .object({
+          vaultId: z.number().int().positive().optional(),
+          noteId: z.number().int().positive().optional(),
+          limit: z.number().int().min(1).max(500).optional(),
+        })
+        .refine(
+          (v) => v.vaultId !== undefined || v.noteId !== undefined,
+          { message: "vaultId or noteId is required" },
+        ),
+    )
+    .query(async ({ input }) => {
+      try {
+        const attachments = await listAttachments(input);
+        return attachments.map((a) => ({
+          ...a,
+          embedSnippet: buildAttachmentEmbedSnippet(a),
+        }));
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  getAttachment: protectedProcedure
+    .input(z.object({ attachmentId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const attachment = await getAttachmentById(input.attachmentId);
+      if (!attachment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Attachment ${input.attachmentId} not found`,
+        });
+      }
+      return {
+        ...attachment,
+        embedSnippet: buildAttachmentEmbedSnippet(attachment),
+      };
+    }),
+
+  linkAttachmentToNote: protectedProcedure
+    .input(
+      z.object({
+        attachmentId: z.number().int().positive(),
+        noteId: z.number().int().positive(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await linkAttachmentToNote(input.attachmentId, input.noteId);
+      } catch (e) {
+        if (e instanceof AttachmentNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  unlinkAttachmentFromNote: protectedProcedure
+    .input(z.object({ attachmentId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await unlinkAttachmentFromNote(input.attachmentId);
+      } catch (e) {
+        if (e instanceof AttachmentNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  markAttachmentAsSourceArtifact: protectedProcedure
+    .input(z.object({ attachmentId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await markAttachmentAsSourceArtifact(input.attachmentId);
+      } catch (e) {
+        if (e instanceof AttachmentNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
     }),
 
   createNoteFromTemplate: protectedProcedure

@@ -68,6 +68,27 @@ export type {
   ExportNoteAsMarkdownOptions,
 } from "./markdown-import-export.js";
 
+export {
+  createAttachment,
+  getAttachmentById,
+  listAttachments,
+  linkAttachmentToNote,
+  unlinkAttachmentFromNote,
+  markAttachmentAsSourceArtifact,
+  buildAttachmentEmbedSnippet,
+  isImageMimeType,
+  isPdfMimeType,
+  isEmbeddableMimeType,
+  AsdbUnavailableError as VaultAttachmentsAsdbUnavailableError,
+  AttachmentNotFoundError,
+} from "./attachments.js";
+export type {
+  CreateAttachmentInput,
+  AttachmentRow,
+  AttachmentServiceOptions,
+  ListAttachmentsInput,
+} from "./attachments.js";
+
 /**
  * Vault Phase 5b note-version creation pipeline.
  *
