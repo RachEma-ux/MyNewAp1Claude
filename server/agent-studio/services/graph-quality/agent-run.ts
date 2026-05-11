@@ -38,6 +38,7 @@ import {
 } from "./scan-orchestrator.js";
 import { convertFindingToProposal } from "./finding-to-proposal.js";
 import type { GraphRepository } from "../graph/repository/index.js";
+import { pushAgentRunNotifications } from "./agent-run-notifications.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -61,6 +62,13 @@ export interface RunQualityAgentInput {
    * `autoConvertFindings=true`.
    */
   readonly proposedByAgentId?: number;
+  /**
+   * If set, push `graph_quality_run_completed` + (conditionally)
+   * `graph_quality_proposals_created` notifications to this user's
+   * inbox after the run finalizes. Operator-triggered runs typically
+   * pass `ctx.user.id`; autonomous runs may omit it.
+   */
+  readonly notifyUserId?: number;
 }
 
 export interface RunQualityAgentOptions {
@@ -215,10 +223,22 @@ export async function runQualityAgent(
     })
     .where(eq(agsGraphQualityAgentRuns.id, agentRunId));
 
-  return {
+  const result: RunQualityAgentResult = {
     agentRunId,
     status: finalStatus,
     proposalsCreated,
     scannerSummaries: summaries,
   };
+
+  // Best-effort notification push. Failure is swallowed by the
+  // bridge (returns errors[] instead of throwing) so a missing
+  // notification never breaks the agent run.
+  if (input.notifyUserId != null) {
+    await pushAgentRunNotifications({
+      userId: input.notifyUserId,
+      agentRunResult: result,
+    });
+  }
+
+  return result;
 }
