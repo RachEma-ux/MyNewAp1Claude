@@ -47,6 +47,14 @@ import {
   runQualityAgent,
   AsdbUnavailableError as QualityAgentAsdbUnavailable,
 } from "./agent-run.js";
+import {
+  applyApprovedProposal,
+  AsdbUnavailableError as MutationWorkerAsdbUnavailable,
+  ProposalNotFoundError,
+  ProposalNotApprovedError,
+  ProposalAlreadyAppliedError,
+  InvalidProposalPayloadError,
+} from "./mutation-worker.js";
 import { QUALITY_SCANNER_REGISTRY } from "./public-api.js";
 
 const ScanStatusEnum = z.enum(["pending", "running", "completed", "failed"]);
@@ -65,12 +73,25 @@ function unwrapError(e: unknown): never {
   }
   if (
     e instanceof FindingConversionAsdbUnavailable ||
-    e instanceof QualityAgentAsdbUnavailable
+    e instanceof QualityAgentAsdbUnavailable ||
+    e instanceof MutationWorkerAsdbUnavailable
   ) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: e.message,
     });
+  }
+  if (e instanceof ProposalNotFoundError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+  }
+  if (e instanceof ProposalNotApprovedError) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+  }
+  if (e instanceof ProposalAlreadyAppliedError) {
+    throw new TRPCError({ code: "CONFLICT", message: e.message });
+  }
+  if (e instanceof InvalidProposalPayloadError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
@@ -140,6 +161,16 @@ export const graphQualityRouter = router({
           proposedByUserId: userId,
           proposedByAgentId: input.proposedByAgentId,
         });
+      } catch (e) {
+        unwrapError(e);
+      }
+    }),
+
+  applyApprovedProposal: protectedProcedure
+    .input(z.object({ proposalId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await applyApprovedProposal({ proposalId: input.proposalId });
       } catch (e) {
         unwrapError(e);
       }
