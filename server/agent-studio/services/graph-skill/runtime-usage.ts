@@ -83,10 +83,17 @@ export function createRuntimeUsageRecorder(
     if (!db) return;
     const packVersionId = await resolvePackVersionId(event.packKey);
     if (packVersionId === null) return;
+    // Phase 12.5 §12 — persist the template-run audit row ids the
+    // router collected via the §11 recorder. `null` when no template
+    // executed (e.g. local/global graph modes that bypass templates).
+    const queryTemplateRunIds =
+      event.queryTemplateRunIds && event.queryTemplateRunIds.length > 0
+        ? event.queryTemplateRunIds
+        : null;
     await db.insert(agsGraphSkillRuntimeUsages).values({
       packVersionId,
       runtimeRunId: event.runtimeRunId,
-      queryTemplateRunIds: null,
+      queryTemplateRunIds,
     });
   };
 }

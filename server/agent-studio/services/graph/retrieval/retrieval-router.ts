@@ -138,6 +138,18 @@ export interface GraphRetrievalUsageEvent {
   readonly mode: RetrievalMode;
   readonly runtimeRunId?: number;
   readonly workspaceId?: number;
+  /**
+   * Phase 12.5 §12 — the audit row ids the template-run recorder
+   * (§11) wrote during this retrieval call. The usage recorder
+   * persists them on `ags_graph_skill_runtime_usages
+   * .query_template_run_ids` so the per-usage row points back at the
+   * specific template-execution audit rows that produced its result.
+   *
+   * Empty array when the §11 recorder isn't wired OR didn't write
+   * (no template executed, or ASDB unavailable, or templateKey
+   * unresolved).
+   */
+  readonly queryTemplateRunIds?: number[];
 }
 
 export type GraphRetrievalUsageRecorder = (
@@ -168,9 +180,22 @@ export interface QueryTemplateRunEvent {
   readonly retrievalRunId?: number;
 }
 
+/**
+ * Phase 12.5 §12 — recorder may return the inserted
+ * `ags_query_template_runs` row id so the §4 usage recorder can
+ * thread it into the usage row's `query_template_run_ids` JSON
+ * column. Return value is best-effort: `undefined` / `null` mean
+ * "no row was written" (ASDB unavailable, unknown templateKey, or
+ * the recorder is fire-and-forget by design); the usage recorder
+ * tolerates an empty array.
+ */
 export type QueryTemplateRunRecorder = (
   event: QueryTemplateRunEvent,
-) => void | Promise<void>;
+) =>
+  | void
+  | number
+  | null
+  | Promise<void | number | null>;
 
 export interface GraphRetrievalRouterOptions {
   readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
@@ -218,6 +243,9 @@ export class GraphRetrievalRouter {
    * per call (success or error). Errors from the recorder itself are
    * swallowed and surfaced as a synthetic safety event by the caller
    * — a flaky audit write must not fail the retrieval call.
+   *
+   * Phase 12.5 §12 — when the recorder returns a numeric row id,
+   * surface it so the caller can thread it into the §4 usage event.
    */
   private async executeTemplateAudited(
     input: GraphRetrievalInput,
@@ -226,9 +254,11 @@ export class GraphRetrievalRouter {
   ): Promise<{
     result: Awaited<ReturnType<GraphRepository["executeTemplate"]>>;
     auditError?: unknown;
+    templateRunId?: number;
   }> {
     const startedAt = Date.now();
     let auditError: unknown;
+    let templateRunId: number | undefined;
     try {
       const result = await this.repository.executeTemplate({
         templateKey,
@@ -237,7 +267,7 @@ export class GraphRetrievalRouter {
       });
       if (this.recordQueryTemplateRun) {
         try {
-          const maybePromise = this.recordQueryTemplateRun({
+          const ret = this.recordQueryTemplateRun({
             templateKey,
             parameters,
             status: "success",
@@ -246,23 +276,26 @@ export class GraphRetrievalRouter {
             userId: input.runtime.userId,
             retrievalRunId: input.runtimeRunId,
           });
-          if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
-            (maybePromise as Promise<void>).catch(() => {
-              // Swallow async failures; surface only sync throws.
-            });
+          if (typeof ret === "number") {
+            templateRunId = ret;
+          } else if (ret && typeof (ret as Promise<unknown>).then === "function") {
+            const awaited = await (ret as Promise<unknown>).catch(() => undefined);
+            if (typeof awaited === "number") templateRunId = awaited;
           }
         } catch (err) {
           auditError = err;
         }
       }
-      return { result, auditError };
+      return { result, auditError, templateRunId };
     } catch (executeErr) {
       // Audit even on failure so operators can see the templates that
       // misfired, then rethrow so the retrieval surface still reports
-      // the actual error.
+      // the actual error. The error-path return id (if any) is not
+      // threaded into the usage event because the usage event only
+      // fires on the success path.
       if (this.recordQueryTemplateRun) {
         try {
-          const maybePromise = this.recordQueryTemplateRun({
+          const ret = this.recordQueryTemplateRun({
             templateKey,
             parameters,
             status: "error",
@@ -274,9 +307,9 @@ export class GraphRetrievalRouter {
             userId: input.runtime.userId,
             retrievalRunId: input.runtimeRunId,
           });
-          if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
-            (maybePromise as Promise<void>).catch(() => {
-              // Swallow async failures.
+          if (ret && typeof (ret as Promise<unknown>).then === "function") {
+            (ret as Promise<unknown>).catch(() => {
+              // Swallow async audit failures on the error path.
             });
           }
         } catch {
@@ -314,6 +347,10 @@ export class GraphRetrievalRouter {
     // call. Async rejections are fire-and-forget (logged inside the
     // helper) and don't reach this list.
     const auditEvents: unknown[] = [];
+    // Phase 12.5 §12 — collect successful template-run row ids so the
+    // §4 usage recorder can persist them in
+    // `ags_graph_skill_runtime_usages.query_template_run_ids`.
+    const templateRunIds: number[] = [];
 
     switch (input.mode) {
       case "graphrag_local": {
@@ -360,12 +397,14 @@ export class GraphRetrievalRouter {
           }
         }
         if (resolvedKey) {
-          const { result: r, auditError } = await this.executeTemplateAudited(
-            input,
-            resolvedKey,
-            input.templateParameters ?? {},
-          );
+          const { result: r, auditError, templateRunId } =
+            await this.executeTemplateAudited(
+              input,
+              resolvedKey,
+              input.templateParameters ?? {},
+            );
           if (auditError) auditEvents.push(auditError);
+          if (typeof templateRunId === "number") templateRunIds.push(templateRunId);
           truncated = r.truncated;
           rawBlocks = r.rows.map((row, i) => this.rowToBlock(`${resolvedKey}:${i}`, row));
         }
@@ -427,6 +466,7 @@ export class GraphRetrievalRouter {
           mode: input.mode,
           runtimeRunId: input.runtimeRunId,
           workspaceId: input.runtime.workspaceId,
+          queryTemplateRunIds: templateRunIds.length > 0 ? [...templateRunIds] : undefined,
         });
         // Fire-and-forget if Promise — don't block the retrieval call.
         if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
