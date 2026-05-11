@@ -111,6 +111,27 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ASDB] Graph Skill row seed skipped — ${message}`);
   }
 
+  // Step 2c.1: Native Graph Workspace Phase 15 — blessed vault templates.
+  //
+  // After ASDB tables exist (Step 1), upsert the 11 global vault
+  // template rows so `agentStudio.vault.listTemplates({ vaultId })`
+  // shows a useful starting set. Idempotent on `(vaultId=null,
+  // templateKey)`. Failures per-row are logged but do not abort
+  // boot.
+  try {
+    const { seedVaultTemplateRows } = await import(
+      "./db/seed-vault-template-rows"
+    );
+    const r = await seedVaultTemplateRows();
+    console.log(
+      `[ASDB] Vault template seeds — inserted: ${r.inserted}, ` +
+        `already-existing: ${r.alreadyExisting}, failed: ${r.failed}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ASDB] Vault template row seed skipped — ${message}`);
+  }
+
   // Step 2d: Native Graph Workspace Phase 11 — promotion adapter wiring.
   //
   // Injects the Drizzle-backed PromotionAdapter into the promotion router
