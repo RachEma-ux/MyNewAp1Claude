@@ -1,12 +1,12 @@
 /**
- * RAC Planner Mode — Retrofit P6.
+ * RAC Planner Mode — Retrofit P6 + Native Graph Workspace Phase 12.
  *
  * Pure function. Takes the existing `RetrievalPlan` (P4) plus a
  * boolean `hasCagPack` (provided by the runtime orchestrator from the
  * CAG resolver) and returns the explicit mode + a short reason string
  * the trace surfaces verbatim.
  *
- * The eight modes match the retrofit prompt's locked enum:
+ * The eight retrofit modes match the original locked enum:
  *
  *   - no_retrieval                       — no sources, no CAG.
  *   - cag_only                           — CAG present, no retrieval.
@@ -19,6 +19,24 @@
  *   - hybrid_cag_rag                     — CAG + KB/RAG sources.
  *   - hybrid_cag_tool_knowledge          — CAG + tool_knowledge.
  *   - hybrid_cag_rag_tool_knowledge      — CAG + KB/RAG + tool_knowledge.
+ *
+ * Phase 12 (Native Graph Workspace) reserves seven additional modes per
+ * `docs/architecture/agent-studio-graphrag-retrieval-router.md` §1.3 so
+ * the GraphRAG retrieval router can label traces distinctly from the
+ * generic `knowledge_retrieval` bucket. Derivation extension is deferred
+ * until per-source retrieval-method metadata lands — `derivePlannerMode`
+ * continues to emit `knowledge_retrieval` for `graph_index` sources
+ * today, with the seven new strings reserved at the type level so
+ * downstream callers (UI, trace columns, tRPC contracts) can already
+ * reference them:
+ *
+ *   - graphrag_local                     — local-context GraphRAG.
+ *   - graphrag_global                    — global-context GraphRAG.
+ *   - graphrag_traversal                 — Neo4j traversal retrieval.
+ *   - graphrag_text2cypher               — guarded Text2Cypher path.
+ *   - graphrag_algorithm                 — graph-algorithm retrieval.
+ *   - hybrid_cag_graphrag                — CAG + GraphRAG.
+ *   - hybrid_rac_graphrag                — RAC sources + GraphRAG.
  *
  * The composer (services/cag/composer.ts) is mode-agnostic — it
  * always reads from `capabilityPack` and `retrievalEvidence`; the mode
@@ -38,7 +56,33 @@ export const RAC_PLANNER_MODES = [
   "hybrid_cag_rag",
   "hybrid_cag_tool_knowledge",
   "hybrid_cag_rag_tool_knowledge",
+  // ── Phase 12 — Native Graph Workspace GraphRAG modes (reserved) ──
+  // Type-level only today; derivation extension deferred until per-source
+  // retrieval-method metadata lands. See file header.
+  "graphrag_local",
+  "graphrag_global",
+  "graphrag_traversal",
+  "graphrag_text2cypher",
+  "graphrag_algorithm",
+  "hybrid_cag_graphrag",
+  "hybrid_rac_graphrag",
 ] as const;
+
+/**
+ * Reserved Phase 12 modes that the current `derivePlannerMode`
+ * implementation never emits. Exported so the lockstep test and
+ * downstream callers can distinguish reservation from active modes
+ * without re-enumerating the literals.
+ */
+export const PHASE_12_RESERVED_MODES = [
+  "graphrag_local",
+  "graphrag_global",
+  "graphrag_traversal",
+  "graphrag_text2cypher",
+  "graphrag_algorithm",
+  "hybrid_cag_graphrag",
+  "hybrid_rac_graphrag",
+] as const satisfies ReadonlyArray<(typeof RAC_PLANNER_MODES)[number]>;
 
 export type RacPlannerMode = (typeof RAC_PLANNER_MODES)[number];
 
