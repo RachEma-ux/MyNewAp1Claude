@@ -40,6 +40,14 @@ import {
   buildAttachmentEmbedSnippet,
   AttachmentNotFoundError,
 } from "./attachments.js";
+import {
+  createSavedView,
+  getSavedViewById,
+  listSavedViews,
+  updateSavedView,
+  deleteSavedView,
+  SavedViewNotFoundError,
+} from "./saved-views.js";
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -394,6 +402,121 @@ export const vaultRouter = router({
         if (e instanceof AttachmentNotFoundError) {
           throw new TRPCError({ code: "NOT_FOUND", message: e.message });
         }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  // ============================================================
+  // Phase 16 §1-§4 — Saved Views
+  // ============================================================
+
+  createSavedView: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive(),
+        name: z.string().min(1).max(255),
+        viewKind: z.string().min(1).max(50),
+        filters: z.record(z.string(), z.unknown()).optional(),
+        sort: z.record(z.string(), z.unknown()).optional(),
+        columns: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      try {
+        return await createSavedView({
+          vaultId: input.vaultId,
+          ownerUserId: userId,
+          name: input.name,
+          viewKind: input.viewKind,
+          filters: input.filters,
+          sort: input.sort,
+          columns: input.columns,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  listSavedViews: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive(),
+        ownerScope: z.enum(["mine", "all"]).optional(),
+        viewKind: z.string().min(1).max(50).optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      const ownerUserId =
+        input.ownerScope === "mine" ? userId ?? null : undefined;
+      try {
+        return await listSavedViews({
+          vaultId: input.vaultId,
+          ownerUserId,
+          viewKind: input.viewKind,
+          limit: input.limit,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  getSavedView: protectedProcedure
+    .input(z.object({ viewId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const view = await getSavedViewById(input.viewId);
+      if (!view) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Saved view ${input.viewId} not found`,
+        });
+      }
+      return view;
+    }),
+
+  updateSavedView: protectedProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        name: z.string().min(1).max(255).optional(),
+        filters: z.record(z.string(), z.unknown()).optional(),
+        sort: z.record(z.string(), z.unknown()).optional(),
+        columns: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await updateSavedView(input);
+      } catch (e) {
+        if (e instanceof SavedViewNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  deleteSavedView: protectedProcedure
+    .input(z.object({ viewId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await deleteSavedView(input.viewId);
+      } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
