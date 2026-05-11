@@ -158,4 +158,45 @@ describe("exportDecisionTraceAsMarkdown — Phase 14 §1", () => {
       expect.objectContaining({ getDb: fakeGetDb }),
     );
   });
+
+  it("Phase 14 §4 — redacts sensitive payloads in step outputs by default", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(
+      makeExplanation({
+        steps: [
+          {
+            stepIndex: 1,
+            stepKind: "model_call",
+            stepInput: { apiKey: "sk-abcdefghijklmnopqrst" },
+            stepOutput: { reply: "Hello alice@example.com" },
+            durationMs: 1,
+            createdAt: STARTED,
+          },
+        ],
+      }),
+    );
+    const result = await exportDecisionTraceAsMarkdown(7);
+    expect(result!.markdown).toContain("[REDACTED]");
+    expect(result!.markdown).not.toContain("sk-abcdefghijklmnopqrst");
+    expect(result!.markdown).not.toContain("alice@example.com");
+  });
+
+  it("Phase 14 §4 — `redact: false` opts out of redaction (raw payloads pass through)", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(
+      makeExplanation({
+        steps: [
+          {
+            stepIndex: 1,
+            stepKind: "model_call",
+            stepInput: { apiKey: "sk-abcdefghijklmnopqrst" },
+            stepOutput: null,
+            durationMs: 1,
+            createdAt: STARTED,
+          },
+        ],
+      }),
+    );
+    const result = await exportDecisionTraceAsMarkdown(7, { redact: false });
+    expect(result!.markdown).toContain("sk-abcdefghijklmnopqrst");
+    expect(result!.markdown).not.toContain("[REDACTED]");
+  });
 });
