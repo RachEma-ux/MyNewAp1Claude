@@ -100,3 +100,11 @@ export type {
   DecisionTraceStepRow,
   LoadDecisionTraceStepsOptions,
 } from "./projection-step-expander.js";
+export {
+  expandRuntimeSkillPackEdges,
+  loadRuntimeSkillPackUsagesForRun,
+} from "./projection-skill-pack-expander.js";
+export type {
+  RuntimeSkillPackUsageRow,
+  LoadRuntimeSkillPackUsagesOptions,
+} from "./projection-skill-pack-expander.js";
