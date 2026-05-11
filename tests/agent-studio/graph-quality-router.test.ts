@@ -21,6 +21,7 @@ describe("graphQualityRouter", () => {
     expect(procedures.runScan).toBeDefined();
     expect(procedures.runAgent).toBeDefined();
     expect(procedures.convertFindingToProposal).toBeDefined();
+    expect(procedures.applyApprovedProposal).toBeDefined();
   });
 
   it("exposes the expected query surface", () => {
@@ -39,6 +40,7 @@ describe("graphQualityRouter", () => {
       "runScan",
       "runAgent",
       "convertFindingToProposal",
+      "applyApprovedProposal",
       "listScans",
       "getScan",
       "listFindings",
