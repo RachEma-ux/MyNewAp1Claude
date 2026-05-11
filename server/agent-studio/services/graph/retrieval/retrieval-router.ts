@@ -25,6 +25,11 @@ import type {
 } from "../repository/index.js";
 import { filterContextBlocks, type ContextBlockInput, type FilterResult } from "./safety-filter.js";
 import { validateCypherReadOnly } from "./text2cypher-validator.js";
+import {
+  selectTemplateForEligiblePacks,
+  type EligibilityResult,
+  type PackTemplateMap,
+} from "../../graph-skill/public-api.js";
 
 /**
  * Phase 12 §6 — BFS hop distance from `seedNodeId` across the given
@@ -95,6 +100,16 @@ export interface GraphRetrievalInput {
   readonly maxDepth?: number;
   readonly maxResults?: number;
   readonly runtime: RuntimeContext;
+  /**
+   * Phase 12.5 §2 — optional Skill Pack eligibility output. When set
+   * AND `templateKey` is absent, the router calls
+   * `selectTemplateForEligiblePacks` to resolve a templateKey from the
+   * highest-ranked eligible pack. Ignored when `templateKey` is
+   * already supplied (caller explicit choice wins).
+   */
+  readonly eligibility?: EligibilityResult;
+  readonly packTemplates?: PackTemplateMap;
+  readonly preferTemplateKeys?: ReadonlyArray<string>;
 }
 
 export interface GraphRetrievalOutput {
@@ -163,14 +178,19 @@ export class GraphRetrievalRouter {
       }
       case "graphrag_traversal":
       case "graphrag_text2cypher": {
-        if (input.templateKey) {
+        // Phase 12.5 §2: when the caller didn't supply a templateKey
+        // directly but did provide eligibility output, resolve one
+        // from the highest-ranked eligible Skill Pack.
+        const resolvedKey =
+          input.templateKey ?? this.resolveTemplateKeyFromEligibility(input);
+        if (resolvedKey) {
           const r = await this.repository.executeTemplate({
-            templateKey: input.templateKey,
+            templateKey: resolvedKey,
             parameters: input.templateParameters ?? {},
             runtime: input.runtime,
           });
           truncated = r.truncated;
-          rawBlocks = r.rows.map((row, i) => this.rowToBlock(`${input.templateKey}:${i}`, row));
+          rawBlocks = r.rows.map((row, i) => this.rowToBlock(`${resolvedKey}:${i}`, row));
         }
         break;
       }
@@ -241,6 +261,25 @@ export class GraphRetrievalRouter {
       governanceStatus: "active",
       payload: row,
     };
+  }
+
+  /**
+   * Phase 12.5 §2 — resolve a templateKey from eligibility output.
+   * Returns `undefined` (not `null`) so the caller's `??` falls through
+   * to the existing no-template-supplied behavior. Requires BOTH
+   * `eligibility` and `packTemplates` to be present; either alone is a
+   * no-op so partial wiring doesn't silently change semantics.
+   */
+  private resolveTemplateKeyFromEligibility(
+    input: GraphRetrievalInput,
+  ): string | undefined {
+    if (!input.eligibility || !input.packTemplates) return undefined;
+    const r = selectTemplateForEligiblePacks({
+      eligibility: input.eligibility,
+      packTemplates: input.packTemplates,
+      preferTemplateKeys: input.preferTemplateKeys,
+    });
+    return r?.templateKey;
   }
 
   private emptyResult(mode: RetrievalMode, startedAt: number, reason: string): GraphRetrievalOutput {
