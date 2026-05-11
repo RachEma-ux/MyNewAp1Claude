@@ -55,6 +55,7 @@ export const agentStudioClientManifest: ClientModuleManifest = {
     "/agent-studio/catalog/tools",
     "/agent-studio/catalog/:section",
     "/agent-studio/marketplace",
+    "/agent-studio/graph-workspace",
     "/agent-studio/:agentId",
     "/agent-studio/:agentId/:section",
     "/agent-studio/:agentId/runs/:runId",
