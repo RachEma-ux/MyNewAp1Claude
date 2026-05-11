@@ -38,6 +38,13 @@ export interface ApproveAndApplyInput {
   readonly proposalId: number;
   readonly decidedByUserId: number;
   readonly rationale?: string;
+  /**
+   * If set, threads through to `applyApprovedProposal` so the apply
+   * step pushes a `graph_quality_proposal_applied` /
+   * `graph_quality_proposal_apply_failed` notification to this user.
+   * Best-effort — notification errors never break the combo.
+   */
+  readonly notifyUserId?: number;
 }
 
 export interface ApproveAndApplyOptions {
@@ -61,7 +68,7 @@ export async function approveAndApplyProposal(
     { getDb: options.getDb },
   );
   const apply = await applyApprovedProposal(
-    { proposalId: input.proposalId },
+    { proposalId: input.proposalId, notifyUserId: input.notifyUserId },
     { getDb: options.getDb, registry: options.registry },
   );
   return { approval, apply };
