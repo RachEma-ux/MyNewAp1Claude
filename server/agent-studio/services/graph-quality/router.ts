@@ -9,16 +9,26 @@
  * Scope of THIS router:
  *   - runScan: dispatch a single scanner kind.
  *   - runAgent: wrap a batch of scanner kinds in an agent run row.
+ *   - convertFindingToProposal: bridge to graph-correction proposals.
+ *   - applyApprovedProposal: dispatch the mutation worker on an
+ *     already-approved proposal.
+ *   - approveAndApply: operator convenience combo (approve + apply).
  *   - listScans / getScan: read recent quality scan rows.
  *   - listFindings / getFinding: read finding rows for triage.
- *   - convertFindingToProposal: bridge to graph-correction proposals.
  *   - listAgentRuns: read recent agent run rows.
+ *   - listRegisteredScanKinds: enumerate scanners for the UI picker.
  *
  * Errors are translated to TRPC codes:
  *   - UnknownScanKindError → BAD_REQUEST
+ *   - InvalidProposalPayloadError → BAD_REQUEST
  *   - FindingNotFoundError → NOT_FOUND
+ *   - ProposalNotFoundError → NOT_FOUND
+ *   - CorrectionProposalNotFoundError → NOT_FOUND
+ *   - ProposalNotApprovedError → PRECONDITION_FAILED
  *   - FindingAlreadyConvertedError → CONFLICT
- *   - AsdbUnavailableError → SERVICE_UNAVAILABLE
+ *   - ProposalAlreadyAppliedError → CONFLICT
+ *   - ProposalAlreadyDecidedError → CONFLICT
+ *   - AsdbUnavailableError → INTERNAL_SERVER_ERROR
  *   - default → INTERNAL_SERVER_ERROR
  */
 
@@ -55,6 +65,11 @@ import {
   ProposalAlreadyAppliedError,
   InvalidProposalPayloadError,
 } from "./mutation-worker.js";
+import { approveAndApplyProposal } from "./approve-and-apply.js";
+import {
+  CorrectionProposalNotFoundError,
+  ProposalAlreadyDecidedError,
+} from "../graph-correction/public-api.js";
 import { QUALITY_SCANNER_REGISTRY } from "./public-api.js";
 
 const ScanStatusEnum = z.enum(["pending", "running", "completed", "failed"]);
@@ -65,10 +80,28 @@ function unwrapError(e: unknown): never {
   if (e instanceof UnknownScanKindError) {
     throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
+  if (e instanceof InvalidProposalPayloadError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+  }
   if (e instanceof FindingNotFoundError) {
     throw new TRPCError({ code: "NOT_FOUND", message: e.message });
   }
+  if (
+    e instanceof ProposalNotFoundError ||
+    e instanceof CorrectionProposalNotFoundError
+  ) {
+    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+  }
+  if (e instanceof ProposalNotApprovedError) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+  }
   if (e instanceof FindingAlreadyConvertedError) {
+    throw new TRPCError({ code: "CONFLICT", message: e.message });
+  }
+  if (e instanceof ProposalAlreadyAppliedError) {
+    throw new TRPCError({ code: "CONFLICT", message: e.message });
+  }
+  if (e instanceof ProposalAlreadyDecidedError) {
     throw new TRPCError({ code: "CONFLICT", message: e.message });
   }
   if (
@@ -80,18 +113,6 @@ function unwrapError(e: unknown): never {
       code: "INTERNAL_SERVER_ERROR",
       message: e.message,
     });
-  }
-  if (e instanceof ProposalNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
-  }
-  if (e instanceof ProposalNotApprovedError) {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
-  }
-  if (e instanceof ProposalAlreadyAppliedError) {
-    throw new TRPCError({ code: "CONFLICT", message: e.message });
-  }
-  if (e instanceof InvalidProposalPayloadError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   }
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
@@ -171,6 +192,33 @@ export const graphQualityRouter = router({
     .mutation(async ({ input }) => {
       try {
         return await applyApprovedProposal({ proposalId: input.proposalId });
+      } catch (e) {
+        unwrapError(e);
+      }
+    }),
+
+  approveAndApply: protectedProcedure
+    .input(
+      z.object({
+        proposalId: z.number().int().positive(),
+        rationale: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "approveAndApply requires an authenticated user",
+        });
+      }
+      try {
+        return await approveAndApplyProposal({
+          proposalId: input.proposalId,
+          decidedByUserId: userId,
+          rationale: input.rationale,
+        });
       } catch (e) {
         unwrapError(e);
       }

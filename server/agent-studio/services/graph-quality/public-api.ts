@@ -83,6 +83,13 @@ export type {
   ApplyApprovedProposalOptions,
 } from "./mutation-worker.js";
 
+export { approveAndApplyProposal } from "./approve-and-apply.js";
+export type {
+  ApproveAndApplyInput,
+  ApproveAndApplyOptions,
+  ApproveAndApplyResult,
+} from "./approve-and-apply.js";
+
 import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
