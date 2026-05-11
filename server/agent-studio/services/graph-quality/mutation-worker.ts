@@ -33,6 +33,7 @@ import {
   agsGraphQualityFindings,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import type { ProposalPayload } from "./proposal-payload-builder.js";
+import { pushApplyProposalNotification } from "./agent-run-notifications.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -144,6 +145,13 @@ export const DEFAULT_APPLIER_REGISTRY: ApplierRegistry = {
 
 export interface ApplyApprovedProposalInput {
   readonly proposalId: number;
+  /**
+   * If set, push a `graph_quality_proposal_applied` or
+   * `graph_quality_proposal_apply_failed` notification to this user's
+   * inbox after the apply finalizes. Best-effort — push errors are
+   * swallowed and never break the apply path.
+   */
+  readonly notifyUserId?: number;
 }
 
 export interface ApplyApprovedProposalResult {
@@ -288,9 +296,21 @@ export async function applyApprovedProposal(
     }
   }
 
-  return {
+  const applyResult: ApplyApprovedProposalResult = {
     proposalId: input.proposalId,
     payloadKind: payload.kind,
     result,
   };
+
+  // Best-effort notification push. Failure is swallowed by the
+  // bridge (returns `error: string | null` instead of throwing) so
+  // a failed push cannot break the apply path.
+  if (input.notifyUserId != null) {
+    await pushApplyProposalNotification({
+      userId: input.notifyUserId,
+      applyResult,
+    });
+  }
+
+  return applyResult;
 }
