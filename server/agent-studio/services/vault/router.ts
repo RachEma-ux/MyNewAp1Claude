@@ -52,6 +52,20 @@ import {
   getViewKindBlueprint,
   listViewKindBlueprints,
 } from "./view-kind-blueprints.js";
+import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+
+/**
+ * Fire-and-forget observability capture before throwing the TRPCError.
+ * Same pattern as graph-correction (#491) / workspace-observability
+ * (#492) / graph-change-proposals (#493). The classifier inside
+ * captureUnexpectedTrpcError filters out expected operator-side codes
+ * (BAD_REQUEST / NOT_FOUND / etc.) and only persists
+ * INTERNAL_SERVER_ERROR + raw Errors.
+ */
+function throwTrpcAndCapture(trpcErr: TRPCError): never {
+  void captureUnexpectedTrpcError("vault.router", trpcErr);
+  throw trpcErr;
+}
 
 let cachedRepo: VaultRepository | null = null;
 function getRepo(): VaultRepository {
@@ -80,7 +94,7 @@ export const vaultRouter = router({
       try {
         return await getRepo().createVault(input, userId);
       } catch (e) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
+        throwTrpcAndCapture(new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) }));
       }
     }),
 
@@ -128,7 +142,7 @@ export const vaultRouter = router({
     .query(async ({ input }) => {
       const note = await getRepo().getNoteById(input.noteId);
       if (!note) {
-        throw new TRPCError({ code: "NOT_FOUND", message: `Note ${input.noteId} not found` });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: `Note ${input.noteId} not found` }));
       }
       const latest = await getRepo().getLatestNoteVersion(input.noteId);
       return { note, latestVersion: latest };
@@ -139,7 +153,7 @@ export const vaultRouter = router({
     .query(async ({ input }) => {
       const version = await getRepo().getNoteVersion(input.noteId, input.version);
       if (!version) {
-        throw new TRPCError({ code: "NOT_FOUND", message: `Version ${input.version} not found for note ${input.noteId}` });
+        throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: `Version ${input.version} not found for note ${input.noteId}` }));
       }
       return version;
     }),
@@ -186,10 +200,10 @@ export const vaultRouter = router({
           frontmatterDefaults: input.frontmatterDefaults,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -205,10 +219,10 @@ export const vaultRouter = router({
       try {
         return await listTemplates({ vaultId: input?.vaultId });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -224,18 +238,18 @@ export const vaultRouter = router({
           repository: getRepo(),
         });
         if (!result) {
-          throw new TRPCError({
+          throwTrpcAndCapture(new TRPCError({
             code: "NOT_FOUND",
             message: `Note ${input.noteId} not found`,
-          });
+          }));
         }
         return result;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -309,10 +323,10 @@ export const vaultRouter = router({
           embedSnippet: buildAttachmentEmbedSnippet(attachment),
         };
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -337,10 +351,10 @@ export const vaultRouter = router({
           embedSnippet: buildAttachmentEmbedSnippet(a),
         }));
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -349,10 +363,10 @@ export const vaultRouter = router({
     .query(async ({ input }) => {
       const attachment = await getAttachmentById(input.attachmentId);
       if (!attachment) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Attachment ${input.attachmentId} not found`,
-        });
+        }));
       }
       return {
         ...attachment,
@@ -372,12 +386,12 @@ export const vaultRouter = router({
         return await linkAttachmentToNote(input.attachmentId, input.noteId);
       } catch (e) {
         if (e instanceof AttachmentNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -388,12 +402,12 @@ export const vaultRouter = router({
         return await unlinkAttachmentFromNote(input.attachmentId);
       } catch (e) {
         if (e instanceof AttachmentNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -404,12 +418,12 @@ export const vaultRouter = router({
         return await markAttachmentAsSourceArtifact(input.attachmentId);
       } catch (e) {
         if (e instanceof AttachmentNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -442,10 +456,10 @@ export const vaultRouter = router({
           columns: input.columns,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -471,10 +485,10 @@ export const vaultRouter = router({
           limit: input.limit,
         });
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -483,10 +497,10 @@ export const vaultRouter = router({
     .query(async ({ input }) => {
       const view = await getSavedViewById(input.viewId);
       if (!view) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Saved view ${input.viewId} not found`,
-        });
+        }));
       }
       return view;
     }),
@@ -506,12 +520,12 @@ export const vaultRouter = router({
         return await updateSavedView(input);
       } catch (e) {
         if (e instanceof SavedViewNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -521,10 +535,10 @@ export const vaultRouter = router({
       try {
         return await deleteSavedView(input.viewId);
       } catch (e) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
-        });
+        }));
       }
     }),
 
@@ -541,10 +555,10 @@ export const vaultRouter = router({
     .query(({ input }) => {
       const blueprint = getViewKindBlueprint(input.viewKind);
       if (!blueprint) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `No blueprint registered for viewKind="${input.viewKind}"`,
-        });
+        }));
       }
       return blueprint;
     }),
@@ -577,10 +591,10 @@ export const vaultRouter = router({
 
       const template = await getTemplateById(input.templateId);
       if (!template) {
-        throw new TRPCError({
+        throwTrpcAndCapture(new TRPCError({
           code: "NOT_FOUND",
           message: `Template ${input.templateId} not found`,
-        });
+        }));
       }
 
       const rendered = renderTemplate({
