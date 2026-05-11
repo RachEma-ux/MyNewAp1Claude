@@ -144,8 +144,37 @@ export type GraphRetrievalUsageRecorder = (
   event: GraphRetrievalUsageEvent,
 ) => void | Promise<void>;
 
+/**
+ * Phase 12.5 §11 — query-template-run audit port. Fired by the router
+ * around every `repository.executeTemplate(...)` call. Caller
+ * (chat-stream / simulation orchestrator) is responsible for resolving
+ * `templateKey` → `templateId` (and optionally `templateVersionId`)
+ * and writing the `ags_query_template_runs` row.
+ *
+ * Errors thrown from the recorder are swallowed and emitted as a
+ * synthetic `safetyEvents` breadcrumb so a flaky audit write never
+ * fails the retrieval call. Same fail-safe contract as
+ * `GraphRetrievalUsageRecorder`.
+ */
+export interface QueryTemplateRunEvent {
+  readonly templateKey: string;
+  readonly parameters: Record<string, unknown>;
+  readonly status: "success" | "error";
+  readonly resultCount?: number;
+  readonly durationMs: number;
+  readonly errorMessage?: string;
+  readonly userId?: number;
+  /** Same FK as `ags_query_template_runs.retrieval_run_id`. */
+  readonly retrievalRunId?: number;
+}
+
+export type QueryTemplateRunRecorder = (
+  event: QueryTemplateRunEvent,
+) => void | Promise<void>;
+
 export interface GraphRetrievalRouterOptions {
   readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
+  readonly recordQueryTemplateRun?: QueryTemplateRunRecorder;
 }
 
 export interface GraphRetrievalOutput {
@@ -173,12 +202,90 @@ export interface GraphRetrievalOutput {
 
 export class GraphRetrievalRouter {
   private readonly recordRuntimeUsage?: GraphRetrievalUsageRecorder;
+  private readonly recordQueryTemplateRun?: QueryTemplateRunRecorder;
 
   constructor(
     private readonly repository: GraphRepository,
     options: GraphRetrievalRouterOptions = {},
   ) {
     this.recordRuntimeUsage = options.recordRuntimeUsage;
+    this.recordQueryTemplateRun = options.recordQueryTemplateRun;
+  }
+
+  /**
+   * Phase 12.5 §11 — wrap `repository.executeTemplate(...)` with an
+   * audit recorder. Records exactly one `ags_query_template_runs` row
+   * per call (success or error). Errors from the recorder itself are
+   * swallowed and surfaced as a synthetic safety event by the caller
+   * — a flaky audit write must not fail the retrieval call.
+   */
+  private async executeTemplateAudited(
+    input: GraphRetrievalInput,
+    templateKey: string,
+    parameters: Record<string, unknown>,
+  ): Promise<{
+    result: Awaited<ReturnType<GraphRepository["executeTemplate"]>>;
+    auditError?: unknown;
+  }> {
+    const startedAt = Date.now();
+    let auditError: unknown;
+    try {
+      const result = await this.repository.executeTemplate({
+        templateKey,
+        parameters,
+        runtime: input.runtime,
+      });
+      if (this.recordQueryTemplateRun) {
+        try {
+          const maybePromise = this.recordQueryTemplateRun({
+            templateKey,
+            parameters,
+            status: "success",
+            resultCount: result.rows.length,
+            durationMs: Date.now() - startedAt,
+            userId: input.runtime.userId,
+            retrievalRunId: input.runtimeRunId,
+          });
+          if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
+            (maybePromise as Promise<void>).catch(() => {
+              // Swallow async failures; surface only sync throws.
+            });
+          }
+        } catch (err) {
+          auditError = err;
+        }
+      }
+      return { result, auditError };
+    } catch (executeErr) {
+      // Audit even on failure so operators can see the templates that
+      // misfired, then rethrow so the retrieval surface still reports
+      // the actual error.
+      if (this.recordQueryTemplateRun) {
+        try {
+          const maybePromise = this.recordQueryTemplateRun({
+            templateKey,
+            parameters,
+            status: "error",
+            durationMs: Date.now() - startedAt,
+            errorMessage:
+              executeErr instanceof Error
+                ? executeErr.message
+                : String(executeErr),
+            userId: input.runtime.userId,
+            retrievalRunId: input.runtimeRunId,
+          });
+          if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
+            (maybePromise as Promise<void>).catch(() => {
+              // Swallow async failures.
+            });
+          }
+        } catch {
+          // Audit failure on error path is swallowed — the original
+          // executeTemplate error is the operator-actionable signal.
+        }
+      }
+      throw executeErr;
+    }
   }
 
   async retrieve(input: GraphRetrievalInput): Promise<GraphRetrievalOutput> {
@@ -202,6 +309,11 @@ export class GraphRetrievalRouter {
     let rawBlocks: ContextBlockInput[] = [];
     let truncated = false;
     let resolvedSkill: GraphRetrievalOutput["resolvedSkill"];
+    // Phase 12.5 §11 — collect sync throws from the audit recorder so
+    // we can surface them as synthetic safety events at the end of the
+    // call. Async rejections are fire-and-forget (logged inside the
+    // helper) and don't reach this list.
+    const auditEvents: unknown[] = [];
 
     switch (input.mode) {
       case "graphrag_local": {
@@ -248,11 +360,12 @@ export class GraphRetrievalRouter {
           }
         }
         if (resolvedKey) {
-          const r = await this.repository.executeTemplate({
-            templateKey: resolvedKey,
-            parameters: input.templateParameters ?? {},
-            runtime: input.runtime,
-          });
+          const { result: r, auditError } = await this.executeTemplateAudited(
+            input,
+            resolvedKey,
+            input.templateParameters ?? {},
+          );
+          if (auditError) auditEvents.push(auditError);
           truncated = r.truncated;
           rawBlocks = r.rows.map((row, i) => this.rowToBlock(`${resolvedKey}:${i}`, row));
         }
@@ -293,6 +406,18 @@ export class GraphRetrievalRouter {
     // recorder are swallowed and surfaced as a synthetic safety event
     // so the retrieval call never fails because of a usage-log issue.
     const safetyEvents = [...filtered.events];
+
+    // Phase 12.5 §11 — surface sync audit-recorder throws as safety
+    // events so operators can debug a misconfigured audit pipeline
+    // without losing the retrieval result.
+    for (const _ of auditEvents) {
+      safetyEvents.push({
+        blockId: "__template_run_audit__",
+        reason: "missing_citation",
+        details: { note: "graphrag_template_run_recorder_threw" },
+      });
+    }
+
     if (resolvedSkill && filtered.blocks.length > 0 && this.recordRuntimeUsage) {
       try {
         const maybePromise = this.recordRuntimeUsage({

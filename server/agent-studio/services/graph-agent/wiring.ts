@@ -20,7 +20,10 @@ import * as repo from "../../repository.js";
 import { GraphAgentEngine, type GraphAgentEngineOptions, type McpDispatchAdapter, type ModelAccessAdapter, type RuntimeTraceAdapter } from "./engine.js";
 import { GraphRetrievalRouter } from "../graph/retrieval/retrieval-router.js";
 import { getGraphRepository } from "../graph/repository/index.js";
-import { createRuntimeUsageRecorder } from "../graph-skill/public-api.js";
+import {
+  createRuntimeUsageRecorder,
+  createQueryTemplateRunRecorder,
+} from "../graph-skill/public-api.js";
 
 /**
  * Real ModelAccessAdapter delegating to the existing OpenRouter
@@ -211,6 +214,7 @@ export function wireGraphAgentLite(input: GraphAgentLiteWiringInput): GraphAgent
   const repository = getGraphRepository();
   const retrievalRouter = new GraphRetrievalRouter(repository, {
     recordRuntimeUsage: createRuntimeUsageRecorder(),
+    recordQueryTemplateRun: createQueryTemplateRunRecorder(),
   });
 
   const modelAccess = new OpenRouterModelAccessAdapter({
