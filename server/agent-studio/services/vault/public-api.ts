@@ -89,6 +89,23 @@ export type {
   ListAttachmentsInput,
 } from "./attachments.js";
 
+export {
+  createSavedView,
+  getSavedViewById,
+  listSavedViews,
+  updateSavedView,
+  deleteSavedView,
+  AsdbUnavailableError as VaultSavedViewsAsdbUnavailableError,
+  SavedViewNotFoundError,
+} from "./saved-views.js";
+export type {
+  CreateSavedViewInput,
+  UpdateSavedViewInput,
+  ListSavedViewsInput,
+  SavedViewRow,
+  SavedViewServiceOptions,
+} from "./saved-views.js";
+
 /**
  * Vault Phase 5b note-version creation pipeline.
  *

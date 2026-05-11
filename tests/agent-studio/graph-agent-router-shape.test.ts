@@ -91,6 +91,14 @@ describe("Vault router", () => {
     expect(src).toMatch(/markAttachmentAsSourceArtifact:\s*protectedProcedure/);
   });
 
+  it("declares Phase 16 saved-view procedures", () => {
+    expect(src).toMatch(/createSavedView:\s*protectedProcedure/);
+    expect(src).toMatch(/listSavedViews:\s*protectedProcedure/);
+    expect(src).toMatch(/getSavedView:\s*protectedProcedure/);
+    expect(src).toMatch(/updateSavedView:\s*protectedProcedure/);
+    expect(src).toMatch(/deleteSavedView:\s*protectedProcedure/);
+  });
+
   it("selects repository via env (stub vs ASDB)", () => {
     expect(src).toMatch(/AGS_VAULT_REPO/);
     expect(src).toMatch(/VaultRepositoryStub/);
