@@ -68,6 +68,7 @@ import { kbRouter } from "./kb-router";
 import { toolKnowledgeRouter } from "./tool-knowledge-router";
 import { mcpSchemaSyncRouter } from "./mcp-schema-sync-router";
 import { toolApprovalsRouter } from "./tool-approvals-router";
+import { graphSkillRouter } from "./graph-skill-router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2224,4 +2225,6 @@ export const agentStudioRouter = router({
   mcpSchemaSync: mcpSchemaSyncRouter,
   // Retrofit Phase 11: ProposedToolCall approval queue (Phase 9 gate)
   toolApprovals: toolApprovalsRouter,
+  // Native Graph Workspace Phase 12.5 §8: Skill Pack usage analytics
+  graphSkill: graphSkillRouter,
 });
