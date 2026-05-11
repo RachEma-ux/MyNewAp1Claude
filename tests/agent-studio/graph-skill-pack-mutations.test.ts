@@ -15,6 +15,7 @@ import {
   AsdbUnavailableError,
   DuplicateVersionError,
   PackNotFoundError,
+  SourceNoteVersionNotFoundError,
 } from "../../server/agent-studio/services/graph-skill/pack-mutations";
 
 type SelectChain = {
@@ -27,18 +28,21 @@ type SelectChain = {
 interface FakeDbState {
   packsByKey: Record<string, { id: number; name: string }>;
   versionsByPackId: Record<number, Array<{ id: number; version: string; createdAt: Date; sourceNoteVersionId: number | null }>>;
-  selectQueue: Array<"pack" | "versionDup" | "versionsForPack">;
+  sourceNoteVersionIds: Set<number>;
+  selectQueue: Array<"pack" | "versionDup" | "versionsForPack" | "sourceNoteVersion">;
   inserted: Array<{ table: string; values: Record<string, unknown> }>;
   nextInsertedId: number;
   activeSkillKey?: string;
   activePackId?: number;
   activeVersion?: string;
+  activeSourceNoteVersionId?: number;
 }
 
 function makeFakeDb(initial: Partial<FakeDbState> = {}) {
   const state: FakeDbState = {
     packsByKey: initial.packsByKey ?? {},
     versionsByPackId: initial.versionsByPackId ?? {},
+    sourceNoteVersionIds: initial.sourceNoteVersionIds ?? new Set(),
     selectQueue: [],
     inserted: [],
     nextInsertedId: 1000,
@@ -72,6 +76,10 @@ function makeFakeDb(initial: Partial<FakeDbState> = {}) {
             createdAt: r.createdAt,
             sourceNoteVersionId: r.sourceNoteVersionId,
           }));
+        }
+        if (op === "sourceNoteVersion") {
+          const id = state.activeSourceNoteVersionId ?? -1;
+          return state.sourceNoteVersionIds.has(id) ? [{ id }] : [];
         }
         return [];
       },
@@ -225,11 +233,13 @@ describe("publishVersion — Phase 12.5 §10", () => {
     const { db, state } = makeFakeDb({
       packsByKey: { "p": { id: 7, name: "P" } },
       versionsByPackId: { 7: [] },
+      sourceNoteVersionIds: new Set([99]),
     });
-    state.selectQueue.push("pack", "versionDup");
+    state.selectQueue.push("pack", "versionDup", "sourceNoteVersion");
     state.activeSkillKey = "p";
     state.activePackId = 7;
     state.activeVersion = "1.1";
+    state.activeSourceNoteVersionId = 99;
     const result = await publishVersion(
       {
         skillKey: "p",
@@ -249,6 +259,51 @@ describe("publishVersion — Phase 12.5 §10", () => {
       manifest: { foo: "bar" },
       changelog: "added foo",
       sourceNoteVersionId: 99,
+    });
+  });
+
+  it("Phase 12.5 §14 — throws SourceNoteVersionNotFoundError when sourceNoteVersionId doesn't resolve", async () => {
+    const { db, state } = makeFakeDb({
+      packsByKey: { "p": { id: 7, name: "P" } },
+      versionsByPackId: { 7: [] },
+      // sourceNoteVersionIds intentionally does NOT include 99
+    });
+    state.selectQueue.push("pack", "versionDup", "sourceNoteVersion");
+    state.activeSkillKey = "p";
+    state.activePackId = 7;
+    state.activeVersion = "1.1";
+    state.activeSourceNoteVersionId = 99;
+    await expect(
+      publishVersion(
+        {
+          skillKey: "p",
+          version: "1.1",
+          manifest: {},
+          sourceNoteVersionId: 99,
+        },
+        { getDb: () => db as never },
+      ),
+    ).rejects.toBeInstanceOf(SourceNoteVersionNotFoundError);
+    expect(state.inserted).toHaveLength(0);
+  });
+
+  it("Phase 12.5 §14 — skips the source-note FK check when sourceNoteVersionId is omitted", async () => {
+    const { db, state } = makeFakeDb({
+      packsByKey: { "p": { id: 7, name: "P" } },
+      versionsByPackId: { 7: [] },
+    });
+    state.selectQueue.push("pack", "versionDup");
+    state.activeSkillKey = "p";
+    state.activePackId = 7;
+    state.activeVersion = "1.0";
+    const result = await publishVersion(
+      { skillKey: "p", version: "1.0", manifest: {} },
+      { getDb: () => db as never },
+    );
+    expect(result.packId).toBe(7);
+    expect(state.inserted).toHaveLength(1);
+    expect(state.inserted[0].values).toMatchObject({
+      sourceNoteVersionId: null,
     });
   });
 });
