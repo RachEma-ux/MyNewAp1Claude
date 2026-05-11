@@ -11,16 +11,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const hoisted = vi.hoisted(() => ({
   getExplanationMock: vi.fn(),
+  getGraphSkillRefsMock: vi.fn(async () => []),
 }));
 
 vi.mock("../../server/agent-studio/services/graph-agent/explain-reader", () => ({
   getExplanationForRun: hoisted.getExplanationMock,
 }));
 
+vi.mock(
+  "../../server/agent-studio/services/graph-agent/graph-skill-source-note-refs-reader",
+  () => ({
+    getGraphSkillSourceNoteRefsForRun: hoisted.getGraphSkillRefsMock,
+  }),
+);
+
 import { exportDecisionTraceAsMarkdown } from "../../server/agent-studio/services/graph-agent/trace-export";
 
 beforeEach(() => {
   hoisted.getExplanationMock.mockReset();
+  hoisted.getGraphSkillRefsMock.mockReset();
+  hoisted.getGraphSkillRefsMock.mockResolvedValue([]);
 });
 
 const STARTED = new Date("2026-05-11T10:00:00Z");
@@ -178,6 +188,72 @@ describe("exportDecisionTraceAsMarkdown — Phase 14 §1", () => {
     expect(result!.markdown).toContain("[REDACTED]");
     expect(result!.markdown).not.toContain("sk-abcdefghijklmnopqrst");
     expect(result!.markdown).not.toContain("alice@example.com");
+  });
+
+  it("Phase 14 §6 — renders Graph Skill References section when refs are non-empty", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getGraphSkillRefs: async () => [
+        {
+          packKey: "seed_link_analysis",
+          packName: "Seed Link Analysis",
+          packVersionId: 10,
+          packVersion: "1.0.0",
+          sourceNoteVersionId: 500,
+          sourceNoteId: 200,
+          sourceNoteVersion: 3,
+          sourceNoteSlug: "seed-skill-pack-note",
+          sourceNoteTitle: "Seed Skill Pack: Documentation",
+        },
+      ],
+    });
+    expect(result!.markdown).toContain("## Graph Skill References");
+    expect(result!.markdown).toContain("**Seed Link Analysis**");
+    expect(result!.markdown).toContain("`seed_link_analysis` v1.0.0");
+    expect(result!.markdown).toContain("packVersionId=10");
+    expect(result!.markdown).toContain("`seed-skill-pack-note`");
+    expect(result!.markdown).toContain("Seed Skill Pack: Documentation");
+    expect(result!.markdown).toContain("v3");
+  });
+
+  it("Phase 14 §6 — renders 'no source note attached' when ref has null sourceNoteId", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getGraphSkillRefs: async () => [
+        {
+          packKey: "p1",
+          packName: "Pack 1",
+          packVersionId: 10,
+          packVersion: "1.0.0",
+          sourceNoteVersionId: null,
+          sourceNoteId: null,
+          sourceNoteVersion: null,
+          sourceNoteSlug: null,
+          sourceNoteTitle: null,
+        },
+      ],
+    });
+    expect(result!.markdown).toContain("## Graph Skill References");
+    expect(result!.markdown).toContain("_no source note attached_");
+  });
+
+  it("Phase 14 §6 — omits Graph Skill References section when refs are empty", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      getGraphSkillRefs: async () => [],
+    });
+    expect(result!.markdown).not.toContain("## Graph Skill References");
+  });
+
+  it("Phase 14 §6 — `includeGraphSkillRefs: false` skips the resolver entirely", async () => {
+    hoisted.getExplanationMock.mockResolvedValueOnce(makeExplanation());
+    const refResolver = vi.fn(async () => []);
+    const result = await exportDecisionTraceAsMarkdown(7, {
+      includeGraphSkillRefs: false,
+      getGraphSkillRefs: refResolver,
+    });
+    expect(refResolver).not.toHaveBeenCalled();
+    expect(result!.markdown).not.toContain("## Graph Skill References");
   });
 
   it("Phase 14 §4 — `redact: false` opts out of redaction (raw payloads pass through)", async () => {

@@ -62,3 +62,8 @@ export type {
   ExportTraceToNoteResult,
   ExportTraceToNoteOptions,
 } from "./trace-note-writer.js";
+export { getGraphSkillSourceNoteRefsForRun } from "./graph-skill-source-note-refs-reader.js";
+export type {
+  GraphSkillSourceNoteRef,
+  GetGraphSkillSourceNoteRefsOptions,
+} from "./graph-skill-source-note-refs-reader.js";
