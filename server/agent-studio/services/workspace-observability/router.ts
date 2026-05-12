@@ -36,6 +36,7 @@ import {
   markNotificationRead,
   markNotificationsRead,
   markAllNotificationsRead,
+  dismissNotifications,
   pushNotificationToUsers,
 } from "./user-notifications.js";
 import { listErrorEvents } from "./error-events.js";
@@ -316,6 +317,37 @@ export const workspaceObservabilityRouter = router({
       }
       try {
         return await markNotificationsRead({
+          userId,
+          notificationIds: input.notificationIds,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  dismissNotifications: protectedProcedure
+    .input(
+      z.object({
+        notificationIds: z
+          .array(z.number().int().positive())
+          .min(0)
+          .max(500),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "dismissNotifications requires an authenticated user",
+        }));
+      }
+      try {
+        return await dismissNotifications({
           userId,
           notificationIds: input.notificationIds,
         });

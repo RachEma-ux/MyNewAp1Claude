@@ -350,6 +350,54 @@ export async function markAllNotificationsRead(
     );
 }
 
+export interface DismissNotificationsInput {
+  readonly userId: number;
+  /**
+   * Notification ids to physically delete. Same userId-scoping as
+   * markNotificationsRead — callers can't delete another user's
+   * rows by id-guessing. Empty short-circuits to no-op.
+   */
+  readonly notificationIds: readonly number[];
+}
+
+export interface DismissNotificationsResult {
+  readonly deletedCount: number;
+}
+
+/**
+ * User-initiated bulk delete of inbox notifications. Different from
+ * markNotificationsRead (which preserves the row + flips read=true)
+ * and from pruneOldNotifications (which deletes by age cutoff
+ * regardless of user). This is the "delete selected" inbox action.
+ *
+ * userId is enforced in the WHERE clause so a malicious caller
+ * can't escalate by id-enumeration.
+ */
+export async function dismissNotifications(
+  input: DismissNotificationsInput,
+  options: ServiceOptions = {},
+): Promise<DismissNotificationsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+  if (input.notificationIds.length === 0) return { deletedCount: 0 };
+
+  const deleted = await db
+    .delete(agsWorkspaceUserNotifications)
+    .where(
+      and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        inArray(
+          agsWorkspaceUserNotifications.id,
+          input.notificationIds as number[],
+        ),
+      ),
+    )
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { deletedCount: deleted.length };
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldNotificationsInput {
