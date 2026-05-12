@@ -287,6 +287,40 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards errorEventsCreatedSince to listErrorEvents (#590)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({ errorEventsCreatedSince: since });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: undefined,
+        sourceKind: undefined,
+        errorMessageLike: undefined,
+        createdSince: since,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("errorEventsCreatedSince composes with errorClass + errorMessageLike (#590)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({
+      errorClass: "BackgroundJobFailed",
+      errorMessageLike: "%OOM%",
+      errorEventsCreatedSince: since,
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: undefined,
+        errorMessageLike: "%OOM%",
+        createdSince: since,
+      },
+      expect.any(Object),
+    );
+  });
+
   it("recentFailedLastErrorLike scopes ONLY the failed slice, not completed (#587)", async () => {
     await getObservabilityDashboard({
       recentFailedLastErrorLike: "%OOM%",
