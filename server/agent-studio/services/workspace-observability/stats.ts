@@ -21,6 +21,17 @@ import {
 
 export interface WorkspaceObservabilityStats {
   readonly errorEventsBySourceKind: Record<string, number>;
+  /**
+   * Lane rollup of errorEventsBySourceKind: groups by the first
+   * dot-separated segment so the dashboard can render a high-level
+   * summary card without listing every per-procedure sourceKind.
+   * Examples (post #513 auto-capture):
+   *   trpc.chat.send + trpc.chat.list + trpc.chat.retry → "trpc" + 3
+   *   vault.router → "vault" + 1
+   *   graphQuality.scanOrchestrator → "graphQuality" + 1
+   * Sourcekinds with no dot use themselves as the lane key.
+   */
+  readonly errorEventsByLane: Record<string, number>;
   readonly errorEventsByErrorClass: Record<string, number>;
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
@@ -39,6 +50,7 @@ export interface WorkspaceObservabilityStatsOptions {
 
 const EMPTY_STATS: WorkspaceObservabilityStats = {
   errorEventsBySourceKind: {},
+  errorEventsByLane: {},
   errorEventsByErrorClass: {},
   jobsByStatus: {},
   jobsByKind: {},
@@ -46,6 +58,23 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   notificationsByReadState: { read: 0, unread: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
 };
+
+/**
+ * Roll up a per-sourceKind bucket map into a per-lane map by the first
+ * dot-separated segment. Exported for direct unit-testing — the SQL
+ * GROUP BY happens upstream; this is pure post-processing.
+ */
+export function rollupSourceKindsByLane(
+  bySourceKind: Record<string, number>,
+): Record<string, number> {
+  const byLane: Record<string, number> = {};
+  for (const [kind, count] of Object.entries(bySourceKind)) {
+    const dot = kind.indexOf(".");
+    const lane = dot === -1 ? kind : kind.slice(0, dot);
+    byLane[lane] = (byLane[lane] ?? 0) + count;
+  }
+  return byLane;
+}
 
 function bucketize<T extends { count: unknown }>(
   rows: readonly T[],
@@ -150,6 +179,7 @@ export async function getWorkspaceObservabilityStats(
 
   return {
     errorEventsBySourceKind,
+    errorEventsByLane: rollupSourceKindsByLane(errorEventsBySourceKind),
     errorEventsByErrorClass,
     jobsByStatus,
     jobsByKind,

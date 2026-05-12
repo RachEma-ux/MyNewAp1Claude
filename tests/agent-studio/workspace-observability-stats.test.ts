@@ -3,7 +3,10 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { getWorkspaceObservabilityStats } from "../../server/agent-studio/services/workspace-observability/stats";
+import {
+  getWorkspaceObservabilityStats,
+  rollupSourceKindsByLane,
+} from "../../server/agent-studio/services/workspace-observability/stats";
 
 interface SeededBuckets {
   errorEventsBySourceKind?: { sourceKind: string; count: number }[];
@@ -147,6 +150,27 @@ describe("getWorkspaceObservabilityStats", () => {
     expect(stats.totals.notifications).toBe(3);
   });
 
+  it("rolls errorEventsBySourceKind up into errorEventsByLane", async () => {
+    const { db } = makeFakeDb({
+      errorEventsBySourceKind: [
+        { sourceKind: "trpc.chat.send", count: 5 },
+        { sourceKind: "trpc.chat.list", count: 3 },
+        { sourceKind: "trpc.providers.list", count: 2 },
+        { sourceKind: "vault.router", count: 1 },
+        { sourceKind: "graphQuality.scanOrchestrator", count: 4 },
+        { sourceKind: "graphQuality.mutationWorker", count: 1 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByLane).toEqual({
+      trpc: 10, // 5 + 3 + 2
+      vault: 1,
+      graphQuality: 5, // 4 + 1
+    });
+  });
+
   it("ignores null bucket keys (defensive)", async () => {
     const { db } = makeFakeDb({
       errorEventsBySourceKind: [
@@ -159,5 +183,39 @@ describe("getWorkspaceObservabilityStats", () => {
     });
     expect(stats.errorEventsBySourceKind).toEqual({ "real.router": 4 });
     expect(stats.totals.errorEvents).toBe(4);
+  });
+});
+
+describe("rollupSourceKindsByLane — pure helper", () => {
+  it("returns {} for an empty input map", () => {
+    expect(rollupSourceKindsByLane({})).toEqual({});
+  });
+
+  it("uses the entire kind as the lane when there is no dot", () => {
+    expect(rollupSourceKindsByLane({ standalone: 7 })).toEqual({ standalone: 7 });
+  });
+
+  it("uses the first segment up to the first dot as the lane", () => {
+    expect(rollupSourceKindsByLane({ "trpc.chat.send": 5 })).toEqual({ trpc: 5 });
+  });
+
+  it("sums counts across kinds that share the same lane", () => {
+    expect(
+      rollupSourceKindsByLane({
+        "trpc.chat.send": 5,
+        "trpc.chat.list": 3,
+        "trpc.providers.list": 2,
+      }),
+    ).toEqual({ trpc: 10 });
+  });
+
+  it("preserves multiple distinct lanes", () => {
+    expect(
+      rollupSourceKindsByLane({
+        "trpc.chat.send": 5,
+        "vault.router": 3,
+        "graphQuality.scanOrchestrator": 2,
+      }),
+    ).toEqual({ trpc: 5, vault: 3, graphQuality: 2 });
   });
 });
