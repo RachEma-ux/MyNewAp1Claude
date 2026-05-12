@@ -10,11 +10,23 @@
  * (P6 orchestrator → P7 store) — this router only reads + accepts
  * feedback. Feedback is idempotent on `messageId` via the unique
  * index in `ags_rac_feedback`.
+ *
+ * Phase 22 follow-up #640 adds two `adminProcedure`s on the same
+ * sub-router:
+ *
+ *   pruneRetention({ retentionDays?, workspaceId?, agentId? })
+ *   getRetentionCronStatus()
+ *
+ * Sister of `runs.pruneRetention` (#623) / `runs.pruneToolCallTracesRetention`
+ * (#627) / `mcp.pruneTransitionsRetention` (#631) /
+ * `catalogSyncLog.pruneRetention` (#635). adminProcedure because the
+ * cron + sweep operate across all workspaces; operators reading status
+ * are doing cross-tenant ops monitoring.
  */
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../../_core/trpc";
 import {
   getTraceById,
   getTraceForMessage,
@@ -80,4 +92,44 @@ export const racTraceRouter = router({
         createdBy: ctx.user.id,
       });
     }),
+
+  // ── Retention (Phase 22 follow-up #638 + #639 + #640) ──────────────
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          workspaceId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldRacRuntimeTraces } = await import(
+        "../services/rac-runtime-traces-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldRacRuntimeTraces({
+        olderThan,
+        workspaceId: input?.workspaceId,
+        agentId: input?.agentId,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getRacRuntimeTracesRetentionCronStatus } = await import(
+      "../services/rac-runtime-traces-retention-cron"
+    );
+    return getRacRuntimeTracesRetentionCronStatus();
+  }),
 });
