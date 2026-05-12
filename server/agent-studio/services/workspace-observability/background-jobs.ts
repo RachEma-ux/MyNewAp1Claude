@@ -379,6 +379,16 @@ export interface ListOldestPendingJobsInput {
    * IN short-circuit (returns []).
    */
   readonly jobKind?: string | readonly string[];
+  /**
+   * Optional SLA cutoff: only return pending rows whose `createdAt`
+   * is strictly older than this. Lets operators trim the backlog
+   * list to actual SLA breaches (`Date.now() - N*hours` for "pending
+   * past N hours") instead of the top-N oldest unconditionally.
+   * Mirrors `listStaleRunningJobs.olderThan` (#588), but anchored on
+   * `createdAt` since that's when a pending row entered the queue
+   * (running rows use `updatedAt` for heartbeat semantics).
+   */
+  readonly olderThan?: Date;
 }
 
 /**
@@ -418,6 +428,9 @@ export async function listOldestPendingJobs(
         eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
       );
     }
+  }
+  if (input.olderThan !== undefined) {
+    filters.push(lt(agsWorkspaceBackgroundJobs.createdAt, input.olderThan));
   }
 
   const rows = await db

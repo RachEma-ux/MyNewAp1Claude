@@ -409,6 +409,31 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards pendingOlderThan SLA cutoff to listOldestPendingJobs (#589)", async () => {
+    const cutoff = new Date("2026-05-12T06:00:00Z");
+    await getObservabilityDashboard({ pendingOlderThan: cutoff });
+    expect(listPendingMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: undefined, olderThan: cutoff },
+      expect.any(Object),
+    );
+  });
+
+  it("pendingOlderThan composes with pendingJobKind (#589)", async () => {
+    const cutoff = new Date("2026-05-12T06:00:00Z");
+    await getObservabilityDashboard({
+      pendingJobKind: "import.scan",
+      pendingOlderThan: cutoff,
+    });
+    expect(listPendingMock).toHaveBeenCalledWith(
+      {
+        limit: 10,
+        jobKind: "import.scan",
+        olderThan: cutoff,
+      },
+      expect.any(Object),
+    );
+  });
+
   it("fans all six underlying calls out in parallel (Promise.all)", async () => {
     const order: string[] = [];
     statsMock.mockImplementationOnce(async () => {
