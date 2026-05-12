@@ -1466,6 +1466,45 @@ describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
     );
     expect(result).toEqual({ deletedCount: 1 });
   });
+
+  it("accepts errorMessageLike filter without throwing (#581)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 3 }, { id: 4 }, { id: 5 }],
+        }),
+      })),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        errorMessageLike: "%timeout%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 3 });
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("errorMessageLike composes with errorClass (ANDed) (#581)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 9 }],
+        }),
+      })),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        errorClass: "TimeoutError",
+        errorMessageLike: "%redis%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 1 });
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
 });
 
 describe("getNotificationById — Phase 22 #557 singleton getter", () => {

@@ -37,6 +37,14 @@ export interface RunRetentionSweepInput {
    */
   readonly errorEventsErrorClass?: string | readonly string[];
   /**
+   * Optional SQL LIKE-style filter on errorMessage (caller supplies
+   * wildcards). Mirrors `pruneOldErrorEvents.errorMessageLike`
+   * (#581) — lets a cron policy shed noisy transient errors by
+   * substring while preserving rare classes. Composes with
+   * `errorEventsErrorClass` (ANDed).
+   */
+  readonly errorEventsErrorMessageLike?: string;
+  /**
    * Days to retain in `ags_workspace_user_notifications`. Default 30.
    */
   readonly notificationsRetentionDays?: number;
@@ -110,6 +118,7 @@ export async function runRetentionSweep(
       {
         olderThan: errorEventsCutoff,
         errorClass: input.errorEventsErrorClass,
+        errorMessageLike: input.errorEventsErrorMessageLike,
       },
       { getDb: options.getDb },
     ),
