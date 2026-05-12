@@ -22,7 +22,11 @@
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceBackgroundJobs } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
-import { recordErrorEvent } from "./error-events.js";
+import {
+  recordErrorEvent,
+  recordErrorEvents,
+  type RecordErrorEventInput,
+} from "./error-events.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -851,6 +855,9 @@ export async function markJobsFailed(
     reason: "not_found" | "not_running";
     currentStatus?: JobStatus;
   }> = [];
+  // Buffer error-event rows for one batched INSERT after the loop —
+  // avoids N round trips for N failed children (#567 / #571).
+  const errorEventInputs: RecordErrorEventInput[] = [];
 
   for (const { jobId, errorMessage } of inputs) {
     const current = await getJobById(jobId, options);
@@ -872,22 +879,27 @@ export async function markJobsFailed(
       options,
     );
     failed.push(row);
-    // Fire-and-forget error_events bridge per failed row — matches
-    // singular markJobFailed semantics.
-    void recordErrorEvent(
-      {
-        sourceKind: `backgroundJob.${row.jobKind}`,
-        sourceId: String(jobId),
-        errorClass: "BackgroundJobFailed",
-        errorMessage,
-        metadata: {
-          jobId,
-          jobKind: row.jobKind,
-          payload: row.payload ?? null,
-        },
+    errorEventInputs.push({
+      sourceKind: `backgroundJob.${row.jobKind}`,
+      sourceId: String(jobId),
+      errorClass: "BackgroundJobFailed",
+      errorMessage,
+      metadata: {
+        jobId,
+        jobKind: row.jobKind,
+        payload: row.payload ?? null,
       },
-      { getDb: options.getDb },
-    ).catch(() => {
+    });
+  }
+
+  // Single batched error_events INSERT, fire-and-forget. Empty-array
+  // short-circuit inside `recordErrorEvents` makes the all-skipped
+  // case a no-op without a DB call. Failure here must not propagate
+  // — observability writes never mask the original failure status.
+  if (errorEventInputs.length > 0) {
+    void recordErrorEvents(errorEventInputs, {
+      getDb: options.getDb,
+    }).catch(() => {
       // Fail-soft: an observability write failure must not propagate.
     });
   }
