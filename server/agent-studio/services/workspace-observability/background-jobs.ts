@@ -559,6 +559,74 @@ export async function markJobCompleted(
   return transitionStatus(jobId, { status: "completed", lastError: null }, options);
 }
 
+export interface MarkJobsCompletedResult {
+  /** Rows successfully flipped to `completed`. */
+  readonly completed: readonly BackgroundJobRow[];
+  /**
+   * Per-id skip reasons: `"not_found"` (no row) or `"not_running"`
+   * (row already in a terminal state — `completed`, `failed`,
+   * `cancelled`, or still `pending`). Partition rather than throw so
+   * a fan-out controller with one stale child doesn't lose the
+   * completion signal for its siblings.
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_running";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+/**
+ * Bulk completion for a fan-out controller whose N children all
+ * finish in one batch. Sister of cancelJobs (#543) / retryJobs
+ * (#542) / bumpJobHeartbeats (#563) on the partition pattern.
+ *
+ * Refuses to flip non-running rows — only a `running` job should
+ * become `completed`. A pending/completed/failed/cancelled row is
+ * surfaced as `not_running` skip instead of being silently
+ * overwritten.
+ */
+export async function markJobsCompleted(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<MarkJobsCompletedResult> {
+  if (jobIds.length === 0) return { completed: [], skipped: [] };
+
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const completed: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_running";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const jobId of jobIds) {
+    const current = await getJobById(jobId, options);
+    if (!current) {
+      skipped.push({ jobId, reason: "not_found" });
+      continue;
+    }
+    if (current.status !== "running") {
+      skipped.push({
+        jobId,
+        reason: "not_running",
+        currentStatus: current.status,
+      });
+      continue;
+    }
+    const row = await transitionStatus(
+      jobId,
+      { status: "completed", lastError: null },
+      options,
+    );
+    completed.push(row);
+  }
+
+  return { completed, skipped };
+}
+
 export async function markJobFailed(
   jobId: number,
   errorMessage: string,
