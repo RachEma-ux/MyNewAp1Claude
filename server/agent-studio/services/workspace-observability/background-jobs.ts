@@ -111,6 +111,50 @@ export async function enqueueJob(
   return rowToJob(row);
 }
 
+/**
+ * Bulk fan-out enqueue. Sister of `pushNotificationToUsers` (#527) on
+ * the notifications surface. Single batched INSERT for N rows so a
+ * sweep that needs to enqueue many jobs (e.g. one rebuild per vault)
+ * doesn't cost N round-trips. Empty input short-circuits with no DB
+ * call to avoid an empty-VALUES SQL error.
+ *
+ * Each row enters in `status='pending'` with `attempts=0`, same as
+ * the singular `enqueueJob`.
+ */
+export async function enqueueJobs(
+  inputs: readonly EnqueueJobInput[],
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow[]> {
+  if (inputs.length === 0) return [];
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const now = new Date();
+  const inserted = await db
+    .insert(agsWorkspaceBackgroundJobs)
+    .values(
+      inputs.map((input) => ({
+        jobKind: input.jobKind,
+        payload: input.payload ?? null,
+        status: "pending" as const,
+        attempts: 0,
+        updatedAt: now,
+      })),
+    )
+    .returning({
+      id: agsWorkspaceBackgroundJobs.id,
+      jobKind: agsWorkspaceBackgroundJobs.jobKind,
+      payload: agsWorkspaceBackgroundJobs.payload,
+      status: agsWorkspaceBackgroundJobs.status,
+      attempts: agsWorkspaceBackgroundJobs.attempts,
+      lastError: agsWorkspaceBackgroundJobs.lastError,
+      createdAt: agsWorkspaceBackgroundJobs.createdAt,
+      updatedAt: agsWorkspaceBackgroundJobs.updatedAt,
+    });
+  return inserted.map(rowToJob);
+}
+
 export async function getJobById(
   jobId: number,
   options: ServiceOptions = {},
