@@ -79,7 +79,12 @@ export const workspaceObservabilityRouter = router({
           status: z
             .union([JobStatusEnum, z.array(JobStatusEnum).max(5)])
             .optional(),
-          jobKind: z.string().min(1).max(100).optional(),
+          jobKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           limit: z.number().int().min(1).max(500).optional(),
           createdSince: z.coerce.date().optional(),
           updatedSince: z.coerce.date().optional(),

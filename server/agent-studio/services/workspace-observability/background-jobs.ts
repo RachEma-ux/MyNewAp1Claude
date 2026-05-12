@@ -194,7 +194,15 @@ export interface ListJobsInput {
    * there are none".
    */
   readonly status?: JobStatus | readonly JobStatus[];
-  readonly jobKind?: string;
+  /**
+   * Single jobKind to filter by (exact `eq`), or an array (`IN` — OR
+   * semantics). Operators reviewing a worker tier often want several
+   * related kinds at once — e.g.
+   * `["projection.rebuild", "projection.repair"]` — without firing
+   * two calls. Empty array short-circuits to no rows (vacuous IN).
+   * Mirrors the array form on listErrorEvents.sourceKind (#553).
+   */
+  readonly jobKind?: string | readonly string[];
   readonly limit?: number;
   /**
    * Restrict to jobs whose `createdAt` is at-or-after this timestamp.
@@ -269,8 +277,22 @@ export async function listJobs(
       );
     }
   }
-  if (input.jobKind !== undefined) {
-    filters.push(eq(agsWorkspaceBackgroundJobs.jobKind, input.jobKind));
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      // Empty array → vacuous IN; short-circuit to no rows.
+      if (jobKindInput.length === 0) return [];
+      filters.push(
+        inArray(
+          agsWorkspaceBackgroundJobs.jobKind,
+          jobKindInput as string[],
+        ),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
   }
   if (input.createdSince !== undefined) {
     filters.push(gte(agsWorkspaceBackgroundJobs.createdAt, input.createdSince));

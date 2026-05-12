@@ -46,6 +46,7 @@ interface FakeState {
     status?: string;
     statuses?: readonly string[];
     jobKind?: string;
+    jobKinds?: readonly string[];
     createdSince?: Date;
     updatedSince?: Date;
   };
@@ -76,6 +77,10 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           }
           if (state.active.jobKind !== undefined) {
             rows = rows.filter((r) => r.jobKind === state.active.jobKind);
+          }
+          if (state.active.jobKinds !== undefined) {
+            const set = new Set(state.active.jobKinds);
+            rows = rows.filter((r) => set.has(r.jobKind));
           }
           if (state.active.createdSince !== undefined) {
             const cutoff = state.active.createdSince.getTime();
@@ -476,6 +481,74 @@ describe("listJobs — Phase 22", () => {
     });
     const result = await listJobs(
       { status: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("filters by an array of jobKinds (#554 OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "projection.rebuild",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 2,
+          jobKind: "projection.repair",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 3,
+          jobKind: "import.scan",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.jobKinds = ["projection.rebuild", "projection.repair"];
+    const result = await listJobs(
+      { jobKind: ["projection.rebuild", "projection.repair"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("returns [] when jobKind array is empty (#554 vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    const result = await listJobs(
+      { jobKind: [] },
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
