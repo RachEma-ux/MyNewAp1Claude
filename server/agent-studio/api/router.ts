@@ -879,6 +879,64 @@ const testingRouter = router({
   listRunsForSuite: protectedProcedure
     .input(z.object({ suiteId: z.number().int().positive() }))
     .query(({ input }) => repo.listTestRunsForSuite(input.suiteId)),
+
+  // ── Retention (Phase 22 follow-up #653 + #654 + #655) ────────────
+  //
+  // Operator surface for `ags_test_runs` retention. Sister of
+  // `runs.pruneRetention` (#623), `simulation.pruneRetention` (#651).
+  // adminProcedure because the cron + sweep operate across all
+  // suites/agents.
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "queued",
+                "running",
+                "passed",
+                "failed",
+                "cancelled",
+              ]),
+            )
+            .max(5)
+            .optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          suiteId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldTestRuns } = await import(
+        "../services/test-runs-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldTestRuns({
+        olderThan,
+        statuses: input?.statuses,
+        agentId: input?.agentId,
+        suiteId: input?.suiteId,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getTestRunsRetentionCronStatus } = await import(
+      "../services/test-runs-retention-cron"
+    );
+    return getTestRunsRetentionCronStatus();
+  }),
 });
 
 // ── Runs / Traces ───────────────────────────────────────────────────────────
