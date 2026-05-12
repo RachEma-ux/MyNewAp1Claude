@@ -157,4 +157,37 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards errorClass when supplied (#584)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ errorClass: "BackgroundJobFailed" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      errorClass: "BackgroundJobFailed",
+    });
+  });
+
+  it("forwards array-form sourceKind when supplied (#584)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({
+      sourceKind: ["trpc.chat.send", "trpc.chat.list"],
+    });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      sourceKind: ["trpc.chat.send", "trpc.chat.list"],
+    });
+  });
+
+  it("rejects oversized errorClass array (#584)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    const oversized = Array.from({ length: 21 }, (_, i) => `c${i}`);
+    await expect(
+      caller.getDashboard({ errorClass: oversized }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

@@ -98,6 +98,22 @@ export interface ObservabilityDashboardInput {
    * backlog.
    */
   readonly pendingJobKind?: string | readonly string[];
+  /**
+   * Optional errorClass filter forwarded to listErrorEvents — lets
+   * the dashboard scope the recent-error-events drilldown to a
+   * specific class when triaging a known incident. Mirrors the
+   * existing list-side filter shape (single string `eq` or array
+   * `IN`). Does not affect the stats slice (which always shows
+   * the full breakdown).
+   */
+  readonly errorClass?: string | readonly string[];
+  /**
+   * Optional sourceKind filter forwarded to listErrorEvents — same
+   * scoping use as `errorClass`, but anchors on the source (e.g.
+   * `trpc.chat.send`) rather than the exception class. Mutually
+   * compatible — both are ANDed at the listing layer.
+   */
+  readonly sourceKind?: string | readonly string[];
 }
 
 export interface ObservabilityDashboardOptions {
@@ -133,7 +149,14 @@ export async function getObservabilityDashboard(
       { status: "completed", limit: recentLimit },
       { getDb: options.getDb },
     ),
-    listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
+    listErrorEvents(
+      {
+        limit: recentLimit,
+        errorClass: input.errorClass,
+        sourceKind: input.sourceKind,
+      },
+      { getDb: options.getDb },
+    ),
     listStaleRunningJobs(
       { limit: staleLimit, jobKind: input.staleJobKind },
       { getDb: options.getDb },
