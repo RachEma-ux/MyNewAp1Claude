@@ -64,6 +64,7 @@ interface ErrState {
   selectQueue: Array<"list">;
   active: {
     sourceKind?: string;
+    sourceKinds?: readonly string[];
     sourceKindLike?: string;
     errorClass?: string;
     errorClasses?: readonly string[];
@@ -535,6 +536,9 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
           let rows = state.rows;
           if (state.active.sourceKind !== undefined) {
             rows = rows.filter((r) => r.sourceKind === state.active.sourceKind);
+          } else if (state.active.sourceKinds !== undefined) {
+            const set = new Set(state.active.sourceKinds);
+            rows = rows.filter((r) => set.has(r.sourceKind));
           } else if (state.active.sourceKindLike !== undefined) {
             // Simple LIKE-prefix simulation: trailing "%" → startsWith.
             const pattern = state.active.sourceKindLike;
@@ -819,6 +823,60 @@ describe("listErrorEvents — errorClass array filter (Phase 22 #540)", () => {
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("listErrorEvents — sourceKind array filter (#553)", () => {
+  it("filters by an array of sourceKinds (OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.list", sourceId: null, userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "trpc.providers.list", sourceId: null, userId: null, errorClass: "E", errorMessage: "c", metadata: null, createdAt: now },
+        { id: 4, sourceKind: "vault.router", sourceId: null, userId: null, errorClass: "E", errorMessage: "d", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKinds = ["trpc.chat.send", "trpc.chat.list"];
+
+    const result = await listErrorEvents(
+      { sourceKind: ["trpc.chat.send", "trpc.chat.list"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("returns [] when sourceKind array is empty (vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "x", metadata: null, createdAt: now },
+      ],
+    });
+    const result = await listErrorEvents(
+      { sourceKind: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("single-string sourceKind still works (back-compat)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.list", sourceId: null, userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKind = "trpc.chat.send";
+
+    const result = await listErrorEvents(
+      { sourceKind: "trpc.chat.send" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
   });
 });
 
