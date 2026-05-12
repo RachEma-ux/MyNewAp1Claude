@@ -23,7 +23,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
+import { router, protectedProcedure, governedProcedure, adminProcedure } from "../../_core/trpc";
 import * as repo from "../repository";
 import {
   listPacksForAgent,
@@ -187,4 +187,55 @@ export const cagRouter = router({
       const draftId = await resolveDraftId(input.agentId);
       return listPackEvents(draftId, input.limit);
     }),
+
+  // ── Retention (Phase 22 follow-up #645 + #646 + #647) ──────────────
+  //
+  // Operator surface for `ags_cag_pack_events` retention. Sister of
+  // `runs.pruneRetention` (#623), `runs.pruneToolCallTracesRetention`
+  // (#627), `mcp.pruneTransitionsRetention` (#631),
+  // `catalogSyncLog.pruneRetention` (#635), `racTrace.pruneRetention`
+  // (#640). adminProcedure because the cron + sweep operate across
+  // all workspaces.
+  pruneEventsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          eventTypes: z.array(z.string().min(1).max(64)).max(20).optional(),
+          eventSeverities: z
+            .array(z.enum(["info", "warn", "error"]))
+            .max(3)
+            .optional(),
+          workspaceId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          agentDraftId: z.number().int().positive().optional(),
+          packId: z.number().int().positive().optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldCagPackEvents } = await import(
+        "../services/cag-pack-events-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldCagPackEvents({
+        olderThan,
+        eventTypes: input?.eventTypes,
+        eventSeverities: input?.eventSeverities,
+        workspaceId: input?.workspaceId,
+        agentDraftId: input?.agentDraftId,
+        packId: input?.packId,
+      });
+    }),
+  getEventsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getCagPackEventsRetentionCronStatus } = await import(
+      "../services/cag-pack-events-retention-cron"
+    );
+    return getCagPackEventsRetentionCronStatus();
+  }),
 });
