@@ -163,6 +163,21 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentJobsUpdatedSince?: Date;
   /**
+   * Optional `createdSince` filter forwarded to BOTH listJobs calls
+   * (failed + completed) via listJobs.createdSince. Anchors on
+   * `createdAt` (enqueue time) rather than `updatedAt` (terminal-
+   * flip time, which is what `recentJobsUpdatedSince` uses).
+   *
+   * Operator workflow: "the bug was deployed at 12:00 — show me
+   * jobs enqueued after that which have already terminal-flipped."
+   * Different from updatedSince ("flipped to terminal status
+   * since X") — this filter scopes by ENQUEUE-time, which lets the
+   * operator focus on rows that entered the system in a specific
+   * incident window regardless of when they finished. Composes
+   * with updatedSince (ANDed) for compound queries.
+   */
+  readonly recentJobsCreatedSince?: Date;
+  /**
    * Optional `attemptsGte` filter forwarded to BOTH listJobs calls
    * (failed + completed) via the listJobs.attemptsGte filter (#592).
    * Lets the dashboard scope recent-jobs drilldowns to high-attempt
@@ -297,6 +312,7 @@ export async function getObservabilityDashboard(
         jobKindLike: input.recentJobKindLike,
         lastErrorLike: input.recentFailedLastErrorLike,
         updatedSince: input.recentJobsUpdatedSince,
+        createdSince: input.recentJobsCreatedSince,
         attemptsGte: input.recentAttemptsGte,
       },
       { getDb: options.getDb },
@@ -308,6 +324,7 @@ export async function getObservabilityDashboard(
         jobKind: input.recentJobKind,
         jobKindLike: input.recentJobKindLike,
         updatedSince: input.recentJobsUpdatedSince,
+        createdSince: input.recentJobsCreatedSince,
         attemptsGte: input.recentAttemptsGte,
       },
       { getDb: options.getDb },
