@@ -57,6 +57,7 @@ interface FakeState {
     statuses?: readonly string[];
     jobKind?: string;
     jobKinds?: readonly string[];
+    jobKindLike?: string;
     createdSince?: Date;
     updatedSince?: Date;
     lastErrorLike?: string;
@@ -89,10 +90,25 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           }
           if (state.active.jobKind !== undefined) {
             rows = rows.filter((r) => r.jobKind === state.active.jobKind);
-          }
-          if (state.active.jobKinds !== undefined) {
+          } else if (state.active.jobKinds !== undefined) {
             const set = new Set(state.active.jobKinds);
             rows = rows.filter((r) => set.has(r.jobKind));
+          } else if (state.active.jobKindLike !== undefined) {
+            // Simple LIKE-prefix simulation: trailing "%" → startsWith;
+            // leading "%" → endsWith; both → includes; neither → exact.
+            const pattern = state.active.jobKindLike;
+            const startsWild = pattern.startsWith("%");
+            const endsWild = pattern.endsWith("%");
+            const core = pattern.slice(
+              startsWild ? 1 : 0,
+              endsWild ? pattern.length - 1 : pattern.length,
+            );
+            rows = rows.filter((r) => {
+              if (startsWild && endsWild) return r.jobKind.includes(core);
+              if (startsWild) return r.jobKind.endsWith(core);
+              if (endsWild) return r.jobKind.startsWith(core);
+              return r.jobKind === core;
+            });
           }
           if (state.active.createdSince !== undefined) {
             const cutoff = state.active.createdSince.getTime();
@@ -813,6 +829,94 @@ describe("listJobs — Phase 22", () => {
     const result = await listJobs(
       { lastErrorLike: "%anything%" },
       { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("jobKindLike: prefix LIKE filter (trailing %) (#598)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "projection.rebuild", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "projection.repair", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 3, jobKind: "projection.snap", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 4, jobKind: "ingestion.crawl", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.jobKindLike = "projection.%";
+
+    const result = await listJobs(
+      { jobKindLike: "projection.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("jobKindLike: substring LIKE filter (leading + trailing %) (#598)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "graph.projection.run", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "graph.snapshot.run", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 3, jobKind: "vault.projection.run", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.jobKindLike = "%projection%";
+
+    const result = await listJobs(
+      { jobKindLike: "%projection%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("jobKindLike: exact jobKind takes precedence over jobKindLike (#598)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "projection.rebuild", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "projection.repair", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    // Service prefers exact jobKind; fake reflects this by setting active.jobKind, not jobKindLike.
+    state.active.jobKind = "projection.rebuild";
+
+    const result = await listJobs(
+      { jobKind: "projection.rebuild", jobKindLike: "projection.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("jobKindLike: ANDs with status + attemptsGte (#598)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "projection.rebuild", payload: null, status: "failed", attempts: 5, lastError: "x", createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "projection.repair", payload: null, status: "failed", attempts: 1, lastError: "x", createdAt: now, updatedAt: now },
+        { id: 3, jobKind: "projection.snap", payload: null, status: "completed", attempts: 5, lastError: null, createdAt: now, updatedAt: now },
+        { id: 4, jobKind: "ingestion.crawl", payload: null, status: "failed", attempts: 5, lastError: "x", createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.status = "failed";
+    state.active.attemptsGte = 3;
+    state.active.jobKindLike = "projection.%";
+
+    const result = await listJobs(
+      { status: "failed", attemptsGte: 3, jobKindLike: "projection.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("jobKindLike: returns [] on ASDB-null (fail-soft)", async () => {
+    const result = await listJobs(
+      { jobKindLike: "projection.%" },
+      { getDb: () => null as never },
     );
     expect(result).toEqual([]);
   });
