@@ -76,6 +76,7 @@ export type {
 export {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
+  rollupByLane,
   zeroFillErrorEventsTrend,
   zeroFillDayTrend,
 } from "./stats.js";

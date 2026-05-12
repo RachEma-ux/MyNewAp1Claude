@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
+  rollupByLane,
   zeroFillErrorEventsTrend,
   zeroFillDayTrend,
 } from "../../server/agent-studio/services/workspace-observability/stats";
@@ -233,6 +234,53 @@ describe("rollupSourceKindsByLane — pure helper", () => {
         "graphQuality.scanOrchestrator": 2,
       }),
     ).toEqual({ trpc: 5, vault: 3, graphQuality: 2 });
+  });
+
+  it("rollupByLane is the canonical alias and yields the same output for jobKind keyspaces", () => {
+    expect(
+      rollupByLane({
+        "projection.rebuild": 3,
+        "projection.sync": 1,
+        "retention.sweep": 2,
+        importScan: 7,
+      }),
+    ).toEqual({ projection: 4, retention: 2, importScan: 7 });
+  });
+});
+
+describe("getWorkspaceObservabilityStats — jobsByLane rollup", () => {
+  it("rolls jobsByKind into lanes by first dot-segment", async () => {
+    const { db } = makeFakeDb({
+      jobsByKind: [
+        { jobKind: "projection.rebuild", count: 3 },
+        { jobKind: "projection.sync", count: 1 },
+        { jobKind: "retention.sweep", count: 2 },
+        { jobKind: "importScan", count: 7 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.jobsByLane).toEqual({
+      projection: 4,
+      retention: 2,
+      importScan: 7,
+    });
+  });
+
+  it("returns an empty jobsByLane when no jobs are recorded", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.jobsByLane).toEqual({});
+  });
+
+  it("returns an empty jobsByLane on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.jobsByLane).toEqual({});
   });
 });
 
