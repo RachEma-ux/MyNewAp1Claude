@@ -8,6 +8,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   enqueueJob,
+  enqueueJobs,
   getJobById,
   listJobs,
   listStaleRunningJobs,
@@ -117,25 +118,31 @@ function makeFakeDb(initial?: Partial<FakeState>) {
   const insert = vi.fn((table: unknown) => {
     const name = tableName(table);
     return {
-      values: (vals: Record<string, unknown>) => ({
+      values: (
+        vals: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
+      ) => ({
         returning: async () => {
           if (name !== "ags_workspace_background_jobs") return [];
           const now = new Date();
-          const id = state.nextId++;
-          const row: FakeRow = {
-            id,
-            jobKind: String(vals.jobKind),
-            payload:
-              (vals.payload as Record<string, unknown> | null | undefined) ??
-              null,
-            status: String(vals.status ?? "pending"),
-            attempts: Number(vals.attempts ?? 0),
-            lastError: vals.lastError == null ? null : String(vals.lastError),
-            createdAt: now,
-            updatedAt: (vals.updatedAt as Date) ?? now,
-          };
-          state.rows.push(row);
-          return [row];
+          const valArr = Array.isArray(vals) ? vals : [vals];
+          const inserted: FakeRow[] = valArr.map((v) => {
+            const id = state.nextId++;
+            const row: FakeRow = {
+              id,
+              jobKind: String(v.jobKind),
+              payload:
+                (v.payload as Record<string, unknown> | null | undefined) ??
+                null,
+              status: String(v.status ?? "pending"),
+              attempts: Number(v.attempts ?? 0),
+              lastError: v.lastError == null ? null : String(v.lastError),
+              createdAt: now,
+              updatedAt: (v.updatedAt as Date) ?? now,
+            };
+            state.rows.push(row);
+            return row;
+          });
+          return inserted;
         },
       }),
     };
@@ -179,6 +186,61 @@ describe("enqueueJob — Phase 22", () => {
     expect(job.attempts).toBe(0);
     expect(job.jobKind).toBe("projection.rebuild");
     expect(state.rows.length).toBe(1);
+  });
+});
+
+describe("enqueueJobs — Phase 22 #547 bulk fan-out", () => {
+  it("short-circuits empty input with no DB call (returns [])", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await enqueueJobs([], { getDb });
+    expect(result).toEqual([]);
+    // Empty input must not even probe ASDB — a sweep that fans out to
+    // zero rows shouldn't fail because the DB happens to be down.
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("throws AsdbUnavailableError when ASDB is unavailable + non-empty input", async () => {
+    await expect(
+      enqueueJobs([{ jobKind: "x" }], { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("inserts N pending rows in a single batched call", async () => {
+    const { db, state } = makeFakeDb();
+    const result = await enqueueJobs(
+      [
+        { jobKind: "projection.rebuild", payload: { vaultId: 1 } },
+        { jobKind: "projection.rebuild", payload: { vaultId: 2 } },
+        { jobKind: "projection.rebuild", payload: { vaultId: 3 } },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(result).toHaveLength(3);
+    expect(result.every((r) => r.status === "pending")).toBe(true);
+    expect(result.every((r) => r.attempts === 0)).toBe(true);
+    expect(state.rows).toHaveLength(3);
+    // All rows enter as pending — no half-status batches.
+    expect(state.rows.map((r) => r.status)).toEqual([
+      "pending",
+      "pending",
+      "pending",
+    ]);
+  });
+
+  it("preserves per-row payload + jobKind", async () => {
+    const { db } = makeFakeDb();
+    const result = await enqueueJobs(
+      [
+        { jobKind: "a.kind", payload: { foo: 1 } },
+        { jobKind: "b.kind", payload: null },
+        { jobKind: "c.kind" },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.jobKind)).toEqual(["a.kind", "b.kind", "c.kind"]);
+    expect(result[0].payload).toEqual({ foo: 1 });
+    expect(result[1].payload).toBeNull();
+    expect(result[2].payload).toBeNull();
   });
 });
 

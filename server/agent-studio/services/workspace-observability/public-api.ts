@@ -10,6 +10,7 @@
 
 export {
   enqueueJob,
+  enqueueJobs,
   getJobById,
   listJobs,
   listStaleRunningJobs,
