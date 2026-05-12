@@ -23,6 +23,7 @@ import { workspaceObservabilityRouter } from "../../server/agent-studio/services
 const PAYLOAD_FIXTURE = {
   stats: { totals: { errorEvents: 0, jobs: 0, notifications: 0 } },
   recentFailedJobs: [],
+  recentCompletedJobs: [],
   recentErrorEvents: [],
   staleRunningJobs: [],
   oldestPendingJobs: [],

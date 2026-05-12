@@ -46,6 +46,16 @@ import {
 export interface ObservabilityDashboardPayload {
   readonly stats: WorkspaceObservabilityStats;
   readonly recentFailedJobs: readonly BackgroundJobRow[];
+  /**
+   * Most-recently-completed jobs, drilldown counterpart to the
+   * `completedJobsByDay` (#570) trend. Operators triaging a
+   * failed-job spike compare the recent slices in parallel:
+   * "is anything completing successfully right now?" answers
+   * cascade-incident vs single-worker-regression. Ordered by
+   * `updatedAt` DESC (most-recent flip first) since that's when
+   * the row reached terminal status.
+   */
+  readonly recentCompletedJobs: readonly BackgroundJobRow[];
   readonly recentErrorEvents: readonly ErrorEventRow[];
   readonly staleRunningJobs: readonly BackgroundJobRow[];
   /**
@@ -109,6 +119,7 @@ export async function getObservabilityDashboard(
   const [
     stats,
     recentFailedJobs,
+    recentCompletedJobs,
     recentErrorEvents,
     staleRunningJobs,
     oldestPendingJobs,
@@ -116,6 +127,10 @@ export async function getObservabilityDashboard(
     getWorkspaceObservabilityStats({ getDb: options.getDb }),
     listJobs(
       { status: "failed", limit: recentLimit },
+      { getDb: options.getDb },
+    ),
+    listJobs(
+      { status: "completed", limit: recentLimit },
       { getDb: options.getDb },
     ),
     listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
@@ -132,6 +147,7 @@ export async function getObservabilityDashboard(
   return {
     stats,
     recentFailedJobs,
+    recentCompletedJobs,
     recentErrorEvents,
     staleRunningJobs,
     oldestPendingJobs,
