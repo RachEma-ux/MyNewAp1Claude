@@ -285,4 +285,24 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards recentJobKindLike (#600)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentJobKindLike: "projection.%" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentJobKindLike: "projection.%",
+    });
+  });
+
+  it("rejects empty recentJobKindLike at the input layer (#600)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ recentJobKindLike: "" }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

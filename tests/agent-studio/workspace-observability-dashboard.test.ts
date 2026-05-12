@@ -256,6 +256,56 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentJobKindLike forwards to BOTH listJobs calls (#600)", async () => {
+    await getObservabilityDashboard({ recentJobKindLike: "projection.%" });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        jobKindLike: "projection.%",
+      }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        jobKindLike: "projection.%",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentJobKindLike composes with recentJobsUpdatedSince on both slices (#600)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({
+      recentJobKindLike: "projection.%",
+      recentJobsUpdatedSince: since,
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        jobKindLike: "projection.%",
+        updatedSince: since,
+      }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        jobKindLike: "projection.%",
+        updatedSince: since,
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentJobKindLike is undefined by default (#600)", async () => {
+    await getObservabilityDashboard();
+    const failedArgs = listJobsMock.mock.calls[0]?.[0] as { jobKindLike?: string };
+    const completedArgs = listJobsMock.mock.calls[1]?.[0] as { jobKindLike?: string };
+    expect(failedArgs.jobKindLike).toBeUndefined();
+    expect(completedArgs.jobKindLike).toBeUndefined();
+  });
+
   it("forwards errorMessageLike to listErrorEvents (#586)", async () => {
     await getObservabilityDashboard({
       errorMessageLike: "%connection refused%",
