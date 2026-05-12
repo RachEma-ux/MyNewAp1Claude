@@ -99,6 +99,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="tool-knowledge">Tool Knowledge</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
           <TabsTrigger value="cron-status">Cron Status</TabsTrigger>
+          <TabsTrigger value="observability-stats">Observability Stats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -118,6 +119,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="cron-status">
           <CronStatusPanel />
+        </TabsContent>
+        <TabsContent value="observability-stats">
+          <ObservabilityStatsPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -806,5 +810,181 @@ function ApprovalRow({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Observability Stats (Phase 22 follow-up #616) ─────────────────────
+//
+// Second client-side consumer of the workspace-observability surface
+// (after #615 cron status panel). Surfaces totals + per-status job
+// counts + system-vs-user error split + the 4-day sparkline trend
+// inputs from `agentStudio.workspaceObservability.getStats`.
+//
+// Intentionally shows the operator-most-relevant subset — failedJobs
+// ByKind / pendingJobsByKind / runningJobsByKind drilldowns and the
+// per-lane rollups stay deferred until operators ask for them (the
+// shape they need varies by jobKind taxonomy and is hard to mock).
+
+function StatBlock({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div className="rounded border border-zinc-800 p-3">
+      <div className="text-xs text-zinc-400 uppercase">{label}</div>
+      <div className="text-2xl font-semibold">{value}</div>
+      {sub ? <div className="text-xs text-zinc-500 mt-1">{sub}</div> : null}
+    </div>
+  );
+}
+
+function MiniTrend({
+  label,
+  buckets,
+  valueKey,
+}: {
+  label: string;
+  buckets: ReadonlyArray<{ [k: string]: unknown }>;
+  valueKey: string;
+}) {
+  const total = buckets.reduce(
+    (acc, b) => acc + ((b[valueKey] as number) ?? 0),
+    0,
+  );
+  const max = buckets.reduce(
+    (acc, b) => Math.max(acc, (b[valueKey] as number) ?? 0),
+    0,
+  );
+  return (
+    <div className="rounded border border-zinc-800 p-3">
+      <div className="text-xs text-zinc-400 uppercase">{label}</div>
+      <div className="text-2xl font-semibold">{total}</div>
+      <div className="text-xs text-zinc-500 mt-1">last 14 days</div>
+      <div className="flex items-end gap-0.5 h-6 mt-2">
+        {buckets.map((b, i) => {
+          const v = (b[valueKey] as number) ?? 0;
+          const h = max > 0 ? Math.max(2, Math.round((v / max) * 24)) : 2;
+          return (
+            <div
+              key={i}
+              className="flex-1 bg-zinc-600 rounded-sm"
+              style={{ height: `${h}px` }}
+              title={`${(b.day as string) ?? ""}: ${v}`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ObservabilityStatsPanel() {
+  const q = trpc.agentStudio.workspaceObservability.getStats.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
+
+  if (q.isLoading) return <LoadingState label="Loading observability stats…" />;
+  if (q.isError) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-red-400">
+          Failed to load stats:{" "}
+          {(q.error as { message?: string })?.message ?? "unknown"}
+        </CardContent>
+      </Card>
+    );
+  }
+  const s = q.data;
+  if (!s) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* Totals row */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Totals</SectionLabel>
+          <div className="grid grid-cols-3 gap-3">
+            <StatBlock label="Background jobs" value={s.totals.jobs} />
+            <StatBlock label="Notifications" value={s.totals.notifications} />
+            <StatBlock label="Error events" value={s.totals.errorEvents} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Jobs by status */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Jobs by status</SectionLabel>
+          <div className="grid grid-cols-5 gap-3">
+            {["pending", "running", "completed", "failed", "cancelled"].map(
+              (status) => (
+                <StatBlock
+                  key={status}
+                  label={status}
+                  value={s.jobsByStatus[status] ?? 0}
+                />
+              ),
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Error events: system vs user */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Error events — system vs user</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <StatBlock
+              label="System (NULL userId)"
+              value={s.errorEventsByUserPresence.system}
+              sub="background workers / sweeps / cron"
+            />
+            <StatBlock
+              label="User"
+              value={s.errorEventsByUserPresence.user}
+              sub="tRPC procedures with a session"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications read state */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Notifications — read state</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <StatBlock label="Unread" value={s.notificationsByReadState.unread} />
+            <StatBlock label="Read" value={s.notificationsByReadState.read} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Day trends */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Daily trends (last 14 days)</SectionLabel>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MiniTrend
+              label="Error events / day"
+              buckets={s.errorEventsByDay as ReadonlyArray<{ [k: string]: unknown }>}
+              valueKey="count"
+            />
+            <MiniTrend
+              label="Jobs created / day"
+              buckets={s.jobsCreatedByDay as ReadonlyArray<{ [k: string]: unknown }>}
+              valueKey="count"
+            />
+            <MiniTrend
+              label="Failed jobs / day"
+              buckets={s.failedJobsByDay as ReadonlyArray<{ [k: string]: unknown }>}
+              valueKey="count"
+            />
+            <MiniTrend
+              label="Completed jobs / day"
+              buckets={s.completedJobsByDay as ReadonlyArray<{ [k: string]: unknown }>}
+              valueKey="count"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
