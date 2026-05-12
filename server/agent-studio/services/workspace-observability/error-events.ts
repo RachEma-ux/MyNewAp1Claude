@@ -274,7 +274,15 @@ export interface ListErrorEventsInput {
    * Empty array short-circuits to [] (vacuous IN).
    */
   readonly errorClass?: string | readonly string[];
-  readonly userId?: number;
+  /**
+   * Single userId (exact `eq`) or array (`IN` — OR semantics).
+   * Single-form is common for "show this user's errors"; array
+   * form is for admin pools, beta-tester cohorts, or "errors for
+   * this specific tenant group" queries. Empty array short-circuits
+   * to `[]` (vacuous IN). Mutually exclusive with `userIdIsNull`
+   * (specific userId is narrower — takes precedence).
+   */
+  readonly userId?: number | readonly number[];
   readonly limit?: number;
   /**
    * Restrict to events whose `createdAt` is at-or-after this
@@ -370,7 +378,16 @@ export async function listErrorEvents(
     }
   }
   if (input.userId !== undefined) {
-    filters.push(eq(agsWorkspaceErrorEvents.userId, input.userId));
+    if (Array.isArray(input.userId)) {
+      if (input.userId.length === 0) return [];
+      filters.push(
+        inArray(agsWorkspaceErrorEvents.userId, input.userId as number[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.userId, input.userId as number),
+      );
+    }
   } else if (input.userIdIsNull === true) {
     filters.push(isNull(agsWorkspaceErrorEvents.userId));
   } else if (input.userIdIsNull === false) {

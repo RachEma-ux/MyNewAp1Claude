@@ -81,6 +81,7 @@ interface ErrState {
     errorClass?: string;
     errorClasses?: readonly string[];
     userId?: number;
+    userIds?: readonly number[];
     createdSince?: Date;
     errorMessageLike?: string;
     userIdIsNull?: boolean;
@@ -873,9 +874,14 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
             const cutoff = state.active.createdSince.getTime();
             rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
           }
-          // userId precedence: specific userId narrower than IS NULL.
+          // userId precedence: specific userId/IDs narrower than IS NULL.
           if (state.active.userId !== undefined) {
             rows = rows.filter((r) => r.userId === state.active.userId);
+          } else if (state.active.userIds !== undefined) {
+            const set = new Set(state.active.userIds);
+            rows = rows.filter(
+              (r) => r.userId !== null && set.has(r.userId as number),
+            );
           } else if (state.active.userIdIsNull === true) {
             rows = rows.filter((r) => r.userId === null);
           } else if (state.active.userIdIsNull === false) {
@@ -1297,6 +1303,86 @@ describe("listErrorEvents — userIdIsNull tri-state filter (Phase 22 #593)", ()
       { getDb: () => db as never },
     );
     expect(result.map((r) => r.id)).toEqual([2]);
+  });
+});
+
+describe("listErrorEvents — userId array filter (Phase 22 #607)", () => {
+  it("filters by an array of userIds (OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: null, userId: 7, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "k", sourceId: null, userId: 8, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "k", sourceId: null, userId: 9, errorClass: "E", errorMessage: "c", metadata: null, createdAt: now },
+        { id: 4, sourceKind: "k", sourceId: null, userId: null, errorClass: "E", errorMessage: "d", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userIds = [7, 9];
+
+    const result = await listErrorEvents(
+      { userId: [7, 9] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("returns [] when userId array is empty (vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: null, userId: 7, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+      ],
+    });
+    const result = await listErrorEvents(
+      { userId: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("excludes NULL-userId rows in array form (IN semantics)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: null, userId: 7, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "k", sourceId: null, userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userIds = [7];
+
+    const result = await listErrorEvents(
+      { userId: [7] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("single-form userId still works (back-compat)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: null, userId: 7, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "k", sourceId: null, userId: 8, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+
+    const result = await listErrorEvents(
+      { userId: 7 },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("returns [] on ASDB-null (fail-soft) for userId array", async () => {
+    const result = await listErrorEvents(
+      { userId: [7, 8, 9] },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
   });
 });
 
