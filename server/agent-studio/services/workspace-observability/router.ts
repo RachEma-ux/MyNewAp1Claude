@@ -553,6 +553,12 @@ export const workspaceObservabilityRouter = router({
         olderThan: z.coerce.date(),
         limit: z.number().int().min(1).max(500).optional(),
         errorMessage: z.string().min(1).max(2000).optional(),
+        jobKind: z
+          .union([
+            z.string().min(1).max(100),
+            z.array(z.string().min(1).max(100)).max(20),
+          ])
+          .optional(),
       }),
     )
     .mutation(async ({ input }) => {

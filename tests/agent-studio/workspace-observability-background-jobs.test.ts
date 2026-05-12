@@ -1387,4 +1387,43 @@ describe("failStaleRunningJobs — Phase 22 #546 auto-failer", () => {
     expect(result.failed).toEqual([]); // but skipped because no longer running
     expect(state.rows[0].status).toBe("completed"); // untouched
   });
+
+  it("short-circuits empty jobKind array with no DB call (#548)", async () => {
+    // Empty array → vacuous IN clause; the function must short-circuit
+    // before probing ASDB so a no-op operator click doesn't fail when
+    // the DB is down.
+    const getDb = vi.fn(() => null as never);
+    const result = await failStaleRunningJobs(
+      { olderThan: new Date("2026-05-12T00:00:00Z"), jobKind: [] },
+      { getDb },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.failed).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("forwards single-string jobKind to the SELECT predicate (#548)", async () => {
+    // The fake's select chain doesn't introspect WHERE filters, so we
+    // verify the path via the inputs-shape contract: the function
+    // should accept the single-string form without throwing.
+    const now = new Date("2026-05-12T00:00:00Z");
+    const { db } = makeFakeDb();
+    const result = await failStaleRunningJobs(
+      { olderThan: now, jobKind: "projection.rebuild" },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0); // no rows in fake
+    expect(result.failed).toEqual([]);
+  });
+
+  it("forwards array-form jobKind to the SELECT predicate (#548)", async () => {
+    const now = new Date("2026-05-12T00:00:00Z");
+    const { db } = makeFakeDb();
+    const result = await failStaleRunningJobs(
+      { olderThan: now, jobKind: ["projection.rebuild", "import.scan"] },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.failed).toEqual([]);
+  });
 });

@@ -489,6 +489,16 @@ export interface FailStaleRunningJobsInput {
    * the bridge). Defaults to a generic "stale" reason.
    */
   readonly errorMessage?: string;
+  /**
+   * Optional jobKind filter — single string (`eq`) or array (`IN`).
+   * Lets an operator paged on a single failing worker target only
+   * that worker's stuck rows instead of nuking unrelated stale work.
+   * Mirrors the array pattern from listJobs.status (#539).
+   *
+   * Empty array short-circuits to no rows (vacuous IN), matching the
+   * intent "filter by these kinds, but there are none".
+   */
+  readonly jobKind?: string | readonly string[];
 }
 
 export interface FailStaleRunningJobsResult {
@@ -513,6 +523,13 @@ export async function failStaleRunningJobs(
   input: FailStaleRunningJobsInput,
   options: ServiceOptions = {},
 ): Promise<FailStaleRunningJobsResult> {
+  // Empty jobKind array → vacuous IN clause; short-circuit BEFORE
+  // probing ASDB so a no-op operator click doesn't fail when the DB
+  // is down. Matches the enqueueJobs (#547) empty-array contract.
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return { failed: [], scanned: 0 };
+  }
+
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) throw new AsdbUnavailableError();
@@ -520,15 +537,25 @@ export async function failStaleRunningJobs(
   const limit = input.limit ?? 100;
   const errorMessage = input.errorMessage ?? DEFAULT_FAIL_STALE_MESSAGE;
 
+  const filters = [
+    eq(agsWorkspaceBackgroundJobs.status, "running"),
+    lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan),
+  ];
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput));
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
+
   const stale = await db
     .select({ id: agsWorkspaceBackgroundJobs.id })
     .from(agsWorkspaceBackgroundJobs)
-    .where(
-      and(
-        eq(agsWorkspaceBackgroundJobs.status, "running"),
-        lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan),
-      ),
-    )
+    .where(and(...filters))
     .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // oldest first
     .limit(limit);
 
