@@ -45,6 +45,17 @@ export interface RunRetentionSweepInput {
    */
   readonly errorEventsErrorMessageLike?: string;
   /**
+   * Optional exact `sourceKind` filter — single string (`eq`) or
+   * array (`IN`) — for the error-events sweep. Sister of
+   * `pruneOldErrorEvents.sourceKind` (#611). Narrower than
+   * `errorEventsSourceKindLike` (#604): lets cron callers prune
+   * one specific procedure's errors aggressively (`trpc.chat.send`)
+   * without affecting siblings. Mutually exclusive with
+   * `errorEventsSourceKindLike` (exact wins — same precedence
+   * convention).
+   */
+  readonly errorEventsSourceKind?: string | readonly string[];
+  /**
    * Optional SQL LIKE-style prefix filter on sourceKind for the
    * error-events sweep. Mirrors `pruneOldErrorEvents.sourceKindLike`
    * (#604) — cron callers can prune by source-family prefix
@@ -155,6 +166,7 @@ export async function runRetentionSweep(
         olderThan: errorEventsCutoff,
         errorClass: input.errorEventsErrorClass,
         errorMessageLike: input.errorEventsErrorMessageLike,
+        sourceKind: input.errorEventsSourceKind,
         sourceKindLike: input.errorEventsSourceKindLike,
       },
       { getDb: options.getDb },
