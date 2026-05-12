@@ -71,6 +71,19 @@ export interface WorkspaceObservabilityStats {
    * sourceKinds.
    */
   readonly failedJobsByDay: readonly DayTrendBucket[];
+  /**
+   * Per-day count of background jobs whose terminal status is
+   * `completed`, last 14 days (UTC), oldest-first, zero-filled.
+   * Success-throughput counterpart to `failedJobsByDay` — operators
+   * distinguish three incident shapes by comparing the pair:
+   *   - failed spike + completed stable: bug in one worker.
+   *   - failed spike + completed drop: cascading incident.
+   *   - completed drop alone: silent regression (slow workers,
+   *     not failing).
+   * Bucketed on `updatedAt` because completion stamps the
+   * terminal-status flip, not the original enqueue.
+   */
+  readonly completedJobsByDay: readonly DayTrendBucket[];
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
   /**
@@ -141,6 +154,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   errorEventsByDay: [],
   jobsCreatedByDay: [],
   failedJobsByDay: [],
+  completedJobsByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
   jobsByLane: {},
@@ -246,6 +260,7 @@ export async function getWorkspaceObservabilityStats(
     jobsTrendRows,
     failedJobsByKindRows,
     failedJobsTrendRows,
+    completedJobsTrendRows,
     notificationsTrendRows,
   ] = await Promise.all([
     db
@@ -330,6 +345,16 @@ export async function getWorkspaceObservabilityStats(
       .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC'`),
     db
       .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(
+        sql`${agsWorkspaceBackgroundJobs.status} = 'completed' AND ${agsWorkspaceBackgroundJobs.updatedAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC'`),
+    db
+      .select({
         day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceUserNotifications.createdAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
         count: sql<number>`count(*)::int`,
       })
@@ -372,6 +397,12 @@ export async function getWorkspaceObservabilityStats(
   const failedJobsTrendMap = bucketize(failedJobsTrendRows, "day");
   const failedJobsByDay = zeroFillDayTrend(failedJobsTrendMap, TREND_DAYS);
 
+  const completedJobsTrendMap = bucketize(completedJobsTrendRows, "day");
+  const completedJobsByDay = zeroFillDayTrend(
+    completedJobsTrendMap,
+    TREND_DAYS,
+  );
+
   const notificationsTrendMap = bucketize(notificationsTrendRows, "day");
   const notificationsByDay = zeroFillDayTrend(notificationsTrendMap, TREND_DAYS);
 
@@ -384,6 +415,7 @@ export async function getWorkspaceObservabilityStats(
     errorEventsByDay,
     jobsCreatedByDay,
     failedJobsByDay,
+    completedJobsByDay,
     jobsByStatus,
     jobsByKind,
     jobsByLane: rollupByLane(jobsByKind),
