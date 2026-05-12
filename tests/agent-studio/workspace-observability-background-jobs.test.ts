@@ -2122,6 +2122,141 @@ describe("markJobsFailed — Phase 22 #565 bulk failure", () => {
     expect(result.skipped[0].reason).toBe("not_running");
     expect(result.skipped[0].currentStatus).toBe("cancelled");
   });
+
+  it("error_events bridge uses ONE batched INSERT not N (#571)", async () => {
+    // Three rows all running → all three should fail → ONE
+    // recordErrorEvents call with a 3-element array. This is the
+    // optimization vs the pre-#571 path that did N individual
+    // recordErrorEvent calls.
+    const now = new Date();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "a",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 2,
+        jobKind: "a",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 3,
+        jobKind: "b",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    // Call sequence per id (id-N: SELECT N → UPDATE N → SELECT N).
+    const selectQueue: number[] = [1, 1, 2, 2, 3, 3];
+    const insertCalls: unknown[] = [];
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          limit: async () => {
+            const id = selectQueue.shift();
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const id = (vals as { __targetId?: number }).__targetId;
+            const target =
+              rows.find((r) => r.status === "running" && r.id !== id) ??
+              rows[0];
+            if ("status" in vals) target.status = String(vals.status);
+            if ("lastError" in vals) {
+              target.lastError =
+                vals.lastError == null ? null : String(vals.lastError);
+            }
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+      insert: vi.fn(() => ({
+        values: (v: unknown) => {
+          insertCalls.push(v);
+          return { returning: async () => [] };
+        },
+      })),
+    };
+
+    await markJobsFailed(
+      [
+        { jobId: 1, errorMessage: "e1" },
+        { jobId: 2, errorMessage: "e2" },
+        { jobId: 3, errorMessage: "e3" },
+      ],
+      { getDb: () => db as never },
+    );
+    // Give the fire-and-forget a tick to drain.
+    await new Promise((r) => setImmediate(r));
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(insertCalls).toHaveLength(1);
+    expect(Array.isArray(insertCalls[0])).toBe(true);
+    const batch = insertCalls[0] as Array<Record<string, unknown>>;
+    expect(batch).toHaveLength(3);
+    expect(batch.map((b) => b.errorMessage)).toEqual(["e1", "e2", "e3"]);
+    expect(batch.every((b) => b.errorClass === "BackgroundJobFailed")).toBe(
+      true,
+    );
+    expect(batch[0].sourceKind).toBe("backgroundJob.a");
+    expect(batch[2].sourceKind).toBe("backgroundJob.b");
+  });
+
+  it("error_events bridge is NOT called when all rows are skipped (#571)", async () => {
+    // All-skipped path → errorEventInputs stays empty →
+    // recordErrorEvents short-circuits before the DB call.
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "cancelled",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const insertSpy = vi.fn();
+    const wrappedDb = {
+      ...(db as Record<string, unknown>),
+      insert: insertSpy,
+    };
+    await markJobsFailed(
+      [{ jobId: 7, errorMessage: "boom" }],
+      { getDb: () => wrappedDb as never },
+    );
+    await new Promise((r) => setImmediate(r));
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("markJobsStarted — Phase 22 #566 bulk worker-pool claim", () => {
