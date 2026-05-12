@@ -201,6 +201,20 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-scheduler] start skipped — ${message}`);
   }
 
+  // Step 3.5: Phase 22 follow-up #612 — workspace-observability retention
+  // cron. The Phase 22 arc shipped runRetentionSweep but had no scheduled
+  // caller — operators had to fire it manually. Default 30-day sweep runs
+  // daily at 03:00 UTC. Env-flag-gated via AGS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureRetentionCronStarted } = await import(
+      "./services/workspace-observability/retention-cron"
+    );
+    ensureRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-retention-cron] start skipped — ${message}`);
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
