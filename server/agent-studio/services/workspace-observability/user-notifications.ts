@@ -431,6 +431,81 @@ export async function markAllNotificationsRead(
     );
 }
 
+export interface MarkAllNotificationsReadByKindInput {
+  readonly userId: number;
+  /**
+   * Restrict the mark-read to notifications of this kind (single
+   * `eq`) or kinds (array `IN`). Empty array short-circuits to
+   * `{markedCount: 0}` with no DB call — matches the canonical
+   * Phase 22 contract.
+   */
+  readonly notificationKind: string | readonly string[];
+}
+
+export interface MarkAllNotificationsReadByKindResult {
+  readonly markedCount: number;
+}
+
+/**
+ * Kind-scoped "mark all as read" — sister of
+ * `markAllNotificationsRead` but only flips rows whose
+ * `notificationKind` matches the filter. Gmail-style "mark all
+ * marketing as read" gesture; lets users clear noisy notification
+ * classes without nuking the whole inbox.
+ *
+ * userId is enforced in the WHERE clause (matches the
+ * id-enumeration-prevention pattern used by markNotificationsRead +
+ * dismissNotifications).
+ *
+ * Returns `markedCount` (the number of rows actually flipped) so
+ * the UI can show "marked 47 notifications as read" toasts. The
+ * caller can pass `unreadOnly` filtering via... actually no: this
+ * is implicitly unread-only because already-read rows would be a
+ * no-op flip. We mirror markAllNotificationsRead's
+ * `read=false` predicate so the row count is accurate.
+ */
+export async function markAllNotificationsReadByKind(
+  input: MarkAllNotificationsReadByKindInput,
+  options: ServiceOptions = {},
+): Promise<MarkAllNotificationsReadByKindResult> {
+  // Empty notificationKind array → vacuous IN; short-circuit BEFORE
+  // the ASDB probe.
+  if (
+    Array.isArray(input.notificationKind) &&
+    input.notificationKind.length === 0
+  ) {
+    return { markedCount: 0 };
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const kindFilter = Array.isArray(input.notificationKind)
+    ? inArray(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKind as string[],
+      )
+    : eq(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKind as string,
+      );
+
+  const marked = await db
+    .update(agsWorkspaceUserNotifications)
+    .set({ read: true })
+    .where(
+      and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        eq(agsWorkspaceUserNotifications.read, false),
+        kindFilter,
+      ),
+    )
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { markedCount: marked.length };
+}
+
 export interface DismissNotificationsInput {
   readonly userId: number;
   /**

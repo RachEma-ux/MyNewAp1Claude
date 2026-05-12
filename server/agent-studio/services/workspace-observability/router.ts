@@ -42,6 +42,7 @@ import {
   markNotificationRead,
   markNotificationsRead,
   markAllNotificationsRead,
+  markAllNotificationsReadByKind,
   dismissNotifications,
   dismissAllNotifications,
   pushNotificationToUsers,
@@ -470,6 +471,38 @@ export const workspaceObservabilityRouter = router({
       }));
     }
   }),
+
+  markAllNotificationsReadByKind: protectedProcedure
+    .input(
+      z.object({
+        notificationKind: z.union([
+          z.string().min(1).max(100),
+          z.array(z.string().min(1).max(100)).max(20),
+        ]),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "markAllNotificationsReadByKind requires an authenticated user",
+        }));
+      }
+      try {
+        return await markAllNotificationsReadByKind({
+          userId,
+          notificationKind: input.notificationKind,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
 
   dismissAllNotifications: protectedProcedure
     .input(

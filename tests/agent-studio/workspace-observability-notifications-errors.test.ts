@@ -19,6 +19,7 @@ import {
   markAllNotificationsRead,
   dismissNotifications,
   dismissAllNotifications,
+  markAllNotificationsReadByKind,
   pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
@@ -377,6 +378,64 @@ describe("user-notifications — Phase 22", () => {
     await expect(
       markAllNotificationsRead(1, { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("markAllNotificationsReadByKind throws AsdbUnavailableError on null DB (#575)", async () => {
+    await expect(
+      markAllNotificationsReadByKind(
+        { userId: 1, notificationKind: "promotion.approved" },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("markAllNotificationsReadByKind short-circuits empty kind array BEFORE the ASDB probe (#575)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await markAllNotificationsReadByKind(
+      { userId: 1, notificationKind: [] },
+      { getDb },
+    );
+    expect(result.markedCount).toBe(0);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("markAllNotificationsReadByKind returns the count of flipped rows (#575)", async () => {
+    const db = {
+      update: vi.fn(() => ({
+        set: () => ({
+          where: () => ({
+            returning: async () => [{ id: 10 }, { id: 11 }, { id: 12 }],
+          }),
+        }),
+      })),
+    };
+    const result = await markAllNotificationsReadByKind(
+      { userId: 7, notificationKind: "promotion.approved" },
+      { getDb: () => db as never },
+    );
+    expect(result.markedCount).toBe(3);
+    expect(db.update).toHaveBeenCalledOnce();
+  });
+
+  it("markAllNotificationsReadByKind accepts array-form notificationKind (#575)", async () => {
+    const db = {
+      update: vi.fn(() => ({
+        set: () => ({
+          where: () => ({
+            returning: async () => [],
+          }),
+        }),
+      })),
+    };
+    const result = await markAllNotificationsReadByKind(
+      {
+        userId: 7,
+        notificationKind: ["promotion.approved", "broadcast"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.markedCount).toBe(0);
+    expect(db.update).toHaveBeenCalledOnce();
   });
 
   it("dismissNotifications throws AsdbUnavailableError on null DB", async () => {
