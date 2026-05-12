@@ -60,6 +60,7 @@ interface FakeState {
     createdSince?: Date;
     updatedSince?: Date;
     lastErrorLike?: string;
+    attemptsGte?: number;
   };
 }
 
@@ -100,6 +101,10 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           if (state.active.updatedSince !== undefined) {
             const cutoff = state.active.updatedSince.getTime();
             rows = rows.filter((r) => r.updatedAt.getTime() >= cutoff);
+          }
+          if (state.active.attemptsGte !== undefined) {
+            const threshold = state.active.attemptsGte;
+            rows = rows.filter((r) => r.attempts >= threshold);
           }
           if (state.active.lastErrorLike !== undefined) {
             // Simulate SQL LIKE with %wildcards%. NULL lastError never
@@ -747,6 +752,48 @@ describe("listJobs — Phase 22", () => {
 
     const result = await listJobs(
       { status: "failed", lastErrorLike: "%OOMKilled%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([3]);
+  });
+
+  it("attemptsGte filters rows with attempts below the threshold (#592)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "first try", createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "x", payload: null, status: "failed", attempts: 3, lastError: "third try", createdAt: now, updatedAt: now },
+        { id: 3, jobKind: "x", payload: null, status: "failed", attempts: 7, lastError: "stuck retry storm", createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.attemptsGte = 3;
+
+    const result = await listJobs(
+      { attemptsGte: 3 },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([2, 3]);
+  });
+
+  it("attemptsGte composes with status filter (#592)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        // High attempts but wrong status — excluded.
+        { id: 1, jobKind: "x", payload: null, status: "completed", attempts: 5, lastError: null, createdAt: now, updatedAt: now },
+        // Right status but below threshold — excluded.
+        { id: 2, jobKind: "x", payload: null, status: "failed", attempts: 2, lastError: "x", createdAt: now, updatedAt: now },
+        // Both right — included.
+        { id: 3, jobKind: "x", payload: null, status: "failed", attempts: 6, lastError: "stuck", createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.status = "failed";
+    state.active.attemptsGte = 5;
+
+    const result = await listJobs(
+      { status: "failed", attemptsGte: 5 },
       { getDb: () => db as never },
     );
     expect(result.map((r) => r.id)).toEqual([3]);

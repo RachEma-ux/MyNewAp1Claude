@@ -101,6 +101,7 @@ export const workspaceObservabilityRouter = router({
           createdSince: z.coerce.date().optional(),
           updatedSince: z.coerce.date().optional(),
           lastErrorLike: z.string().min(1).max(200).optional(),
+          attemptsGte: z.number().int().min(0).max(1000).optional(),
         })
         .optional(),
     )
