@@ -242,4 +242,47 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards recentErrorEventsSourceId single-string (#597)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentErrorEventsSourceId: "trace-A" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsSourceId: "trace-A",
+    });
+  });
+
+  it("forwards recentErrorEventsSourceId array form (#597)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({
+      recentErrorEventsSourceId: ["trace-A", "trace-B", "trace-C"],
+    });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsSourceId: ["trace-A", "trace-B", "trace-C"],
+    });
+  });
+
+  it("rejects oversized recentErrorEventsSourceId array (>50) at the input layer (#597)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    const oversized = Array.from({ length: 51 }, (_, i) => `trace-${i}`);
+    await expect(
+      caller.getDashboard({ recentErrorEventsSourceId: oversized }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty recentErrorEventsSourceId at the input layer (#597)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ recentErrorEventsSourceId: "" }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });
