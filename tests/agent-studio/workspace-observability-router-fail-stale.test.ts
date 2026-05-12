@@ -113,4 +113,49 @@ describe("workspaceObservabilityRouter.failStaleRunningBackgroundJobs", () => {
     ).rejects.toThrow();
     expect(failStaleMock).not.toHaveBeenCalled();
   });
+
+  it("forwards single-string jobKind (#548)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const cutoff = new Date("2026-05-12T00:00:00Z");
+    await caller.failStaleRunningBackgroundJobs({
+      olderThan: cutoff,
+      jobKind: "projection.rebuild",
+    });
+    expect(failStaleMock).toHaveBeenCalledWith({
+      olderThan: cutoff,
+      jobKind: "projection.rebuild",
+    });
+  });
+
+  it("forwards array-form jobKind (#548)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const cutoff = new Date("2026-05-12T00:00:00Z");
+    await caller.failStaleRunningBackgroundJobs({
+      olderThan: cutoff,
+      jobKind: ["projection.rebuild", "import.scan"],
+    });
+    expect(failStaleMock).toHaveBeenCalledWith({
+      olderThan: cutoff,
+      jobKind: ["projection.rebuild", "import.scan"],
+    });
+  });
+
+  it("rejects oversized jobKind array at the input layer (#548)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const cutoff = new Date("2026-05-12T00:00:00Z");
+    const oversized = Array.from({ length: 21 }, (_, i) => `kind.${i}`);
+    await expect(
+      caller.failStaleRunningBackgroundJobs({
+        olderThan: cutoff,
+        jobKind: oversized,
+      }),
+    ).rejects.toThrow();
+    expect(failStaleMock).not.toHaveBeenCalled();
+  });
 });
