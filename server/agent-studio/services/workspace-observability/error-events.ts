@@ -98,7 +98,19 @@ export async function recordErrorEvent(
 }
 
 export interface ListErrorEventsInput {
-  readonly sourceKind?: string;
+  /**
+   * Single sourceKind to filter by (exact `eq`), or an array (`IN`
+   * — OR semantics). Operators triaging an incident often want to
+   * look at several related procedures at once — e.g.
+   * `["trpc.chat.send", "trpc.chat.list"]` for the chat slice — and
+   * the array form removes the need for two separate calls + a
+   * client-side merge.
+   *
+   * Empty array short-circuits to `[]` (vacuous IN). Mutually exclusive
+   * with `sourceKindLike` (this takes precedence when both are set —
+   * exact match is narrower).
+   */
+  readonly sourceKind?: string | readonly string[];
   /**
    * SQL LIKE-style prefix match on `sourceKind` (caller supplies the
    * trailing `%`). Useful with the auto-capture middleware (#513) that
@@ -136,9 +148,27 @@ export async function listErrorEvents(
   const db = getDb();
   if (!db) return [];
 
+  // Empty sourceKind array → vacuous IN; short-circuit (matches the
+  // errorClass empty-array contract).
+  if (Array.isArray(input.sourceKind) && input.sourceKind.length === 0) {
+    return [];
+  }
+
   const filters = [];
-  if (input.sourceKind !== undefined) {
-    filters.push(eq(agsWorkspaceErrorEvents.sourceKind, input.sourceKind));
+  const sourceKindInput = input.sourceKind;
+  if (sourceKindInput !== undefined) {
+    if (Array.isArray(sourceKindInput)) {
+      filters.push(
+        inArray(
+          agsWorkspaceErrorEvents.sourceKind,
+          sourceKindInput as string[],
+        ),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.sourceKind, sourceKindInput as string),
+      );
+    }
   } else if (input.sourceKindLike !== undefined) {
     filters.push(like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike));
   }
