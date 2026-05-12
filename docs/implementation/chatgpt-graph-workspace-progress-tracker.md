@@ -5,18 +5,18 @@
 - Updated by: ChatGPT independent progress auditor
 - Repository: `RachEma-ux/MyNewAp1Claude`
 - Branch: `main`
-- Latest commit inspected: `d63510f459e6a5d88572c972fd93c1018270473f` / PR #548 (`feat(workspace-observability): jobKind filter on failStaleRunningJobs`)
+- Latest commit inspected: `d70c6b51e72a80a1873a721f984e655f8eaa46c4` / PR #566 (`feat(workspace-observability): markJobsStarted bulk worker-pool claim`)
 - Working tree status: Not directly observable through GitHub remote inspection. Remote `main` inspected through GitHub file, PR, commit, and patch evidence.
-- Evaluation scope: Fresh audit against `AGENTS.md`, `CLAUDE.md`, `docs/implementation/agent-studio-native-graph-workspace-execution-plan.md`, `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md`, recent PR search, and actual PR #548 code diff.
+- Evaluation scope: Fresh audit against `AGENTS.md`, `CLAUDE.md`, `docs/implementation/agent-studio-native-graph-workspace-execution-plan.md`, `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md`, recent PR search, and actual PR #566 code diff.
 
 ## 2. Current Overall Verdict
-- Status: Execution remains active and broad. Latest verified evidence reaches PR #548. The recent work is still primarily Phase 22 workspace-observability/operator-recovery hardening, not final MVP 4 closure.
+- Status: Execution remains active. Latest verified evidence reaches PR #566. Recent work remains concentrated in Phase 22 workspace-observability/operator and worker-tier recovery hardening, not final MVP 4 closure.
 - Current MVP: MVP 4 in progress.
-- Current phase: Phase 22 observability/operator recovery recently active. Phase 16 closed; Phase 23 correction/quality loop partially implemented; Phase 28 hardening invariants documented.
+- Current phase: Phase 22 observability/operator/worker recovery recently active. Phase 16 closed; Phase 23 correction/quality loop partially implemented; Phase 28 hardening invariants documented.
 - Current gate: G10 remains open. G6 active Neo4j CE backend remains open. G8 remains partially evidenced. G9 is mostly implemented but not fully evidence-closed.
-- Completion estimate: 73–76% by breadth of implementation; approximately 69–71% by closure quality.
+- Completion estimate: 74–77% by breadth of implementation; approximately 70–72% by closure quality.
 - Main blocker: Live Neo4j CE validation / G6, graph benchmark evidence, GraphRAG permission pushdown evidence, golden-question pass evidence, and complete MVP 4 closure evidence.
-- Next required action: Stop expanding support/operator surfaces; update continuation-state through PR #548 and focus on G6, G8, G9 final evidence, and G10 closure.
+- Next required action: Stop expanding Phase 22 support/worker surfaces; update continuation-state through PR #566 and focus on G6, G8, G9 final evidence, and G10 closure.
 
 ## 3. Execution Boundary Check
 Required final boundary:
@@ -30,7 +30,7 @@ Required final boundary:
 - [x] Correction proposal flow tested
 - [ ] Evidence docs written
 
-Verdict: Not closed. Graph Agent Lite exists, correction proposal flow exists, and Phase 22 observability/recovery has advanced through #548. Final closure still lacks live backend validation, GraphRAG permission evidence, benchmark evidence, golden-question pass evidence, and consolidated closure docs.
+Verdict: Not closed. Graph Agent Lite and correction proposal surfaces exist. PR #566 improves worker-tier background-job claiming via `markJobsStarted`, but final closure still lacks live backend validation, GraphRAG permission evidence, benchmark evidence, golden-question pass evidence, and consolidated closure docs.
 
 ## 4. MVP Progress Matrix
 
@@ -39,8 +39,8 @@ Verdict: Not closed. Graph Agent Lite exists, correction proposal flow exists, a
 | MVP 0 | Architecture, reconciliation, ADRs, benchmark gate | Complete / validation caveat | Required ADRs exist; non-build list exists; backend decision ADR exists. | Backend decision remains provisional until live benchmark evidence is captured. |
 | MVP 1 | Workspace foundation | In progress / partially complete | Vault schemas, templates, Markdown import/export, attachments, saved views, and view-kind blueprints are evidenced. | Full editor UI, complete workspace UX, search/command palette, and browser verification not proven. |
 | MVP 2 | Neo4j CE typed graph foundation | In progress / partial | GraphRepository abstraction and GraphRAG router use are evidenced; Postgres/Neo4j split documented. | Real `neo4j-driver` integration, live Neo4j CE health, projection sync runtime, drift detection, permission pushdown, graph view UI. |
-| MVP 3 | Runtime traceability and promotion | In progress / substantial | Promotion/change/correction flows, trace exports, source refs, retention, observability bridges, and operator recovery surfaces exist. | Neo4j trace graph projection and full rollback/governance evidence incomplete. |
-| MVP 4 | GraphRAG and Graph Agent Lite | In progress / substantial | GraphRAG router, Graph Skill Packs, Graph Agent Lite, Why/trace surfaces, observability, correction lifecycle, notification/error capture, bulk retry/cancel/stale-job operator surfaces are present. | Golden questions passing, benchmark evidence, complete G8/G9/G10 closure, and final evidence docs. |
+| MVP 3 | Runtime traceability and promotion | In progress / substantial | Promotion/change/correction flows, trace exports, source refs, retention, observability bridges, operator recovery, worker retry/cancel/start/complete/fail/heartbeat surfaces exist through #566. | Neo4j trace graph projection and full rollback/governance evidence incomplete. |
+| MVP 4 | GraphRAG and Graph Agent Lite | In progress / substantial | GraphRAG router, Graph Skill Packs, Graph Agent Lite, Why/trace surfaces, observability, correction lifecycle, notification/error capture, worker/operator recovery surfaces are present. | Golden questions passing, benchmark evidence, complete G8/G9/G10 closure, and final evidence docs. |
 
 ## 5. Gate Status
 
@@ -135,7 +135,7 @@ Verdict: Not closed. Graph Agent Lite exists, correction proposal flow exists, a
 | `npm test` | Not observed | No direct output. | GitHub remote only. |
 | `npm run test` | Not observed | No direct output. | GitHub remote only. |
 | `npm run build` | Not observed | No direct output. | GitHub remote only. |
-| `pnpm check` | Reported passing in PRs through #548 | PR messages report green. | Not independently executed by ChatGPT. |
+| `pnpm check` | Reported passing in PRs through #566 | PR messages report clean. | Not independently executed by ChatGPT. |
 | graph benchmark command | Not validated | No evidence under `docs/evidence/graph-backend/` found in this audit. | G6/G10 blocker. |
 | golden question suite | Seeded, not proven passing | No pass evidence found. | G10 blocker. |
 
@@ -154,7 +154,7 @@ Verdict: Not closed. Graph Agent Lite exists, correction proposal flow exists, a
 - [x] Preserved OpenRouter boundary
 - [x] Preserved governance boundary
 
-Verdict: Claude has not stopped early. The current risk is continuing support/observability expansion while the closure gates remain open.
+Verdict: Claude has not stopped early. The current risk is continuing Phase 22 support/worker-surface expansion while core closure gates remain open.
 
 ## 11. Missing Required Work
 
@@ -165,17 +165,17 @@ Verdict: Claude has not stopped early. The current risk is continuing support/ob
 | P0 | Golden-question pass evidence | G10 | Run seeded golden questions and capture output. |
 | P0 | Consolidated MVP 4 closure evidence docs | G10 | Create evidence doc tying G6/G8/G9/G10 to files and outputs. |
 | P1 | Neo4j trace graph projection evidence | Phase 14/G10 | Verify projection from runtime trace ledgers to Neo4j CE. |
-| P1 | Update continuation-state after latest #548 work | Execution continuity | Refresh continuation-state so it no longer says MVP 1–4 are not started. |
+| P1 | Update continuation-state after latest #566 work | Execution continuity | Refresh continuation-state so it no longer says MVP 1–4 are not started. |
 | P2 | Browser/UI verification | MVP 1/2 quality | Validate user-facing workspace/graph views after backend closure. |
 
 ## 12. Progress Summary for User
 
-- Current status: Broad implementation is active through PR #548; current best estimate is roughly 71% full implementation.
-- What Claude completed: MVP 0 baseline, GraphRepository skeletons, GraphRAG router, Graph Skill Packs, Graph Agent Lite, trace/Why surfaces, vault import/export/templates/attachments/saved views, correction lifecycle, Phase 22 observability/recovery including fail/retry/cancel/stale-job surfaces.
+- Current status: Broad implementation is active through PR #566; current best estimate is roughly 72% full implementation.
+- What Claude completed: MVP 0 baseline, GraphRepository skeletons, GraphRAG router, Graph Skill Packs, Graph Agent Lite, trace/Why surfaces, vault import/export/templates/attachments/saved views, correction lifecycle, Phase 22 observability/recovery including fail/retry/cancel/stale-job and worker heartbeat/start/complete/fail surfaces.
 - What Claude has not completed: Live Neo4j CE validation, benchmark evidence, full GraphRAG permission proof, golden-question pass evidence, final G10 closure package, and full UI/browser validation.
 - Whether Claude stopped too early: No.
 - Whether the repo is healthy: Partial evidence. PRs report focused tests and `pnpm check` green, but ChatGPT did not run tests or inspect full CI logs locally.
-- What should happen next: Stop adding operator-support surfaces and close G6/G8/G9/G10 with evidence.
+- What should happen next: Stop adding Phase 22 support/worker surfaces and close G6/G8/G9/G10 with evidence.
 
 ## 13. Next Prompt Recommendation
 
@@ -190,7 +190,7 @@ Do not ask questions.
 Do not request approval.
 Do not wait.
 Do not stop at summaries.
-Do not add more support phases, UI panels, analytics, observability bridges, retry/cancel/stale-job surfaces, or documentation-only expansions until the MVP 4 closure gates are evidenced.
+Do not add more support phases, UI panels, analytics, observability bridges, retry/cancel/stale-job surfaces, worker-pool bulk transition helpers, or documentation-only expansions until the MVP 4 closure gates are evidenced.
 
 Read first:
 
@@ -202,7 +202,7 @@ Read first:
 
 Your next task is a closure-evidence sprint:
 
-1. Update `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md` through PR #548.
+1. Update `docs/implementation/agent-studio-native-graph-workspace-continuation-state.md` through PR #566.
 2. Close or explicitly hard-block G6:
    - verify `Neo4jCommunityGraphRepository` live backend wiring,
    - run or document the graph benchmark path,
