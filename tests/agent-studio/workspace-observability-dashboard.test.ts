@@ -421,6 +421,50 @@ describe("getObservabilityDashboard", () => {
     expect(args.userIdIsNull).toBeUndefined();
   });
 
+  it("forwards recentErrorEventsSourceId (single string) to listErrorEvents (#597)", async () => {
+    await getObservabilityDashboard({ recentErrorEventsSourceId: "trace-A" });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceId: "trace-A" }),
+      expect.any(Object),
+    );
+  });
+
+  it("forwards recentErrorEventsSourceId (array form) to listErrorEvents (#597)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsSourceId: ["trace-A", "trace-B"],
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceId: ["trace-A", "trace-B"] }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentErrorEventsSourceId composes with errorClass + recentErrorEventsUserIdIsNull (#597)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsSourceId: "trace-A",
+      errorClass: "BackgroundJobFailed",
+      recentErrorEventsUserIdIsNull: true,
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: undefined,
+        errorMessageLike: undefined,
+        createdSince: undefined,
+        userIdIsNull: true,
+        sourceId: "trace-A",
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("undefined recentErrorEventsSourceId means no sourceId filter is applied (#597)", async () => {
+    await getObservabilityDashboard({});
+    const args = listErrorsMock.mock.calls[0]?.[0] as { sourceId?: unknown };
+    expect(args.sourceId).toBeUndefined();
+  });
+
   it("recentFailedLastErrorLike scopes ONLY the failed slice, not completed (#587)", async () => {
     await getObservabilityDashboard({
       recentFailedLastErrorLike: "%OOM%",

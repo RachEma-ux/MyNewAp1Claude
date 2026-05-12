@@ -196,6 +196,21 @@ export interface ObservabilityDashboardInput {
    * sourceKind / errorMessageLike / createdSince.
    */
   readonly recentErrorEventsUserIdIsNull?: boolean;
+  /**
+   * Optional `sourceId` filter forwarded to listErrorEvents (#596).
+   * Dashboard-side companion to the trace-anchored triage filter.
+   * Operator workflow: alert fires with a trace/request ID → land
+   * on the dashboard → forward this to scope the recent-errors
+   * slice to that one trace.
+   *
+   * Single string → exact `eq`; array → `IN` (OR semantics, up to
+   * 50 entries at the router boundary). NULL sourceIds are never
+   * matched. Composes with all other recent-errors filters
+   * (errorClass, sourceKind, errorMessageLike,
+   * errorEventsCreatedSince, recentErrorEventsUserIdIsNull) —
+   * ANDed in the WHERE clause.
+   */
+  readonly recentErrorEventsSourceId?: string | readonly string[];
 }
 
 export interface ObservabilityDashboardOptions {
@@ -250,6 +265,7 @@ export async function getObservabilityDashboard(
         errorMessageLike: input.errorMessageLike,
         createdSince: input.errorEventsCreatedSince,
         userIdIsNull: input.recentErrorEventsUserIdIsNull,
+        sourceId: input.recentErrorEventsSourceId,
       },
       { getDb: options.getDb },
     ),
