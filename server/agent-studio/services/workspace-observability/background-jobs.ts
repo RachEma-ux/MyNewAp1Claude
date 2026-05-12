@@ -181,6 +181,43 @@ export async function getJobById(
   return rowToJob(rows[0]);
 }
 
+/**
+ * Bulk read sibling of getJobById. Operators clicking a multi-select
+ * action on the dashboard often need the full row payloads for the
+ * selection — one round-trip instead of N. Sister of cancelJobs (#543)
+ * and retryJobs (#542) on the bulk-action side: read-bulk lets the
+ * UI render a "you're about to act on these" confirmation list.
+ *
+ * Empty input short-circuits to [] with no DB call (matches the
+ * empty-array contract used across Phase 22). Returns ROWS, not a
+ * partitioned skip/success pair — id-not-found is signalled by
+ * absence (caller does the diff against the requested ids if needed).
+ */
+export async function getJobsByIds(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow[]> {
+  if (jobIds.length === 0) return [];
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceBackgroundJobs.id,
+      jobKind: agsWorkspaceBackgroundJobs.jobKind,
+      payload: agsWorkspaceBackgroundJobs.payload,
+      status: agsWorkspaceBackgroundJobs.status,
+      attempts: agsWorkspaceBackgroundJobs.attempts,
+      lastError: agsWorkspaceBackgroundJobs.lastError,
+      createdAt: agsWorkspaceBackgroundJobs.createdAt,
+      updatedAt: agsWorkspaceBackgroundJobs.updatedAt,
+    })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(inArray(agsWorkspaceBackgroundJobs.id, jobIds as number[]));
+  return rows.map(rowToJob);
+}
+
 export interface ListJobsInput {
   /**
    * Single status to filter by, or an array of statuses (OR semantics

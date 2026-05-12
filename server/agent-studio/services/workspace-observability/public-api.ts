@@ -12,6 +12,7 @@ export {
   enqueueJob,
   enqueueJobs,
   getJobById,
+  getJobsByIds,
   listJobs,
   listStaleRunningJobs,
   markJobStarted,
