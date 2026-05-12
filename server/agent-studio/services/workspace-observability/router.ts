@@ -815,6 +815,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          notificationsNotificationKindLike: z.string().min(1).max(100).optional(),
           backgroundJobsRetentionDays: z
             .number()
             .int()
