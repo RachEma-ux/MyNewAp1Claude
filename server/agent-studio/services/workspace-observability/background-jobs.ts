@@ -472,6 +472,71 @@ export async function bumpJobHeartbeat(
   return transitionStatus(jobId, {}, options);
 }
 
+export interface BumpJobHeartbeatsResult {
+  /** Rows whose updatedAt was bumped. */
+  readonly bumped: readonly BackgroundJobRow[];
+  /**
+   * Per-id skip reasons: `"not_found"` (no row) or `"not_running"`
+   * (row exists but isn't in 'running' state). The bulk operator
+   * partitions rather than throws so a fan-out controller with one
+   * stale id doesn't lose the heartbeat for its other in-flight
+   * children. Sister of cancelJobs (#543) and retryJobs (#542).
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_running";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+/**
+ * Bulk worker heartbeat. A fan-out controller worker that manages N
+ * parallel children calls this periodically to keep them all alive
+ * in one round-trip — sister of the singular bumpJobHeartbeat (#562).
+ *
+ * Empty input short-circuits with no DB call. ASDB-unavailable
+ * throws (consistent with the bulk-write operators retryJobs/
+ * cancelJobs — fan-out controllers want to fail loudly when the DB
+ * is down rather than silently lose heartbeats).
+ */
+export async function bumpJobHeartbeats(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<BumpJobHeartbeatsResult> {
+  if (jobIds.length === 0) return { bumped: [], skipped: [] };
+
+  // Probe ASDB upfront so a null DB fails the whole batch loudly.
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const bumped: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_running";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const jobId of jobIds) {
+    const current = await getJobById(jobId, options);
+    if (!current) {
+      skipped.push({ jobId, reason: "not_found" });
+      continue;
+    }
+    if (current.status !== "running") {
+      skipped.push({
+        jobId,
+        reason: "not_running",
+        currentStatus: current.status,
+      });
+      continue;
+    }
+    const row = await transitionStatus(jobId, {}, options);
+    bumped.push(row);
+  }
+
+  return { bumped, skipped };
+}
+
 export async function markJobStarted(
   jobId: number,
   options: ServiceOptions = {},
