@@ -19,7 +19,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceBackgroundJobs } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import { recordErrorEvent } from "./error-events.js";
@@ -141,6 +141,20 @@ export interface ListJobsInput {
   readonly status?: JobStatus;
   readonly jobKind?: string;
   readonly limit?: number;
+  /**
+   * Restrict to jobs whose `createdAt` is at-or-after this timestamp.
+   * Use for incident-triage queries like "show me jobs enqueued in
+   * the last hour" without forcing the caller to compute the cutoff
+   * via the worker tier.
+   */
+  readonly createdSince?: Date;
+  /**
+   * Restrict to jobs whose `updatedAt` is at-or-after this timestamp.
+   * `updatedAt` moves on every state transition, so this answers
+   * "what's been touched recently" — useful for spotting stuck-running
+   * jobs or recent failure flips.
+   */
+  readonly updatedSince?: Date;
 }
 
 export async function listJobs(
@@ -157,6 +171,12 @@ export async function listJobs(
   }
   if (input.jobKind !== undefined) {
     filters.push(eq(agsWorkspaceBackgroundJobs.jobKind, input.jobKind));
+  }
+  if (input.createdSince !== undefined) {
+    filters.push(gte(agsWorkspaceBackgroundJobs.createdAt, input.createdSince));
+  }
+  if (input.updatedSince !== undefined) {
+    filters.push(gte(agsWorkspaceBackgroundJobs.updatedAt, input.updatedSince));
   }
 
   const rows = await db
