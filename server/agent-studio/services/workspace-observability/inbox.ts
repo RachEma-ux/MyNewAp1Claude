@@ -27,7 +27,7 @@ export interface InboxCompositePayload {
 export interface InboxCompositeInput {
   readonly userId: number;
   readonly unreadOnly?: boolean;
-  readonly notificationKind?: string;
+  readonly notificationKind?: string | readonly string[];
   readonly limit?: number;
 }
 

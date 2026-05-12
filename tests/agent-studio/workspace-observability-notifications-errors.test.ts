@@ -52,6 +52,7 @@ interface NotifState {
     userId?: number;
     unreadOnly?: boolean;
     kind?: string;
+    kinds?: readonly string[];
     createdSince?: Date;
   };
 }
@@ -98,6 +99,10 @@ function makeNotifFakeDb(initial?: Partial<NotifState>) {
           if (state.active.unreadOnly) rows = rows.filter((r) => !r.read);
           if (state.active.kind !== undefined) {
             rows = rows.filter((r) => r.notificationKind === state.active.kind);
+          }
+          if (state.active.kinds !== undefined) {
+            const set = new Set(state.active.kinds);
+            rows = rows.filter((r) => set.has(r.notificationKind));
           }
           if (state.active.createdSince !== undefined) {
             const cutoff = state.active.createdSince.getTime();
@@ -233,6 +238,40 @@ describe("user-notifications — Phase 22", () => {
     expect(result.insertedCount).toBe(3);
     expect(state.rows.length).toBe(3);
     expect(state.rows.every((r) => r.userId === 7)).toBe(true);
+  });
+
+  it("listNotifications filters by an array of notificationKinds (OR semantics)", async () => {
+    const now = new Date();
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 42, notificationKind: "promotion.approved", payload: null, read: false, createdAt: now },
+        { id: 2, userId: 42, notificationKind: "promotion.rejected", payload: null, read: false, createdAt: now },
+        { id: 3, userId: 42, notificationKind: "maintenance.window", payload: null, read: false, createdAt: now },
+        { id: 4, userId: 42, notificationKind: "broadcast", payload: null, read: false, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 42;
+    state.active.kinds = ["promotion.approved", "promotion.rejected"];
+    const result = await listNotifications(
+      { userId: 42, notificationKind: ["promotion.approved", "promotion.rejected"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("listNotifications returns [] when notificationKind array is empty", async () => {
+    const now = new Date();
+    const { db } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 42, notificationKind: "x", payload: null, read: false, createdAt: now },
+      ],
+    });
+    const result = await listNotifications(
+      { userId: 42, notificationKind: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
   });
 
   it("listNotifications filters by createdSince when supplied", async () => {

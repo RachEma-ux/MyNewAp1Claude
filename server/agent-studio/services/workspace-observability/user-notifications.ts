@@ -149,7 +149,13 @@ export async function pushNotificationToUsers(
 export interface ListNotificationsInput {
   readonly userId: number;
   readonly unreadOnly?: boolean;
-  readonly notificationKind?: string;
+  /**
+   * Single notificationKind to filter by, or an array (OR semantics
+   * via SQL IN). Symmetric with listJobs.status (#539) and
+   * listErrorEvents.errorClass (#540). Empty array short-circuits
+   * to [] (vacuous IN).
+   */
+  readonly notificationKind?: string | readonly string[];
   readonly limit?: number;
   /**
    * Restrict to notifications whose `createdAt` is at-or-after this
@@ -172,10 +178,24 @@ export async function listNotifications(
   if (input.unreadOnly) {
     filters.push(eq(agsWorkspaceUserNotifications.read, false));
   }
-  if (input.notificationKind !== undefined) {
-    filters.push(
-      eq(agsWorkspaceUserNotifications.notificationKind, input.notificationKind),
-    );
+  const kindInput = input.notificationKind;
+  if (kindInput !== undefined) {
+    if (Array.isArray(kindInput)) {
+      if (kindInput.length === 0) return [];
+      filters.push(
+        inArray(
+          agsWorkspaceUserNotifications.notificationKind,
+          kindInput as string[],
+        ),
+      );
+    } else {
+      filters.push(
+        eq(
+          agsWorkspaceUserNotifications.notificationKind,
+          kindInput as string,
+        ),
+      );
+    }
   }
   if (input.createdSince !== undefined) {
     filters.push(
