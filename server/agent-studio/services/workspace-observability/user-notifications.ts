@@ -479,6 +479,63 @@ export async function dismissNotifications(
   return { deletedCount: deleted.length };
 }
 
+export interface DismissAllNotificationsInput {
+  readonly userId: number;
+  /**
+   * If true, only deletes notifications that have already been read.
+   * Default true — the safer default for a "clear my inbox" gesture:
+   * preserves unread rows the user hasn't triaged yet. Pass `false`
+   * to nuke the whole inbox including unread.
+   *
+   * Mirrors the same flag on `pruneOldNotifications.readOnly` (where
+   * the default is `false` because that's a retention sweep, not a
+   * user gesture).
+   */
+  readonly readOnly?: boolean;
+}
+
+export interface DismissAllNotificationsResult {
+  readonly deletedCount: number;
+}
+
+/**
+ * User-initiated "clear my inbox" — symmetric to
+ * `markAllNotificationsRead`. Bulk-delete every notification for
+ * the user (default: only the already-read ones) in a single
+ * DELETE round trip.
+ *
+ * Different from `dismissNotifications` (which takes an explicit id
+ * list — the "delete selected" gesture) and from
+ * `pruneOldNotifications` (which is the operator-controlled
+ * retention sweep, age-based and per-kind).
+ *
+ * userId is enforced in the WHERE clause; cross-user dismissal is
+ * impossible.
+ */
+export async function dismissAllNotifications(
+  input: DismissAllNotificationsInput,
+  options: ServiceOptions = {},
+): Promise<DismissAllNotificationsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const readOnly = input.readOnly ?? true;
+  const whereClause = readOnly
+    ? and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        eq(agsWorkspaceUserNotifications.read, true),
+      )
+    : eq(agsWorkspaceUserNotifications.userId, input.userId);
+
+  const deleted = await db
+    .delete(agsWorkspaceUserNotifications)
+    .where(whereClause)
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { deletedCount: deleted.length };
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldNotificationsInput {

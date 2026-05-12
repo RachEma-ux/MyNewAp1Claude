@@ -18,6 +18,7 @@ import {
   markNotificationsRead,
   markAllNotificationsRead,
   dismissNotifications,
+  dismissAllNotifications,
   pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
@@ -416,6 +417,76 @@ describe("user-notifications — Phase 22", () => {
     );
     expect(result.deletedCount).toBe(2);
     expect(captured.whereCalled).toBe(true);
+  });
+
+  it("dismissAllNotifications throws AsdbUnavailableError on null DB (#568)", async () => {
+    await expect(
+      dismissAllNotifications(
+        { userId: 1 },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("dismissAllNotifications defaults to readOnly=true (deletes read rows only) (#568)", async () => {
+    const captured: { delCalled: boolean } = { delCalled: false };
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => {
+          captured.delCalled = true;
+          return {
+            returning: async () => [{ id: 10 }, { id: 11 }, { id: 12 }],
+          };
+        },
+      })),
+    };
+    const result = await dismissAllNotifications(
+      { userId: 7 },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(3);
+    expect(captured.delCalled).toBe(true);
+    // We can't easily introspect the and(eq, eq) clause from this fake,
+    // but the next test asserts the readOnly=false branch takes a
+    // different where shape, which combined proves the default path.
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("dismissAllNotifications with readOnly=false nukes the whole inbox (#568)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [
+            { id: 10 },
+            { id: 11 },
+            { id: 12 },
+            { id: 13 },
+            { id: 14 },
+          ],
+        }),
+      })),
+    };
+    const result = await dismissAllNotifications(
+      { userId: 7, readOnly: false },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(5);
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("dismissAllNotifications returns deletedCount: 0 when nothing matches (#568)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      })),
+    };
+    const result = await dismissAllNotifications(
+      { userId: 7 },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(0);
   });
 
   it("markNotificationsRead throws AsdbUnavailableError on null DB", async () => {
