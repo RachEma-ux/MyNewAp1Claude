@@ -11,6 +11,10 @@
  *     appears on the trend.
  *   - `recentErrorEvents`: listErrorEvents({limit}) — the latest
  *     captured errors across all routers.
+ *   - `staleRunningJobs`: listStaleRunningJobs(staleLimit) — the
+ *     longest-running rows currently in `status='running'`, surfaced
+ *     so operators can spot stuck workers without sorting the failed
+ *     list.
  *
  * Composition is parallel via Promise.all. Sister of
  * `services/graph-quality/operator-dashboard.ts` but scoped to the
@@ -30,6 +34,7 @@ import {
 } from "./stats.js";
 import {
   listJobs,
+  listStaleRunningJobs,
   type BackgroundJobRow,
 } from "./background-jobs.js";
 import {
@@ -41,6 +46,7 @@ export interface ObservabilityDashboardPayload {
   readonly stats: WorkspaceObservabilityStats;
   readonly recentFailedJobs: readonly BackgroundJobRow[];
   readonly recentErrorEvents: readonly ErrorEventRow[];
+  readonly staleRunningJobs: readonly BackgroundJobRow[];
 }
 
 export interface ObservabilityDashboardInput {
@@ -50,6 +56,11 @@ export interface ObservabilityDashboardInput {
    * without inflating payload for the initial render.
    */
   readonly recentLimit?: number;
+  /**
+   * Cap on `staleRunningJobs`. Default 10 — operators want a short
+   * "what's stuck" list, not a full running-job dump.
+   */
+  readonly staleLimit?: number;
 }
 
 export interface ObservabilityDashboardOptions {
@@ -57,21 +68,25 @@ export interface ObservabilityDashboardOptions {
 }
 
 const DEFAULT_RECENT_LIMIT = 20;
+const DEFAULT_STALE_LIMIT = 10;
 
 export async function getObservabilityDashboard(
   input: ObservabilityDashboardInput = {},
   options: ObservabilityDashboardOptions = {},
 ): Promise<ObservabilityDashboardPayload> {
   const recentLimit = input.recentLimit ?? DEFAULT_RECENT_LIMIT;
+  const staleLimit = input.staleLimit ?? DEFAULT_STALE_LIMIT;
 
-  const [stats, recentFailedJobs, recentErrorEvents] = await Promise.all([
-    getWorkspaceObservabilityStats({ getDb: options.getDb }),
-    listJobs(
-      { status: "failed", limit: recentLimit },
-      { getDb: options.getDb },
-    ),
-    listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
-  ]);
+  const [stats, recentFailedJobs, recentErrorEvents, staleRunningJobs] =
+    await Promise.all([
+      getWorkspaceObservabilityStats({ getDb: options.getDb }),
+      listJobs(
+        { status: "failed", limit: recentLimit },
+        { getDb: options.getDb },
+      ),
+      listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
+      listStaleRunningJobs(staleLimit, { getDb: options.getDb }),
+    ]);
 
-  return { stats, recentFailedJobs, recentErrorEvents };
+  return { stats, recentFailedJobs, recentErrorEvents, staleRunningJobs };
 }

@@ -24,6 +24,7 @@ const PAYLOAD_FIXTURE = {
   stats: { totals: { errorEvents: 0, jobs: 0, notifications: 0 } },
   recentFailedJobs: [],
   recentErrorEvents: [],
+  staleRunningJobs: [],
 };
 
 beforeEach(() => {
@@ -57,6 +58,14 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     expect(dashboardMock).toHaveBeenCalledWith({ recentLimit: 50 });
   });
 
+  it("forwards staleLimit when supplied", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ staleLimit: 5 });
+    expect(dashboardMock).toHaveBeenCalledWith({ staleLimit: 5 });
+  });
+
   it("rejects out-of-range recentLimit at the input layer", async () => {
     const caller = workspaceObservabilityRouter.createCaller({
       user: { id: 1, role: "user" },
@@ -66,6 +75,19 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     await expect(
       caller.getDashboard({ recentLimit: 999 }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects out-of-range staleLimit at the input layer", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ staleLimit: 0 }),
+    ).rejects.toThrow();
+    await expect(
+      caller.getDashboard({ staleLimit: 500 }),
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });

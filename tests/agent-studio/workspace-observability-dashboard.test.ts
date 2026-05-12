@@ -9,11 +9,14 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { statsMock, listJobsMock, listErrorsMock } = vi.hoisted(() => ({
-  statsMock: vi.fn(),
-  listJobsMock: vi.fn(),
-  listErrorsMock: vi.fn(),
-}));
+const { statsMock, listJobsMock, listErrorsMock, listStaleMock } = vi.hoisted(
+  () => ({
+    statsMock: vi.fn(),
+    listJobsMock: vi.fn(),
+    listErrorsMock: vi.fn(),
+    listStaleMock: vi.fn(),
+  }),
+);
 
 vi.mock(
   "../../server/agent-studio/services/workspace-observability/stats.js",
@@ -26,7 +29,11 @@ vi.mock(
   "../../server/agent-studio/services/workspace-observability/background-jobs.js",
   async (orig) => {
     const real = (await orig()) as Record<string, unknown>;
-    return { ...real, listJobs: listJobsMock };
+    return {
+      ...real,
+      listJobs: listJobsMock,
+      listStaleRunningJobs: listStaleMock,
+    };
   },
 );
 vi.mock(
@@ -60,13 +67,15 @@ beforeEach(() => {
   statsMock.mockReset();
   listJobsMock.mockReset();
   listErrorsMock.mockReset();
+  listStaleMock.mockReset();
   statsMock.mockResolvedValue(STATS_FIXTURE);
   listJobsMock.mockResolvedValue([]);
   listErrorsMock.mockResolvedValue([]);
+  listStaleMock.mockResolvedValue([]);
 });
 
 describe("getObservabilityDashboard", () => {
-  it("returns the bundled payload from all three underlying calls", async () => {
+  it("returns the bundled payload from all four underlying calls", async () => {
     statsMock.mockResolvedValueOnce(STATS_FIXTURE);
     listJobsMock.mockResolvedValueOnce([
       { id: 1, jobKind: "k", status: "failed" } as never,
@@ -75,15 +84,19 @@ describe("getObservabilityDashboard", () => {
     listErrorsMock.mockResolvedValueOnce([
       { id: 10, sourceKind: "x.y" } as never,
     ]);
+    listStaleMock.mockResolvedValueOnce([
+      { id: 99, jobKind: "k", status: "running" } as never,
+    ]);
 
     const payload = await getObservabilityDashboard();
 
     expect(payload.stats).toBe(STATS_FIXTURE);
     expect(payload.recentFailedJobs).toHaveLength(2);
     expect(payload.recentErrorEvents).toHaveLength(1);
+    expect(payload.staleRunningJobs).toHaveLength(1);
   });
 
-  it("defaults the recent slices to limit=20 and status='failed'", async () => {
+  it("defaults the recent slices to limit=20 and status='failed', stale to 10", async () => {
     await getObservabilityDashboard();
     expect(listJobsMock).toHaveBeenCalledWith(
       { status: "failed", limit: 20 },
@@ -93,6 +106,7 @@ describe("getObservabilityDashboard", () => {
       { limit: 20 },
       expect.any(Object),
     );
+    expect(listStaleMock).toHaveBeenCalledWith(10, expect.any(Object));
   });
 
   it("respects a custom recentLimit on both recent slices", async () => {
@@ -101,7 +115,12 @@ describe("getObservabilityDashboard", () => {
     expect(listErrorsMock.mock.calls[0][0].limit).toBe(5);
   });
 
-  it("fans the three underlying calls out in parallel (Promise.all)", async () => {
+  it("respects a custom staleLimit on the stale-running slice", async () => {
+    await getObservabilityDashboard({ staleLimit: 3 });
+    expect(listStaleMock).toHaveBeenCalledWith(3, expect.any(Object));
+  });
+
+  it("fans all four underlying calls out in parallel (Promise.all)", async () => {
     const order: string[] = [];
     statsMock.mockImplementationOnce(async () => {
       order.push("stats:start");
@@ -121,6 +140,12 @@ describe("getObservabilityDashboard", () => {
       order.push("errors:end");
       return [];
     });
+    listStaleMock.mockImplementationOnce(async () => {
+      order.push("stale:start");
+      await new Promise((r) => setTimeout(r, 25));
+      order.push("stale:end");
+      return [];
+    });
 
     await getObservabilityDashboard();
 
@@ -128,11 +153,13 @@ describe("getObservabilityDashboard", () => {
       order.indexOf("stats:start"),
       order.indexOf("jobs:start"),
       order.indexOf("errors:start"),
+      order.indexOf("stale:start"),
     ];
     const ends = [
       order.indexOf("stats:end"),
       order.indexOf("jobs:end"),
       order.indexOf("errors:end"),
+      order.indexOf("stale:end"),
     ];
     expect(Math.max(...starts)).toBeLessThan(Math.min(...ends));
   });

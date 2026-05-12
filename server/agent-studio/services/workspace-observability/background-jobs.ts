@@ -168,6 +168,40 @@ export interface ListJobsInput {
   readonly updatedSince?: Date;
 }
 
+/**
+ * "Stale running" oldest-updated-first selector for the operator
+ * dashboard. listJobs orders by `desc(updatedAt)` (most-recently-
+ * touched first), which is the wrong sort for stuck-running
+ * detection — operators want the running rows whose updatedAt is
+ * oldest, since those have been running the longest without a
+ * markJobStarted/markJobCompleted bump.
+ */
+export async function listStaleRunningJobs(
+  limit = 10,
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow[]> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceBackgroundJobs.id,
+      jobKind: agsWorkspaceBackgroundJobs.jobKind,
+      payload: agsWorkspaceBackgroundJobs.payload,
+      status: agsWorkspaceBackgroundJobs.status,
+      attempts: agsWorkspaceBackgroundJobs.attempts,
+      lastError: agsWorkspaceBackgroundJobs.lastError,
+      createdAt: agsWorkspaceBackgroundJobs.createdAt,
+      updatedAt: agsWorkspaceBackgroundJobs.updatedAt,
+    })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(eq(agsWorkspaceBackgroundJobs.status, "running"))
+    .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // ASC = oldest-touched first
+    .limit(limit);
+  return rows.map(rowToJob);
+}
+
 export async function listJobs(
   input: ListJobsInput = {},
   options: ServiceOptions = {},
