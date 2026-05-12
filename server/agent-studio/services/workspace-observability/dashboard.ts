@@ -163,6 +163,16 @@ export interface ObservabilityDashboardInput {
    * Composes with errorClass + sourceKind (ANDed in the WHERE).
    */
   readonly errorMessageLike?: string;
+  /**
+   * Optional time-window cutoff forwarded to listErrorEvents's
+   * `createdSince` filter (#537-era). Lets the dashboard scope
+   * recent-errors to a specific window — e.g.
+   * `new Date(Date.now() - 60*60*1000)` for "errors in the last
+   * hour" — without relying solely on the limit + ORDER BY DESC
+   * approximation. Composes with errorClass / sourceKind /
+   * errorMessageLike (ANDed in the WHERE).
+   */
+  readonly errorEventsCreatedSince?: Date;
 }
 
 export interface ObservabilityDashboardOptions {
@@ -213,6 +223,7 @@ export async function getObservabilityDashboard(
         errorClass: input.errorClass,
         sourceKind: input.sourceKind,
         errorMessageLike: input.errorMessageLike,
+        createdSince: input.errorEventsCreatedSince,
       },
       { getDb: options.getDb },
     ),
