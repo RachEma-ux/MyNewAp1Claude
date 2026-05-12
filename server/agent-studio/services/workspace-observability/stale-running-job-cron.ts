@@ -81,11 +81,33 @@ export interface TickStaleRunningCronResult {
   readonly result?: FailStaleRunningJobsResult;
 }
 
+/**
+ * Module-level state. Mirrors retention-cron.ts (#614) — see its
+ * doc-block for the status-getter rationale. Operators want two
+ * independent signals:
+ *  - `lastRunAt` + `lastResult` — most recent successful sweep
+ *  - `lastError` — most recent failure (cleared on next success)
+ *
+ * `lastRunMinuteKey` is dedup-only and is set on EVERY attempt
+ * (including failures) so a tight re-tick within the minute can't
+ * retry-storm. The split between dedup key (advances on every
+ * attempt) and `lastRunAt` (advances on success only) lets a status
+ * panel detect "the cron is firing but always erroring" — dedup key
+ * is current, `lastRunAt` is stale, `lastError` is set.
+ */
 export interface EnsureState {
   lastRunMinuteKey: string | null;
+  lastRunAt: Date | null;
+  lastResult: FailStaleRunningJobsResult | null;
+  lastError: string | null;
 }
 
-const moduleState: EnsureState = { lastRunMinuteKey: null };
+const moduleState: EnsureState = {
+  lastRunMinuteKey: null,
+  lastRunAt: null,
+  lastResult: null,
+  lastError: null,
+};
 
 function minuteKey(d: Date): string {
   return d.toISOString().slice(0, 16);
@@ -160,6 +182,9 @@ export async function tickStaleRunningCron(
     options.runSweep ?? ((input) => failStaleRunningJobs(input));
   try {
     const result = await sweep({ olderThan, limit });
+    state.lastRunAt = now;
+    state.lastResult = result;
+    state.lastError = null;
     log(
       `[ags-stale-running-cron] swept — scanned=${result.scanned} ` +
         `failed=${result.failed.length} thresholdMs=${thresholdMs}`,
@@ -167,9 +192,31 @@ export async function tickStaleRunningCron(
     return { fired: true, result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    state.lastError = msg;
     warn(`[ags-stale-running-cron] sweep failed: ${msg}`);
     return { fired: false, skippedReason: "swept_error" };
   }
+}
+
+/**
+ * Operator-visible cron status. Same shape as
+ * `getRetentionCronStatus()` (#614) — see retention-cron.ts for the
+ * status-getter rationale.
+ */
+export interface StaleRunningCronStatus {
+  readonly lastRunAt: Date | null;
+  readonly lastResult: FailStaleRunningJobsResult | null;
+  readonly lastError: string | null;
+}
+
+export function getStaleRunningCronStatus(
+  state: EnsureState = moduleState,
+): StaleRunningCronStatus {
+  return {
+    lastRunAt: state.lastRunAt,
+    lastResult: state.lastResult,
+    lastError: state.lastError,
+  };
 }
 
 let started = false;
@@ -215,4 +262,7 @@ export function _resetStaleRunningCronForTests(): void {
   }
   started = false;
   moduleState.lastRunMinuteKey = null;
+  moduleState.lastRunAt = null;
+  moduleState.lastResult = null;
+  moduleState.lastError = null;
 }

@@ -57,7 +57,7 @@ describe("module-level defaults", () => {
 
 describe("tickStaleRunningCron — cron matching", () => {
   it("fires when now matches the default cron (every 10 min — 00:00)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
@@ -68,7 +68,7 @@ describe("tickStaleRunningCron — cron matching", () => {
   });
 
   it("fires when now matches the default cron (every 10 min — 14:30)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:30:00Z"),
       state,
@@ -78,7 +78,7 @@ describe("tickStaleRunningCron — cron matching", () => {
   });
 
   it("skips when minute does not match the default cron (14:05)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:05:00Z"),
       state,
@@ -109,7 +109,7 @@ describe("tickStaleRunningCron — env disable", () => {
 describe("tickStaleRunningCron — cron expression override", () => {
   it("honors AGS_STALE_RUNNING_CRON_EXPR (every 5 minutes)", async () => {
     process.env.AGS_STALE_RUNNING_CRON_EXPR = "*/5 * * * *";
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:05:00Z"),
       state,
@@ -118,7 +118,7 @@ describe("tickStaleRunningCron — cron expression override", () => {
     expect(result.fired).toBe(true);
   });
   it("honors options.cronExpr override", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T07:15:00Z"),
       cronExpr: "15 7 * * *",
@@ -132,7 +132,7 @@ describe("tickStaleRunningCron — cron expression override", () => {
 describe("tickStaleRunningCron — threshold and limit overrides", () => {
   it("computes olderThan = now - default threshold (30 min)", async () => {
     const now = new Date("2026-05-12T14:00:00Z");
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({ now, state, log: () => {} });
     expect(sweepMock).toHaveBeenCalledTimes(1);
     const arg = sweepMock.mock.calls[0][0];
@@ -143,7 +143,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
   it("honors AGS_STALE_RUNNING_THRESHOLD_MS env override", async () => {
     process.env.AGS_STALE_RUNNING_THRESHOLD_MS = "60000"; // 1 minute
     const now = new Date("2026-05-12T14:00:00Z");
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({ now, state, log: () => {} });
     const arg = sweepMock.mock.calls[0][0];
     expect(arg.olderThan.toISOString()).toBe("2026-05-12T13:59:00.000Z");
@@ -151,7 +151,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
 
   it("honors options.thresholdMs override", async () => {
     const now = new Date("2026-05-12T14:00:00Z");
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({
       now,
       state,
@@ -164,7 +164,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
 
   it("honors AGS_STALE_RUNNING_LIMIT env override", async () => {
     process.env.AGS_STALE_RUNNING_LIMIT = "25";
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
@@ -174,7 +174,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
   });
 
   it("honors options.limit override", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
@@ -187,7 +187,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
   it("ignores invalid AGS_STALE_RUNNING_THRESHOLD_MS values and falls back to default", async () => {
     process.env.AGS_STALE_RUNNING_THRESHOLD_MS = "not-a-number";
     const now = new Date("2026-05-12T14:00:00Z");
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickStaleRunningCron({ now, state, log: () => {} });
     const arg = sweepMock.mock.calls[0][0];
     // default 30-min threshold → 13:30:00
@@ -197,7 +197,7 @@ describe("tickStaleRunningCron — threshold and limit overrides", () => {
 
 describe("tickStaleRunningCron — dedup", () => {
   it("dedupes a second fire within the same minute key", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const now = new Date("2026-05-12T14:00:00Z");
     const a = await tickStaleRunningCron({ now, state, log: () => {} });
     const b = await tickStaleRunningCron({ now, state, log: () => {} });
@@ -207,7 +207,7 @@ describe("tickStaleRunningCron — dedup", () => {
   });
 
   it("does NOT dedupe across the next 10-min slot", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const a = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
@@ -228,7 +228,7 @@ describe("tickStaleRunningCron — failure handling", () => {
   it("swallows sweep failures without crashing", async () => {
     sweepMock.mockRejectedValueOnce(new Error("ASDB unreachable"));
     const warn = vi.fn();
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
@@ -242,7 +242,7 @@ describe("tickStaleRunningCron — failure handling", () => {
 
   it("still marks lastRunMinuteKey when sweep throws", async () => {
     sweepMock.mockRejectedValueOnce(new Error("boom"));
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const now = new Date("2026-05-12T14:00:00Z");
     await tickStaleRunningCron({ now, state, warn: () => {} });
     const second = await tickStaleRunningCron({ now, state, warn: () => {} });
@@ -256,7 +256,7 @@ describe("tickStaleRunningCron — runSweep test seam", () => {
     const customSweep = vi
       .fn()
       .mockResolvedValue({ failed: [{} as any, {} as any], scanned: 5 });
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickStaleRunningCron({
       now: new Date("2026-05-12T14:00:00Z"),
       state,
