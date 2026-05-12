@@ -210,6 +210,20 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentErrorEventsUserIdIsNull?: boolean;
   /**
+   * Optional SQL LIKE-style prefix filter forwarded to
+   * listErrorEvents (#514's sourceKindLike). Lets the dashboard
+   * scope the recent-errors slice to a kind prefix — e.g.
+   * `trpc.chat.%` to scope to all chat-related procedures, or
+   * `vault.%` for all vault routers. Sister of `recentJobKindLike`
+   * (#600) on the errors side; closes the dashboard LIKE-by-kind
+   * symmetry pair.
+   *
+   * Mutually exclusive with the exact `sourceKind` filter — exact
+   * match wins when both are set (matches listErrorEvents
+   * precedence convention).
+   */
+  readonly recentErrorEventsSourceKindLike?: string;
+  /**
    * Optional `sourceId` filter forwarded to listErrorEvents (#596).
    * Dashboard-side companion to the trace-anchored triage filter.
    * Operator workflow: alert fires with a trace/request ID → land
@@ -277,6 +291,7 @@ export async function getObservabilityDashboard(
         limit: recentLimit,
         errorClass: input.errorClass,
         sourceKind: input.sourceKind,
+        sourceKindLike: input.recentErrorEventsSourceKindLike,
         errorMessageLike: input.errorMessageLike,
         createdSince: input.errorEventsCreatedSince,
         userIdIsNull: input.recentErrorEventsUserIdIsNull,

@@ -706,6 +706,7 @@ export const workspaceObservabilityRouter = router({
             ])
             .optional(),
           recentJobKindLike: z.string().min(1).max(100).optional(),
+          recentErrorEventsSourceKindLike: z.string().min(1).max(100).optional(),
           recentFailedLastErrorLike: z.string().min(1).max(200).optional(),
           recentJobsUpdatedSince: z.coerce.date().optional(),
           errorClass: z
