@@ -40,6 +40,7 @@ import { listErrorEvents } from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
 import { getWorkspaceObservabilityStats } from "./stats.js";
 import { runRetentionSweep } from "./retention-sweep.js";
+import { getObservabilityDashboard } from "./dashboard.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -290,6 +291,34 @@ export const workspaceObservabilityRouter = router({
       }));
     }
   }),
+
+  // ============================================================
+  // Operator dashboard composite (single round-trip)
+  //
+  // Bundles getStats + recent-failed-jobs + recent-error-events so
+  // the dashboard's initial render is one tRPC call instead of
+  // three. Drilldown views still call the underlying procedures
+  // directly when the operator filters or paginates.
+  // ============================================================
+
+  getDashboard: protectedProcedure
+    .input(
+      z
+        .object({
+          recentLimit: z.number().int().min(1).max(200).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await getObservabilityDashboard(input ?? {});
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
 
   // ============================================================
   // Operator broadcast (admin-only)
