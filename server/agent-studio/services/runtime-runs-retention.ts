@@ -16,9 +16,20 @@
  *    (`completed`, `failed`, `cancelled` — runtime runs can ALSO
  *    finish in `awaiting_approval` permanently if abandoned, but
  *    operators want those preserved for audit)
- *  - Cascade-deletes `agsRuntimeRunSteps` rows for the runs being
- *    deleted in the same transaction shape (issue a DELETE on
- *    steps first, then runs)
+ *  - Cascade-deletes 5 sibling tables that key on `runId`:
+ *      agsRuntimeRunSteps     (per-step trace)
+ *      agsRuntimeToolCalls    (tool dispatch trace)
+ *      agsRuntimeMemoryEvents (memory writes per run)
+ *      agsRuntimePolicyEvents (governance decisions per run)
+ *      agsRuntimeHookExecutions (hook invocations per run)
+ *    Deletion order: children first, then parent (no FK constraint,
+ *    but orphans are visually confusing in the operator UI when a
+ *    sub-table query returns rows for a non-existent run).
+ *
+ *  - **#637 fix:** original #621 only cascaded to agsRuntimeRunSteps.
+ *    Tool calls / memory events / policy events / hook executions
+ *    were silently orphaned on every sweep. Operators querying the
+ *    sub-tables would see rows pointing at deleted runIds.
  *  - Adds `environment` filter — runtime runs are partitioned across
  *    `draft` / `staging` / `production` and operators usually want
  *    distinct retention windows per environment (longer for prod)
@@ -35,6 +46,10 @@ import { getAsDb } from "../db/connection.js";
 import {
   agsRuntimeRuns,
   agsRuntimeRunSteps,
+  agsRuntimeToolCalls,
+  agsRuntimeMemoryEvents,
+  agsRuntimePolicyEvents,
+  agsRuntimeHookExecutions,
 } from "../../../drizzle/tables/agent-studio.js";
 
 export type RuntimeRunStatus =
@@ -52,6 +67,16 @@ const DEFAULT_TERMINAL_STATUSES: readonly RuntimeRunStatus[] = [
   "failed",
   "cancelled",
 ];
+
+/** Zero-counts result used by every short-circuit + fail-soft branch. */
+const ZERO_RESULT: PruneOldRuntimeRunsResult = {
+  deletedRunsCount: 0,
+  deletedStepsCount: 0,
+  deletedToolCallsCount: 0,
+  deletedMemoryEventsCount: 0,
+  deletedPolicyEventsCount: 0,
+  deletedHookExecutionsCount: 0,
+};
 
 export interface PruneOldRuntimeRunsInput {
   /** Cutoff — runs with `createdAt < olderThan` are eligible. */
@@ -96,6 +121,14 @@ export interface PruneOldRuntimeRunsResult {
    * `>= 0`; will be 0 if the matched runs had no steps.
    */
   readonly deletedStepsCount: number;
+  /**
+   * #637 cascade-delete sub-counts. All sibling-table rows whose
+   * `runId` matched one of the deleted runs. Always `>= 0`.
+   */
+  readonly deletedToolCallsCount: number;
+  readonly deletedMemoryEventsCount: number;
+  readonly deletedPolicyEventsCount: number;
+  readonly deletedHookExecutionsCount: number;
 }
 
 export interface PruneOldRuntimeRunsOptions {
@@ -118,18 +151,18 @@ export async function pruneOldRuntimeRuns(
   // Empty-array short-circuits BEFORE the ASDB probe (canonical
   // pattern across workspace-observability + retention-sweep).
   if (Array.isArray(input.agentId) && input.agentId.length === 0) {
-    return { deletedRunsCount: 0, deletedStepsCount: 0 };
+    return ZERO_RESULT;
   }
   if (Array.isArray(input.environment) && input.environment.length === 0) {
-    return { deletedRunsCount: 0, deletedStepsCount: 0 };
+    return ZERO_RESULT;
   }
   if (Array.isArray(input.statuses) && input.statuses.length === 0) {
-    return { deletedRunsCount: 0, deletedStepsCount: 0 };
+    return ZERO_RESULT;
   }
 
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
-  if (!db) return { deletedRunsCount: 0, deletedStepsCount: 0 };
+  if (!db) return ZERO_RESULT;
 
   const statuses = input.statuses ?? DEFAULT_TERMINAL_STATUSES;
   const filters = [
@@ -163,16 +196,43 @@ export async function pruneOldRuntimeRuns(
     .where(and(...filters));
 
   if (candidates.length === 0) {
-    return { deletedRunsCount: 0, deletedStepsCount: 0 };
+    return ZERO_RESULT;
   }
 
   const runIds = candidates.map((r) => Number(r.id));
 
-  // Cascade-delete steps first so we don't leave orphans.
-  const deletedSteps = await db
-    .delete(agsRuntimeRunSteps)
-    .where(inArray(agsRuntimeRunSteps.runId, runIds))
-    .returning({ id: agsRuntimeRunSteps.id });
+  // Cascade-delete children first so we don't leave orphans.
+  // Five sibling tables key on runId (#637 fixed the original
+  // #621 oversight that only cascaded to steps). Issue them in
+  // parallel via Promise.all since they're independent of each other.
+  const [
+    deletedSteps,
+    deletedToolCalls,
+    deletedMemoryEvents,
+    deletedPolicyEvents,
+    deletedHookExecutions,
+  ] = await Promise.all([
+    db
+      .delete(agsRuntimeRunSteps)
+      .where(inArray(agsRuntimeRunSteps.runId, runIds))
+      .returning({ id: agsRuntimeRunSteps.id }),
+    db
+      .delete(agsRuntimeToolCalls)
+      .where(inArray(agsRuntimeToolCalls.runId, runIds))
+      .returning({ id: agsRuntimeToolCalls.id }),
+    db
+      .delete(agsRuntimeMemoryEvents)
+      .where(inArray(agsRuntimeMemoryEvents.runId, runIds))
+      .returning({ id: agsRuntimeMemoryEvents.id }),
+    db
+      .delete(agsRuntimePolicyEvents)
+      .where(inArray(agsRuntimePolicyEvents.runId, runIds))
+      .returning({ id: agsRuntimePolicyEvents.id }),
+    db
+      .delete(agsRuntimeHookExecutions)
+      .where(inArray(agsRuntimeHookExecutions.runId, runIds))
+      .returning({ id: agsRuntimeHookExecutions.id }),
+  ]);
 
   const deletedRuns = await db
     .delete(agsRuntimeRuns)
@@ -182,5 +242,9 @@ export async function pruneOldRuntimeRuns(
   return {
     deletedRunsCount: deletedRuns.length,
     deletedStepsCount: deletedSteps.length,
+    deletedToolCallsCount: deletedToolCalls.length,
+    deletedMemoryEventsCount: deletedMemoryEvents.length,
+    deletedPolicyEventsCount: deletedPolicyEvents.length,
+    deletedHookExecutionsCount: deletedHookExecutions.length,
   };
 }
