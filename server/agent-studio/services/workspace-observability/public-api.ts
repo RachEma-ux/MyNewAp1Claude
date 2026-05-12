@@ -20,6 +20,7 @@ export {
   retryJob,
   retryJobs,
   cancelJobs,
+  failStaleRunningJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError as BackgroundJobsAsdbUnavailableError,
   JobNotFoundError,
@@ -33,6 +34,8 @@ export type {
   JobStatus,
   RetryJobsResult,
   CancelJobsResult,
+  FailStaleRunningJobsInput,
+  FailStaleRunningJobsResult,
   PruneOldBackgroundJobsInput,
   PruneOldBackgroundJobsResult,
 } from "./background-jobs.js";
