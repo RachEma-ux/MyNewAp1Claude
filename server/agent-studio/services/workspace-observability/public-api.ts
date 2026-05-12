@@ -55,6 +55,7 @@ export type {
 export {
   captureUnexpectedTrpcError,
   classifyTrpcErrorForCapture,
+  extractTrpcErrorMetadata,
   EXPECTED_TRPC_CODES,
 } from "./trpc-error-capture.js";
 export type {

@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import {
   classifyTrpcErrorForCapture,
   captureUnexpectedTrpcError,
+  extractTrpcErrorMetadata,
   EXPECTED_TRPC_CODES,
 } from "../../server/agent-studio/services/workspace-observability/trpc-error-capture";
 
@@ -152,5 +153,83 @@ describe("captureUnexpectedTrpcError", () => {
       { recordErrorEvent: recorderSpy as never },
     );
     expect(recorderSpy.mock.calls[0][0].errorClass).toBe("WeirdError");
+  });
+});
+
+describe("extractTrpcErrorMetadata", () => {
+  it("returns {} for non-TRPCError values", () => {
+    expect(extractTrpcErrorMetadata(new Error("plain"))).toEqual({});
+    expect(extractTrpcErrorMetadata("string")).toEqual({});
+    expect(extractTrpcErrorMetadata(null)).toEqual({});
+    expect(extractTrpcErrorMetadata({ not: "an error" })).toEqual({});
+  });
+
+  it("includes trpcCode from TRPCError", () => {
+    const err = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "boom" });
+    const meta = extractTrpcErrorMetadata(err);
+    expect(meta.trpcCode).toBe("INTERNAL_SERVER_ERROR");
+  });
+
+  it("includes cause when set with an Error", () => {
+    const cause = new Error("underlying db crash");
+    const err = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "wrap", cause });
+    const meta = extractTrpcErrorMetadata(err);
+    expect(meta.cause).toEqual({ name: "Error", message: "underlying db crash" });
+  });
+
+  it("does not include cause field when err.cause is unset", () => {
+    const err = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "boom" });
+    const meta = extractTrpcErrorMetadata(err);
+    expect("cause" in meta).toBe(false);
+  });
+
+  it("includes data field when defensively attached to the err", () => {
+    const err = new TRPCError({ code: "BAD_REQUEST", message: "validation" });
+    (err as unknown as { data: unknown }).data = { zodIssues: [{ path: ["x"] }] };
+    const meta = extractTrpcErrorMetadata(err);
+    expect(meta.data).toEqual({ zodIssues: [{ path: ["x"] }] });
+  });
+});
+
+describe("captureUnexpectedTrpcError — metadata merge with extractTrpcErrorMetadata", () => {
+  it("merges TRPCError metadata into the recorded event metadata", async () => {
+    const recorderSpy = vi.fn(async () => ({ id: 1 }));
+    const cause = new Error("db down");
+    const err = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "wrap", cause });
+    await captureUnexpectedTrpcError(
+      "vault.router",
+      err,
+      { metadata: { extra: "context" } },
+      { recordErrorEvent: recorderSpy as never },
+    );
+    const recorded = (recorderSpy.mock.calls[0][0] as { metadata: Record<string, unknown> }).metadata;
+    expect(recorded.trpcCode).toBe("INTERNAL_SERVER_ERROR");
+    expect(recorded.cause).toEqual({ name: "Error", message: "db down" });
+    expect(recorded.extra).toBe("context");
+  });
+
+  it("caller-supplied metadata wins on key collision (per-router context preserved)", async () => {
+    const recorderSpy = vi.fn(async () => ({ id: 1 }));
+    const err = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "wrap" });
+    await captureUnexpectedTrpcError(
+      "vault.router",
+      err,
+      { metadata: { trpcCode: "OVERRIDDEN_BY_CALLER" } },
+      { recordErrorEvent: recorderSpy as never },
+    );
+    const recorded = (recorderSpy.mock.calls[0][0] as { metadata: Record<string, unknown> }).metadata;
+    expect(recorded.trpcCode).toBe("OVERRIDDEN_BY_CALLER");
+  });
+
+  it("records null metadata when neither caller nor extractor produced anything", async () => {
+    const recorderSpy = vi.fn(async () => ({ id: 1 }));
+    await captureUnexpectedTrpcError(
+      "service.x",
+      new Error("plain"),
+      {},
+      { recordErrorEvent: recorderSpy as never },
+    );
+    const call = recorderSpy.mock.calls[0][0] as { metadata: unknown };
+    expect(call.metadata).toBeNull();
   });
 });

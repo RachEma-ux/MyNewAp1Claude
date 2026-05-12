@@ -108,6 +108,38 @@ export interface CaptureOptions {
  * Fail-soft — this function never throws. The caller is already in
  * an error path; double-throwing would mask the original error.
  */
+/**
+ * Pulls richer fields out of a TRPCError into the recorded metadata.
+ * `data` (the formatter-derived shape with appBlocker, zod issues, etc.)
+ * + `cause` (the underlying Error, when present) — both let the
+ * dashboard surface root-cause context that the bare message strips.
+ *
+ * Non-TRPCError values fall through with no extra fields. Exported for
+ * direct unit-testing.
+ */
+export function extractTrpcErrorMetadata(err: unknown): Record<string, unknown> {
+  if (!(err instanceof TRPCError)) return {};
+  const out: Record<string, unknown> = {};
+  // .code is already in errorClass, but echoing it in metadata makes the
+  // raw event row queryable without parsing the class string.
+  out.trpcCode = err.code;
+  if (err.cause !== undefined && err.cause !== null) {
+    out.cause = {
+      name: err.cause instanceof Error ? err.cause.name : "unknown",
+      message:
+        err.cause instanceof Error ? err.cause.message : String(err.cause),
+    };
+  }
+  // TRPCError has no public `data` field, but the formatter derives one
+  // at the wire boundary. Some callers attach extra context via
+  // `(err as any).data` before throw; capture that defensively.
+  const dataAny = (err as unknown as { data?: unknown }).data;
+  if (dataAny !== undefined && dataAny !== null) {
+    out.data = dataAny;
+  }
+  return out;
+}
+
 export async function captureUnexpectedTrpcError(
   sourceKind: string,
   err: unknown,
@@ -119,6 +151,15 @@ export async function captureUnexpectedTrpcError(
 
   const recorder = options.recordErrorEvent ?? recordErrorEvent;
 
+  // Merge caller-supplied metadata with rich TRPCError extraction. The
+  // caller-supplied metadata wins on key collision so per-router context
+  // (sourceId, scanKind, etc.) isn't overwritten by the generic extractor.
+  const richMetadata = extractTrpcErrorMetadata(err);
+  const mergedMetadata: Record<string, unknown> | null =
+    Object.keys(richMetadata).length === 0 && !ctx.metadata
+      ? null
+      : { ...richMetadata, ...(ctx.metadata ?? {}) };
+
   try {
     const event = await recorder({
       sourceKind,
@@ -126,7 +167,7 @@ export async function captureUnexpectedTrpcError(
       userId: ctx.userId ?? null,
       errorClass: decision.errorClass,
       errorMessage: decision.errorMessage,
-      metadata: ctx.metadata ?? null,
+      metadata: mergedMetadata,
     });
     return event ? event.id : null;
   } catch {
