@@ -269,6 +269,17 @@ export interface ListJobsInput {
    * never match (SQL LIKE on NULL returns NULL).
    */
   readonly lastErrorLike?: string;
+  /**
+   * Minimum attempts count: only return rows where `attempts >=
+   * this`. Operator gesture for stuck-retry triage — "show me
+   * jobs that have been retried more than 3 times" finds rows
+   * that aren't healing on their own and probably need manual
+   * intervention. A job with 5+ attempts and status='failed' is a
+   * different incident from a fresh failure: the retry storm
+   * itself is the signal. Composes with the other filters
+   * (ANDed). Default behavior (omitted) is unconstrained.
+   */
+  readonly attemptsGte?: number;
 }
 
 export interface ListStaleRunningJobsInput {
@@ -501,6 +512,9 @@ export async function listJobs(
     filters.push(
       like(agsWorkspaceBackgroundJobs.lastError, input.lastErrorLike),
     );
+  }
+  if (input.attemptsGte !== undefined) {
+    filters.push(gte(agsWorkspaceBackgroundJobs.attempts, input.attemptsGte));
   }
 
   const rows = await db
