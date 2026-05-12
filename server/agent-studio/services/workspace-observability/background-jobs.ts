@@ -1216,6 +1216,95 @@ export async function retryJobs(
   return { retried, skipped };
 }
 
+export interface RetryJobsByQueryInput {
+  /**
+   * Restrict the sweep to jobs of this jobKind. Single string `eq`,
+   * array `IN`. Empty array short-circuits to `{retried: [],
+   * scanned: 0}` with no DB call. Matches the empty-array contract
+   * established by failStaleRunningJobs (#548).
+   */
+  readonly jobKind?: string | readonly string[];
+  /**
+   * Cap on rows the SELECT returns. Defaults to 100 so an operator's
+   * "retry all" click after a major outage doesn't fan out
+   * unboundedly. Sweep callers can raise this.
+   */
+  readonly limit?: number;
+  /**
+   * Optional age floor: only retry rows whose `updatedAt` is
+   * strictly older than this. Lets operators say "retry failures
+   * from before the worker hotfix landed" without re-retrying rows
+   * that failed after the fix (which probably have a real bug).
+   */
+  readonly olderThan?: Date;
+}
+
+export interface RetryJobsByQueryResult {
+  /** Rows successfully flipped failed→pending. */
+  readonly retried: readonly BackgroundJobRow[];
+  /**
+   * Pre-flip SELECT size. `retried.length` may be smaller if rows
+   * raced through the partition's `not_retryable` skip (e.g.
+   * another operator already retried them, or the worker picked
+   * them up between SELECT and flip).
+   */
+  readonly scanned: number;
+}
+
+/**
+ * Operator-triggered bulk retry by query — sister of
+ * `failStaleRunningJobs` (#546) on the opposite-direction transition
+ * (failed→pending vs running→failed). The "retry all failed of
+ * jobKind X after worker hotfix" gesture, single round-trip from
+ * cron/operator instead of N retryJob calls.
+ *
+ * Delegates the per-row flip to `retryJobs` (#542), inheriting its
+ * partition pattern; the wrapper only adds the SELECT-by-query +
+ * limit + scanned-count contract that matches failStaleRunningJobs.
+ */
+export async function retryJobsByQuery(
+  input: RetryJobsByQueryInput = {},
+  options: ServiceOptions = {},
+): Promise<RetryJobsByQueryResult> {
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return { retried: [], scanned: 0 };
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const limit = input.limit ?? 100;
+
+  const filters = [eq(agsWorkspaceBackgroundJobs.status, "failed")];
+  if (input.olderThan !== undefined) {
+    filters.push(lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan));
+  }
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput));
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
+
+  const candidates = await db
+    .select({ id: agsWorkspaceBackgroundJobs.id })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // oldest-failed first
+    .limit(limit);
+
+  const bulkResult = await retryJobs(
+    candidates.map(({ id }) => id),
+    options,
+  );
+  return { retried: [...bulkResult.retried], scanned: candidates.length };
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldBackgroundJobsInput {

@@ -25,6 +25,7 @@ import {
   bumpJobHeartbeats,
   retryJob,
   retryJobs,
+  retryJobsByQuery,
   cancelJobs,
   failStaleRunningJobs,
   pruneOldBackgroundJobs,
@@ -2628,5 +2629,143 @@ describe("listOldestPendingJobs — Phase 22 #569 dashboard helper", () => {
     const { db } = makePendingFakeDb(rows);
     const result = await listOldestPendingJobs({}, { getDb: () => db as never });
     expect(result).toHaveLength(10);
+  });
+});
+
+describe("retryJobsByQuery — Phase 22 #573 operator bulk retry sweep", () => {
+  it("throws AsdbUnavailableError when ASDB is unavailable", async () => {
+    await expect(
+      retryJobsByQuery({}, { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("short-circuits empty jobKind array BEFORE the ASDB probe", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await retryJobsByQuery({ jobKind: [] }, { getDb });
+    expect(result.scanned).toBe(0);
+    expect(result.retried).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("returns scanned=0 / retried=[] when no failed rows match", async () => {
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({ limit: async () => [] }),
+        };
+        return chain;
+      },
+    };
+    const result = await retryJobsByQuery(
+      {},
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.retried).toEqual([]);
+  });
+
+  it("delegates to retryJobs and reports both scanned + retried (#573)", async () => {
+    const now = new Date();
+    const rows: FakeRow[] = [
+      {
+        id: 10,
+        jobKind: "k",
+        payload: null,
+        status: "failed",
+        attempts: 1,
+        lastError: "old",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 11,
+        jobKind: "k",
+        payload: null,
+        status: "failed",
+        attempts: 1,
+        lastError: "old",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    // Outer orderBy().limit() returns ids 10 and 11.
+    // Each id then runs: getJobById SELECT N → UPDATE N → refetch SELECT N.
+    let firstOrderBy = true;
+    const selectQueue: number[] = [10, 10, 11, 11];
+    let lastSelectedId: number | undefined;
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async () => {
+              if (firstOrderBy) {
+                firstOrderBy = false;
+                return rows.map(({ id }) => ({ id }));
+              }
+              return [];
+            },
+          }),
+          limit: async () => {
+            const id = selectQueue.shift();
+            lastSelectedId = id;
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const target = rows.find((r) => r.id === lastSelectedId);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("lastError" in vals) {
+              target.lastError =
+                vals.lastError == null ? null : String(vals.lastError);
+            }
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+    };
+
+    const result = await retryJobsByQuery(
+      { jobKind: "k" },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(2);
+    expect(result.retried).toHaveLength(2);
+    expect(result.retried.every((r) => r.status === "pending")).toBe(true);
+    expect(result.retried.every((r) => r.lastError === null)).toBe(true);
+  });
+
+  it("accepts olderThan + array-form jobKind without throwing (#573)", async () => {
+    // Filter-plumbing smoke test — the fake doesn't introspect filter
+    // shape, just verifies the function accepts the union types.
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({ limit: async () => [] }),
+        };
+        return chain;
+      },
+    };
+    const result = await retryJobsByQuery(
+      {
+        jobKind: ["a", "b"],
+        olderThan: new Date("2026-05-01T00:00:00Z"),
+        limit: 25,
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.retried).toEqual([]);
   });
 });
