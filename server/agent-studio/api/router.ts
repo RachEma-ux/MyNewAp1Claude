@@ -2338,6 +2338,55 @@ const marketplaceRouter = router({
     }),
 });
 
+// ── Catalog sync log retention (Phase 22 follow-up #633 + #634 + #635) ──
+
+const catalogSyncLogRouter = router({
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          eventTypes: z
+            .array(
+              z.enum([
+                "aiTypes.catalog.registered",
+                "aiTypes.catalog.published",
+                "aiTypes.catalog.deprecated",
+              ]),
+            )
+            .max(3)
+            .optional(),
+          sourceModule: z
+            .union([
+              z.string().min(1).max(64),
+              z.array(z.string().min(1).max(64)).max(10),
+            ])
+            .optional(),
+          catalogEntryId: z.number().int().positive().optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldCatalogSyncLog } = await import(
+        "../services/catalog-sync-log-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldCatalogSyncLog({
+        olderThan,
+        eventTypes: input?.eventTypes,
+        sourceModule: input?.sourceModule,
+        catalogEntryId: input?.catalogEntryId,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getCatalogSyncLogRetentionCronStatus } = await import(
+      "../services/catalog-sync-log-retention-cron"
+    );
+    return getCatalogSyncLogRetentionCronStatus();
+  }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -2411,4 +2460,11 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
   // findings + finding→proposal conversion surface for operator UI.
   graphQuality: graphQualityRouter,
+  // Phase 22 follow-up #635: catalog-sync-log retention admin surface
+  // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
+  // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
+  // (#631). Lives on its own sub-router because catalog-sync-log is a
+  // distinct domain (aiTypes lifecycle events recorded by AS subscriber)
+  // — not a runs/MCP concern.
+  catalogSyncLog: catalogSyncLogRouter,
 });
