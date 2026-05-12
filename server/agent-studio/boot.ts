@@ -334,6 +334,23 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.13: Phase 22 follow-up #650 — simulation-runs retention cron.
+  // The ags_simulation_runs + ags_simulation_run_steps tables had no
+  // retention before #649 + #650. Default daily 10:00 UTC sweep — 8th
+  // slot in the daily-sweep ladder. Cascades steps before parent runs.
+  // Env-flag-gated via AGS_SIMULATION_RUNS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureSimulationRunsRetentionCronStarted } = await import(
+      "./services/simulation-runs-retention-cron"
+    );
+    ensureSimulationRunsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-simulation-runs-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
