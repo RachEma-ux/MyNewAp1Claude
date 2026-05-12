@@ -84,12 +84,19 @@ beforeEach(() => {
 });
 
 describe("getObservabilityDashboard", () => {
-  it("returns the bundled payload from all five underlying calls", async () => {
+  it("returns the bundled payload from all six underlying calls", async () => {
     statsMock.mockResolvedValueOnce(STATS_FIXTURE);
-    listJobsMock.mockResolvedValueOnce([
-      { id: 1, jobKind: "k", status: "failed" } as never,
-      { id: 2, jobKind: "k", status: "failed" } as never,
-    ]);
+    // listJobsMock queues two calls in order: status=failed, then status=completed.
+    listJobsMock
+      .mockResolvedValueOnce([
+        { id: 1, jobKind: "k", status: "failed" } as never,
+        { id: 2, jobKind: "k", status: "failed" } as never,
+      ])
+      .mockResolvedValueOnce([
+        { id: 50, jobKind: "k", status: "completed" } as never,
+        { id: 51, jobKind: "k", status: "completed" } as never,
+        { id: 52, jobKind: "k", status: "completed" } as never,
+      ]);
     listErrorsMock.mockResolvedValueOnce([
       { id: 10, sourceKind: "x.y" } as never,
     ]);
@@ -105,15 +112,20 @@ describe("getObservabilityDashboard", () => {
 
     expect(payload.stats).toBe(STATS_FIXTURE);
     expect(payload.recentFailedJobs).toHaveLength(2);
+    expect(payload.recentCompletedJobs).toHaveLength(3);
     expect(payload.recentErrorEvents).toHaveLength(1);
     expect(payload.staleRunningJobs).toHaveLength(1);
     expect(payload.oldestPendingJobs).toHaveLength(2);
   });
 
-  it("defaults the recent slices to limit=20 and status='failed', stale to 10, pending to 10", async () => {
+  it("defaults the recent slices to limit=20 and queries both 'failed' AND 'completed', stale to 10, pending to 10", async () => {
     await getObservabilityDashboard();
     expect(listJobsMock).toHaveBeenCalledWith(
       { status: "failed", limit: 20 },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "completed", limit: 20 },
       expect.any(Object),
     );
     expect(listErrorsMock).toHaveBeenCalledWith(
@@ -126,6 +138,18 @@ describe("getObservabilityDashboard", () => {
     );
     expect(listPendingMock).toHaveBeenCalledWith(
       { limit: 10, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
+  it("recentLimit applies to BOTH failed AND completed slices (#577)", async () => {
+    await getObservabilityDashboard({ recentLimit: 7 });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "failed", limit: 7 },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "completed", limit: 7 },
       expect.any(Object),
     );
   });
@@ -180,7 +204,7 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
-  it("fans all five underlying calls out in parallel (Promise.all)", async () => {
+  it("fans all six underlying calls out in parallel (Promise.all)", async () => {
     const order: string[] = [];
     statsMock.mockImplementationOnce(async () => {
       order.push("stats:start");
@@ -188,12 +212,20 @@ describe("getObservabilityDashboard", () => {
       order.push("stats:end");
       return STATS_FIXTURE;
     });
-    listJobsMock.mockImplementationOnce(async () => {
-      order.push("jobs:start");
-      await new Promise((r) => setTimeout(r, 25));
-      order.push("jobs:end");
-      return [];
-    });
+    // Two listJobs calls in Promise.all (failed + completed).
+    listJobsMock
+      .mockImplementationOnce(async () => {
+        order.push("jobs-failed:start");
+        await new Promise((r) => setTimeout(r, 25));
+        order.push("jobs-failed:end");
+        return [];
+      })
+      .mockImplementationOnce(async () => {
+        order.push("jobs-completed:start");
+        await new Promise((r) => setTimeout(r, 25));
+        order.push("jobs-completed:end");
+        return [];
+      });
     listErrorsMock.mockImplementationOnce(async () => {
       order.push("errors:start");
       await new Promise((r) => setTimeout(r, 25));
@@ -217,14 +249,16 @@ describe("getObservabilityDashboard", () => {
 
     const starts = [
       order.indexOf("stats:start"),
-      order.indexOf("jobs:start"),
+      order.indexOf("jobs-failed:start"),
+      order.indexOf("jobs-completed:start"),
       order.indexOf("errors:start"),
       order.indexOf("stale:start"),
       order.indexOf("pending:start"),
     ];
     const ends = [
       order.indexOf("stats:end"),
-      order.indexOf("jobs:end"),
+      order.indexOf("jobs-failed:end"),
+      order.indexOf("jobs-completed:end"),
       order.indexOf("errors:end"),
       order.indexOf("stale:end"),
       order.indexOf("pending:end"),
