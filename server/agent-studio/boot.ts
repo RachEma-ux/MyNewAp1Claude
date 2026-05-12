@@ -247,6 +247,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.8: Phase 22 follow-up #626 — tool-call-traces retention cron.
+  // The ags_tool_call_traces table had no retention path before
+  // #625 + #626. Default daily 05:00 UTC sweep (offset 1h from runtime-
+  // runs sweep, 2h from workspace-observability sweep) with 30-day
+  // window. Default dispatchResults=["ok"] preserves error+blocked
+  // rows. Env-flag-gated via AGS_TOOL_CALL_TRACES_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureToolCallTracesRetentionCronStarted } = await import(
+      "./services/tool-call-traces-retention-cron"
+    );
+    ensureToolCallTracesRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-tool-call-traces-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
