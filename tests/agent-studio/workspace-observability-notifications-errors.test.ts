@@ -64,6 +64,7 @@ interface ErrState {
     sourceKind?: string;
     sourceKindLike?: string;
     errorClass?: string;
+    errorClasses?: readonly string[];
     userId?: number;
     createdSince?: Date;
   };
@@ -467,6 +468,10 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
           if (state.active.errorClass !== undefined) {
             rows = rows.filter((r) => r.errorClass === state.active.errorClass);
           }
+          if (state.active.errorClasses !== undefined) {
+            const set = new Set(state.active.errorClasses);
+            rows = rows.filter((r) => set.has(r.errorClass));
+          }
           if (state.active.createdSince !== undefined) {
             const cutoff = state.active.createdSince.getTime();
             rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
@@ -698,6 +703,42 @@ describe("listErrorEvents — createdSince date-window filter (Phase 22 #537)", 
     );
     expect(result.length).toBe(1);
     expect(result[0].id).toBe(2);
+  });
+});
+
+describe("listErrorEvents — errorClass array filter (Phase 22 #540)", () => {
+  it("filters by an array of errorClasses (OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "TRPCError:UNAUTHORIZED", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: null, errorClass: "TRPCError:FORBIDDEN", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "x", sourceId: null, userId: null, errorClass: "ZodError", errorMessage: "c", metadata: null, createdAt: now },
+        { id: 4, sourceKind: "x", sourceId: null, userId: null, errorClass: "BackgroundJobFailed", errorMessage: "d", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.errorClasses = ["TRPCError:UNAUTHORIZED", "TRPCError:FORBIDDEN"];
+
+    const result = await listErrorEvents(
+      { errorClass: ["TRPCError:UNAUTHORIZED", "TRPCError:FORBIDDEN"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("returns [] when errorClass array is empty (vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "x", metadata: null, createdAt: now },
+      ],
+    });
+    const result = await listErrorEvents(
+      { errorClass: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
   });
 });
 
