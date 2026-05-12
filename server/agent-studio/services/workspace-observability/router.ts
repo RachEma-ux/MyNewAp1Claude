@@ -26,6 +26,7 @@ import {
   markJobCancelled,
   retryJob,
   retryJobs,
+  cancelJobs,
   JobNotFoundError,
   JobNotRetryableError,
 } from "./background-jobs.js";
@@ -116,6 +117,26 @@ export const workspaceObservabilityRouter = router({
         if (e instanceof JobNotFoundError) {
           throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  cancelBackgroundJobs: protectedProcedure
+    .input(
+      z.object({
+        jobIds: z.array(z.number().int().positive()).min(0).max(200),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await cancelJobs(input.jobIds);
+      } catch (e) {
+        // cancelJobs partitions JobNotFoundError + non-cancellable
+        // status into the `skipped` array, so anything thrown here
+        // is a hard infrastructure failure (e.g. ASDB unavailable).
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),

@@ -18,10 +18,12 @@ export {
   markJobCancelled,
   retryJob,
   retryJobs,
+  cancelJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError as BackgroundJobsAsdbUnavailableError,
   JobNotFoundError,
   JobNotRetryableError,
+  JobNotCancellableError,
 } from "./background-jobs.js";
 export type {
   EnqueueJobInput,
@@ -29,6 +31,7 @@ export type {
   BackgroundJobRow,
   JobStatus,
   RetryJobsResult,
+  CancelJobsResult,
   PruneOldBackgroundJobsInput,
   PruneOldBackgroundJobsResult,
 } from "./background-jobs.js";

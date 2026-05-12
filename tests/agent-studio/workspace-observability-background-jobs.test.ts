@@ -16,6 +16,7 @@ import {
   markJobCancelled,
   retryJob,
   retryJobs,
+  cancelJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError,
   JobNotFoundError,
@@ -801,6 +802,94 @@ describe("retryJobs — Phase 22 #542 bulk operator retry", () => {
   it("propagates AsdbUnavailableError on null DB (loud failure on infra)", async () => {
     await expect(
       retryJobs([1, 2], { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+});
+
+describe("cancelJobs — Phase 22 #543 bulk operator cancel", () => {
+  // Same queue-driven fake pattern as retryJobs (#542 invariants).
+  function makeQueuedDb(selectQueue: ReadonlyArray<FakeRow[] | []>) {
+    const queue = [...selectQueue];
+    const updates: Array<Record<string, unknown>> = [];
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => ({
+            limit: async () => queue.shift() ?? [],
+          }),
+        };
+        return chain;
+      }),
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            updates.push(vals);
+          },
+        }),
+      })),
+    };
+    return { db, updates, remaining: () => queue.length };
+  }
+
+  it("cancels pending/running rows + skips terminal rows + skips not_found", async () => {
+    const now = new Date();
+    const id1Pending: FakeRow = {
+      id: 1,
+      jobKind: "x",
+      payload: null,
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const id1Cancelled: FakeRow = { ...id1Pending, status: "cancelled" };
+    const id2Running: FakeRow = { ...id1Pending, id: 2, status: "running" };
+    const id2Cancelled: FakeRow = { ...id2Running, status: "cancelled" };
+    const id3Completed: FakeRow = { ...id1Pending, id: 3, status: "completed" };
+    const id4Failed: FakeRow = { ...id1Pending, id: 4, status: "failed" };
+
+    // Per id, cancelJobs does:
+    //   getJobById → check status → if cancellable, transitionStatus
+    //   (which does update + getJobById post-update)
+    // So queue of byId responses:
+    //   id=1 (pending → cancellable): byId(pre)=[pending], byId(post)=[cancelled]
+    //   id=2 (running → cancellable): byId(pre)=[running], byId(post)=[cancelled]
+    //   id=3 (completed → skip):      byId=[completed]
+    //   id=4 (failed → skip):         byId=[failed]
+    //   id=99 (not_found → skip):     byId=[]
+    const { db } = makeQueuedDb([
+      [id1Pending],
+      [id1Cancelled],
+      [id2Running],
+      [id2Cancelled],
+      [id3Completed],
+      [id4Failed],
+      [],
+    ]);
+
+    const result = await cancelJobs([1, 2, 3, 4, 99], {
+      getDb: () => db as never,
+    });
+
+    expect(result.cancelled.map((r) => r.id).sort()).toEqual([1, 2]);
+    expect(result.cancelled.every((r) => r.status === "cancelled")).toBe(true);
+    expect(result.skipped).toEqual([
+      { jobId: 3, reason: "not_cancellable", currentStatus: "completed" },
+      { jobId: 4, reason: "not_cancellable", currentStatus: "failed" },
+      { jobId: 99, reason: "not_found" },
+    ]);
+  });
+
+  it("returns empty result on empty input (no DB probe)", async () => {
+    const result = await cancelJobs([], { getDb: () => null as never });
+    expect(result).toEqual({ cancelled: [], skipped: [] });
+  });
+
+  it("propagates AsdbUnavailableError on null DB (loud failure on infra)", async () => {
+    await expect(
+      cancelJobs([1, 2], { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(AsdbUnavailableError);
   });
 });

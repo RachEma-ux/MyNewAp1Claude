@@ -303,6 +303,92 @@ export async function markJobCancelled(
   return transitionStatus(jobId, { status: "cancelled" }, options);
 }
 
+export class JobNotCancellableError extends Error {
+  constructor(
+    public readonly jobId: number,
+    public readonly currentStatus: JobStatus,
+  ) {
+    super(
+      `Background job ${jobId} cannot be cancelled (status='${currentStatus}'); only 'pending' or 'running' jobs are cancellable in bulk`,
+    );
+    this.name = "JobNotCancellableError";
+  }
+}
+
+export interface CancelJobsResult {
+  /** Jobs that were successfully flipped to `cancelled`. */
+  readonly cancelled: readonly BackgroundJobRow[];
+  /**
+   * Jobs that were skipped, with the reason: `"not_found"` (no row),
+   * or `"not_cancellable"` (status was already terminal —
+   * completed/failed/cancelled). The bulk operator preserves
+   * terminal state so a stale selection doesn't overwrite a
+   * row that finished between the list-fetch and the click.
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_cancellable";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+const CANCELLABLE_STATUSES: ReadonlySet<JobStatus> = new Set([
+  "pending",
+  "running",
+]);
+
+/**
+ * Bulk operator cancel: flip pending/running jobs to cancelled,
+ * partition terminal-status rows into skipped. Sister of `retryJobs`
+ * (#542) — same partition + ASDB-upfront-probe semantics.
+ *
+ * Note: the singular `markJobCancelled` is permissive (no status
+ * check) for back-compat with worker-tier callers that may want to
+ * force-cancel a row regardless of state. The bulk surface is the
+ * stricter operator-facing contract.
+ */
+export async function cancelJobs(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<CancelJobsResult> {
+  if (jobIds.length === 0) return { cancelled: [], skipped: [] };
+
+  // Probe ASDB upfront so a null DB fails the whole batch loudly.
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const cancelled: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_cancellable";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const jobId of jobIds) {
+    const current = await getJobById(jobId, options);
+    if (!current) {
+      skipped.push({ jobId, reason: "not_found" });
+      continue;
+    }
+    if (!CANCELLABLE_STATUSES.has(current.status)) {
+      skipped.push({
+        jobId,
+        reason: "not_cancellable",
+        currentStatus: current.status,
+      });
+      continue;
+    }
+    const row = await transitionStatus(
+      jobId,
+      { status: "cancelled" },
+      options,
+    );
+    cancelled.push(row);
+  }
+
+  return { cancelled, skipped };
+}
+
 export class JobNotRetryableError extends Error {
   constructor(
     public readonly jobId: number,
