@@ -125,6 +125,15 @@ export interface ObservabilityDashboardInput {
    * compatible — both are ANDed at the listing layer.
    */
   readonly sourceKind?: string | readonly string[];
+  /**
+   * Optional SQL LIKE-style filter on errorMessage forwarded to
+   * listErrorEvents (#579). Lets the dashboard scope the
+   * recent-errors drilldown to a substring — "show me recent
+   * events whose message mentions 'connection refused'" without
+   * the operator running a separate listErrorEvents call.
+   * Composes with errorClass + sourceKind (ANDed in the WHERE).
+   */
+  readonly errorMessageLike?: string;
 }
 
 export interface ObservabilityDashboardOptions {
@@ -169,6 +178,7 @@ export async function getObservabilityDashboard(
         limit: recentLimit,
         errorClass: input.errorClass,
         sourceKind: input.sourceKind,
+        errorMessageLike: input.errorMessageLike,
       },
       { getDb: options.getDb },
     ),
