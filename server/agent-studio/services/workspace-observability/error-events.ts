@@ -12,7 +12,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, like } from "drizzle-orm";
+import { and, desc, eq, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -156,4 +156,45 @@ export async function listErrorEvents(
     .orderBy(desc(agsWorkspaceErrorEvents.createdAt))
     .limit(input.limit ?? 100);
   return rows.map(rowToEvent);
+}
+
+// ---------- retention prune ----------
+
+export interface PruneOldErrorEventsInput {
+  /**
+   * Delete events whose createdAt is strictly older than this cutoff.
+   * Caller controls the policy (e.g. 30 days for normal retention,
+   * 7 days for noisy-environment cleanup, 0 for "delete everything").
+   */
+  readonly olderThan: Date;
+}
+
+export interface PruneOldErrorEventsResult {
+  readonly deletedCount: number;
+}
+
+/**
+ * Bulk-delete error events older than the given cutoff. Intended to be
+ * called from a periodic background job (or by an operator action) so
+ * the auto-capture middleware (#513) doesn't accumulate unbounded rows
+ * in `ags_workspace_error_events`.
+ *
+ * Returns `{deletedCount: 0}` on ASDB-null instead of throwing — same
+ * fail-soft contract as `recordErrorEvent`. The caller can log the
+ * zero-count and move on.
+ */
+export async function pruneOldErrorEvents(
+  input: PruneOldErrorEventsInput,
+  options: ServiceOptions = {},
+): Promise<PruneOldErrorEventsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return { deletedCount: 0 };
+
+  const deleted = await db
+    .delete(agsWorkspaceErrorEvents)
+    .where(lt(agsWorkspaceErrorEvents.createdAt, input.olderThan))
+    .returning({ id: agsWorkspaceErrorEvents.id });
+
+  return { deletedCount: deleted.length };
 }
