@@ -98,6 +98,61 @@ export async function recordErrorEvent(
 }
 
 /**
+ * Bulk write sibling — a fan-out controller that catches N
+ * exceptions in one batch, or a log-backfill seeding historical
+ * errors, can write all rows in a single INSERT instead of N round
+ * trips. Sister of `pushNotificationToUsers` (#509-era) on the bulk
+ * write pattern.
+ *
+ * Empty-array short-circuit BEFORE the ASDB probe (canonical Phase
+ * 22 contract — observability writes for an empty batch must not
+ * even probe the DB).
+ *
+ * Fail-soft on ASDB-null matches the singular `recordErrorEvent`
+ * semantic: observability writes never throw into an
+ * already-failing flow. Returns `[]` for the empty case AND for
+ * ASDB-null with a non-empty batch — callers cannot distinguish
+ * "DB was down" from "nothing to write," which is intentional;
+ * loud failure would mask the original errors the caller was
+ * trying to log.
+ */
+export async function recordErrorEvents(
+  inputs: readonly RecordErrorEventInput[],
+  options: ServiceOptions = {},
+): Promise<readonly ErrorEventRow[]> {
+  if (inputs.length === 0) return [];
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const inserted = await db
+    .insert(agsWorkspaceErrorEvents)
+    .values(
+      inputs.map((input) => ({
+        sourceKind: input.sourceKind,
+        sourceId: input.sourceId ?? null,
+        userId: input.userId ?? null,
+        errorClass: input.errorClass,
+        errorMessage: input.errorMessage,
+        metadata: input.metadata ?? null,
+      })),
+    )
+    .returning({
+      id: agsWorkspaceErrorEvents.id,
+      sourceKind: agsWorkspaceErrorEvents.sourceKind,
+      sourceId: agsWorkspaceErrorEvents.sourceId,
+      userId: agsWorkspaceErrorEvents.userId,
+      errorClass: agsWorkspaceErrorEvents.errorClass,
+      errorMessage: agsWorkspaceErrorEvents.errorMessage,
+      metadata: agsWorkspaceErrorEvents.metadata,
+      createdAt: agsWorkspaceErrorEvents.createdAt,
+    });
+
+  return inserted.map((row) => rowToEvent(row));
+}
+
+/**
  * Singleton getter — completes the per-table getById symmetry across
  * the three Phase 22 tables. `getJobById` (#511-era) and
  * `getNotificationById` (#557) already existed; this is the matching

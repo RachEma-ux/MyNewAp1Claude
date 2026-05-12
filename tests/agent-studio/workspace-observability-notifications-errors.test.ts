@@ -23,6 +23,7 @@ import {
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
 import {
   recordErrorEvent,
+  recordErrorEvents,
   getErrorEventById,
   getErrorEventsByIds,
   listErrorEvents,
@@ -576,24 +577,31 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
   const insert = vi.fn((table: unknown) => {
     const name = tableName(table);
     return {
-      values: (vals: Record<string, unknown>) => ({
+      values: (
+        vals: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
+      ) => ({
         returning: async () => {
           if (name !== "ags_workspace_error_events") return [];
-          const id = state.nextId++;
-          const row: ErrEventRow = {
-            id,
-            sourceKind: String(vals.sourceKind),
-            sourceId: vals.sourceId == null ? null : String(vals.sourceId),
-            userId: vals.userId == null ? null : Number(vals.userId),
-            errorClass: String(vals.errorClass),
-            errorMessage: String(vals.errorMessage),
-            metadata:
-              (vals.metadata as Record<string, unknown> | null | undefined) ??
-              null,
-            createdAt: new Date(),
-          };
-          state.rows.push(row);
-          return [row];
+          const batch = Array.isArray(vals) ? vals : [vals];
+          const out: ErrEventRow[] = [];
+          for (const v of batch) {
+            const id = state.nextId++;
+            const row: ErrEventRow = {
+              id,
+              sourceKind: String(v.sourceKind),
+              sourceId: v.sourceId == null ? null : String(v.sourceId),
+              userId: v.userId == null ? null : Number(v.userId),
+              errorClass: String(v.errorClass),
+              errorMessage: String(v.errorMessage),
+              metadata:
+                (v.metadata as Record<string, unknown> | null | undefined) ??
+                null,
+              createdAt: new Date(),
+            };
+            state.rows.push(row);
+            out.push(row);
+          }
+          return out;
         },
       }),
     };
@@ -633,6 +641,65 @@ describe("error-events — Phase 22", () => {
     expect(result!.userId).toBe(7);
     expect(result!.metadata).toEqual({ fields: ["sourceNoteVersionId"] });
     expect(state.rows.length).toBe(1);
+  });
+
+  it("recordErrorEvents short-circuits empty input with no DB call (#567)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await recordErrorEvents([], { getDb });
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("recordErrorEvents returns [] on ASDB-null fail-soft with non-empty input (#567)", async () => {
+    const result = await recordErrorEvents(
+      [
+        {
+          sourceKind: "promotion",
+          errorClass: "validation",
+          errorMessage: "x",
+        },
+      ],
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("recordErrorEvents inserts N rows in a single batch (#567)", async () => {
+    const { db, state } = makeErrFakeDb();
+    const result = await recordErrorEvents(
+      [
+        {
+          sourceKind: "promotion",
+          sourceId: "p_42",
+          errorClass: "validation",
+          errorMessage: "first",
+          metadata: { idx: 0 },
+        },
+        {
+          sourceKind: "promotion",
+          sourceId: "p_43",
+          userId: 9,
+          errorClass: "timeout",
+          errorMessage: "second",
+        },
+        {
+          sourceKind: "neo4j.sync",
+          errorClass: "io",
+          errorMessage: "third",
+          metadata: null,
+        },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(result).toHaveLength(3);
+    expect(result.map((r) => r.errorMessage)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+    expect(result[1].userId).toBe(9);
+    expect(result[0].metadata).toEqual({ idx: 0 });
+    expect(state.rows).toHaveLength(3);
   });
 
   it("listErrorEvents filters by sourceKind + errorClass", async () => {

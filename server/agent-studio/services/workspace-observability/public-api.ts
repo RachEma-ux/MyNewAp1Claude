@@ -85,6 +85,7 @@ export type {
 
 export {
   recordErrorEvent,
+  recordErrorEvents,
   getErrorEventById,
   getErrorEventsByIds,
   listErrorEvents,
