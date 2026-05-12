@@ -27,6 +27,7 @@ import {
   retryJobs,
   retryJobsByQuery,
   cancelJobs,
+  cancelJobsByQuery,
   failStaleRunningJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError,
@@ -2767,5 +2768,159 @@ describe("retryJobsByQuery — Phase 22 #573 operator bulk retry sweep", () => {
     );
     expect(result.scanned).toBe(0);
     expect(result.retried).toEqual([]);
+  });
+});
+
+describe("cancelJobsByQuery — Phase 22 #574 operator bulk cancel sweep", () => {
+  it("throws AsdbUnavailableError when ASDB is unavailable", async () => {
+    await expect(
+      cancelJobsByQuery({}, { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("short-circuits empty jobKind array BEFORE the ASDB probe", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await cancelJobsByQuery({ jobKind: [] }, { getDb });
+    expect(result.scanned).toBe(0);
+    expect(result.cancelled).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits empty statuses array BEFORE the ASDB probe", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await cancelJobsByQuery({ statuses: [] }, { getDb });
+    expect(result.scanned).toBe(0);
+    expect(result.cancelled).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("returns scanned=0 / cancelled=[] when no candidates match", async () => {
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({ limit: async () => [] }),
+        };
+        return chain;
+      },
+    };
+    const result = await cancelJobsByQuery(
+      {},
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.cancelled).toEqual([]);
+  });
+
+  it("delegates to cancelJobs and reports both scanned + cancelled (#574)", async () => {
+    const now = new Date();
+    const rows: FakeRow[] = [
+      {
+        id: 20,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 21,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    let firstOrderBy = true;
+    const selectQueue: number[] = [20, 20, 21, 21];
+    let lastSelectedId: number | undefined;
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async () => {
+              if (firstOrderBy) {
+                firstOrderBy = false;
+                return rows.map(({ id }) => ({ id }));
+              }
+              return [];
+            },
+          }),
+          limit: async () => {
+            const id = selectQueue.shift();
+            lastSelectedId = id;
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const target = rows.find((r) => r.id === lastSelectedId);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+    };
+
+    const result = await cancelJobsByQuery(
+      { jobKind: "k" },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(2);
+    expect(result.cancelled).toHaveLength(2);
+    expect(result.cancelled.every((r) => r.status === "cancelled")).toBe(true);
+  });
+
+  it("accepts statuses=['pending'] for queue-drain only (#574)", async () => {
+    // The fake doesn't introspect WHERE filters, so we verify input
+    // shape acceptance + scanned=0 path on no matches.
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({ limit: async () => [] }),
+        };
+        return chain;
+      },
+    };
+    const result = await cancelJobsByQuery(
+      { statuses: ["pending"], olderThan: new Date("2026-05-01T00:00:00Z") },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.cancelled).toEqual([]);
+  });
+
+  it("accepts array-form jobKind without throwing (#574)", async () => {
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({ limit: async () => [] }),
+        };
+        return chain;
+      },
+    };
+    const result = await cancelJobsByQuery(
+      { jobKind: ["a", "b"], limit: 25 },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.cancelled).toEqual([]);
   });
 });

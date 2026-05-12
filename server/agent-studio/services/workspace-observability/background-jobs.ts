@@ -1000,6 +1000,111 @@ export async function cancelJobs(
   return { cancelled, skipped };
 }
 
+export interface CancelJobsByQueryInput {
+  /**
+   * Restrict the sweep to jobs of this jobKind. Single string `eq`,
+   * array `IN`. Empty array short-circuits to `{cancelled: [],
+   * scanned: 0}` with no DB call.
+   */
+  readonly jobKind?: string | readonly string[];
+  /**
+   * Statuses eligible for cancellation. Defaults to
+   * `["pending", "running"]` (matches CANCELLABLE_STATUSES on the
+   * id-list cancelJobs path). Operators in a maintenance window
+   * who want to nuke only the queue (without touching mid-flight
+   * workers) pass `["pending"]`.
+   */
+  readonly statuses?: readonly JobStatus[];
+  /**
+   * Optional age floor: only cancel rows whose `createdAt` is
+   * strictly older than this. Lets operators say "cancel queued
+   * jobs older than 6 hours" without touching freshly-enqueued
+   * work.
+   */
+  readonly olderThan?: Date;
+  /**
+   * Cap on rows the SELECT returns. Defaults to 100 — same as
+   * retryJobsByQuery (#573) / listJobs page size.
+   */
+  readonly limit?: number;
+}
+
+export interface CancelJobsByQueryResult {
+  /** Rows successfully flipped to `cancelled`. */
+  readonly cancelled: readonly BackgroundJobRow[];
+  /** Pre-flip SELECT size. `cancelled.length` may be smaller if
+   * partition skipped rows that raced to terminal mid-sweep. */
+  readonly scanned: number;
+}
+
+/**
+ * Operator-triggered bulk cancel by query — completes the
+ * operator-by-query sweep trio:
+ *   - failStaleRunningJobs (#546): running → failed
+ *   - retryJobsByQuery (#573): failed → pending
+ *   - cancelJobsByQuery (#574): pending/running → cancelled
+ *
+ * Use case: maintenance window. Operator wants to stop a worker
+ * subsystem's queued work without manually multi-selecting in the
+ * UI. Statuses parameter lets the gesture be "drain the queue
+ * only" (statuses=["pending"]) or "abort everything in flight too"
+ * (default).
+ *
+ * Delegates per-row flip to `cancelJobs` (#543), inheriting its
+ * partition pattern — race-condition `not_cancellable` skip is
+ * preserved when a row hits a terminal state between SELECT and
+ * UPDATE.
+ */
+export async function cancelJobsByQuery(
+  input: CancelJobsByQueryInput = {},
+  options: ServiceOptions = {},
+): Promise<CancelJobsByQueryResult> {
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return { cancelled: [], scanned: 0 };
+  }
+  // Empty statuses array → vacuous IN; same short-circuit invariant.
+  if (input.statuses !== undefined && input.statuses.length === 0) {
+    return { cancelled: [], scanned: 0 };
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const limit = input.limit ?? 100;
+  const statuses = input.statuses ?? (["pending", "running"] as const);
+
+  const filters = [
+    inArray(agsWorkspaceBackgroundJobs.status, statuses as string[]),
+  ];
+  if (input.olderThan !== undefined) {
+    filters.push(lt(agsWorkspaceBackgroundJobs.createdAt, input.olderThan));
+  }
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput));
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
+
+  const candidates = await db
+    .select({ id: agsWorkspaceBackgroundJobs.id })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .orderBy(agsWorkspaceBackgroundJobs.createdAt) // oldest-enqueued first
+    .limit(limit);
+
+  const bulkResult = await cancelJobs(
+    candidates.map(({ id }) => id),
+    options,
+  );
+  return { cancelled: [...bulkResult.cancelled], scanned: candidates.length };
+}
+
 export interface FailStaleRunningJobsInput {
   /**
    * Cutoff timestamp — any job in `status='running'` whose `updatedAt`

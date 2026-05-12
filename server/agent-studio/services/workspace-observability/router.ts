@@ -29,6 +29,7 @@ import {
   retryJobs,
   retryJobsByQuery,
   cancelJobs,
+  cancelJobsByQuery,
   failStaleRunningJobs,
   JobNotFoundError,
   JobNotRetryableError,
@@ -795,6 +796,47 @@ export const workspaceObservabilityRouter = router({
     .mutation(async ({ input }) => {
       try {
         return await retryJobsByQuery(input ?? {});
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // ============================================================
+  // Bulk-cancel-by-query (operator-triggered, admin-only)
+  //
+  // Completes the operator-by-query sweep trio (fail #546 / retry
+  // #573 / cancel #574). Maintenance-window gesture: drain the
+  // queue and/or abort in-flight workers for a jobKind subset.
+  // Statuses parameter lets operators choose "pending only" (drain
+  // queue, leave running alone) or default ["pending","running"]
+  // (full stop).
+  // ============================================================
+
+  cancelBackgroundJobsByQuery: adminProcedure
+    .input(
+      z
+        .object({
+          jobKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+          statuses: z
+            .array(z.enum(["pending", "running", "completed", "failed", "cancelled"]))
+            .max(5)
+            .optional(),
+          limit: z.number().int().min(1).max(500).optional(),
+          olderThan: z.coerce.date().optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await cancelJobsByQuery(input ?? {});
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
