@@ -90,6 +90,12 @@ export {
 } from "./stats.js";
 
 export { runRetentionSweep } from "./retention-sweep.js";
+export { getObservabilityDashboard } from "./dashboard.js";
+export type {
+  ObservabilityDashboardInput,
+  ObservabilityDashboardOptions,
+  ObservabilityDashboardPayload,
+} from "./dashboard.js";
 export type {
   RunRetentionSweepInput,
   RunRetentionSweepResult,
