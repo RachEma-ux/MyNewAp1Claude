@@ -163,6 +163,17 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentJobsUpdatedSince?: Date;
   /**
+   * Optional `attemptsGte` filter forwarded to BOTH listJobs calls
+   * (failed + completed) via the listJobs.attemptsGte filter (#592).
+   * Lets the dashboard scope recent-jobs drilldowns to high-attempt
+   * rows — typical operator workflow: "show me the retry-storm
+   * subset on the failed side, plus the completed-after-N-retries
+   * subset for capacity context." Shared across both slices (matches
+   * `recentJobKind` shape) because rows in either status can have
+   * attempts > 1.
+   */
+  readonly recentAttemptsGte?: number;
+  /**
    * Optional errorClass filter forwarded to listErrorEvents — lets
    * the dashboard scope the recent-error-events drilldown to a
    * specific class when triaging a known incident. Mirrors the
@@ -286,6 +297,7 @@ export async function getObservabilityDashboard(
         jobKindLike: input.recentJobKindLike,
         lastErrorLike: input.recentFailedLastErrorLike,
         updatedSince: input.recentJobsUpdatedSince,
+        attemptsGte: input.recentAttemptsGte,
       },
       { getDb: options.getDb },
     ),
@@ -296,6 +308,7 @@ export async function getObservabilityDashboard(
         jobKind: input.recentJobKind,
         jobKindLike: input.recentJobKindLike,
         updatedSince: input.recentJobsUpdatedSince,
+        attemptsGte: input.recentAttemptsGte,
       },
       { getDb: options.getDb },
     ),
