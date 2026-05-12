@@ -1,13 +1,16 @@
 /**
- * Phase 22 follow-up #621 + #637 — pruneOldRuntimeRuns service.
+ * Phase 22 follow-up #621 + #637 + #643 — pruneOldRuntimeRuns service.
  *
  * #621 shipped the prune primitive with cascade-delete to
  * agsRuntimeRunSteps only.
  *
  * #637 extended cascade to 4 sibling tables (agsRuntimeToolCalls,
  * agsRuntimeMemoryEvents, agsRuntimePolicyEvents,
- * agsRuntimeHookExecutions) that key on runId. Tests rewritten to
- * cover the full 6-table cascade.
+ * agsRuntimeHookExecutions) that key on runId.
+ *
+ * #643 extends cascade further to agsRuntimeGraphEvents (Phase 14
+ * Native Graph Workspace; FK runtimeRunId). Tests cover the full
+ * 7-table cascade (6 children + 1 parent).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -23,14 +26,15 @@ import { pruneOldRuntimeRuns } from "../../server/agent-studio/services/runtime-
 interface FakeState {
   selectResult: Array<{ id: number }>;
   /**
-   * Per-delete-call results. The production code issues 6 deletes per
+   * Per-delete-call results. The production code issues 7 deletes per
    * sweep in this order:
-   *  0: steps      (parallel cascade)
-   *  1: toolCalls  (parallel cascade)
-   *  2: memoryEvts (parallel cascade)
-   *  3: policyEvts (parallel cascade)
-   *  4: hookExecs  (parallel cascade)
-   *  5: runs       (parent, sequentially after the children resolve)
+   *  0: steps       (parallel cascade)
+   *  1: toolCalls   (parallel cascade)
+   *  2: memoryEvts  (parallel cascade)
+   *  3: policyEvts  (parallel cascade)
+   *  4: hookExecs   (parallel cascade)
+   *  5: graphEvts   (parallel cascade — #643)
+   *  6: runs        (parent, sequentially after the children resolve)
    */
   deleteResults: Array<Array<{ id: number }>>;
   selectFilters: any[];
@@ -85,6 +89,7 @@ const ZERO_RESULT = {
   deletedMemoryEventsCount: 0,
   deletedPolicyEventsCount: 0,
   deletedHookExecutionsCount: 0,
+  deletedGraphEventsCount: 0,
 };
 
 describe("pruneOldRuntimeRuns — fail-soft on ASDB null", () => {
@@ -143,7 +148,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
     expect(state.selectFilters).toHaveLength(1);
   });
 
-  it("cascade-deletes all 5 sibling tables + runs (#637)", async () => {
+  it("cascade-deletes all 6 sibling tables + runs (#637 + #643)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 10 }, { id: 11 }, { id: 12 }];
     state.deleteResults = [
@@ -152,6 +157,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
       [{ id: 300 }, { id: 301 }, { id: 302 }], // memoryEvents (3)
       [{ id: 400 }], // policyEvents (1)
       [{ id: 500 }, { id: 501 }, { id: 502 }, { id: 503 }], // hookExecutions (4)
+      [{ id: 600 }, { id: 601 }, { id: 602 }, { id: 603 }, { id: 604 }, { id: 605 }], // graphEvents (6) — #643
       [{ id: 10 }, { id: 11 }, { id: 12 }], // runs (3)
     ];
 
@@ -166,6 +172,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
     expect(result.deletedMemoryEventsCount).toBe(3);
     expect(result.deletedPolicyEventsCount).toBe(1);
     expect(result.deletedHookExecutionsCount).toBe(4);
+    expect(result.deletedGraphEventsCount).toBe(6);
   });
 
   it("returns 0 for sibling tables that had no rows for the deleted runs", async () => {
@@ -177,6 +184,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
       [], // memoryEvents
       [], // policyEvents
       [], // hookExecutions
+      [], // graphEvents — #643
       [{ id: 9 }], // runs
     ];
 
@@ -191,12 +199,13 @@ describe("pruneOldRuntimeRuns — happy path", () => {
     expect(result.deletedMemoryEventsCount).toBe(0);
     expect(result.deletedPolicyEventsCount).toBe(0);
     expect(result.deletedHookExecutionsCount).toBe(0);
+    expect(result.deletedGraphEventsCount).toBe(0);
   });
 
   it("accepts a single agentId (eq form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 5 }];
-    state.deleteResults = [[], [], [], [], [], [{ id: 5 }]];
+    state.deleteResults = [[], [], [], [], [], [], [{ id: 5 }]];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), agentId: 42 },
       { getDb: () => makeFakeDb(state) as any },
@@ -208,6 +217,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
     const state = fresh();
     state.selectResult = [{ id: 5 }, { id: 6 }];
     state.deleteResults = [
+      [],
       [],
       [],
       [],
@@ -225,7 +235,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
   it("accepts a single environment (eq form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 7 }];
-    state.deleteResults = [[], [], [], [], [], [{ id: 7 }]];
+    state.deleteResults = [[], [], [], [], [], [], [{ id: 7 }]];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), environment: "draft" },
       { getDb: () => makeFakeDb(state) as any },
@@ -237,6 +247,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
     const state = fresh();
     state.selectResult = [{ id: 7 }, { id: 8 }];
     state.deleteResults = [
+      [],
       [],
       [],
       [],
@@ -256,7 +267,7 @@ describe("pruneOldRuntimeRuns — composability", () => {
   it("composes agentId + environment + statuses filters in one pass", async () => {
     const state = fresh();
     state.selectResult = [{ id: 1 }];
-    state.deleteResults = [[], [], [], [], [], [{ id: 1 }]];
+    state.deleteResults = [[], [], [], [], [], [], [{ id: 1 }]];
     const result = await pruneOldRuntimeRuns(
       {
         olderThan: new Date(),
