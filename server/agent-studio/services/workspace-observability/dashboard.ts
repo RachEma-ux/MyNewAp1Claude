@@ -99,6 +99,17 @@ export interface ObservabilityDashboardInput {
    */
   readonly pendingJobKind?: string | readonly string[];
   /**
+   * Optional jobKind filter forwarded to BOTH the
+   * `recentFailedJobs` and `recentCompletedJobs` slices. Lets the
+   * operator triage by worker subsystem — see failures and
+   * completions for the same jobKind in parallel on the same
+   * screen. Shared across both slices because the common case is
+   * incident-scoped comparison; a single value covers both sides
+   * of the failed/completed pair (matches `recentLimit`'s shared
+   * shape).
+   */
+  readonly recentJobKind?: string | readonly string[];
+  /**
    * Optional errorClass filter forwarded to listErrorEvents — lets
    * the dashboard scope the recent-error-events drilldown to a
    * specific class when triaging a known incident. Mirrors the
@@ -142,11 +153,15 @@ export async function getObservabilityDashboard(
   ] = await Promise.all([
     getWorkspaceObservabilityStats({ getDb: options.getDb }),
     listJobs(
-      { status: "failed", limit: recentLimit },
+      { status: "failed", limit: recentLimit, jobKind: input.recentJobKind },
       { getDb: options.getDb },
     ),
     listJobs(
-      { status: "completed", limit: recentLimit },
+      {
+        status: "completed",
+        limit: recentLimit,
+        jobKind: input.recentJobKind,
+      },
       { getDb: options.getDb },
     ),
     listErrorEvents(
