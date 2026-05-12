@@ -44,12 +44,15 @@ export type {
 export {
   recordErrorEvent,
   listErrorEvents,
+  pruneOldErrorEvents,
   AsdbUnavailableError as ErrorEventsAsdbUnavailableError,
 } from "./error-events.js";
 export type {
   RecordErrorEventInput,
   ListErrorEventsInput,
   ErrorEventRow,
+  PruneOldErrorEventsInput,
+  PruneOldErrorEventsResult,
 } from "./error-events.js";
 
 export {

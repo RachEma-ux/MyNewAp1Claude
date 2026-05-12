@@ -18,6 +18,7 @@ import {
 import {
   recordErrorEvent,
   listErrorEvents,
+  pruneOldErrorEvents,
 } from "../../server/agent-studio/services/workspace-observability/error-events";
 
 interface NotifRow {
@@ -502,5 +503,46 @@ describe("listErrorEvents — sourceKindLike prefix filter (Phase 22 #514)", () 
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
+  it("returns deletedCount=0 on ASDB-null (fail-soft, no throw)", async () => {
+    const result = await pruneOldErrorEvents(
+      { olderThan: new Date() },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+  });
+
+  it("returns the number of deleted rows from .returning()", async () => {
+    const deleted = [{ id: 1 }, { id: 2 }, { id: 5 }];
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => deleted,
+        }),
+      }),
+    };
+    const result = await pruneOldErrorEvents(
+      { olderThan: new Date("2026-04-01") },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 3 });
+  });
+
+  it("returns deletedCount=0 when no rows match the cutoff", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    };
+    const result = await pruneOldErrorEvents(
+      { olderThan: new Date("2026-01-01") },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
   });
 });
