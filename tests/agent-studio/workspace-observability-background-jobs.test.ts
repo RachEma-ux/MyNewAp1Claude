@@ -276,6 +276,82 @@ describe("state transitions — Phase 22", () => {
     expect(result.lastError).toBeNull();
   });
 
+  it("markJobFailed also records an error_event row (Phase 22 #517 bridge)", async () => {
+    const now = new Date();
+    const errorEventRows: Record<string, unknown>[] = [];
+
+    function tableName(t: unknown): string {
+      if (!t) return "?";
+      const sym = Object.getOwnPropertySymbols(t as object).find(
+        (s) => s.description === "drizzle:Name",
+      );
+      return sym ? String((t as Record<symbol, unknown>)[sym] ?? "?") : "?";
+    }
+
+    const jobRow: FakeRow = {
+      id: 99,
+      jobKind: "projection_sync",
+      payload: { source: "x" },
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const db = {
+      select: vi.fn(() => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [jobRow],
+            orderBy: () => ({ limit: async () => [jobRow] }),
+          }),
+        }),
+      })),
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            if ("status" in vals) jobRow.status = String(vals.status);
+            if ("lastError" in vals)
+              jobRow.lastError = vals.lastError == null ? null : String(vals.lastError);
+          },
+        }),
+      })),
+      insert: vi.fn((table: unknown) => ({
+        values: (vals: Record<string, unknown>) => {
+          if (tableName(table) === "ags_workspace_error_events") {
+            errorEventRows.push(vals);
+          }
+          return {
+            returning: async () => [{ id: 99999, ...vals, createdAt: new Date() }],
+            then: (resolve: (v: void) => unknown) => resolve(undefined),
+          };
+        },
+      })),
+    };
+
+    const result = await markJobFailed(99, "model crashed", {
+      getDb: () => db as never,
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.lastError).toBe("model crashed");
+
+    // Give the void-prefixed bridge a chance to flush.
+    await new Promise((r) => setImmediate(r));
+
+    expect(errorEventRows).toHaveLength(1);
+    expect(errorEventRows[0]).toMatchObject({
+      sourceKind: "backgroundJob.projection_sync",
+      sourceId: "99",
+      errorClass: "BackgroundJobFailed",
+      errorMessage: "model crashed",
+    });
+    expect(
+      (errorEventRows[0].metadata as Record<string, unknown>).jobId,
+    ).toBe(99);
+  });
+
   it("markJobFailed sets lastError", async () => {
     const now = new Date();
     const { db, state } = makeFakeDb({
