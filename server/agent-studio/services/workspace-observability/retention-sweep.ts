@@ -30,6 +30,13 @@ export interface RunRetentionSweepInput {
    */
   readonly errorEventsRetentionDays?: number;
   /**
+   * Restrict error-event deletion to events of this errorClass (string)
+   * or classes (array). Mirrors the errorClass filter on
+   * pruneOldErrorEvents (#550) — lets cron callers shed noisy classes
+   * aggressively while preserving rare ones.
+   */
+  readonly errorEventsErrorClass?: string | readonly string[];
+  /**
    * Days to retain in `ags_workspace_user_notifications`. Default 30.
    */
   readonly notificationsRetentionDays?: number;
@@ -93,7 +100,10 @@ export async function runRetentionSweep(
 
   const [errorRes, notifRes, jobsRes] = await Promise.all([
     pruneOldErrorEvents(
-      { olderThan: errorEventsCutoff },
+      {
+        olderThan: errorEventsCutoff,
+        errorClass: input.errorEventsErrorClass,
+      },
       { getDb: options.getDb },
     ),
     pruneOldNotifications(

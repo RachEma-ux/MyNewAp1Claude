@@ -861,6 +861,49 @@ describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
     );
     expect(result).toEqual({ deletedCount: 0 });
   });
+
+  it("short-circuits empty errorClass array with no DB call (#550)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await pruneOldErrorEvents(
+      { olderThan: new Date("2026-04-01"), errorClass: [] },
+      { getDb },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("forwards single-string errorClass to DELETE predicate (#550)", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }],
+        }),
+      }),
+    };
+    const result = await pruneOldErrorEvents(
+      { olderThan: new Date("2026-04-01"), errorClass: "ValidationError" },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 2 });
+  });
+
+  it("forwards array-form errorClass to DELETE predicate (#550)", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [{ id: 5 }],
+        }),
+      }),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        errorClass: ["ValidationError", "RateLimitError"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 1 });
+  });
 });
 
 describe("pruneOldNotifications — Phase 22 #520 retention prune", () => {

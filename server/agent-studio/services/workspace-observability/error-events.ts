@@ -195,6 +195,17 @@ export interface PruneOldErrorEventsInput {
    * 7 days for noisy-environment cleanup, 0 for "delete everything").
    */
   readonly olderThan: Date;
+  /**
+   * Optional errorClass filter — single string (`eq`) or array (`IN`).
+   * Lets a cron/operator prune only one error class's history (e.g.
+   * shed `ValidationError` aggressively while preserving rare
+   * `OutOfMemoryError` rows). Mirrors the same filter pattern on
+   * `pruneOldBackgroundJobs.jobKind` (#549).
+   *
+   * Empty array short-circuits to `{deletedCount: 0}` (vacuous IN),
+   * with no DB call.
+   */
+  readonly errorClass?: string | readonly string[];
 }
 
 export interface PruneOldErrorEventsResult {
@@ -215,13 +226,33 @@ export async function pruneOldErrorEvents(
   input: PruneOldErrorEventsInput,
   options: ServiceOptions = {},
 ): Promise<PruneOldErrorEventsResult> {
+  // Empty errorClass array → vacuous IN; short-circuit BEFORE the
+  // ASDB probe (matches pruneOldBackgroundJobs #549 contract).
+  if (Array.isArray(input.errorClass) && input.errorClass.length === 0) {
+    return { deletedCount: 0 };
+  }
+
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) return { deletedCount: 0 };
 
+  const filters = [lt(agsWorkspaceErrorEvents.createdAt, input.olderThan)];
+  const errorClassInput = input.errorClass;
+  if (errorClassInput !== undefined) {
+    if (Array.isArray(errorClassInput)) {
+      filters.push(
+        inArray(agsWorkspaceErrorEvents.errorClass, errorClassInput as string[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.errorClass, errorClassInput as string),
+      );
+    }
+  }
+
   const deleted = await db
     .delete(agsWorkspaceErrorEvents)
-    .where(lt(agsWorkspaceErrorEvents.createdAt, input.olderThan))
+    .where(filters.length === 1 ? filters[0] : and(...filters))
     .returning({ id: agsWorkspaceErrorEvents.id });
 
   return { deletedCount: deleted.length };

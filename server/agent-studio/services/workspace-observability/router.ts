@@ -504,6 +504,12 @@ export const workspaceObservabilityRouter = router({
       z
         .object({
           errorEventsRetentionDays: z.number().int().min(0).max(3650).optional(),
+          errorEventsErrorClass: z
+            .union([
+              z.string().min(1).max(200),
+              z.array(z.string().min(1).max(200)).max(20),
+            ])
+            .optional(),
           notificationsRetentionDays: z
             .number()
             .int()

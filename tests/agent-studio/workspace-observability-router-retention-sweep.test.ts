@@ -143,4 +143,39 @@ describe("workspaceObservabilityRouter.runRetentionSweep", () => {
     ).rejects.toThrow();
     expect(sweepMock).not.toHaveBeenCalled();
   });
+
+  it("forwards single-string errorEventsErrorClass (#550)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      errorEventsErrorClass: "ValidationError",
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      errorEventsErrorClass: "ValidationError",
+    });
+  });
+
+  it("forwards array-form errorEventsErrorClass (#550)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      errorEventsErrorClass: ["ValidationError", "RateLimitError"],
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      errorEventsErrorClass: ["ValidationError", "RateLimitError"],
+    });
+  });
+
+  it("rejects oversized errorEventsErrorClass array (#550)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const oversized = Array.from({ length: 21 }, (_, i) => `Class${i}`);
+    await expect(
+      caller.runRetentionSweep({ errorEventsErrorClass: oversized }),
+    ).rejects.toThrow();
+    expect(sweepMock).not.toHaveBeenCalled();
+  });
 });
