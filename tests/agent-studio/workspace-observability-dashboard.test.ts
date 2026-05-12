@@ -287,6 +287,53 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentFailedLastErrorLike scopes ONLY the failed slice, not completed (#587)", async () => {
+    await getObservabilityDashboard({
+      recentFailedLastErrorLike: "%OOM%",
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "failed",
+        limit: 20,
+        jobKind: undefined,
+        lastErrorLike: "%OOM%",
+      },
+      expect.any(Object),
+    );
+    // The completed call MUST NOT include lastErrorLike — completed
+    // rows have NULL lastError and operators want the unfiltered
+    // completion side as a healthy-baseline comparison.
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "completed", limit: 20, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
+  it("recentFailedLastErrorLike composes with recentJobKind on failed slice (#587)", async () => {
+    await getObservabilityDashboard({
+      recentJobKind: "projection.rebuild",
+      recentFailedLastErrorLike: "%OOM%",
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "failed",
+        limit: 20,
+        jobKind: "projection.rebuild",
+        lastErrorLike: "%OOM%",
+      },
+      expect.any(Object),
+    );
+    // Completed side still scoped by jobKind only.
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "completed",
+        limit: 20,
+        jobKind: "projection.rebuild",
+      },
+      expect.any(Object),
+    );
+  });
+
   it("respects a custom pendingLimit on the pending-backlog slice (#569)", async () => {
     await getObservabilityDashboard({ pendingLimit: 3 });
     expect(listPendingMock).toHaveBeenCalledWith(
