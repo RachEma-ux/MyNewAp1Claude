@@ -41,6 +41,7 @@ import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
 import { getWorkspaceObservabilityStats } from "./stats.js";
 import { runRetentionSweep } from "./retention-sweep.js";
 import { getObservabilityDashboard } from "./dashboard.js";
+import { getInboxComposite } from "./inbox.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -162,6 +163,40 @@ export const workspaceObservabilityRouter = router({
       if (userId == null) return [];
       try {
         return await listNotifications({
+          userId,
+          unreadOnly: input?.unreadOnly,
+          notificationKind: input?.notificationKind,
+          limit: input?.limit,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getMyInbox: protectedProcedure
+    .input(
+      z
+        .object({
+          unreadOnly: z.boolean().optional(),
+          notificationKind: z.string().min(1).max(100).optional(),
+          limit: z.number().int().min(1).max(500).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        return {
+          notifications: [],
+          unreadCount: { total: 0, byKind: {} },
+        };
+      }
+      try {
+        return await getInboxComposite({
           userId,
           unreadOnly: input?.unreadOnly,
           notificationKind: input?.notificationKind,

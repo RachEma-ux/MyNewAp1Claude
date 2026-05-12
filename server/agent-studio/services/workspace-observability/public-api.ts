@@ -96,6 +96,11 @@ export type {
   ObservabilityDashboardOptions,
   ObservabilityDashboardPayload,
 } from "./dashboard.js";
+export { getInboxComposite } from "./inbox.js";
+export type {
+  InboxCompositeInput,
+  InboxCompositePayload,
+} from "./inbox.js";
 export type {
   RunRetentionSweepInput,
   RunRetentionSweepResult,
