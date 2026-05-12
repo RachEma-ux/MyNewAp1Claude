@@ -316,6 +316,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.12: Phase 22 follow-up #646 — cag-pack-events retention cron.
+  // The ags_cag_pack_events table accumulates one row per CAG pack
+  // lifecycle event (pack_used / pack_validation_failed / etc) without
+  // any retention path before #645 + #646. Default daily 09:00 UTC
+  // sweep — 7th slot in the daily-sweep ladder. Env-flag-gated via
+  // AGS_CAG_PACK_EVENTS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureCagPackEventsRetentionCronStarted } = await import(
+      "./services/cag-pack-events-retention-cron"
+    );
+    ensureCagPackEventsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-cag-pack-events-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
