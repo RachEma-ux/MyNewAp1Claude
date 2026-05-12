@@ -75,6 +75,7 @@ export {
   markAllNotificationsReadByKind,
   dismissNotifications,
   dismissAllNotifications,
+  dismissAllNotificationsByKind,
   pruneOldNotifications,
   AsdbUnavailableError as UserNotificationsAsdbUnavailableError,
 } from "./user-notifications.js";
@@ -93,6 +94,8 @@ export type {
   DismissNotificationsResult,
   DismissAllNotificationsInput,
   DismissAllNotificationsResult,
+  DismissAllNotificationsByKindInput,
+  DismissAllNotificationsByKindResult,
   PruneOldNotificationsInput,
   PruneOldNotificationsResult,
 } from "./user-notifications.js";

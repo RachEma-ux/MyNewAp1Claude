@@ -611,6 +611,86 @@ export async function dismissAllNotifications(
   return { deletedCount: deleted.length };
 }
 
+export interface DismissAllNotificationsByKindInput {
+  readonly userId: number;
+  /**
+   * Restrict the delete to notifications of this kind (single `eq`)
+   * or kinds (array `IN`). Empty array short-circuits to
+   * `{deletedCount: 0}` with no DB call — canonical Phase 22
+   * contract.
+   */
+  readonly notificationKind: string | readonly string[];
+  /**
+   * If true, only deletes notifications that have already been
+   * read. Default true — matches `dismissAllNotifications` default
+   * (safer "clear" gesture that preserves unread rows). Pass
+   * `false` to nuke matching rows regardless of read state.
+   */
+  readonly readOnly?: boolean;
+}
+
+export interface DismissAllNotificationsByKindResult {
+  readonly deletedCount: number;
+}
+
+/**
+ * Kind-scoped "clear my inbox" — sister of
+ * `dismissAllNotifications` (#568) with a notificationKind filter,
+ * completing the kind-scoped user gesture pair alongside
+ * `markAllNotificationsReadByKind` (#575). Use case: "dismiss all
+ * my promotion notifications" without nuking the whole inbox or
+ * multi-selecting in the UI.
+ *
+ * userId is enforced in the WHERE clause (cross-user dismissal
+ * impossible). Different from `pruneOldNotifications` (operator
+ * retention sweep, age-based) and from `dismissNotifications`
+ * (explicit id list).
+ */
+export async function dismissAllNotificationsByKind(
+  input: DismissAllNotificationsByKindInput,
+  options: ServiceOptions = {},
+): Promise<DismissAllNotificationsByKindResult> {
+  if (
+    Array.isArray(input.notificationKind) &&
+    input.notificationKind.length === 0
+  ) {
+    return { deletedCount: 0 };
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const readOnly = input.readOnly ?? true;
+  const kindFilter = Array.isArray(input.notificationKind)
+    ? inArray(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKind as string[],
+      )
+    : eq(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKind as string,
+      );
+
+  const whereClause = readOnly
+    ? and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        eq(agsWorkspaceUserNotifications.read, true),
+        kindFilter,
+      )
+    : and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        kindFilter,
+      );
+
+  const deleted = await db
+    .delete(agsWorkspaceUserNotifications)
+    .where(whereClause)
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { deletedCount: deleted.length };
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldNotificationsInput {

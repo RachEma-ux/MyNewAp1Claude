@@ -45,6 +45,7 @@ import {
   markAllNotificationsReadByKind,
   dismissNotifications,
   dismissAllNotifications,
+  dismissAllNotificationsByKind,
   pushNotificationToUsers,
 } from "./user-notifications.js";
 import {
@@ -525,6 +526,40 @@ export const workspaceObservabilityRouter = router({
         return await dismissAllNotifications({
           userId,
           readOnly: input?.readOnly,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  dismissAllNotificationsByKind: protectedProcedure
+    .input(
+      z.object({
+        notificationKind: z.union([
+          z.string().min(1).max(100),
+          z.array(z.string().min(1).max(100)).max(20),
+        ]),
+        readOnly: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "dismissAllNotificationsByKind requires an authenticated user",
+        }));
+      }
+      try {
+        return await dismissAllNotificationsByKind({
+          userId,
+          notificationKind: input.notificationKind,
+          readOnly: input.readOnly,
         });
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
