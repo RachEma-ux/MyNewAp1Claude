@@ -63,6 +63,7 @@ interface NotifState {
     unreadOnly?: boolean;
     kind?: string;
     kinds?: readonly string[];
+    kindLike?: string;
     createdSince?: Date;
   };
 }
@@ -114,10 +115,24 @@ function makeNotifFakeDb(initial?: Partial<NotifState>) {
           if (state.active.unreadOnly) rows = rows.filter((r) => !r.read);
           if (state.active.kind !== undefined) {
             rows = rows.filter((r) => r.notificationKind === state.active.kind);
-          }
-          if (state.active.kinds !== undefined) {
+          } else if (state.active.kinds !== undefined) {
             const set = new Set(state.active.kinds);
             rows = rows.filter((r) => set.has(r.notificationKind));
+          } else if (state.active.kindLike !== undefined) {
+            const pattern = state.active.kindLike;
+            const startsWild = pattern.startsWith("%");
+            const endsWild = pattern.endsWith("%");
+            const core = pattern.slice(
+              startsWild ? 1 : 0,
+              endsWild ? pattern.length - 1 : pattern.length,
+            );
+            rows = rows.filter((r) => {
+              if (startsWild && endsWild)
+                return r.notificationKind.includes(core);
+              if (startsWild) return r.notificationKind.endsWith(core);
+              if (endsWild) return r.notificationKind.startsWith(core);
+              return r.notificationKind === core;
+            });
           }
           if (state.active.createdSince !== undefined) {
             const cutoff = state.active.createdSince.getTime();
@@ -2060,5 +2075,108 @@ describe("pruneOldNotifications — Phase 22 #520 retention prune", () => {
       { getDb: () => db as never },
     );
     expect(result).toEqual({ deletedCount: 1 });
+  });
+});
+
+describe("listNotifications — notificationKindLike prefix filter (Phase 22 #599)", () => {
+  it("prefix LIKE (trailing %) — operator filters all 'promotion.%' kinds", async () => {
+    const now = new Date();
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 7, notificationKind: "promotion.approved", payload: null, read: false, createdAt: now },
+        { id: 2, userId: 7, notificationKind: "promotion.rejected", payload: null, read: false, createdAt: now },
+        { id: 3, userId: 7, notificationKind: "promotion.expired", payload: null, read: false, createdAt: now },
+        { id: 4, userId: 7, notificationKind: "graph_quality_run_completed", payload: null, read: false, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+    state.active.kindLike = "promotion.%";
+
+    const result = await listNotifications(
+      { userId: 7, notificationKindLike: "promotion.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("substring LIKE (leading + trailing %)", async () => {
+    const now = new Date();
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 7, notificationKind: "graph.proposal.approved", payload: null, read: false, createdAt: now },
+        { id: 2, userId: 7, notificationKind: "ingestion.proposal.rejected", payload: null, read: false, createdAt: now },
+        { id: 3, userId: 7, notificationKind: "graph.run.completed", payload: null, read: false, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+    state.active.kindLike = "%proposal%";
+
+    const result = await listNotifications(
+      { userId: 7, notificationKindLike: "%proposal%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("exact notificationKind takes precedence over notificationKindLike", async () => {
+    const now = new Date();
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 7, notificationKind: "promotion.approved", payload: null, read: false, createdAt: now },
+        { id: 2, userId: 7, notificationKind: "promotion.rejected", payload: null, read: false, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+    // Service prefers exact notificationKind over notificationKindLike; fake reflects this.
+    state.active.kind = "promotion.approved";
+
+    const result = await listNotifications(
+      {
+        userId: 7,
+        notificationKind: "promotion.approved",
+        notificationKindLike: "promotion.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("ANDs with unreadOnly + createdSince", async () => {
+    const old = new Date("2026-04-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        { id: 1, userId: 7, notificationKind: "promotion.approved", payload: null, read: true,  createdAt: recent },
+        { id: 2, userId: 7, notificationKind: "promotion.rejected", payload: null, read: false, createdAt: recent },
+        { id: 3, userId: 7, notificationKind: "promotion.expired",  payload: null, read: false, createdAt: old },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+    state.active.kindLike = "promotion.%";
+    state.active.unreadOnly = true;
+    state.active.createdSince = new Date("2026-05-01T00:00:00Z");
+
+    const result = await listNotifications(
+      {
+        userId: 7,
+        notificationKindLike: "promotion.%",
+        unreadOnly: true,
+        createdSince: new Date("2026-05-01T00:00:00Z"),
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([2]);
+  });
+
+  it("returns [] on ASDB-null (fail-soft)", async () => {
+    const result = await listNotifications(
+      { userId: 7, notificationKindLike: "promotion.%" },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
   });
 });

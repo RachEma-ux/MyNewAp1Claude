@@ -14,7 +14,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, count, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceUserNotifications } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -294,8 +294,24 @@ export interface ListNotificationsInput {
    * via SQL IN). Symmetric with listJobs.status (#539) and
    * listErrorEvents.errorClass (#540). Empty array short-circuits
    * to [] (vacuous IN).
+   *
+   * Mutually exclusive with `notificationKindLike` (exact match
+   * takes precedence when both are set — narrower wins).
    */
   readonly notificationKind?: string | readonly string[];
+  /**
+   * SQL LIKE-style prefix match on `notificationKind`. Sister of
+   * `listErrorEvents.sourceKindLike` (#514) and
+   * `listJobs.jobKindLike` (#598) — closes the LIKE-by-kind
+   * symmetry triad. Operators with kinds like `promotion.approved`
+   * / `promotion.rejected` / `promotion.expired` can scope all
+   * `promotion.%` rows in one call.
+   *
+   * Caller supplies the wildcards (typically `prefix%`). Composes
+   * with the other filters (ANDed in the WHERE). Mutually
+   * exclusive with `notificationKind` (exact match wins).
+   */
+  readonly notificationKindLike?: string;
   readonly limit?: number;
   /**
    * Restrict to notifications whose `createdAt` is at-or-after this
@@ -336,6 +352,13 @@ export async function listNotifications(
         ),
       );
     }
+  } else if (input.notificationKindLike !== undefined) {
+    filters.push(
+      like(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKindLike,
+      ),
+    );
   }
   if (input.createdSince !== undefined) {
     filters.push(
