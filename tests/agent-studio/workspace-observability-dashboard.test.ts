@@ -64,6 +64,8 @@ const STATS_FIXTURE = {
   jobsByKind: {},
   jobsByLane: {},
   failedJobsByKind: {},
+  pendingJobsByKind: {},
+  pendingJobsByLane: {},
   notificationsByKind: {},
   notificationsByLane: {},
   notificationsByReadState: { read: 0, unread: 0 },

@@ -17,6 +17,7 @@ interface SeededBuckets {
   jobsByStatus?: { status: string; count: number }[];
   jobsByKind?: { jobKind: string; count: number }[];
   failedJobsByKind?: { jobKind: string; count: number }[];
+  pendingJobsByKind?: { jobKind: string; count: number }[];
   notificationsByKind?: { notificationKind: string; count: number }[];
   notificationsByReadState?: { read: boolean | null; count: number }[];
   errorEventsByDay?: { day: string; count: number }[];
@@ -44,6 +45,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     | "day"
     | null = null;
   let jobsDayCallCount = 0;
+  let jobsKindWhereCallCount = 0;
 
   const select = vi.fn((shape: Record<string, unknown>) => {
     if ("sourceKind" in shape) nextSelectKind = "errorSource";
@@ -66,10 +68,17 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
             case "jobStatus":
               return seeded.jobsByStatus ?? [];
             case "jobKind":
-              // The failed-only jobsByKind query uses .where(); the
-              // total-jobsByKind query doesn't. Use that to dispatch.
-              if (whereCalled) return seeded.failedJobsByKind ?? [];
-              return seeded.jobsByKind ?? [];
+              // jobsByKind shapes in promise-order:
+              //   1) total jobsByKind   — no .where() (status-agnostic)
+              //   2) failedJobsByKind   — .where('failed')
+              //   3) pendingJobsByKind  — .where('pending')
+              // .where() calls dispatch by call count; the no-where call
+              // is the total.
+              if (!whereCalled) return seeded.jobsByKind ?? [];
+              jobsKindWhereCallCount += 1;
+              if (jobsKindWhereCallCount === 1)
+                return seeded.failedJobsByKind ?? [];
+              return seeded.pendingJobsByKind ?? [];
             case "notifKind":
               return seeded.notificationsByKind ?? [];
             case "notifRead":
@@ -440,6 +449,77 @@ describe("getWorkspaceObservabilityStats — failedJobsByKind sub-stat", () => {
       getDb: () => null as never,
     });
     expect(stats.failedJobsByKind).toEqual({});
+  });
+});
+
+describe("getWorkspaceObservabilityStats — pendingJobsByKind sub-stat (#578)", () => {
+  it("buckets only the pending-status rows by jobKind", async () => {
+    const { db } = makeFakeDb({
+      jobsByKind: [
+        { jobKind: "projection.rebuild", count: 12 },
+        { jobKind: "projection.sync", count: 4 },
+        { jobKind: "retention.sweep", count: 2 },
+      ],
+      pendingJobsByKind: [
+        { jobKind: "projection.rebuild", count: 8 },
+        { jobKind: "projection.sync", count: 1 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.pendingJobsByKind).toEqual({
+      "projection.rebuild": 8,
+      "projection.sync": 1,
+    });
+  });
+
+  it("pendingJobsByLane rolls up by first dot-segment (#578)", async () => {
+    const { db } = makeFakeDb({
+      pendingJobsByKind: [
+        { jobKind: "projection.rebuild", count: 4 },
+        { jobKind: "projection.sync", count: 2 },
+        { jobKind: "retention.sweep", count: 1 },
+        { jobKind: "importScan", count: 3 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.pendingJobsByLane).toEqual({
+      projection: 6,
+      retention: 1,
+      importScan: 3,
+    });
+  });
+
+  it("failed + pending kind breakdowns are independent (#578)", async () => {
+    const { db } = makeFakeDb({
+      failedJobsByKind: [{ jobKind: "x", count: 5 }],
+      pendingJobsByKind: [{ jobKind: "y", count: 7 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.failedJobsByKind).toEqual({ x: 5 });
+    expect(stats.pendingJobsByKind).toEqual({ y: 7 });
+  });
+
+  it("returns an empty pendingJobsByKind when nothing is pending", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.pendingJobsByKind).toEqual({});
+    expect(stats.pendingJobsByLane).toEqual({});
+  });
+
+  it("returns an empty pendingJobsByKind on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.pendingJobsByKind).toEqual({});
+    expect(stats.pendingJobsByLane).toEqual({});
   });
 });
 
