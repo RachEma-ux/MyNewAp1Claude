@@ -10,6 +10,7 @@ import {
   enqueueJob,
   getJobById,
   listJobs,
+  listStaleRunningJobs,
   markJobStarted,
   markJobCompleted,
   markJobFailed,
@@ -957,5 +958,136 @@ describe("pruneOldBackgroundJobs — Phase 22 retention", () => {
       { getDb: () => db as never },
     );
     expect(result.deletedCount).toBe(1);
+  });
+});
+
+describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
+  // Dedicated fake — the global makeFakeDb hardcodes desc(updatedAt)
+  // for the listJobs path; this helper sorts ASC instead, so we want
+  // a fake that proves the filter + ordering happen at the SQL layer.
+  function makeStaleFakeDb(rows: FakeRow[]) {
+    const calls: { whereCalled: boolean; orderByCalled: boolean } = {
+      whereCalled: false,
+      orderByCalled: false,
+    };
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => {
+            calls.whereCalled = true;
+            return chain;
+          },
+          orderBy: () => {
+            calls.orderByCalled = true;
+            return {
+              limit: async (n: number) => {
+                const running = rows.filter((r) => r.status === "running");
+                running.sort(
+                  (a, b) => a.updatedAt.getTime() - b.updatedAt.getTime(),
+                );
+                return running.slice(0, n);
+              },
+            };
+          },
+        };
+        return chain;
+      }),
+    };
+    return { db, calls };
+  }
+
+  it("fail-soft returns [] when ASDB is unavailable", async () => {
+    const result = await listStaleRunningJobs(10, {
+      getDb: () => null as never,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("returns running rows sorted oldest-touched first", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base + 5000),
+      },
+      {
+        id: 2,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base + 1000),
+      },
+      {
+        id: 3,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base + 3000),
+      },
+      {
+        id: 4,
+        jobKind: "k",
+        payload: null,
+        status: "completed",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base),
+      },
+    ];
+    const { db, calls } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(10, { getDb: () => db as never });
+    expect(calls.whereCalled).toBe(true);
+    expect(calls.orderByCalled).toBe(true);
+    expect(result.map((r) => r.id)).toEqual([2, 3, 1]);
+  });
+
+  it("respects the limit parameter", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      jobKind: "k",
+      payload: null,
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: new Date(base),
+      updatedAt: new Date(base + i * 1000),
+    }));
+    const { db } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(5, { getDb: () => db as never });
+    expect(result).toHaveLength(5);
+  });
+
+  it("defaults limit to 10 when not specified", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      jobKind: "k",
+      payload: null,
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: new Date(base),
+      updatedAt: new Date(base + i * 1000),
+    }));
+    const { db } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(undefined, {
+      getDb: () => db as never,
+    });
+    expect(result).toHaveLength(10);
   });
 });

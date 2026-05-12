@@ -405,6 +405,7 @@ export const workspaceObservabilityRouter = router({
       z
         .object({
           recentLimit: z.number().int().min(1).max(200).optional(),
+          staleLimit: z.number().int().min(1).max(100).optional(),
         })
         .optional(),
     )
