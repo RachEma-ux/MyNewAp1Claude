@@ -15,7 +15,7 @@
  * approval).
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -100,6 +100,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
           <TabsTrigger value="cron-status">Cron Status</TabsTrigger>
           <TabsTrigger value="observability-stats">Observability Stats</TabsTrigger>
+          <TabsTrigger value="observability-dashboard">Observability Dashboard</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -122,6 +123,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="observability-stats">
           <ObservabilityStatsPanel />
+        </TabsContent>
+        <TabsContent value="observability-dashboard">
+          <ObservabilityDashboardPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -985,6 +989,173 @@ function ObservabilityStatsPanel() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ── Observability Dashboard (Phase 22 follow-up #617) ─────────────────
+//
+// Third client-side consumer of the workspace-observability surface
+// (after #615 cron status + #616 stats). Surfaces the 5 recent-slice
+// drilldown lists from `agentStudio.workspaceObservability.getDashboard`:
+//  - recentFailedJobs   — drilldown for failedJobsByDay
+//  - recentCompletedJobs — drilldown for completedJobsByDay
+//  - recentErrorEvents  — drilldown for errorEventsByDay
+//  - staleRunningJobs   — running-tier SLA breach
+//  - oldestPendingJobs  — pending-tier backlog
+//
+// Each list is small + plaintext (id / kind / status / timestamp / a
+// truncated message). Operators copy the id into a separate triage
+// flow — this panel is the "what's on fire right now" overview, NOT
+// the deep drilldown view. The 7-PR Phase 22 ledger covers far more
+// stats than this seed panel surfaces; richer filtering UIs are
+// natural follow-ups.
+
+function shortTime(d: Date | string | null | undefined): string {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toISOString().replace("T", " ").slice(0, 16) + "Z";
+}
+
+function truncate(s: string | null | undefined, n: number): string {
+  if (!s) return "";
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+function ListSlice<T extends { id: number }>({
+  title,
+  rows,
+  renderRow,
+  emptyMessage,
+}: {
+  title: string;
+  rows: readonly T[] | undefined;
+  renderRow: (r: T) => ReactNode;
+  emptyMessage: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <SectionLabel>{title}</SectionLabel>
+          <Badge variant="secondary">{rows?.length ?? 0}</Badge>
+        </div>
+        {!rows || rows.length === 0 ? (
+          <div className="text-xs text-zinc-500 italic">{emptyMessage}</div>
+        ) : (
+          <div className="space-y-1">
+            {rows.map((r) => (
+              <div
+                key={r.id}
+                className="rounded border border-zinc-800 p-2 text-xs"
+              >
+                {renderRow(r)}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ObservabilityDashboardPanel() {
+  const q = trpc.agentStudio.workspaceObservability.getDashboard.useQuery(
+    {},
+    { refetchInterval: 30_000 },
+  );
+
+  if (q.isLoading) return <LoadingState label="Loading observability dashboard…" />;
+  if (q.isError) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-red-400">
+          Failed to load dashboard:{" "}
+          {(q.error as { message?: string })?.message ?? "unknown"}
+        </CardContent>
+      </Card>
+    );
+  }
+  const d = q.data;
+  if (!d) return null;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <ListSlice
+        title="Recent failed jobs"
+        rows={d.recentFailedJobs}
+        emptyMessage="No recent failures."
+        renderRow={(j: any) => (
+          <>
+            <div className="flex justify-between gap-2">
+              <span className="font-mono">#{j.id}</span>
+              <span className="text-zinc-400">{j.jobKind}</span>
+              <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
+            </div>
+            {j.lastError ? (
+              <div className="text-red-300 mt-1">{truncate(j.lastError, 160)}</div>
+            ) : null}
+          </>
+        )}
+      />
+      <ListSlice
+        title="Recent completed jobs"
+        rows={d.recentCompletedJobs}
+        emptyMessage="No recent completions."
+        renderRow={(j: any) => (
+          <div className="flex justify-between gap-2">
+            <span className="font-mono">#{j.id}</span>
+            <span className="text-zinc-400">{j.jobKind}</span>
+            <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
+          </div>
+        )}
+      />
+      <ListSlice
+        title="Recent error events"
+        rows={d.recentErrorEvents}
+        emptyMessage="No recent error events."
+        renderRow={(e: any) => (
+          <>
+            <div className="flex justify-between gap-2">
+              <span className="font-mono">#{e.id}</span>
+              <span className="text-zinc-400">{e.errorClass ?? "—"}</span>
+              <span className="text-zinc-500">{shortTime(e.createdAt)}</span>
+            </div>
+            <div className="text-zinc-300 mt-1">{e.sourceKind}</div>
+            {e.errorMessage ? (
+              <div className="text-red-300 mt-1">{truncate(e.errorMessage, 160)}</div>
+            ) : null}
+          </>
+        )}
+      />
+      <ListSlice
+        title="Stale running jobs"
+        rows={d.staleRunningJobs}
+        emptyMessage="No stuck running jobs."
+        renderRow={(j: any) => (
+          <div className="flex justify-between gap-2">
+            <span className="font-mono">#{j.id}</span>
+            <span className="text-zinc-400">{j.jobKind}</span>
+            <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
+          </div>
+        )}
+      />
+      <div className="md:col-span-2">
+        <ListSlice
+          title="Oldest pending jobs"
+          rows={d.oldestPendingJobs}
+          emptyMessage="No pending backlog."
+          renderRow={(j: any) => (
+            <div className="flex justify-between gap-2">
+              <span className="font-mono">#{j.id}</span>
+              <span className="text-zinc-400">{j.jobKind}</span>
+              <span className="text-zinc-500">
+                queued {shortTime(j.createdAt)}
+              </span>
+            </div>
+          )}
+        />
+      </div>
     </div>
   );
 }
