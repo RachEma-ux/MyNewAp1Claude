@@ -156,7 +156,12 @@ export const workspaceObservabilityRouter = router({
       z
         .object({
           unreadOnly: z.boolean().optional(),
-          notificationKind: z.string().min(1).max(100).optional(),
+          notificationKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           limit: z.number().int().min(1).max(500).optional(),
           createdSince: z.coerce.date().optional(),
         })
@@ -187,7 +192,12 @@ export const workspaceObservabilityRouter = router({
       z
         .object({
           unreadOnly: z.boolean().optional(),
-          notificationKind: z.string().min(1).max(100).optional(),
+          notificationKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           limit: z.number().int().min(1).max(500).optional(),
         })
         .optional(),
