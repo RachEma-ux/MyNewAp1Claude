@@ -361,6 +361,27 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     });
   });
 
+  it("forwards recentAttemptsGte (#609)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentAttemptsGte: 5 });
+    expect(dashboardMock).toHaveBeenCalledWith({ recentAttemptsGte: 5 });
+  });
+
+  it("rejects out-of-range recentAttemptsGte at the input layer (#609)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ recentAttemptsGte: -1 }),
+    ).rejects.toThrow();
+    await expect(
+      caller.getDashboard({ recentAttemptsGte: 9999 }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
+
   it("rejects oversized recentErrorEventsUserId array (>50) at the input layer (#608)", async () => {
     const caller = workspaceObservabilityRouter.createCaller({
       user: { id: 1, role: "user" },

@@ -391,6 +391,49 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentAttemptsGte forwards to BOTH listJobs calls (#609)", async () => {
+    await getObservabilityDashboard({ recentAttemptsGte: 5 });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", attemptsGte: 5 }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", attemptsGte: 5 }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentAttemptsGte composes with recentJobKind on both slices (#609)", async () => {
+    await getObservabilityDashboard({
+      recentAttemptsGte: 3,
+      recentJobKind: "projection.rebuild",
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        jobKind: "projection.rebuild",
+        attemptsGte: 3,
+      }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        jobKind: "projection.rebuild",
+        attemptsGte: 3,
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentAttemptsGte undefined → no attemptsGte filter (#609)", async () => {
+    await getObservabilityDashboard({});
+    const failedArgs = listJobsMock.mock.calls[0]?.[0] as { attemptsGte?: number };
+    const completedArgs = listJobsMock.mock.calls[1]?.[0] as { attemptsGte?: number };
+    expect(failedArgs.attemptsGte).toBeUndefined();
+    expect(completedArgs.attemptsGte).toBeUndefined();
+  });
+
   it("forwards errorEventsCreatedSince to listErrorEvents (#590)", async () => {
     const since = new Date("2026-05-12T12:00:00Z");
     await getObservabilityDashboard({ errorEventsCreatedSince: since });
