@@ -215,6 +215,21 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-retention-cron] start skipped — ${message}`);
   }
 
+  // Step 3.6: Phase 22 follow-up #613 — stale-running background-job sweep
+  // cron. The Phase 22 arc shipped failStaleRunningJobs but had no scheduled
+  // caller — operators had to fire it manually to unstick phantom in-flight
+  // rows. Default 10-minute tick with a 30-minute staleness threshold.
+  // Env-flag-gated via AGS_STALE_RUNNING_CRON_DISABLED.
+  try {
+    const { ensureStaleRunningCronStarted } = await import(
+      "./services/workspace-observability/stale-running-job-cron"
+    );
+    ensureStaleRunningCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-stale-running-cron] start skipped — ${message}`);
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
