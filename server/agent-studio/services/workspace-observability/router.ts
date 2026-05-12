@@ -679,6 +679,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          staleOlderThan: z.coerce.date().optional(),
           pendingLimit: z.number().int().min(1).max(100).optional(),
           pendingJobKind: z
             .union([

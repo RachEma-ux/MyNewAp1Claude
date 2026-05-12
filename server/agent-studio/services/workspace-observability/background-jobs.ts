@@ -286,6 +286,15 @@ export interface ListStaleRunningJobsInput {
    * short-circuit (returns []).
    */
   readonly jobKind?: string | readonly string[];
+  /**
+   * Optional SLA cutoff: only return rows whose `updatedAt` is
+   * strictly older than this. Lets operators trim the stale-running
+   * list to actual SLA breaches (`Date.now() - 30*60*1000` for "stuck
+   * past 30 minutes") instead of just the top-N oldest. Mirrors
+   * `failStaleRunningJobs.olderThan` (#546) — same time anchor on
+   * `updatedAt` (the heartbeat timestamp).
+   */
+  readonly olderThan?: Date;
 }
 
 /**
@@ -332,6 +341,9 @@ export async function listStaleRunningJobs(
         eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
       );
     }
+  }
+  if (input.olderThan !== undefined) {
+    filters.push(lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan));
   }
 
   const rows = await db

@@ -384,6 +384,31 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards staleOlderThan SLA cutoff to listStaleRunningJobs (#588)", async () => {
+    const cutoff = new Date("2026-05-12T11:30:00Z");
+    await getObservabilityDashboard({ staleOlderThan: cutoff });
+    expect(listStaleMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: undefined, olderThan: cutoff },
+      expect.any(Object),
+    );
+  });
+
+  it("staleOlderThan composes with staleJobKind (#588)", async () => {
+    const cutoff = new Date("2026-05-12T11:30:00Z");
+    await getObservabilityDashboard({
+      staleJobKind: "projection.rebuild",
+      staleOlderThan: cutoff,
+    });
+    expect(listStaleMock).toHaveBeenCalledWith(
+      {
+        limit: 10,
+        jobKind: "projection.rebuild",
+        olderThan: cutoff,
+      },
+      expect.any(Object),
+    );
+  });
+
   it("fans all six underlying calls out in parallel (Promise.all)", async () => {
     const order: string[] = [];
     statsMock.mockImplementationOnce(async () => {

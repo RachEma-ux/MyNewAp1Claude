@@ -1403,6 +1403,62 @@ describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
     expect(result).toEqual([]);
   });
 
+  it("olderThan filter excludes rows whose updatedAt is at-or-after the cutoff (#588)", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const cutoff = new Date(base + 4000); // anything updatedAt < this is stale
+    const rows: FakeRow[] = [
+      // updatedAt < cutoff (3000 < 4000) → STALE, included.
+      {
+        id: 100,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base + 3000),
+      },
+      // updatedAt > cutoff (5000 > 4000) → NOT stale, excluded.
+      {
+        id: 101,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base + 5000),
+      },
+    ];
+    // Mini-fake similar to makeStaleFakeDb but applies olderThan
+    // filter at the orderBy/limit step.
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async (n: number) => {
+              const filtered = rows
+                .filter((r) => r.status === "running")
+                .filter((r) => r.updatedAt.getTime() < cutoff.getTime());
+              filtered.sort(
+                (a, b) => a.updatedAt.getTime() - b.updatedAt.getTime(),
+              );
+              return filtered.slice(0, n);
+            },
+          }),
+        };
+        return chain;
+      }),
+    };
+    const result = await listStaleRunningJobs(
+      { limit: 10, olderThan: cutoff },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([100]);
+  });
+
   it("returns running rows sorted oldest-touched first", async () => {
     const base = new Date("2026-05-12T00:00:00Z").getTime();
     const rows: FakeRow[] = [
