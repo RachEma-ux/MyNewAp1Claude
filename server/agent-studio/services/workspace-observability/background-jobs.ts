@@ -700,6 +700,17 @@ export interface PruneOldBackgroundJobsInput {
    * or ["completed"] for the safest policy.
    */
   readonly statuses?: readonly JobStatus[];
+  /**
+   * Optional jobKind filter — single string (`eq`) or array (`IN`).
+   * Lets an operator/cron prune one worker's old rows without
+   * touching others. Mirrors the array pattern on
+   * failStaleRunningJobs.jobKind (#548).
+   *
+   * Empty array short-circuits to `{deletedCount: 0}` (vacuous IN),
+   * with no DB call so a no-op operator click doesn't fail when
+   * ASDB is down.
+   */
+  readonly jobKind?: string | readonly string[];
 }
 
 export interface PruneOldBackgroundJobsResult {
@@ -721,6 +732,12 @@ export async function pruneOldBackgroundJobs(
   input: PruneOldBackgroundJobsInput,
   options: ServiceOptions = {},
 ): Promise<PruneOldBackgroundJobsResult> {
+  // Empty jobKind array → vacuous IN; short-circuit BEFORE the ASDB
+  // probe (matches failStaleRunningJobs #548 + enqueueJobs #547).
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return { deletedCount: 0 };
+  }
+
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) return { deletedCount: 0 };
@@ -730,6 +747,16 @@ export async function pruneOldBackgroundJobs(
     lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan),
     inArray(agsWorkspaceBackgroundJobs.status, statuses as JobStatus[]),
   ];
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput));
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
 
   const deleted = await db
     .delete(agsWorkspaceBackgroundJobs)

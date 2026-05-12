@@ -101,6 +101,25 @@ describe("runRetentionSweep", () => {
     ]);
   });
 
+  it("passes backgroundJobsJobKind through to the jobs prune (single kind, #549)", async () => {
+    await runRetentionSweep(
+      { backgroundJobsJobKind: "projection.rebuild" },
+      { now: new Date() },
+    );
+    expect(pruneJobsMock.mock.calls[0][0].jobKind).toBe("projection.rebuild");
+  });
+
+  it("passes backgroundJobsJobKind through to the jobs prune (array, #549)", async () => {
+    await runRetentionSweep(
+      { backgroundJobsJobKind: ["projection.rebuild", "import.scan"] },
+      { now: new Date() },
+    );
+    expect(pruneJobsMock.mock.calls[0][0].jobKind).toEqual([
+      "projection.rebuild",
+      "import.scan",
+    ]);
+  });
+
   it("runs all three prunes in parallel (not serially)", async () => {
     const callOrder: string[] = [];
     pruneErrorMock.mockImplementationOnce(async () => {

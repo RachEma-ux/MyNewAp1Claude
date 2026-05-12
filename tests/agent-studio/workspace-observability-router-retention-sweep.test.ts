@@ -108,4 +108,39 @@ describe("workspaceObservabilityRouter.runRetentionSweep", () => {
     ).rejects.toThrow();
     expect(sweepMock).not.toHaveBeenCalled();
   });
+
+  it("forwards single-string backgroundJobsJobKind (#549)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      backgroundJobsJobKind: "projection.rebuild",
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      backgroundJobsJobKind: "projection.rebuild",
+    });
+  });
+
+  it("forwards array-form backgroundJobsJobKind (#549)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      backgroundJobsJobKind: ["projection.rebuild", "import.scan"],
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      backgroundJobsJobKind: ["projection.rebuild", "import.scan"],
+    });
+  });
+
+  it("rejects oversized backgroundJobsJobKind array (#549)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const oversized = Array.from({ length: 21 }, (_, i) => `kind.${i}`);
+    await expect(
+      caller.runRetentionSweep({ backgroundJobsJobKind: oversized }),
+    ).rejects.toThrow();
+    expect(sweepMock).not.toHaveBeenCalled();
+  });
 });
