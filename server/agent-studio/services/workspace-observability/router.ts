@@ -27,6 +27,7 @@ import {
   markJobCancelled,
   retryJob,
   retryJobs,
+  retryJobsByQuery,
   cancelJobs,
   failStaleRunningJobs,
   JobNotFoundError,
@@ -757,6 +758,43 @@ export const workspaceObservabilityRouter = router({
     .mutation(async ({ input }) => {
       try {
         return await failStaleRunningJobs(input);
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // ============================================================
+  // Bulk-retry-by-query (operator-triggered, admin-only)
+  //
+  // Sister of failStaleRunningBackgroundJobs on the opposite-direction
+  // transition (failed→pending vs running→failed). After a worker-side
+  // hotfix lands, an operator can run "retry all failed jobs of
+  // jobKind X" in one round trip instead of multi-selecting failed
+  // rows in the UI. Delegates to retryJobs for the per-row flip
+  // (partition pattern).
+  // ============================================================
+
+  retryBackgroundJobsByQuery: adminProcedure
+    .input(
+      z
+        .object({
+          jobKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+          limit: z.number().int().min(1).max(500).optional(),
+          olderThan: z.coerce.date().optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await retryJobsByQuery(input ?? {});
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
