@@ -128,6 +128,26 @@ export interface WorkspaceObservabilityStats {
    * on the pending-backlog axis.
    */
   readonly pendingJobsByLane: Record<string, number>;
+  /**
+   * Running-only subset of `jobsByKind`: counts only rows where
+   * `status='running'`, bucketed by jobKind. Closes the per-
+   * operationally-distinct-status byKind trio (failed + pending +
+   * running). Operator question: "which kind has the most
+   * concurrent workers right now?" — capacity / worker-pool visibility
+   * complement to the pending-backlog and failure breakdowns.
+   *
+   * Paired with `listStaleRunningJobs` (#545): this gives the live
+   * running-count by kind, that gives the longest-running rows.
+   * A kind with a high count here AND old samples in the stale list
+   * is a worker subsystem failing to terminate.
+   */
+  readonly runningJobsByKind: Record<string, number>;
+  /**
+   * Lane rollup of `runningJobsByKind` — running-only counts
+   * aggregated by first dot-segment. Completes the lane-rollup trio
+   * for jobs by operational status (failed/pending/running).
+   */
+  readonly runningJobsByLane: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
   /**
    * Lane rollup of `notificationsByKind` by the first dot-separated
@@ -189,6 +209,8 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   failedJobsByLane: {},
   pendingJobsByKind: {},
   pendingJobsByLane: {},
+  runningJobsByKind: {},
+  runningJobsByLane: {},
   notificationsByKind: {},
   notificationsByLane: {},
   notificationsByDay: [],
@@ -291,6 +313,7 @@ export async function getWorkspaceObservabilityStats(
     jobsTrendRows,
     failedJobsByKindRows,
     pendingJobsByKindRows,
+    runningJobsByKindRows,
     failedJobsTrendRows,
     completedJobsTrendRows,
     notificationsTrendRows,
@@ -382,6 +405,14 @@ export async function getWorkspaceObservabilityStats(
       .groupBy(agsWorkspaceBackgroundJobs.jobKind),
     db
       .select({
+        jobKind: agsWorkspaceBackgroundJobs.jobKind,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(sql`${agsWorkspaceBackgroundJobs.status} = 'running'`)
+      .groupBy(agsWorkspaceBackgroundJobs.jobKind),
+    db
+      .select({
         day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
         count: sql<number>`count(*)::int`,
       })
@@ -466,6 +497,7 @@ export async function getWorkspaceObservabilityStats(
 
   const failedJobsByKind = bucketize(failedJobsByKindRows, "jobKind");
   const pendingJobsByKind = bucketize(pendingJobsByKindRows, "jobKind");
+  const runningJobsByKind = bucketize(runningJobsByKindRows, "jobKind");
 
   return {
     errorEventsBySourceKind,
@@ -482,6 +514,8 @@ export async function getWorkspaceObservabilityStats(
     failedJobsByLane: rollupByLane(failedJobsByKind),
     pendingJobsByKind,
     pendingJobsByLane: rollupByLane(pendingJobsByKind),
+    runningJobsByKind,
+    runningJobsByLane: rollupByLane(runningJobsByKind),
     notificationsByKind,
     notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByDay,
