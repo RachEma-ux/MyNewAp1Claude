@@ -361,6 +361,17 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     });
   });
 
+  it("forwards recentJobsCreatedSince (#610)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    const since = new Date("2026-05-12T12:00:00Z");
+    await caller.getDashboard({ recentJobsCreatedSince: since });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentJobsCreatedSince: since,
+    });
+  });
+
   it("forwards recentAttemptsGte (#609)", async () => {
     const caller = workspaceObservabilityRouter.createCaller({
       user: { id: 1, role: "user" },

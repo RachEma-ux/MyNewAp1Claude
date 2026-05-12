@@ -391,6 +391,44 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentJobsCreatedSince forwards to BOTH listJobs calls (#610)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({ recentJobsCreatedSince: since });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", createdSince: since }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", createdSince: since }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentJobsCreatedSince composes with recentJobsUpdatedSince (#610)", async () => {
+    const enqueued = new Date("2026-05-12T12:00:00Z");
+    const flipped = new Date("2026-05-12T13:00:00Z");
+    await getObservabilityDashboard({
+      recentJobsCreatedSince: enqueued,
+      recentJobsUpdatedSince: flipped,
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        createdSince: enqueued,
+        updatedSince: flipped,
+      }),
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        createdSince: enqueued,
+        updatedSince: flipped,
+      }),
+      expect.any(Object),
+    );
+  });
+
   it("recentAttemptsGte forwards to BOTH listJobs calls (#609)", async () => {
     await getObservabilityDashboard({ recentAttemptsGte: 5 });
     expect(listJobsMock).toHaveBeenCalledWith(
