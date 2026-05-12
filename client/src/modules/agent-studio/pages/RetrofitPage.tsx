@@ -103,6 +103,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="observability-dashboard">Observability Dashboard</TabsTrigger>
           <TabsTrigger value="admin-sweeps">Admin Sweeps</TabsTrigger>
           <TabsTrigger value="bulk-job-ops">Bulk Job Ops</TabsTrigger>
+          <TabsTrigger value="runtime-runs-retention">Runtime Runs Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -134,6 +135,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="bulk-job-ops">
           <BulkJobOpsPanel />
+        </TabsContent>
+        <TabsContent value="runtime-runs-retention">
+          <RuntimeRunsRetentionPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -1488,6 +1492,166 @@ function BulkJobOpsPanel() {
               <div className="text-zinc-400 uppercase mb-1">Last run</div>
               <div>cancelled: {cancelResult.cancelled}</div>
               <div>scanned: {cancelResult.scanned}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Runtime Runs Retention (Phase 22 follow-up #624) ──────────────────
+//
+// Operator UI for the runtime-runs retention mini-arc (#621 prune
+// primitive + #622 cron scheduler + #623 tRPC exposure). Mirrors the
+// shape of CronStatusPanel + AdminSweepsPanel for the workspace-
+// observability surface — two cards side-by-side:
+//
+//   1. Cron status (read-only, auto-refresh every 30s)
+//   2. Manual sweep "Run Now" with retentionDays + environment inputs
+//
+// Operators use this to verify the daily 04:00 UTC cron is firing
+// healthily and to fire on-demand sweeps post-incident (e.g. flush
+// 7-day-old draft runs after a load test).
+
+function RuntimeRunsRetentionPanel() {
+  const statusQuery = trpc.agentStudio.runs.getRetentionCronStatus.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
+  const [retentionDays, setRetentionDays] = useState("30");
+  const [environment, setEnvironment] = useState("");
+  const [manualResult, setManualResult] = useState<
+    { deletedRunsCount: number; deletedStepsCount: number } | null
+  >(null);
+
+  const pruneMut = trpc.agentStudio.runs.pruneRetention.useMutation({
+    onSuccess: (data) => {
+      setManualResult({
+        deletedRunsCount: data.deletedRunsCount,
+        deletedStepsCount: data.deletedStepsCount,
+      });
+      toast.success(
+        `Retention sweep complete — ${data.deletedRunsCount} run(s) + ${data.deletedStepsCount} step row(s) deleted`,
+      );
+      void statusQuery.refetch();
+    },
+    onError: (err) =>
+      toast.error(`Retention sweep failed: ${err.message ?? "unknown"}`),
+  });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 30);
+  const status = statusQuery.data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Cron status */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Runtime-runs retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 04:00 UTC (env: AGS_RUNTIME_RUNS_RETENTION_CRON_EXPR
+            / AGS_RUNTIME_RUNS_RETENTION_DAYS). Sweeps `ags_runtime_runs` +
+            cascades to `ags_runtime_run_steps` for runs older than the
+            retention window with terminal statuses `completed` / `failed` /
+            `cancelled`.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last result</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? `${status.lastResult.deletedRunsCount} runs`
+                  : "—"}
+              </div>
+              {status?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  + {status.lastResult.deletedStepsCount} step row(s)
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Manual sweep */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Bypasses the daily cron — fires a sweep immediately. Useful for
+            post-incident flushes or pre-demo prep. Empty `environment`
+            sweeps all environments.
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">retentionDays</Label>
+              <Input
+                type="number"
+                value={retentionDays}
+                onChange={(e) => setRetentionDays(e.target.value)}
+                min={1}
+                max={3650}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">environment (optional)</Label>
+              <Input
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value)}
+                placeholder="e.g. draft / staging / production"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              const envSummary = environment.trim()
+                ? ` in environment="${environment.trim()}"`
+                : "";
+              if (
+                window.confirm(
+                  `Delete runs older than ${parsedDays} days${envSummary}? This also cascade-deletes the corresponding step rows.`,
+                )
+              ) {
+                pruneMut.mutate({
+                  retentionDays: parsedDays,
+                  environment: environment.trim() || undefined,
+                });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs">
+              <div className="text-zinc-400 uppercase mb-1">Last manual run</div>
+              <div>runs deleted: {manualResult.deletedRunsCount}</div>
+              <div>steps deleted: {manualResult.deletedStepsCount}</div>
             </div>
           ) : null}
         </CardContent>
