@@ -59,6 +59,7 @@ const STATS_FIXTURE = {
   errorEventsByDay: [],
   jobsCreatedByDay: [],
   failedJobsByDay: [],
+  completedJobsByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
   jobsByLane: {},
