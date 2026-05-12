@@ -39,6 +39,7 @@ interface FakeState {
   active: {
     jobId?: number;
     status?: string;
+    statuses?: readonly string[];
     jobKind?: string;
     createdSince?: Date;
     updatedSince?: Date;
@@ -63,6 +64,10 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           let rows = state.rows;
           if (state.active.status !== undefined) {
             rows = rows.filter((r) => r.status === state.active.status);
+          }
+          if (state.active.statuses !== undefined) {
+            const set = new Set(state.active.statuses);
+            rows = rows.filter((r) => set.has(r.status));
           }
           if (state.active.jobKind !== undefined) {
             rows = rows.filter((r) => r.jobKind === state.active.jobKind);
@@ -330,6 +335,84 @@ describe("listJobs — Phase 22", () => {
     );
     expect(result.length).toBe(1);
     expect(result[0].id).toBe(2);
+  });
+
+  it("filters by an array of statuses (OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 2,
+          jobKind: "x",
+          payload: null,
+          status: "failed",
+          attempts: 2,
+          lastError: "boom",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 3,
+          jobKind: "x",
+          payload: null,
+          status: "cancelled",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 4,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.statuses = ["failed", "cancelled"];
+    const result = await listJobs(
+      { status: ["failed", "cancelled"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([2, 3]);
+  });
+
+  it("returns [] when status array is empty (vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "pending",
+          attempts: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    const result = await listJobs(
+      { status: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
   });
 
   it("filters by status when supplied", async () => {

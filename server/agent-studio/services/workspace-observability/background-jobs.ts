@@ -138,7 +138,18 @@ export async function getJobById(
 }
 
 export interface ListJobsInput {
-  readonly status?: JobStatus;
+  /**
+   * Single status to filter by, or an array of statuses (OR semantics
+   * via SQL `IN`). Operators routinely want "failed OR cancelled" for
+   * incident triage or "pending OR running" for the live-work view —
+   * the array form removes the need for two separate calls + a
+   * client-side merge.
+   *
+   * Empty array short-circuits to no rows (the IN clause would be
+   * vacuous), matching the intent "filter by these statuses, but
+   * there are none".
+   */
+  readonly status?: JobStatus | readonly JobStatus[];
   readonly jobKind?: string;
   readonly limit?: number;
   /**
@@ -166,8 +177,19 @@ export async function listJobs(
   if (!db) return [];
 
   const filters = [];
-  if (input.status !== undefined) {
-    filters.push(eq(agsWorkspaceBackgroundJobs.status, input.status));
+  const statusInput = input.status;
+  if (statusInput !== undefined) {
+    if (Array.isArray(statusInput)) {
+      // Empty array → vacuous IN clause; short-circuit to no rows.
+      if (statusInput.length === 0) return [];
+      filters.push(
+        inArray(agsWorkspaceBackgroundJobs.status, statusInput as JobStatus[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.status, statusInput as JobStatus),
+      );
+    }
   }
   if (input.jobKind !== undefined) {
     filters.push(eq(agsWorkspaceBackgroundJobs.jobKind, input.jobKind));
