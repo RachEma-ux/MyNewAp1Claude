@@ -386,6 +386,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.16: Phase 22 follow-up #662 — graph-correction-proposals retention cron.
+  // The ags_graph_correction_proposals + ags_graph_correction_decisions +
+  // ags_graph_correction_audit_events tables had no retention before
+  // #661 + #662. Default daily 13:00 UTC sweep — 11th slot in the
+  // daily-sweep ladder. Three-table cascade: decisions + audit_events
+  // (parallel, both NO ACTION FKs) then proposals. Env-flag-gated via
+  // AGS_GRAPH_CORRECTION_PROPOSALS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureGraphCorrectionProposalsRetentionCronStarted } =
+      await import("./services/graph-correction-proposals-retention-cron");
+    ensureGraphCorrectionProposalsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-correction-proposals-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
