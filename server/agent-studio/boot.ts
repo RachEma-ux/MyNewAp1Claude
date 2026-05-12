@@ -283,6 +283,22 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.10: Phase 22 follow-up #634 — catalog-sync-log retention cron.
+  // The ags_catalog_sync_log table had no retention before #633 + #634.
+  // Default daily 07:00 UTC sweep — 5th slot in the daily-sweep ladder.
+  // Env-flag-gated via AGS_CATALOG_SYNC_LOG_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureCatalogSyncLogRetentionCronStarted } = await import(
+      "./services/catalog-sync-log-retention-cron"
+    );
+    ensureCatalogSyncLogRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-catalog-sync-log-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
