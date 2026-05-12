@@ -88,6 +88,14 @@ export interface ObservabilityDashboardInput {
    */
   readonly staleJobKind?: string | readonly string[];
   /**
+   * Optional SLA cutoff forwarded to listStaleRunningJobs (#588).
+   * Filters the stale-running drilldown to rows whose `updatedAt`
+   * predates this timestamp — e.g. `Date.now() - 30*60*1000` for
+   * "stuck past 30 minutes". Without it, the drilldown returns the
+   * top-N oldest-touched running rows regardless of age.
+   */
+  readonly staleOlderThan?: Date;
+  /**
    * Cap on `oldestPendingJobs`. Default 10 — operators want a short
    * "what's waiting" list, not a full pending-queue dump.
    */
@@ -200,7 +208,11 @@ export async function getObservabilityDashboard(
       { getDb: options.getDb },
     ),
     listStaleRunningJobs(
-      { limit: staleLimit, jobKind: input.staleJobKind },
+      {
+        limit: staleLimit,
+        jobKind: input.staleJobKind,
+        olderThan: input.staleOlderThan,
+      },
       { getDb: options.getDb },
     ),
     listOldestPendingJobs(
