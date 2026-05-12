@@ -124,8 +124,21 @@ export interface ObservabilityDashboardInput {
    * incident-scoped comparison; a single value covers both sides
    * of the failed/completed pair (matches `recentLimit`'s shared
    * shape).
+   *
+   * Mutually exclusive with `recentJobKindLike` (exact match wins
+   * when both are set — narrower).
    */
   readonly recentJobKind?: string | readonly string[];
+  /**
+   * Optional SQL LIKE-style prefix filter forwarded to BOTH listJobs
+   * calls (failed + completed). Sister of `recentJobKind` (#585) but
+   * with prefix semantics — operators with kinds like
+   * `projection.rebuild` / `projection.repair` / `projection.snap`
+   * can scope the dashboard's recent-jobs drilldowns to
+   * `projection.%` in one shot. Forwards #598's listJobs.jobKindLike.
+   * Mutually exclusive with `recentJobKind` (exact wins).
+   */
+  readonly recentJobKindLike?: string;
   /**
    * Optional SQL LIKE-style filter on `lastError`, forwarded to
    * the `recentFailedJobs` slice ONLY — operators triaging a
@@ -243,6 +256,7 @@ export async function getObservabilityDashboard(
         status: "failed",
         limit: recentLimit,
         jobKind: input.recentJobKind,
+        jobKindLike: input.recentJobKindLike,
         lastErrorLike: input.recentFailedLastErrorLike,
         updatedSince: input.recentJobsUpdatedSince,
       },
@@ -253,6 +267,7 @@ export async function getObservabilityDashboard(
         status: "completed",
         limit: recentLimit,
         jobKind: input.recentJobKind,
+        jobKindLike: input.recentJobKindLike,
         updatedSince: input.recentJobsUpdatedSince,
       },
       { getDb: options.getDb },
