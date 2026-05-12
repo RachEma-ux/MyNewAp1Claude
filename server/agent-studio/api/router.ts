@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
+import { router, protectedProcedure, adminProcedure, governedProcedure } from "../../_core/trpc";
 import { getAuditLogger } from "../../services/auditLogger";
 import * as repo from "../repository";
 import * as readinessSvc from "../services/readiness";
@@ -886,6 +886,72 @@ const runsRouter = router({
       }
       return tree;
     }),
+
+  // ── Retention (Phase 22 follow-up #621 + #622 + #623) ─────────────
+  //
+  // Admin-only sweep + status surface for ags_runtime_runs +
+  // ags_runtime_run_steps. The cron (#622) fires on its own; these
+  // procedures let an operator (a) fire a sweep on demand and
+  // (b) inspect the last-run state of the cron from the UI without
+  // tailing logs.
+  //
+  // adminProcedure (not protected) because cron state isn't workspace-
+  // scoped and the sweep deletes rows across all workspaces. Operators
+  // doing cross-tenant ops monitoring shouldn't be filtered by their
+  // own workspace membership.
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "queued",
+                "pending",
+                "running",
+                "awaiting_approval",
+                "completed",
+                "failed",
+                "cancelled",
+              ]),
+            )
+            .max(7)
+            .optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          environment: z
+            .union([
+              z.string().min(1).max(32),
+              z.array(z.string().min(1).max(32)).max(10),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldRuntimeRuns } = await import(
+        "../services/runtime-runs-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldRuntimeRuns({
+        olderThan,
+        statuses: input?.statuses,
+        agentId: input?.agentId,
+        environment: input?.environment,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getRuntimeRunsRetentionCronStatus } = await import(
+      "../services/runtime-runs-retention-cron"
+    );
+    return getRuntimeRunsRetentionCronStatus();
+  }),
 });
 
 // ── Versions ────────────────────────────────────────────────────────────────
