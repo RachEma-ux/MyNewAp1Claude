@@ -248,6 +248,42 @@ describe("rollupSourceKindsByLane — pure helper", () => {
   });
 });
 
+describe("getWorkspaceObservabilityStats — notificationsByLane rollup", () => {
+  it("rolls notificationsByKind into lanes by first dot-segment", async () => {
+    const { db } = makeFakeDb({
+      notificationsByKind: [
+        { notificationKind: "promotion.approved", count: 3 },
+        { notificationKind: "promotion.rejected", count: 1 },
+        { notificationKind: "maintenance.window", count: 2 },
+        { notificationKind: "broadcast", count: 5 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.notificationsByLane).toEqual({
+      promotion: 4,
+      maintenance: 2,
+      broadcast: 5,
+    });
+  });
+
+  it("returns an empty notificationsByLane when no notifications are recorded", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.notificationsByLane).toEqual({});
+  });
+
+  it("returns an empty notificationsByLane on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.notificationsByLane).toEqual({});
+  });
+});
+
 describe("getWorkspaceObservabilityStats — jobsByLane rollup", () => {
   it("rolls jobsByKind into lanes by first dot-segment", async () => {
     const { db } = makeFakeDb({

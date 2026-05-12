@@ -75,6 +75,16 @@ export interface WorkspaceObservabilityStats {
    */
   readonly jobsByLane: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
+  /**
+   * Lane rollup of `notificationsByKind` by the first dot-separated
+   * segment, completing the lane-rollup symmetry across all three
+   * Phase 22 tables (errorEventsByLane / jobsByLane).
+   * Examples:
+   *   promotion.approved + promotion.rejected → "promotion" + 2
+   *   maintenance.window → "maintenance" + 1
+   *   broadcast → "broadcast" + 1 (no dot → key is itself)
+   */
+  readonly notificationsByLane: Record<string, number>;
   readonly notificationsByReadState: { read: number; unread: number };
   readonly totals: {
     readonly errorEvents: number;
@@ -99,6 +109,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   jobsByKind: {},
   jobsByLane: {},
   notificationsByKind: {},
+  notificationsByLane: {},
   notificationsByReadState: { read: 0, unread: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
 };
@@ -298,6 +309,7 @@ export async function getWorkspaceObservabilityStats(
     jobsByKind,
     jobsByLane: rollupByLane(jobsByKind),
     notificationsByKind,
+    notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByReadState: { read: readCount, unread: unreadCount },
     totals: {
       errorEvents: sumBuckets(errorEventsBySourceKind),
