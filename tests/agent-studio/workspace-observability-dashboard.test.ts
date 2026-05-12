@@ -515,6 +515,34 @@ describe("getObservabilityDashboard", () => {
     expect(args.sourceId).toBeUndefined();
   });
 
+  it("forwards recentErrorEventsUserId to listErrorEvents (#606)", async () => {
+    await getObservabilityDashboard({ recentErrorEventsUserId: 42 });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 42 }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentErrorEventsUserId composes with errorClass (#606)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsUserId: 7,
+      errorClass: "ValidationError",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 7,
+        errorClass: "ValidationError",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("undefined recentErrorEventsUserId means no userId filter (#606)", async () => {
+    await getObservabilityDashboard({});
+    const args = listErrorsMock.mock.calls[0]?.[0] as { userId?: unknown };
+    expect(args.userId).toBeUndefined();
+  });
+
   it("forwards recentErrorEventsSourceKindLike to listErrorEvents (#601)", async () => {
     await getObservabilityDashboard({
       recentErrorEventsSourceKindLike: "trpc.chat.%",
