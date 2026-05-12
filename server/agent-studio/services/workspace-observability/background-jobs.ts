@@ -559,6 +559,78 @@ export async function markJobCompleted(
   return transitionStatus(jobId, { status: "completed", lastError: null }, options);
 }
 
+export interface MarkJobsStartedResult {
+  /** Rows successfully claimed and flipped to `running`. */
+  readonly started: readonly BackgroundJobRow[];
+  /**
+   * Per-id skip reasons: `"not_found"` (no row) or `"not_pending"`
+   * (row was already claimed by another worker, completed, failed,
+   * cancelled, or running). Partition rather than throw so a pool
+   * worker that races with a sibling for the same job doesn't lose
+   * the claims that did land.
+   *
+   * Note: the singular `markJobStarted` is permissive (flips any
+   * found row to running and bumps attempts). The bulk surface is
+   * the stricter pool-claim contract, matching the bulk-strict /
+   * singular-permissive split used by `cancelJobs` (#543).
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_pending";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+/**
+ * Bulk worker-pool claim: a pool that pulled N pending jobs from
+ * `listJobs({status:"pending"})` calls this once instead of N round
+ * trips. Strict — only `pending` rows are claimed; anything else is
+ * surfaced as a skip so the caller can drop it from its work plan.
+ *
+ * Sister of `markJobsCompleted` (#564) / `markJobsFailed` (#565)
+ * on the partition pattern; closes the worker-tier transition trio.
+ */
+export async function markJobsStarted(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<MarkJobsStartedResult> {
+  if (jobIds.length === 0) return { started: [], skipped: [] };
+
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const started: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_pending";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const jobId of jobIds) {
+    const current = await getJobById(jobId, options);
+    if (!current) {
+      skipped.push({ jobId, reason: "not_found" });
+      continue;
+    }
+    if (current.status !== "pending") {
+      skipped.push({
+        jobId,
+        reason: "not_pending",
+        currentStatus: current.status,
+      });
+      continue;
+    }
+    const row = await transitionStatus(
+      jobId,
+      { status: "running", attempts: current.attempts + 1 },
+      options,
+    );
+    started.push(row);
+  }
+
+  return { started, skipped };
+}
+
 export interface MarkJobsCompletedResult {
   /** Rows successfully flipped to `completed`. */
   readonly completed: readonly BackgroundJobRow[];

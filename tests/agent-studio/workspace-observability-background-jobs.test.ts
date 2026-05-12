@@ -14,6 +14,7 @@ import {
   listJobs,
   listStaleRunningJobs,
   markJobStarted,
+  markJobsStarted,
   markJobCompleted,
   markJobsCompleted,
   markJobFailed,
@@ -2119,5 +2120,115 @@ describe("markJobsFailed — Phase 22 #565 bulk failure", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("not_running");
     expect(result.skipped[0].currentStatus).toBe("cancelled");
+  });
+});
+
+describe("markJobsStarted — Phase 22 #566 bulk worker-pool claim", () => {
+  it("short-circuits empty input with no DB call", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await markJobsStarted([], { getDb });
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("throws AsdbUnavailableError when ASDB is unavailable + non-empty input", async () => {
+    await expect(
+      markJobsStarted([1, 2, 3], { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("partitions: claims pending, skips not_found + not_pending", async () => {
+    const now = new Date();
+    const rows: FakeRow[] = [
+      {
+        id: 7,
+        jobKind: "x",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 8,
+        jobKind: "x",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    // Call sequence for [7, 8, 999]:
+    //   id 7 (pending):  SELECT 7 → UPDATE 7 → SELECT 7 refetch
+    //   id 8 (running):  SELECT 8 (skipped not_pending)
+    //   id 999 (missing): SELECT 999 (skipped not_found)
+    const selectQueue: number[] = [7, 7, 8, 999];
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          limit: async () => {
+            const id = selectQueue.shift();
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const target = rows.find((r) => r.id === 7);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("attempts" in vals) target.attempts = Number(vals.attempts);
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+    };
+
+    const result = await markJobsStarted([7, 8, 999], {
+      getDb: () => db as never,
+    });
+    expect(result.started).toHaveLength(1);
+    expect(result.started[0].id).toBe(7);
+    expect(result.started[0].status).toBe("running");
+    expect(result.started[0].attempts).toBe(1);
+    expect(result.skipped).toHaveLength(2);
+    const reasons = result.skipped.map((s) => s.reason).sort();
+    expect(reasons).toEqual(["not_found", "not_pending"]);
+    const skippedFor8 = result.skipped.find((s) => s.jobId === 8);
+    expect(skippedFor8?.currentStatus).toBe("running");
+  });
+
+  it("returns empty started when no rows are pending", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await markJobsStarted([7], { getDb: () => db as never });
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe("not_pending");
+    expect(result.skipped[0].currentStatus).toBe("completed");
   });
 });
