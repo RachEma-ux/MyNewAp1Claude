@@ -15,6 +15,7 @@ import {
   markNotificationRead,
   markNotificationsRead,
   markAllNotificationsRead,
+  dismissNotifications,
   pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
@@ -369,6 +370,46 @@ describe("user-notifications — Phase 22", () => {
     await expect(
       markAllNotificationsRead(1, { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("dismissNotifications throws AsdbUnavailableError on null DB", async () => {
+    await expect(
+      dismissNotifications(
+        { userId: 1, notificationIds: [10, 11] },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("dismissNotifications short-circuits to no-op on empty notificationIds", async () => {
+    const deleteSpy = vi.fn();
+    const db = { delete: deleteSpy } as unknown;
+    const result = await dismissNotifications(
+      { userId: 1, notificationIds: [] },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(0);
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it("dismissNotifications returns the number of deleted rows", async () => {
+    const captured: { whereCalled: boolean } = { whereCalled: false };
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => {
+          captured.whereCalled = true;
+          return {
+            returning: async () => [{ id: 10 }, { id: 11 }],
+          };
+        },
+      })),
+    };
+    const result = await dismissNotifications(
+      { userId: 7, notificationIds: [10, 11, 12] },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(2);
+    expect(captured.whereCalled).toBe(true);
   });
 
   it("markNotificationsRead throws AsdbUnavailableError on null DB", async () => {
