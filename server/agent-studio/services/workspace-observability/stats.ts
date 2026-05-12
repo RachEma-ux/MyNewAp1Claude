@@ -64,6 +64,16 @@ export interface WorkspaceObservabilityStats {
   readonly jobsCreatedByDay: readonly DayTrendBucket[];
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
+  /**
+   * Lane rollup of `jobsByKind` by the first dot-separated segment,
+   * mirroring `errorEventsByLane`. Lets the dashboard render a
+   * high-level summary card without listing every per-action jobKind.
+   * Examples:
+   *   projection.rebuild + projection.sync → "projection" + 2
+   *   retention.sweep → "retention" + 1
+   *   importScan → "importScan" + 1 (no dot → key is itself)
+   */
+  readonly jobsByLane: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
   readonly notificationsByReadState: { read: number; unread: number };
   readonly totals: {
@@ -87,6 +97,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   jobsCreatedByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
+  jobsByLane: {},
   notificationsByKind: {},
   notificationsByReadState: { read: 0, unread: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
@@ -126,21 +137,27 @@ export function zeroFillDayTrend(
 export const zeroFillErrorEventsTrend = zeroFillDayTrend;
 
 /**
- * Roll up a per-sourceKind bucket map into a per-lane map by the first
+ * Roll up a per-key bucket map into a per-lane map by the first
  * dot-separated segment. Exported for direct unit-testing — the SQL
  * GROUP BY happens upstream; this is pure post-processing.
+ *
+ * Generic across keyspaces: errorEvents.sourceKind, backgroundJobs.jobKind,
+ * etc. — anywhere the keys follow a `module.action` taxonomy.
  */
-export function rollupSourceKindsByLane(
-  bySourceKind: Record<string, number>,
+export function rollupByLane(
+  byKey: Record<string, number>,
 ): Record<string, number> {
   const byLane: Record<string, number> = {};
-  for (const [kind, count] of Object.entries(bySourceKind)) {
+  for (const [kind, count] of Object.entries(byKey)) {
     const dot = kind.indexOf(".");
     const lane = dot === -1 ? kind : kind.slice(0, dot);
     byLane[lane] = (byLane[lane] ?? 0) + count;
   }
   return byLane;
 }
+
+/** @deprecated Use {@link rollupByLane}. Kept for back-compat. */
+export const rollupSourceKindsByLane = rollupByLane;
 
 function bucketize<T extends { count: unknown }>(
   rows: readonly T[],
@@ -273,12 +290,13 @@ export async function getWorkspaceObservabilityStats(
 
   return {
     errorEventsBySourceKind,
-    errorEventsByLane: rollupSourceKindsByLane(errorEventsBySourceKind),
+    errorEventsByLane: rollupByLane(errorEventsBySourceKind),
     errorEventsByErrorClass,
     errorEventsByDay,
     jobsCreatedByDay,
     jobsByStatus,
     jobsByKind,
+    jobsByLane: rollupByLane(jobsByKind),
     notificationsByKind,
     notificationsByReadState: { read: readCount, unread: unreadCount },
     totals: {
