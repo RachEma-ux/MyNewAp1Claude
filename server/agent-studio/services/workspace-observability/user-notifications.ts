@@ -85,6 +85,65 @@ export async function pushNotification(
   return rowToNotification(row);
 }
 
+export interface PushNotificationsResult {
+  readonly insertedCount: number;
+  readonly notifications: readonly NotificationRow[];
+}
+
+/**
+ * Bulk-personalized push — each input has its own
+ * `{userId, notificationKind, payload}`. Sister of
+ * `pushNotificationToUsers` (#509-era) which broadcasts ONE
+ * payload to N users; this one broadcasts N heterogeneous
+ * payloads to N (possibly distinct, possibly overlapping) users.
+ *
+ * Use case: fan-out controllers that emit per-recipient
+ * notifications — "your job X completed" where X differs per
+ * recipient, or "promotion N approved (you authored it)" /
+ * "promotion N rejected (you reviewed it)" emitted from the same
+ * batch. Saves N-1 round trips vs N individual `pushNotification`
+ * calls.
+ *
+ * Empty input short-circuits to `{insertedCount: 0,
+ * notifications: []}` with no DB call. ASDB-null throws (matches
+ * the push primitives — these are user-tier mutations, not
+ * fail-soft observability writes).
+ */
+export async function pushNotifications(
+  inputs: readonly PushNotificationInput[],
+  options: ServiceOptions = {},
+): Promise<PushNotificationsResult> {
+  if (inputs.length === 0) {
+    return { insertedCount: 0, notifications: [] };
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const values = inputs.map((input) => ({
+    userId: input.userId,
+    notificationKind: input.notificationKind,
+    payload: input.payload ?? null,
+    read: false,
+  }));
+
+  const inserted = await db
+    .insert(agsWorkspaceUserNotifications)
+    .values(values)
+    .returning({
+      id: agsWorkspaceUserNotifications.id,
+      userId: agsWorkspaceUserNotifications.userId,
+      notificationKind: agsWorkspaceUserNotifications.notificationKind,
+      payload: agsWorkspaceUserNotifications.payload,
+      read: agsWorkspaceUserNotifications.read,
+      createdAt: agsWorkspaceUserNotifications.createdAt,
+    });
+
+  const notifications = inserted.map(rowToNotification);
+  return { insertedCount: notifications.length, notifications };
+}
+
 /**
  * Singleton getter — sister of `getJobById` (#511-era). The
  * notifications surface previously only exposed list/count/markRead/

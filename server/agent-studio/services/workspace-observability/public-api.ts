@@ -64,6 +64,7 @@ export type {
 
 export {
   pushNotification,
+  pushNotifications,
   pushNotificationToUsers,
   getNotificationById,
   getNotificationsByIds,
@@ -81,6 +82,7 @@ export {
 } from "./user-notifications.js";
 export type {
   PushNotificationInput,
+  PushNotificationsResult,
   PushNotificationToUsersInput,
   PushNotificationToUsersResult,
   ListNotificationsInput,

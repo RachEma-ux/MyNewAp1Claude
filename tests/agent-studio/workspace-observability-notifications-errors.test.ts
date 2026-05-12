@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   pushNotification,
+  pushNotifications,
   pushNotificationToUsers,
   getNotificationById,
   getNotificationsByIds,
@@ -249,6 +250,81 @@ describe("user-notifications — Phase 22", () => {
     expect(result.insertedCount).toBe(3);
     expect(state.rows.length).toBe(3);
     expect(state.rows.every((r) => r.userId === 7)).toBe(true);
+  });
+
+  it("pushNotifications throws AsdbUnavailableError on null DB with non-empty input (#583)", async () => {
+    await expect(
+      pushNotifications(
+        [{ userId: 1, notificationKind: "x" }],
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("pushNotifications short-circuits empty input with no DB call (#583)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await pushNotifications([], { getDb });
+    expect(result.insertedCount).toBe(0);
+    expect(result.notifications).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("pushNotifications inserts heterogeneous payloads in one batch (#583)", async () => {
+    const { db, state } = makeNotifFakeDb();
+    const result = await pushNotifications(
+      [
+        {
+          userId: 11,
+          notificationKind: "job.completed",
+          payload: { jobId: 101, jobKind: "projection.rebuild" },
+        },
+        {
+          userId: 22,
+          notificationKind: "job.completed",
+          payload: { jobId: 102, jobKind: "projection.repair" },
+        },
+        {
+          userId: 33,
+          notificationKind: "promotion.approved",
+          payload: { promotionId: 7 },
+        },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(result.insertedCount).toBe(3);
+    expect(state.rows.length).toBe(3);
+    // Each row preserves its own userId / kind / payload.
+    const byUser = new Map(
+      result.notifications.map((n) => [n.userId, n] as const),
+    );
+    expect(byUser.get(11)?.notificationKind).toBe("job.completed");
+    expect(
+      (byUser.get(11)?.payload as Record<string, unknown>).jobId,
+    ).toBe(101);
+    expect(byUser.get(22)?.notificationKind).toBe("job.completed");
+    expect(
+      (byUser.get(22)?.payload as Record<string, unknown>).jobId,
+    ).toBe(102);
+    expect(byUser.get(33)?.notificationKind).toBe("promotion.approved");
+    expect(result.notifications.every((n) => n.read === false)).toBe(true);
+  });
+
+  it("pushNotifications calls db.insert exactly once for N inputs (#583)", async () => {
+    const { db, state } = makeNotifFakeDb();
+    // makeNotifFakeDb.insert is a vi.fn — assert call count.
+    const dbAny = db as unknown as { insert: { mock: { calls: unknown[] } } };
+    const initialCalls = dbAny.insert.mock.calls.length;
+    await pushNotifications(
+      [
+        { userId: 1, notificationKind: "x" },
+        { userId: 2, notificationKind: "y" },
+        { userId: 3, notificationKind: "z" },
+        { userId: 4, notificationKind: "w" },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(dbAny.insert.mock.calls.length - initialCalls).toBe(1);
+    expect(state.rows.length).toBe(4);
   });
 
   it("listNotifications filters by an array of notificationKinds (OR semantics)", async () => {
