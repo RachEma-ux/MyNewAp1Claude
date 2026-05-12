@@ -686,6 +686,18 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          errorClass: z
+            .union([
+              z.string().min(1).max(200),
+              z.array(z.string().min(1).max(200)).max(20),
+            ])
+            .optional(),
+          sourceKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
         })
         .optional(),
     )

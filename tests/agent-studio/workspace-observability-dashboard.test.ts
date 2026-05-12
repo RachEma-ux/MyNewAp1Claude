@@ -156,6 +156,59 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards errorClass to listErrorEvents (#584)", async () => {
+    await getObservabilityDashboard({ errorClass: "BackgroundJobFailed" });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: undefined,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards array-form errorClass to listErrorEvents (#584)", async () => {
+    await getObservabilityDashboard({
+      errorClass: ["BackgroundJobFailed", "ValidationError"],
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: ["BackgroundJobFailed", "ValidationError"],
+        sourceKind: undefined,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards sourceKind to listErrorEvents (#584)", async () => {
+    await getObservabilityDashboard({ sourceKind: "trpc.chat.send" });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: undefined,
+        sourceKind: "trpc.chat.send",
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("ANDs errorClass + sourceKind when both are set (#584)", async () => {
+    await getObservabilityDashboard({
+      errorClass: "BackgroundJobFailed",
+      sourceKind: ["backgroundJob.projection.rebuild"],
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: ["backgroundJob.projection.rebuild"],
+      },
+      expect.any(Object),
+    );
+  });
+
   it("respects a custom pendingLimit on the pending-backlog slice (#569)", async () => {
     await getObservabilityDashboard({ pendingLimit: 3 });
     expect(listPendingMock).toHaveBeenCalledWith(
