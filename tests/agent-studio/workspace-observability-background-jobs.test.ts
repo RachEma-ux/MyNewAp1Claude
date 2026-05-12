@@ -36,7 +36,13 @@ interface FakeState {
   rows: FakeRow[];
   nextId: number;
   selectQueue: Array<"byId" | "list">;
-  active: { jobId?: number; status?: string; jobKind?: string };
+  active: {
+    jobId?: number;
+    status?: string;
+    jobKind?: string;
+    createdSince?: Date;
+    updatedSince?: Date;
+  };
 }
 
 function makeFakeDb(initial?: Partial<FakeState>) {
@@ -60,6 +66,14 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           }
           if (state.active.jobKind !== undefined) {
             rows = rows.filter((r) => r.jobKind === state.active.jobKind);
+          }
+          if (state.active.createdSince !== undefined) {
+            const cutoff = state.active.createdSince.getTime();
+            rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
+          }
+          if (state.active.updatedSince !== undefined) {
+            const cutoff = state.active.updatedSince.getTime();
+            rows = rows.filter((r) => r.updatedAt.getTime() >= cutoff);
           }
           return {
             limit: async () =>
@@ -193,6 +207,129 @@ describe("listJobs — Phase 22", () => {
   it("returns [] on ASDB-null", async () => {
     const result = await listJobs({}, { getDb: () => null as never });
     expect(result).toEqual([]);
+  });
+
+  it("filters by createdSince when supplied", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const cutoff = new Date("2026-04-01T00:00:00Z");
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 0,
+          lastError: null,
+          createdAt: old,
+          updatedAt: old,
+        },
+        {
+          id: 2,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 0,
+          lastError: null,
+          createdAt: recent,
+          updatedAt: recent,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.createdSince = cutoff;
+    const result = await listJobs(
+      { createdSince: cutoff },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
+  });
+
+  it("filters by updatedSince when supplied", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const justUpdated = new Date("2026-05-12T00:00:00Z");
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: old,
+          updatedAt: old,
+        },
+        {
+          id: 2,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 5,
+          lastError: null,
+          createdAt: old,
+          updatedAt: justUpdated,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.updatedSince = new Date("2026-05-01T00:00:00Z");
+    const result = await listJobs(
+      { updatedSince: new Date("2026-05-01T00:00:00Z") },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
+  });
+
+  it("combines createdSince + status filter (AND semantics)", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 1,
+          jobKind: "x",
+          payload: null,
+          status: "failed",
+          attempts: 2,
+          lastError: "boom",
+          createdAt: old,
+          updatedAt: old,
+        },
+        {
+          id: 2,
+          jobKind: "x",
+          payload: null,
+          status: "failed",
+          attempts: 1,
+          lastError: "fresh boom",
+          createdAt: recent,
+          updatedAt: recent,
+        },
+        {
+          id: 3,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 1,
+          lastError: null,
+          createdAt: recent,
+          updatedAt: recent,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.status = "failed";
+    state.active.createdSince = new Date("2026-04-01T00:00:00Z");
+    const result = await listJobs(
+      { status: "failed", createdSince: new Date("2026-04-01T00:00:00Z") },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
   });
 
   it("filters by status when supplied", async () => {
