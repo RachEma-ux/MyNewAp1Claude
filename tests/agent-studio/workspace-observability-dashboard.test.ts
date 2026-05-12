@@ -287,6 +287,57 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentJobsUpdatedSince forwards to BOTH failed AND completed listJobs (#591)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({ recentJobsUpdatedSince: since });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "failed",
+        limit: 20,
+        jobKind: undefined,
+        lastErrorLike: undefined,
+        updatedSince: since,
+      },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "completed",
+        limit: 20,
+        jobKind: undefined,
+        updatedSince: since,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("recentJobsUpdatedSince composes with recentJobKind on both slices (#591)", async () => {
+    const since = new Date("2026-05-12T12:00:00Z");
+    await getObservabilityDashboard({
+      recentJobKind: "projection.rebuild",
+      recentJobsUpdatedSince: since,
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "failed",
+        limit: 20,
+        jobKind: "projection.rebuild",
+        lastErrorLike: undefined,
+        updatedSince: since,
+      },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "completed",
+        limit: 20,
+        jobKind: "projection.rebuild",
+        updatedSince: since,
+      },
+      expect.any(Object),
+    );
+  });
+
   it("forwards errorEventsCreatedSince to listErrorEvents (#590)", async () => {
     const since = new Date("2026-05-12T12:00:00Z");
     await getObservabilityDashboard({ errorEventsCreatedSince: since });

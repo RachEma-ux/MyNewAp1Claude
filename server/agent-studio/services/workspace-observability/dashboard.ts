@@ -139,6 +139,17 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentFailedLastErrorLike?: string;
   /**
+   * Optional time-window cutoff forwarded to BOTH listJobs calls
+   * (failed + completed) via `updatedSince`. Lets the dashboard
+   * scope the recent-jobs drilldowns to terminal flips that
+   * happened since this timestamp — e.g. "show me jobs that
+   * succeeded or failed since the incident alert at 12:00".
+   * Anchored on `updatedAt` (not createdAt) because that's the
+   * terminal-status-flip timestamp; matches `failedJobsByDay` /
+   * `completedJobsByDay` trend bucketing.
+   */
+  readonly recentJobsUpdatedSince?: Date;
+  /**
    * Optional errorClass filter forwarded to listErrorEvents — lets
    * the dashboard scope the recent-error-events drilldown to a
    * specific class when triaging a known incident. Mirrors the
@@ -206,6 +217,7 @@ export async function getObservabilityDashboard(
         limit: recentLimit,
         jobKind: input.recentJobKind,
         lastErrorLike: input.recentFailedLastErrorLike,
+        updatedSince: input.recentJobsUpdatedSince,
       },
       { getDb: options.getDb },
     ),
@@ -214,6 +226,7 @@ export async function getObservabilityDashboard(
         status: "completed",
         limit: recentLimit,
         jobKind: input.recentJobKind,
+        updatedSince: input.recentJobsUpdatedSince,
       },
       { getDb: options.getDb },
     ),
