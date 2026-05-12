@@ -788,6 +788,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          backgroundJobsLastErrorLike: z.string().min(1).max(200).optional(),
         })
         .optional(),
     )

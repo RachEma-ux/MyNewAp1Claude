@@ -77,6 +77,14 @@ export interface RunRetentionSweepInput {
    * per-worker retention policies without firing N sweeps.
    */
   readonly backgroundJobsJobKind?: string | readonly string[];
+  /**
+   * Optional SQL LIKE filter on `lastError` for the background-jobs
+   * sweep. Mirrors `pruneOldBackgroundJobs.lastErrorLike` (#582) —
+   * cron callers can prune already-triaged transient failures by
+   * substring (e.g. `"%OOMKilled%"`) without forcing them through
+   * the singular prune call.
+   */
+  readonly backgroundJobsLastErrorLike?: string;
 }
 
 export interface RunRetentionSweepResult {
@@ -135,6 +143,7 @@ export async function runRetentionSweep(
         olderThan: backgroundJobsCutoff,
         statuses: input.backgroundJobsStatuses,
         jobKind: input.backgroundJobsJobKind,
+        lastErrorLike: input.backgroundJobsLastErrorLike,
       },
       { getDb: options.getDb },
     ),
