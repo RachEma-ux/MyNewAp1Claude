@@ -102,6 +102,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="observability-stats">Observability Stats</TabsTrigger>
           <TabsTrigger value="observability-dashboard">Observability Dashboard</TabsTrigger>
           <TabsTrigger value="admin-sweeps">Admin Sweeps</TabsTrigger>
+          <TabsTrigger value="bulk-job-ops">Bulk Job Ops</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -130,6 +131,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="admin-sweeps">
           <AdminSweepsPanel />
+        </TabsContent>
+        <TabsContent value="bulk-job-ops">
+          <BulkJobOpsPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -1284,6 +1288,206 @@ function AdminSweepsPanel() {
               <div className="text-zinc-400 uppercase mb-1">Last run</div>
               <div>scanned: {staleResult.scanned}</div>
               <div>jobs auto-failed: {staleResult.failedCount}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Bulk Job Ops (Phase 22 follow-up #619) ────────────────────────────
+//
+// Fifth client-side consumer of the workspace-observability surface
+// (after #615 cron status, #616 stats, #617 dashboard, #618 admin
+// sweeps). Operator-triggered bulk retry / cancel by query — the
+// "I just shipped a worker fix, retry the failed pile" and "this
+// workflow is stampeding, cancel the queue" gestures, single round-
+// trip from the UI instead of N per-row clicks.
+//
+// retryBackgroundJobsByQuery operates only on `status='failed'`;
+// cancelBackgroundJobsByQuery accepts a statuses filter (default
+// ["pending"]) so operators can scope the cancel to safe targets.
+
+function BulkJobOpsPanel() {
+  const [retryJobKind, setRetryJobKind] = useState("");
+  const [retryLimit, setRetryLimit] = useState("50");
+  const [cancelJobKind, setCancelJobKind] = useState("");
+  const [cancelStatuses, setCancelStatuses] = useState("pending");
+  const [cancelLimit, setCancelLimit] = useState("50");
+
+  const [retryResult, setRetryResult] = useState<
+    { retried: number; scanned: number } | null
+  >(null);
+  const [cancelResult, setCancelResult] = useState<
+    { cancelled: number; scanned: number } | null
+  >(null);
+
+  const retryMut =
+    trpc.agentStudio.workspaceObservability.retryBackgroundJobsByQuery.useMutation({
+      onSuccess: (data: any) => {
+        setRetryResult({
+          retried: Array.isArray(data?.retried) ? data.retried.length : 0,
+          scanned: data?.scanned ?? 0,
+        });
+        toast.success(
+          `Retry sweep complete — ${Array.isArray(data?.retried) ? data.retried.length : 0} retried (of ${data?.scanned ?? 0} scanned)`,
+        );
+      },
+      onError: (err) =>
+        toast.error(`Retry sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  const cancelMut =
+    trpc.agentStudio.workspaceObservability.cancelBackgroundJobsByQuery.useMutation({
+      onSuccess: (data: any) => {
+        setCancelResult({
+          cancelled: Array.isArray(data?.cancelled) ? data.cancelled.length : 0,
+          scanned: data?.scanned ?? 0,
+        });
+        toast.success(
+          `Cancel sweep complete — ${Array.isArray(data?.cancelled) ? data.cancelled.length : 0} cancelled (of ${data?.scanned ?? 0} scanned)`,
+        );
+      },
+      onError: (err) =>
+        toast.error(`Cancel sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  const parsedRetryLimit = Math.max(1, parseInt(retryLimit, 10) || 50);
+  const parsedCancelLimit = Math.max(1, parseInt(cancelLimit, 10) || 50);
+  const parsedCancelStatuses = cancelStatuses
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Retry by query card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Bulk retry failed jobs</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Flips `status='failed'` rows back to `pending` for re-execution.
+            Operates only on failed rows — running/pending/completed are
+            untouched. Default limit 50 per click; raise if you have a
+            larger cohort to flush.
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">jobKind filter (optional, single)</Label>
+              <Input
+                value={retryJobKind}
+                onChange={(e) => setRetryJobKind(e.target.value)}
+                placeholder="e.g. projection.rebuild"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">limit</Label>
+              <Input
+                type="number"
+                value={retryLimit}
+                onChange={(e) => setRetryLimit(e.target.value)}
+                min={1}
+                max={500}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={retryMut.isPending}
+            onClick={() => {
+              const summary = retryJobKind.trim()
+                ? `Retry up to ${parsedRetryLimit} failed jobs of kind="${retryJobKind.trim()}"?`
+                : `Retry up to ${parsedRetryLimit} failed jobs (any kind)?`;
+              if (window.confirm(summary)) {
+                retryMut.mutate({
+                  jobKind: retryJobKind.trim() || undefined,
+                  limit: parsedRetryLimit,
+                });
+              }
+            }}
+          >
+            {retryMut.isPending ? "Retrying…" : "Retry failed jobs"}
+          </Button>
+          {retryResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs">
+              <div className="text-zinc-400 uppercase mb-1">Last run</div>
+              <div>retried: {retryResult.retried}</div>
+              <div>scanned: {retryResult.scanned}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Cancel by query card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Bulk cancel jobs</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Flips rows matching the status filter to `cancelled`. Default
+            scope is `["pending"]` — safe to cancel a stampede that hasn't
+            started yet. Adding `"running"` will mark in-flight rows
+            cancelled but won't kill the worker process; the worker is
+            expected to honor cooperative cancellation.
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">jobKind filter (optional, single)</Label>
+              <Input
+                value={cancelJobKind}
+                onChange={(e) => setCancelJobKind(e.target.value)}
+                placeholder="e.g. import.scan"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">
+                statuses (comma-separated)
+              </Label>
+              <Input
+                value={cancelStatuses}
+                onChange={(e) => setCancelStatuses(e.target.value)}
+                placeholder="pending,running"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">limit</Label>
+              <Input
+                type="number"
+                value={cancelLimit}
+                onChange={(e) => setCancelLimit(e.target.value)}
+                min={1}
+                max={500}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={cancelMut.isPending}
+            onClick={() => {
+              const statuses =
+                parsedCancelStatuses.length > 0
+                  ? parsedCancelStatuses
+                  : ["pending"];
+              const summary = cancelJobKind.trim()
+                ? `Cancel up to ${parsedCancelLimit} jobs of kind="${cancelJobKind.trim()}" with status in [${statuses.join(", ")}]?`
+                : `Cancel up to ${parsedCancelLimit} jobs (any kind) with status in [${statuses.join(", ")}]?`;
+              if (window.confirm(summary)) {
+                cancelMut.mutate({
+                  jobKind: cancelJobKind.trim() || undefined,
+                  statuses: statuses as ("pending" | "running" | "completed" | "failed" | "cancelled")[],
+                  limit: parsedCancelLimit,
+                });
+              }
+            }}
+          >
+            {cancelMut.isPending ? "Cancelling…" : "Cancel jobs"}
+          </Button>
+          {cancelResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs">
+              <div className="text-zinc-400 uppercase mb-1">Last run</div>
+              <div>cancelled: {cancelResult.cancelled}</div>
+              <div>scanned: {cancelResult.scanned}</div>
             </div>
           ) : null}
         </CardContent>
