@@ -248,6 +248,7 @@ export const workspaceObservabilityRouter = router({
             ])
             .optional(),
           limit: z.number().int().min(1).max(500).optional(),
+          createdSince: z.coerce.date().optional(),
         })
         .optional(),
     )
@@ -266,6 +267,7 @@ export const workspaceObservabilityRouter = router({
           unreadOnly: input?.unreadOnly,
           notificationKind: input?.notificationKind,
           limit: input?.limit,
+          createdSince: input?.createdSince,
         });
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({

@@ -45,6 +45,22 @@ describe("workspaceObservabilityRouter.getMyInbox", () => {
       unreadOnly: true,
       notificationKind: "promotion.approved",
       limit: 25,
+      createdSince: undefined,
+    });
+  });
+
+  it("forwards createdSince when supplied (#555)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 42, role: "user" },
+    } as never);
+    const cutoff = new Date("2026-05-12T00:00:00Z");
+    await caller.getMyInbox({ createdSince: cutoff });
+    expect(inboxMock).toHaveBeenCalledWith({
+      userId: 42,
+      unreadOnly: undefined,
+      notificationKind: undefined,
+      limit: undefined,
+      createdSince: cutoff,
     });
   });
 
