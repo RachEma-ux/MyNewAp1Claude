@@ -63,7 +63,10 @@ export type {
   CaptureOptions,
 } from "./trpc-error-capture.js";
 
-export { getWorkspaceObservabilityStats } from "./stats.js";
+export {
+  getWorkspaceObservabilityStats,
+  rollupSourceKindsByLane,
+} from "./stats.js";
 export type {
   WorkspaceObservabilityStats,
   WorkspaceObservabilityStatsOptions,
