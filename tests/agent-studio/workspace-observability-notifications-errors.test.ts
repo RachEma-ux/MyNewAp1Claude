@@ -961,4 +961,50 @@ describe("pruneOldNotifications — Phase 22 #520 retention prune", () => {
     );
     expect(result.deletedCount).toBe(0);
   });
+
+  it("short-circuits empty notificationKind array with no DB call (#551)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await pruneOldNotifications(
+      { olderThan: new Date("2026-04-01"), notificationKind: [] },
+      { getDb },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("forwards single-string notificationKind to DELETE predicate (#551)", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }),
+      }),
+    };
+    const result = await pruneOldNotifications(
+      {
+        olderThan: new Date("2026-04-01"),
+        notificationKind: "graph_quality_run_completed",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 3 });
+  });
+
+  it("forwards array-form notificationKind to DELETE predicate (#551)", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [{ id: 5 }],
+        }),
+      }),
+    };
+    const result = await pruneOldNotifications(
+      {
+        olderThan: new Date("2026-04-01"),
+        notificationKind: ["graph_quality_run_completed", "import_complete"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 1 });
+  });
 });

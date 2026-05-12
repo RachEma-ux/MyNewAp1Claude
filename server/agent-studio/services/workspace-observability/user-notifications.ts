@@ -412,6 +412,16 @@ export interface PruneOldNotificationsInput {
    * safer policy — operators may not have triaged unread rows yet.
    */
   readonly readOnly?: boolean;
+  /**
+   * Optional notificationKind filter — single string (`eq`) or array
+   * (`IN`). Lets a cron/operator prune one kind aggressively while
+   * preserving rarer ones. Mirrors the same filter pattern on
+   * pruneOldBackgroundJobs.jobKind (#549) and
+   * pruneOldErrorEvents.errorClass (#550).
+   *
+   * Empty array short-circuits to `{deletedCount: 0}` with no DB call.
+   */
+  readonly notificationKind?: string | readonly string[];
 }
 
 export interface PruneOldNotificationsResult {
@@ -433,6 +443,15 @@ export async function pruneOldNotifications(
   input: PruneOldNotificationsInput,
   options: ServiceOptions = {},
 ): Promise<PruneOldNotificationsResult> {
+  // Empty notificationKind array → vacuous IN; short-circuit BEFORE
+  // the ASDB probe (matches pruneOldErrorEvents #550 contract).
+  if (
+    Array.isArray(input.notificationKind) &&
+    input.notificationKind.length === 0
+  ) {
+    return { deletedCount: 0 };
+  }
+
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) return { deletedCount: 0 };
@@ -440,6 +459,24 @@ export async function pruneOldNotifications(
   const filters = [lt(agsWorkspaceUserNotifications.createdAt, input.olderThan)];
   if (input.readOnly) {
     filters.push(eq(agsWorkspaceUserNotifications.read, true));
+  }
+  const kindInput = input.notificationKind;
+  if (kindInput !== undefined) {
+    if (Array.isArray(kindInput)) {
+      filters.push(
+        inArray(
+          agsWorkspaceUserNotifications.notificationKind,
+          kindInput as string[],
+        ),
+      );
+    } else {
+      filters.push(
+        eq(
+          agsWorkspaceUserNotifications.notificationKind,
+          kindInput as string,
+        ),
+      );
+    }
   }
 
   const deleted = await db
