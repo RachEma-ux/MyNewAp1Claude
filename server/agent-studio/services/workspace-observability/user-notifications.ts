@@ -14,7 +14,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, count, desc, eq, lt } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceUserNotifications } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -199,6 +199,55 @@ export async function markNotificationRead(
     .update(agsWorkspaceUserNotifications)
     .set({ read: true })
     .where(eq(agsWorkspaceUserNotifications.id, notificationId));
+}
+
+export interface MarkNotificationsReadInput {
+  readonly userId: number;
+  /**
+   * Notification ids to mark as read. Empty short-circuits to no-op.
+   * The userId predicate is enforced server-side so callers can't
+   * mark another user's notifications by id-guessing.
+   */
+  readonly notificationIds: readonly number[];
+}
+
+export interface MarkNotificationsReadResult {
+  readonly markedCount: number;
+}
+
+/**
+ * Bulk-mark notifications as read for a single user. Sister of
+ * markNotificationRead (singular) and markAllNotificationsRead
+ * (whole inbox). Use this when the operator selects a subset of
+ * rows in the inbox UI and clicks "mark selected read".
+ *
+ * Always scoped to userId so a malicious caller can't escalate
+ * by id-enumeration. Empty `notificationIds` short-circuits.
+ */
+export async function markNotificationsRead(
+  input: MarkNotificationsReadInput,
+  options: ServiceOptions = {},
+): Promise<MarkNotificationsReadResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+  if (input.notificationIds.length === 0) return { markedCount: 0 };
+
+  const updated = await db
+    .update(agsWorkspaceUserNotifications)
+    .set({ read: true })
+    .where(
+      and(
+        eq(agsWorkspaceUserNotifications.userId, input.userId),
+        inArray(
+          agsWorkspaceUserNotifications.id,
+          input.notificationIds as number[],
+        ),
+      ),
+    )
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { markedCount: updated.length };
 }
 
 export interface UnreadNotificationCount {

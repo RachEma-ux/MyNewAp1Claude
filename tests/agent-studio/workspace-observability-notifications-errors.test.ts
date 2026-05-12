@@ -13,6 +13,7 @@ import {
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
+  markNotificationsRead,
   markAllNotificationsRead,
   pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
@@ -284,6 +285,48 @@ describe("user-notifications — Phase 22", () => {
     await expect(
       markAllNotificationsRead(1, { getDb: () => null as never }),
     ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("markNotificationsRead throws AsdbUnavailableError on null DB", async () => {
+    await expect(
+      markNotificationsRead(
+        { userId: 1, notificationIds: [10, 11] },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("markNotificationsRead short-circuits to no-op on empty notificationIds", async () => {
+    const updateSpy = vi.fn();
+    const db = { update: updateSpy } as unknown;
+    const result = await markNotificationsRead(
+      { userId: 1, notificationIds: [] },
+      { getDb: () => db as never },
+    );
+    expect(result.markedCount).toBe(0);
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it("markNotificationsRead returns the count of returned rows", async () => {
+    const captured: { vals?: Record<string, unknown> } = {};
+    const db = {
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => {
+          captured.vals = vals;
+          return {
+            where: () => ({
+              returning: async () => [{ id: 10 }, { id: 11 }],
+            }),
+          };
+        },
+      })),
+    };
+    const result = await markNotificationsRead(
+      { userId: 7, notificationIds: [10, 11, 12] },
+      { getDb: () => db as never },
+    );
+    expect(result.markedCount).toBe(2);
+    expect(captured.vals).toEqual({ read: true });
   });
 
   it("countUnreadNotifications returns zero-state on ASDB-null (fail-soft)", async () => {
