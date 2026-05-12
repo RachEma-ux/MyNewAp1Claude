@@ -98,6 +98,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="provenance">Provenance</TabsTrigger>
           <TabsTrigger value="tool-knowledge">Tool Knowledge</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          <TabsTrigger value="cron-status">Cron Status</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -115,7 +116,165 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         <TabsContent value="approvals">
           <ApprovalsPanel agentDraftId={draftId} />
         </TabsContent>
+        <TabsContent value="cron-status">
+          <CronStatusPanel />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ── Cron Status (Phase 22 follow-up #615) ─────────────────────────────
+//
+// Seed client-side consumer for the workspace-observability surface
+// (zero consumers existed before this PR — see project_phase_22_cron
+// _mini_arc.md). Surfaces the two scheduled sweep crons (#612 retention,
+// #613 stale-running) via the #614 `getCronStatus` adminProcedure.
+//
+// Two cards, identical shape: lastRunAt + lastResult counters +
+// any outstanding lastError. Auto-refreshes every 30s so an operator
+// who left the tab open sees the cron tick through without manual
+// refresh. Renders an unambiguous "never" state for fresh boots
+// where no sweep has fired yet.
+
+function formatRelative(date: Date | null | undefined): string {
+  if (!date) return "never";
+  const d = new Date(date);
+  const ms = Date.now() - d.getTime();
+  if (ms < 0) return d.toISOString();
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
+}
+
+function CronStatusPanel() {
+  const q = trpc.agentStudio.workspaceObservability.getCronStatus.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
+
+  if (q.isLoading) return <LoadingState label="Loading cron status…" />;
+  if (q.isError) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-red-400">
+          Failed to load cron status:{" "}
+          {(q.error as { message?: string })?.message ?? "unknown"}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const retention = q.data?.retention;
+  const staleRunning = q.data?.staleRunning;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Retention sweep card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Retention sweep</SectionLabel>
+            {retention?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : retention?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 03:00 UTC (env: AGS_RETENTION_CRON_EXPR).
+            Sweeps `ags_workspace_error_events`,
+            `ags_workspace_user_notifications`,
+            `ags_workspace_background_jobs` older than 30 days.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(retention?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">rows deleted</div>
+              <div className="text-lg font-semibold">
+                {retention?.lastResult
+                  ? retention.lastResult.errorEventsDeleted +
+                    retention.lastResult.notificationsDeleted +
+                    retention.lastResult.backgroundJobsDeleted
+                  : "—"}
+              </div>
+              {retention?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  errors {retention.lastResult.errorEventsDeleted} ·
+                  notifications {retention.lastResult.notificationsDeleted} ·
+                  jobs {retention.lastResult.backgroundJobsDeleted}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {retention?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {retention.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Stale-running sweep card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Stale-running sweep</SectionLabel>
+            {staleRunning?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : staleRunning?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: every 10 min, 30-min staleness threshold (env:
+            AGS_STALE_RUNNING_CRON_EXPR / AGS_STALE_RUNNING_THRESHOLD_MS).
+            Auto-fails background jobs stuck in `status='running'`.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(staleRunning?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">jobs failed</div>
+              <div className="text-lg font-semibold">
+                {staleRunning?.lastResult
+                  ? staleRunning.lastResult.failed.length
+                  : "—"}
+              </div>
+              {staleRunning?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  scanned {staleRunning.lastResult.scanned}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {staleRunning?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {staleRunning.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
