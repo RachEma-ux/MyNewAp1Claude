@@ -344,6 +344,76 @@ export async function retryJob(
   );
 }
 
+export interface RetryJobsResult {
+  /** Jobs that were successfully flipped failed→pending. */
+  readonly retried: readonly BackgroundJobRow[];
+  /**
+   * Jobs that were skipped, with the reason: either "not_found" (the
+   * id didn't match a row) or "not_retryable" (status wasn't
+   * "failed"). The bulk operator wants partial success so a single
+   * stuck row doesn't block the whole batch.
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_retryable";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+/**
+ * Bulk operator retry: call retryJob() for each id, partitioning
+ * results into retried + skipped instead of failing fast on the
+ * first non-retryable id. The dashboard "retry all selected" button
+ * uses this — operators select multiple failed rows, the call
+ * retries the ones that are still failed, reports the rest.
+ *
+ * Empty input short-circuits to {retried: [], skipped: []}.
+ * Unknown errors (e.g. AsdbUnavailableError) propagate so the
+ * operator's batch fails loudly instead of silently reporting
+ * partial success.
+ */
+export async function retryJobs(
+  jobIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<RetryJobsResult> {
+  if (jobIds.length === 0) return { retried: [], skipped: [] };
+
+  // Probe ASDB upfront so a null DB fails the whole batch loudly
+  // instead of having every id skip-as-not_found (since getJobById is
+  // fail-soft on ASDB-null and would translate the infra failure
+  // into per-row JobNotFoundError noise).
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const retried: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_retryable";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const jobId of jobIds) {
+    try {
+      const row = await retryJob(jobId, options);
+      retried.push(row);
+    } catch (err) {
+      if (err instanceof JobNotFoundError) {
+        skipped.push({ jobId, reason: "not_found" });
+      } else if (err instanceof JobNotRetryableError) {
+        skipped.push({
+          jobId,
+          reason: "not_retryable",
+          currentStatus: err.currentStatus,
+        });
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  return { retried, skipped };
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldBackgroundJobsInput {

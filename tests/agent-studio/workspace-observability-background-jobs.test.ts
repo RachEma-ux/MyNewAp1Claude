@@ -15,6 +15,7 @@ import {
   markJobFailed,
   markJobCancelled,
   retryJob,
+  retryJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError,
   JobNotFoundError,
@@ -709,6 +710,98 @@ describe("state transitions — Phase 22", () => {
     await expect(
       markJobCompleted(999, { getDb: () => db as never }),
     ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+});
+
+describe("retryJobs — Phase 22 #542 bulk operator retry", () => {
+  // The shared makeFakeDb assumes a single active.jobId, which retryJob
+  // doesn't fit (each id triggers its own getJobById + transitionStatus
+  // + post-update getJobById). Use a queue-driven fake instead: each
+  // .limit() call shifts the next planned response.
+  function makeQueuedDb(selectQueue: ReadonlyArray<FakeRow[] | []>) {
+    const queue = [...selectQueue];
+    const updates: Array<Record<string, unknown>> = [];
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => ({
+            limit: async () => queue.shift() ?? [],
+          }),
+        };
+        return chain;
+      }),
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            updates.push(vals);
+          },
+        }),
+      })),
+    };
+    return { db, updates, remaining: () => queue.length };
+  }
+
+  it("partitions success + skipped reasons across the batch", async () => {
+    const now = new Date();
+    const id1Failed: FakeRow = {
+      id: 1,
+      jobKind: "x",
+      payload: null,
+      status: "failed",
+      attempts: 2,
+      lastError: "boom",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const id1Pending: FakeRow = { ...id1Failed, status: "pending", lastError: null };
+    const id2Completed: FakeRow = {
+      id: 2,
+      jobKind: "x",
+      payload: null,
+      status: "completed",
+      attempts: 1,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Queue per retryJob iteration:
+    //   id=1: getJobById → [failed]; transition; getJobById → [pending]
+    //   id=2: getJobById → [completed]; throws JobNotRetryableError
+    //   id=99: getJobById → []; throws JobNotFoundError
+    const { db } = makeQueuedDb([
+      [id1Failed],
+      [id1Pending],
+      [id2Completed],
+      [],
+    ]);
+
+    const result = await retryJobs([1, 2, 99], {
+      getDb: () => db as never,
+    });
+
+    expect(result.retried).toHaveLength(1);
+    expect(result.retried[0].id).toBe(1);
+    expect(result.retried[0].status).toBe("pending");
+    expect(result.retried[0].lastError).toBeNull();
+    // attempts preserved across retry (per #532 invariant).
+    expect(result.retried[0].attempts).toBe(2);
+    expect(result.skipped).toEqual([
+      { jobId: 2, reason: "not_retryable", currentStatus: "completed" },
+      { jobId: 99, reason: "not_found" },
+    ]);
+  });
+
+  it("returns empty result on empty input (no DB probe)", async () => {
+    const result = await retryJobs([], { getDb: () => null as never });
+    expect(result).toEqual({ retried: [], skipped: [] });
+  });
+
+  it("propagates AsdbUnavailableError on null DB (loud failure on infra)", async () => {
+    await expect(
+      retryJobs([1, 2], { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
   });
 });
 
