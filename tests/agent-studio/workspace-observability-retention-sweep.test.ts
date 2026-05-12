@@ -120,6 +120,25 @@ describe("runRetentionSweep", () => {
     ]);
   });
 
+  it("passes errorEventsErrorClass through to the errors prune (single, #550)", async () => {
+    await runRetentionSweep(
+      { errorEventsErrorClass: "ValidationError" },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0].errorClass).toBe("ValidationError");
+  });
+
+  it("passes errorEventsErrorClass through to the errors prune (array, #550)", async () => {
+    await runRetentionSweep(
+      { errorEventsErrorClass: ["ValidationError", "RateLimitError"] },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0].errorClass).toEqual([
+      "ValidationError",
+      "RateLimitError",
+    ]);
+  });
+
   it("runs all three prunes in parallel (not serially)", async () => {
     const callOrder: string[] = [];
     pruneErrorMock.mockImplementationOnce(async () => {
