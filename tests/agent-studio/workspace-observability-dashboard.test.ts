@@ -209,6 +209,52 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("recentJobKind forwards to BOTH listJobs calls (#585)", async () => {
+    await getObservabilityDashboard({ recentJobKind: "projection.rebuild" });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "failed", limit: 20, jobKind: "projection.rebuild" },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "completed", limit: 20, jobKind: "projection.rebuild" },
+      expect.any(Object),
+    );
+  });
+
+  it("array-form recentJobKind forwards to both recent slices (#585)", async () => {
+    await getObservabilityDashboard({
+      recentJobKind: ["projection.rebuild", "projection.repair"],
+    });
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "failed",
+        limit: 20,
+        jobKind: ["projection.rebuild", "projection.repair"],
+      },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      {
+        status: "completed",
+        limit: 20,
+        jobKind: ["projection.rebuild", "projection.repair"],
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("recentJobKind is undefined by default (does not narrow listJobs) (#585)", async () => {
+    await getObservabilityDashboard();
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "failed", limit: 20, jobKind: undefined },
+      expect.any(Object),
+    );
+    expect(listJobsMock).toHaveBeenCalledWith(
+      { status: "completed", limit: 20, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
   it("respects a custom pendingLimit on the pending-backlog slice (#569)", async () => {
     await getObservabilityDashboard({ pendingLimit: 3 });
     expect(listPendingMock).toHaveBeenCalledWith(
