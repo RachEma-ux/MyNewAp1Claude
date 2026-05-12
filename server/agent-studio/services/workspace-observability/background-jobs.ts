@@ -1453,6 +1453,19 @@ export interface PruneOldBackgroundJobsInput {
    * ASDB is down.
    */
   readonly jobKind?: string | readonly string[];
+  /**
+   * SQL LIKE-style filter on `lastError` (caller supplies the
+   * wildcards). Sister of `listJobs.lastErrorLike` (#580) and
+   * `pruneOldErrorEvents.errorMessageLike` (#581) — lets operators
+   * prune already-triaged transient failures by substring while
+   * preserving rare classes. Composes with the other filters
+   * (ANDed). Rows with `lastError = NULL` never match (SQL LIKE
+   * semantics) — typically not what callers want, since pending /
+   * completed rows have NULL lastError. Pair with
+   * `statuses: ["failed"]` for a targeted "prune failed jobs whose
+   * lastError mentions X" sweep.
+   */
+  readonly lastErrorLike?: string;
 }
 
 export interface PruneOldBackgroundJobsResult {
@@ -1498,6 +1511,11 @@ export async function pruneOldBackgroundJobs(
         eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
       );
     }
+  }
+  if (input.lastErrorLike !== undefined) {
+    filters.push(
+      like(agsWorkspaceBackgroundJobs.lastError, input.lastErrorLike),
+    );
   }
 
   const deleted = await db

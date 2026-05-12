@@ -1318,6 +1318,46 @@ describe("pruneOldBackgroundJobs — Phase 22 retention", () => {
     );
     expect(result.deletedCount).toBe(1);
   });
+
+  it("accepts lastErrorLike filter without throwing (#582)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 7 }, { id: 8 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        statuses: ["failed"],
+        lastErrorLike: "%OOMKilled%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(2);
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("lastErrorLike composes with jobKind + statuses (ANDed) (#582)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 9 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        statuses: ["failed"],
+        jobKind: "projection.rebuild",
+        lastErrorLike: "%timeout%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(1);
+  });
 });
 
 describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
