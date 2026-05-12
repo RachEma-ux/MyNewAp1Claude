@@ -107,6 +107,15 @@ export interface ObservabilityDashboardInput {
    */
   readonly pendingJobKind?: string | readonly string[];
   /**
+   * Optional SLA cutoff forwarded to listOldestPendingJobs (#589).
+   * Filters the pending-backlog drilldown to rows whose `createdAt`
+   * predates this timestamp — e.g. `Date.now() - 6*60*60*1000` for
+   * "pending past 6 hours". Sister of `staleOlderThan` (#588), but
+   * anchored on enqueue time since pending rows haven't been
+   * touched by a worker yet.
+   */
+  readonly pendingOlderThan?: Date;
+  /**
    * Optional jobKind filter forwarded to BOTH the
    * `recentFailedJobs` and `recentCompletedJobs` slices. Lets the
    * operator triage by worker subsystem — see failures and
@@ -216,7 +225,11 @@ export async function getObservabilityDashboard(
       { getDb: options.getDb },
     ),
     listOldestPendingJobs(
-      { limit: pendingLimit, jobKind: input.pendingJobKind },
+      {
+        limit: pendingLimit,
+        jobKind: input.pendingJobKind,
+        olderThan: input.pendingOlderThan,
+      },
       { getDb: options.getDb },
     ),
   ]);

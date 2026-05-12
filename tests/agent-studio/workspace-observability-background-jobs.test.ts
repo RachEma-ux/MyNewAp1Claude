@@ -2827,6 +2827,60 @@ describe("listOldestPendingJobs — Phase 22 #569 dashboard helper", () => {
     const result = await listOldestPendingJobs({}, { getDb: () => db as never });
     expect(result).toHaveLength(10);
   });
+
+  it("olderThan filter excludes rows whose createdAt is at-or-after the cutoff (#589)", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const cutoff = new Date(base + 4000); // anything createdAt < this is "old enough"
+    const rows: FakeRow[] = [
+      // createdAt < cutoff (3000 < 4000) → SLA breach, included.
+      {
+        id: 300,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 3000),
+        updatedAt: new Date(base + 3000),
+      },
+      // createdAt > cutoff (5000 > 4000) → fresh enqueue, excluded.
+      {
+        id: 301,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 5000),
+        updatedAt: new Date(base + 5000),
+      },
+    ];
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async (n: number) => {
+              const filtered = rows
+                .filter((r) => r.status === "pending")
+                .filter((r) => r.createdAt.getTime() < cutoff.getTime());
+              filtered.sort(
+                (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+              );
+              return filtered.slice(0, n);
+            },
+          }),
+        };
+        return chain;
+      }),
+    };
+    const result = await listOldestPendingJobs(
+      { limit: 10, olderThan: cutoff },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([300]);
+  });
 });
 
 describe("retryJobsByQuery — Phase 22 #573 operator bulk retry sweep", () => {

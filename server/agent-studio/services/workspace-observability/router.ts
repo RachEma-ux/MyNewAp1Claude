@@ -687,6 +687,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          pendingOlderThan: z.coerce.date().optional(),
           recentJobKind: z
             .union([
               z.string().min(1).max(100),
