@@ -110,6 +110,18 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentJobKind?: string | readonly string[];
   /**
+   * Optional SQL LIKE-style filter on `lastError`, forwarded to
+   * the `recentFailedJobs` slice ONLY — operators triaging a
+   * failure spike scope to the matching signature ("%OOM%",
+   * "%timeout%"). The companion `recentCompletedJobs` slice is
+   * intentionally unfiltered: completed jobs have
+   * `lastError = NULL`, so LIKE would always exclude them; more
+   * importantly, the operator typically wants the unfiltered
+   * completion side as a healthy-baseline reference. Same wildcard
+   * convention as `listJobs.lastErrorLike` (#580).
+   */
+  readonly recentFailedLastErrorLike?: string;
+  /**
    * Optional errorClass filter forwarded to listErrorEvents — lets
    * the dashboard scope the recent-error-events drilldown to a
    * specific class when triaging a known incident. Mirrors the
@@ -162,7 +174,12 @@ export async function getObservabilityDashboard(
   ] = await Promise.all([
     getWorkspaceObservabilityStats({ getDb: options.getDb }),
     listJobs(
-      { status: "failed", limit: recentLimit, jobKind: input.recentJobKind },
+      {
+        status: "failed",
+        limit: recentLimit,
+        jobKind: input.recentJobKind,
+        lastErrorLike: input.recentFailedLastErrorLike,
+      },
       { getDb: options.getDb },
     ),
     listJobs(
