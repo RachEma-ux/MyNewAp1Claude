@@ -24,6 +24,7 @@ import {
 import {
   recordErrorEvent,
   getErrorEventById,
+  getErrorEventsByIds,
   listErrorEvents,
   pruneOldErrorEvents,
 } from "../../server/agent-studio/services/workspace-observability/error-events";
@@ -934,6 +935,73 @@ describe("getErrorEventById — Phase 22 #558 singleton getter", () => {
       getDb: () => db as never,
     });
     expect(result).toBeNull();
+  });
+});
+
+describe("getErrorEventsByIds — Phase 22 #561 bulk reader", () => {
+  it("short-circuits empty input with no DB call", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await getErrorEventsByIds([], { getDb });
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("returns [] on ASDB-null with non-empty input (fail-soft)", async () => {
+    const result = await getErrorEventsByIds([1, 2], {
+      getDb: () => null as never,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("returns matched rows via SQL IN", async () => {
+    const now = new Date();
+    const rows: ErrEventRow[] = [
+      {
+        id: 7,
+        sourceKind: "trpc.chat.send",
+        sourceId: null,
+        userId: null,
+        errorClass: "ValidationError",
+        errorMessage: "a",
+        metadata: null,
+        createdAt: now,
+      },
+      {
+        id: 9,
+        sourceKind: "trpc.chat.list",
+        sourceId: null,
+        userId: null,
+        errorClass: "ZodError",
+        errorMessage: "b",
+        metadata: null,
+        createdAt: now,
+      },
+    ];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => rows,
+        }),
+      }),
+    };
+    const result = await getErrorEventsByIds([7, 9, 999], {
+      getDb: () => db as never,
+    });
+    expect(result.map((r) => r.id).sort()).toEqual([7, 9]);
+  });
+
+  it("returns [] when no ids match (all missing)", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => [],
+        }),
+      }),
+    };
+    const result = await getErrorEventsByIds([100, 200], {
+      getDb: () => db as never,
+    });
+    expect(result).toEqual([]);
   });
 });
 

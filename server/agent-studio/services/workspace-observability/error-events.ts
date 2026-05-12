@@ -136,6 +136,43 @@ export async function getErrorEventById(
   return rowToEvent(rows[0]);
 }
 
+/**
+ * Bulk reader sibling of getErrorEventById (#558). Completes the
+ * bulk-getById symmetry across all 3 Phase 22 tables (matches
+ * getJobsByIds #559 and getNotificationsByIds #560). Used by
+ * incident-triage UIs to fetch multiple selected errors in one
+ * round-trip — typical workflow: list shows 20 recent errors,
+ * operator picks 5, "show full payload" drilldown hits this.
+ *
+ * Empty input short-circuits to [] with no DB call. NOT user-scoped
+ * (error events don't have an owning userId in the dashboard-triage
+ * flow — same shape as the singleton getter).
+ */
+export async function getErrorEventsByIds(
+  errorEventIds: readonly number[],
+  options: ServiceOptions = {},
+): Promise<ErrorEventRow[]> {
+  if (errorEventIds.length === 0) return [];
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceErrorEvents.id,
+      sourceKind: agsWorkspaceErrorEvents.sourceKind,
+      sourceId: agsWorkspaceErrorEvents.sourceId,
+      userId: agsWorkspaceErrorEvents.userId,
+      errorClass: agsWorkspaceErrorEvents.errorClass,
+      errorMessage: agsWorkspaceErrorEvents.errorMessage,
+      metadata: agsWorkspaceErrorEvents.metadata,
+      createdAt: agsWorkspaceErrorEvents.createdAt,
+    })
+    .from(agsWorkspaceErrorEvents)
+    .where(inArray(agsWorkspaceErrorEvents.id, errorEventIds as number[]));
+  return rows.map(rowToEvent);
+}
+
 export interface ListErrorEventsInput {
   /**
    * Single sourceKind to filter by (exact `eq`), or an array (`IN`
