@@ -43,7 +43,11 @@ import {
   dismissNotifications,
   pushNotificationToUsers,
 } from "./user-notifications.js";
-import { getErrorEventById, listErrorEvents } from "./error-events.js";
+import {
+  getErrorEventById,
+  getErrorEventsByIds,
+  listErrorEvents,
+} from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
 import { getWorkspaceObservabilityStats } from "./stats.js";
 import { runRetentionSweep } from "./retention-sweep.js";
@@ -516,6 +520,23 @@ export const workspaceObservabilityRouter = router({
         return row;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getErrorEventsByIds: protectedProcedure
+    .input(
+      z.object({
+        errorEventIds: z.array(z.number().int().positive()).min(0).max(200),
+      }),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await getErrorEventsByIds(input.errorEventIds);
+      } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),

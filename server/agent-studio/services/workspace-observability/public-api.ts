@@ -75,6 +75,7 @@ export type {
 export {
   recordErrorEvent,
   getErrorEventById,
+  getErrorEventsByIds,
   listErrorEvents,
   pruneOldErrorEvents,
   AsdbUnavailableError as ErrorEventsAsdbUnavailableError,
