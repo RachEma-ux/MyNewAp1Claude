@@ -62,6 +62,15 @@ export interface WorkspaceObservabilityStats {
    * operators can spot throughput dips alongside error spikes.
    */
   readonly jobsCreatedByDay: readonly DayTrendBucket[];
+  /**
+   * Per-day count of background jobs whose terminal status is
+   * `failed`, last 14 days (UTC), oldest-first, zero-filled. Sister
+   * of `failedJobsByKind` (which answers "which") — this answers
+   * "when". A spike on the trend chart is the dashboard's first
+   * incident-detection signal before operators dig into specific
+   * sourceKinds.
+   */
+  readonly failedJobsByDay: readonly DayTrendBucket[];
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
   /**
@@ -113,6 +122,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   errorEventsByErrorClass: {},
   errorEventsByDay: [],
   jobsCreatedByDay: [],
+  failedJobsByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
   jobsByLane: {},
@@ -215,6 +225,7 @@ export async function getWorkspaceObservabilityStats(
     errorEventsTrendRows,
     jobsTrendRows,
     failedJobsByKindRows,
+    failedJobsTrendRows,
   ] = await Promise.all([
     db
       .select({
@@ -286,6 +297,16 @@ export async function getWorkspaceObservabilityStats(
       .from(agsWorkspaceBackgroundJobs)
       .where(sql`${agsWorkspaceBackgroundJobs.status} = 'failed'`)
       .groupBy(agsWorkspaceBackgroundJobs.jobKind),
+    db
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(
+        sql`${agsWorkspaceBackgroundJobs.status} = 'failed' AND ${agsWorkspaceBackgroundJobs.updatedAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC'`),
   ]);
 
   const errorEventsBySourceKind = bucketize(
@@ -317,12 +338,16 @@ export async function getWorkspaceObservabilityStats(
   const jobsTrendMap = bucketize(jobsTrendRows, "day");
   const jobsCreatedByDay = zeroFillDayTrend(jobsTrendMap, TREND_DAYS);
 
+  const failedJobsTrendMap = bucketize(failedJobsTrendRows, "day");
+  const failedJobsByDay = zeroFillDayTrend(failedJobsTrendMap, TREND_DAYS);
+
   return {
     errorEventsBySourceKind,
     errorEventsByLane: rollupByLane(errorEventsBySourceKind),
     errorEventsByErrorClass,
     errorEventsByDay,
     jobsCreatedByDay,
+    failedJobsByDay,
     jobsByStatus,
     jobsByKind,
     jobsByLane: rollupByLane(jobsByKind),
