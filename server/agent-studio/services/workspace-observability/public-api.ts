@@ -19,6 +19,7 @@ export {
   markJobCompleted,
   markJobFailed,
   markJobCancelled,
+  bumpJobHeartbeat,
   retryJob,
   retryJobs,
   cancelJobs,
@@ -28,6 +29,7 @@ export {
   JobNotFoundError,
   JobNotRetryableError,
   JobNotCancellableError,
+  JobNotRunningError,
 } from "./background-jobs.js";
 export type {
   EnqueueJobInput,

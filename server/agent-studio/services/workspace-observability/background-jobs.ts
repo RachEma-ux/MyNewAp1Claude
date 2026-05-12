@@ -428,6 +428,50 @@ async function transitionStatus(
   return updated;
 }
 
+/**
+ * Worker heartbeat — refreshes `updatedAt` on a running job without
+ * changing status, so `failStaleRunningJobs` (#546) doesn't auto-fail
+ * a worker that's legitimately still working past the stale-after
+ * window. Long-running workers (projection rebuilds, large imports)
+ * should call this periodically from their inner loop.
+ *
+ * No-op on non-running rows — the heartbeat invariant is "I, the
+ * worker that called markJobStarted, am still alive". A heartbeat on
+ * a completed/failed/cancelled row would be a worker-tier bug (worker
+ * leaked a reference past its job's terminal state) and silently
+ * doing the update would hide that bug. Returns the row regardless so
+ * the caller can inspect and decide.
+ *
+ * Throws JobNotFoundError if the row doesn't exist. The status-mismatch
+ * case is surfaced via JobNotRunningError so a worker can distinguish
+ * "row gone" from "row already terminated by external action"
+ * (operator cancel, retention prune race, etc.).
+ */
+export class JobNotRunningError extends Error {
+  constructor(
+    public readonly jobId: number,
+    public readonly currentStatus: JobStatus,
+  ) {
+    super(
+      `Background job ${jobId} is not 'running' (status='${currentStatus}'); heartbeat requires the running state`,
+    );
+    this.name = "JobNotRunningError";
+  }
+}
+
+export async function bumpJobHeartbeat(
+  jobId: number,
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow> {
+  const current = await getJobById(jobId, options);
+  if (!current) throw new JobNotFoundError(jobId);
+  if (current.status !== "running") {
+    throw new JobNotRunningError(jobId, current.status);
+  }
+  // Touch updatedAt only — status, attempts, lastError stay as-is.
+  return transitionStatus(jobId, {}, options);
+}
+
 export async function markJobStarted(
   jobId: number,
   options: ServiceOptions = {},
