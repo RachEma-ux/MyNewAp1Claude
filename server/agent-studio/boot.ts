@@ -230,6 +230,23 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-stale-running-cron] start skipped — ${message}`);
   }
 
+  // Step 3.7: Phase 22 follow-up #622 — runtime-runs retention cron.
+  // The ags_runtime_runs + ags_runtime_run_steps tables had no retention
+  // path before #621 + #622. Default daily 04:00 UTC sweep (offset 1h
+  // from #612 retention cron) with 30-day window. Env-flag-gated via
+  // AGS_RUNTIME_RUNS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureRuntimeRunsRetentionCronStarted } = await import(
+      "./services/runtime-runs-retention-cron"
+    );
+    ensureRuntimeRunsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-runtime-runs-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
