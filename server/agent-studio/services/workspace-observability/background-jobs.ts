@@ -657,6 +657,98 @@ export async function markJobFailed(
   return row;
 }
 
+export interface MarkJobsFailedInput {
+  readonly jobId: number;
+  readonly errorMessage: string;
+}
+
+export interface MarkJobsFailedResult {
+  /** Rows successfully flipped to `failed`. */
+  readonly failed: readonly BackgroundJobRow[];
+  /**
+   * Per-id skip reasons: `"not_found"` (no row) or `"not_running"`
+   * (row already in a terminal state — `completed`, `failed`,
+   * `cancelled`, or still `pending`). Partition rather than throw so
+   * a fan-out controller with a mix of running + already-terminal
+   * children doesn't lose the failure signal for the rest.
+   */
+  readonly skipped: ReadonlyArray<{
+    readonly jobId: number;
+    readonly reason: "not_found" | "not_running";
+    readonly currentStatus?: JobStatus;
+  }>;
+}
+
+/**
+ * Bulk failure for a fan-out controller whose N children all
+ * fault in one batch (each with its own error message). Sister
+ * of markJobsCompleted (#564) on the partition pattern, with the
+ * fire-and-forget error_events bridge preserved per-id.
+ *
+ * Refuses to flip non-running rows — only a `running` job should
+ * become `failed`. A pending/completed/failed/cancelled row is
+ * surfaced as `not_running` skip instead of being silently
+ * overwritten.
+ */
+export async function markJobsFailed(
+  inputs: readonly MarkJobsFailedInput[],
+  options: ServiceOptions = {},
+): Promise<MarkJobsFailedResult> {
+  if (inputs.length === 0) return { failed: [], skipped: [] };
+
+  const probeDb = (options.getDb ?? getAsDb)();
+  if (!probeDb) throw new AsdbUnavailableError();
+
+  const failed: BackgroundJobRow[] = [];
+  const skipped: Array<{
+    jobId: number;
+    reason: "not_found" | "not_running";
+    currentStatus?: JobStatus;
+  }> = [];
+
+  for (const { jobId, errorMessage } of inputs) {
+    const current = await getJobById(jobId, options);
+    if (!current) {
+      skipped.push({ jobId, reason: "not_found" });
+      continue;
+    }
+    if (current.status !== "running") {
+      skipped.push({
+        jobId,
+        reason: "not_running",
+        currentStatus: current.status,
+      });
+      continue;
+    }
+    const row = await transitionStatus(
+      jobId,
+      { status: "failed", lastError: errorMessage },
+      options,
+    );
+    failed.push(row);
+    // Fire-and-forget error_events bridge per failed row — matches
+    // singular markJobFailed semantics.
+    void recordErrorEvent(
+      {
+        sourceKind: `backgroundJob.${row.jobKind}`,
+        sourceId: String(jobId),
+        errorClass: "BackgroundJobFailed",
+        errorMessage,
+        metadata: {
+          jobId,
+          jobKind: row.jobKind,
+          payload: row.payload ?? null,
+        },
+      },
+      { getDb: options.getDb },
+    ).catch(() => {
+      // Fail-soft: an observability write failure must not propagate.
+    });
+  }
+
+  return { failed, skipped };
+}
+
 export async function markJobCancelled(
   jobId: number,
   options: ServiceOptions = {},
