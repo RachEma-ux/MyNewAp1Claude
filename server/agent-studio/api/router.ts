@@ -1647,6 +1647,45 @@ const mcpRouter = router({
         });
       return { ok: true, expiresAt: tokens.expiresAt ?? null };
     }),
+
+  // ── Transitions retention (Phase 22 follow-up #629 + #630 + #631) ───
+  //
+  // Admin sweep + status surface for ags_mcp_transitions. Mirrors
+  // runs.pruneRetention / runs.getRetentionCronStatus on the
+  // mcp-transitions table. Cron (#630) fires daily 06:00 UTC; these
+  // procedures let an operator fire on-demand sweeps + monitor the
+  // cron from the UI.
+  pruneTransitionsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          serverId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldMcpTransitions } = await import(
+        "../services/mcp-transitions-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldMcpTransitions({
+        olderThan,
+        serverId: input?.serverId,
+      });
+    }),
+  getTransitionsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getMcpTransitionsRetentionCronStatus } = await import(
+      "../services/mcp-transitions-retention-cron"
+    );
+    return getMcpTransitionsRetentionCronStatus();
+  }),
 });
 
 // ── Skills (attached from local catalog — adapter comes in Phase 0c) ────────
