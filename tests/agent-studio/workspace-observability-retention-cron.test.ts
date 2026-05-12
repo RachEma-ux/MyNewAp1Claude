@@ -54,7 +54,7 @@ describe("DEFAULT_RETENTION_CRON_EXPR", () => {
 
 describe("tickRetentionCron — cron matching", () => {
   it("fires when now matches the default cron (03:00 UTC)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,
@@ -65,7 +65,7 @@ describe("tickRetentionCron — cron matching", () => {
   });
 
   it("skips when now does not match the default cron (03:01 UTC)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T03:01:00Z"),
       state,
@@ -76,7 +76,7 @@ describe("tickRetentionCron — cron matching", () => {
   });
 
   it("skips when now matches a different hour (04:00 UTC)", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T04:00:00Z"),
       state,
@@ -117,7 +117,7 @@ describe("tickRetentionCron — env disable", () => {
 describe("tickRetentionCron — cron expression override", () => {
   it("honors AGS_RETENTION_CRON_EXPR (every hour at :30)", async () => {
     process.env.AGS_RETENTION_CRON_EXPR = "30 * * * *";
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T14:30:00Z"),
       state,
@@ -127,7 +127,7 @@ describe("tickRetentionCron — cron expression override", () => {
   });
 
   it("honors options.cronExpr override", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T05:15:00Z"),
       cronExpr: "15 5 * * *",
@@ -149,7 +149,7 @@ describe("tickRetentionCron — cron expression override", () => {
 
 describe("tickRetentionCron — dedup", () => {
   it("dedupes a second fire within the same minute key", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const now = new Date("2026-05-12T03:00:00Z");
     const first = await tickRetentionCron({ now, state, log: () => {} });
     const second = await tickRetentionCron({ now, state, log: () => {} });
@@ -160,7 +160,7 @@ describe("tickRetentionCron — dedup", () => {
   });
 
   it("does NOT dedupe across the next day's same-minute fire", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const day1 = await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,
@@ -181,7 +181,7 @@ describe("tickRetentionCron — failure handling", () => {
   it("swallows sweep failures without crashing the tick", async () => {
     sweepMock.mockRejectedValueOnce(new Error("ASDB unreachable"));
     const warn = vi.fn();
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,
@@ -195,7 +195,7 @@ describe("tickRetentionCron — failure handling", () => {
 
   it("still marks lastRunMinuteKey when sweep throws (no retry-storm within minute)", async () => {
     sweepMock.mockRejectedValueOnce(new Error("boom"));
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const now = new Date("2026-05-12T03:00:00Z");
     await tickRetentionCron({ now, state, warn: () => {} });
     // Second call same minute — should be deduped, NOT retry the sweep
@@ -207,7 +207,7 @@ describe("tickRetentionCron — failure handling", () => {
 
 describe("tickRetentionCron — sweep input forwarding", () => {
   it("calls runRetentionSweep with empty input by default", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,
@@ -217,7 +217,7 @@ describe("tickRetentionCron — sweep input forwarding", () => {
   });
 
   it("forwards options.sweepInput to runRetentionSweep", async () => {
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,
@@ -242,7 +242,7 @@ describe("tickRetentionCron — sweep input forwarding", () => {
       notificationsCutoff: new Date(0),
       backgroundJobsCutoff: new Date(0),
     });
-    const state = { lastRunMinuteKey: null as string | null };
+    const state = { lastRunMinuteKey: null as string | null, lastRunAt: null as Date | null, lastResult: null as any, lastError: null as string | null };
     const result = await tickRetentionCron({
       now: new Date("2026-05-12T03:00:00Z"),
       state,

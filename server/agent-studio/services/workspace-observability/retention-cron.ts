@@ -79,16 +79,40 @@ export interface TickRetentionCronResult {
 }
 
 /**
- * Module-level dedup state. Holds the minute-key of the most recent
- * fire so the same minute doesn't double-fire across rapid ticks (the
- * 60s tick interval is best-effort — clock skew or event-loop lag
- * could in principle land two ticks in the same minute).
+ * Module-level state. Holds:
+ *  - `lastRunMinuteKey` — minute-key of the most recent fire (or
+ *    most recent attempt — set even when the sweep throws — so a
+ *    tight re-tick within the same minute deduplicates and doesn't
+ *    retry-storm).
+ *  - `lastRunAt` — wall-clock timestamp of the most recent successful
+ *    fire (only set on `fired=true`; sweep failures do NOT advance it,
+ *    so operator monitors can detect "the cron is firing but always
+ *    erroring" by seeing a stale `lastRunAt`).
+ *  - `lastResult` — result of the most recent successful fire. Same
+ *    advance semantics as `lastRunAt`.
+ *  - `lastError` — error message from the most recent failed fire
+ *    (cleared on the next successful fire so the indicator
+ *    auto-resolves once the sweep recovers).
+ *
+ * Status-getter rationale: operators monitor the dashboard for "what
+ * sweeps ran today?" — `lastRunAt` answers that without re-running
+ * the sweep. The split between `lastRunAt`/`lastResult` (success only)
+ * and `lastError` (failure only) lets a status panel render both
+ * "last good sweep" and "is there a current outage?" independently.
  */
 export interface EnsureState {
   lastRunMinuteKey: string | null;
+  lastRunAt: Date | null;
+  lastResult: RunRetentionSweepResult | null;
+  lastError: string | null;
 }
 
-const moduleState: EnsureState = { lastRunMinuteKey: null };
+const moduleState: EnsureState = {
+  lastRunMinuteKey: null,
+  lastRunAt: null,
+  lastResult: null,
+  lastError: null,
+};
 
 function minuteKey(d: Date): string {
   // YYYY-MM-DDTHH:MM (UTC) — coarsest dedup that still allows
@@ -139,6 +163,9 @@ export async function tickRetentionCron(
   const sweep = options.runSweep ?? ((input) => runRetentionSweep(input));
   try {
     const result = await sweep(options.sweepInput ?? {});
+    state.lastRunAt = now;
+    state.lastResult = result;
+    state.lastError = null;
     log(
       `[ags-retention-cron] swept — errors=${result.errorEventsDeleted} ` +
         `notifications=${result.notificationsDeleted} ` +
@@ -147,9 +174,37 @@ export async function tickRetentionCron(
     return { fired: true, result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    state.lastError = msg;
     warn(`[ags-retention-cron] sweep failed: ${msg}`);
     return { fired: false, skippedReason: "swept_error" };
   }
+}
+
+/**
+ * Operator-visible cron status. Returns `{ lastRunAt, lastResult,
+ * lastError }` from module state — only the most recent successful
+ * fire advances `lastRunAt` / `lastResult`; failures only set
+ * `lastError`. Lets an admin panel render two independent signals:
+ *  - "last successful sweep" → `lastRunAt` + `lastResult.*Deleted`
+ *  - "current outage" → non-null `lastError`
+ *
+ * Returns a snapshot — not a live binding. Callers should re-invoke
+ * for fresh data.
+ */
+export interface RetentionCronStatus {
+  readonly lastRunAt: Date | null;
+  readonly lastResult: RunRetentionSweepResult | null;
+  readonly lastError: string | null;
+}
+
+export function getRetentionCronStatus(
+  state: EnsureState = moduleState,
+): RetentionCronStatus {
+  return {
+    lastRunAt: state.lastRunAt,
+    lastResult: state.lastResult,
+    lastError: state.lastError,
+  };
 }
 
 let started = false;
@@ -198,4 +253,7 @@ export function _resetRetentionCronForTests(): void {
   }
   started = false;
   moduleState.lastRunMinuteKey = null;
+  moduleState.lastRunAt = null;
+  moduleState.lastResult = null;
+  moduleState.lastError = null;
 }

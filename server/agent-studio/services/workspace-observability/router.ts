@@ -58,6 +58,8 @@ import { getWorkspaceObservabilityStats } from "./stats.js";
 import { runRetentionSweep } from "./retention-sweep.js";
 import { getObservabilityDashboard } from "./dashboard.js";
 import { getInboxComposite } from "./inbox.js";
+import { getRetentionCronStatus } from "./retention-cron.js";
+import { getStaleRunningCronStatus } from "./stale-running-job-cron.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -982,6 +984,22 @@ export const workspaceObservabilityRouter = router({
         }));
       }
     }),
+
+  /**
+   * Phase 22 follow-up #614 — operator-visible status of the two
+   * scheduled sweep crons (#612 retention, #613 stale-running).
+   * Returns the last-successful-run timestamp + result, and any
+   * outstanding error from the most recent failed fire. Admin-only
+   * because the cron state isn't workspace-scoped (single set of
+   * timers per process) and operators reading it are doing
+   * cross-tenant ops monitoring.
+   */
+  getCronStatus: adminProcedure.query(() => {
+    return {
+      retention: getRetentionCronStatus(),
+      staleRunning: getStaleRunningCronStatus(),
+    };
+  }),
 });
 
 export type WorkspaceObservabilityRouter = typeof workspaceObservabilityRouter;
