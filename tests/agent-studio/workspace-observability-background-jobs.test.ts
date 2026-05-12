@@ -1697,6 +1697,113 @@ describe("failStaleRunningJobs — Phase 22 #546 auto-failer", () => {
     expect(result.scanned).toBe(0);
     expect(result.failed).toEqual([]);
   });
+
+  it("delegates to markJobsFailed bulk — one error_events INSERT for N stale rows (#572)", async () => {
+    const now = new Date("2026-05-12T00:00:00Z");
+    const stale = new Date("2026-05-11T00:00:00Z");
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "a",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: stale,
+        updatedAt: stale,
+      },
+      {
+        id: 2,
+        jobKind: "a",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: stale,
+        updatedAt: stale,
+      },
+      {
+        id: 3,
+        jobKind: "b",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: stale,
+        updatedAt: stale,
+      },
+    ];
+    // Call sequence after the outer orderBy().limit() that returns
+    // [{id:1},{id:2},{id:3}]:
+    //   id 1: getJobById SELECT 1 → UPDATE 1 → transitionStatus refetch SELECT 1
+    //   id 2: getJobById SELECT 2 → UPDATE 2 → transitionStatus refetch SELECT 2
+    //   id 3: getJobById SELECT 3 → UPDATE 3 → transitionStatus refetch SELECT 3
+    // Then 1 batched error_events INSERT.
+    const selectQueue: number[] = [1, 1, 2, 2, 3, 3];
+    let lastSelectedId: number | undefined;
+    let firstOrderBy = true;
+    const insertCalls: unknown[] = [];
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async () => {
+              if (firstOrderBy) {
+                firstOrderBy = false;
+                return rows.map(({ id }) => ({ id }));
+              }
+              return [];
+            },
+          }),
+          limit: async () => {
+            const id = selectQueue.shift();
+            lastSelectedId = id;
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const target = rows.find((r) => r.id === lastSelectedId);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("lastError" in vals) {
+              target.lastError =
+                vals.lastError == null ? null : String(vals.lastError);
+            }
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+      insert: vi.fn(() => ({
+        values: (v: unknown) => {
+          insertCalls.push(v);
+          return { returning: async () => [] };
+        },
+      })),
+    };
+
+    const result = await failStaleRunningJobs(
+      { olderThan: now },
+      { getDb: () => db as never },
+    );
+    // Let the fire-and-forget error_events INSERT drain.
+    await new Promise((r) => setImmediate(r));
+
+    expect(result.scanned).toBe(3);
+    expect(result.failed).toHaveLength(3);
+    // The bulk path emits ONE batched error_events INSERT for all
+    // three failed rows (pre-#572 path would have emitted 3).
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(insertCalls).toHaveLength(1);
+    expect(Array.isArray(insertCalls[0])).toBe(true);
+    expect((insertCalls[0] as unknown[]).length).toBe(3);
+  });
 });
 
 describe("bumpJobHeartbeat — Phase 22 #562 worker heartbeat", () => {
