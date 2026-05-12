@@ -19,7 +19,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceBackgroundJobs } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import { recordErrorEvent } from "./error-events.js";
@@ -259,4 +259,60 @@ export async function markJobCancelled(
   options: ServiceOptions = {},
 ): Promise<BackgroundJobRow> {
   return transitionStatus(jobId, { status: "cancelled" }, options);
+}
+
+// ---------- retention prune ----------
+
+export interface PruneOldBackgroundJobsInput {
+  /**
+   * Delete jobs whose updatedAt is strictly older than this cutoff.
+   * Uses updatedAt (not createdAt) so a job that's been re-attempted
+   * recently is preserved even if it was first enqueued long ago.
+   */
+  readonly olderThan: Date;
+  /**
+   * Restrict deletion to jobs in these terminal statuses. Default
+   * ["completed", "cancelled"] — failed jobs are preserved by default
+   * because their lastError + audit trail may still be operator-relevant.
+   * Pass ["completed", "failed", "cancelled"] for aggressive cleanup,
+   * or ["completed"] for the safest policy.
+   */
+  readonly statuses?: readonly JobStatus[];
+}
+
+export interface PruneOldBackgroundJobsResult {
+  readonly deletedCount: number;
+}
+
+const DEFAULT_TERMINAL_STATUSES: readonly JobStatus[] = ["completed", "cancelled"];
+
+/**
+ * Bulk-delete background jobs older than the given cutoff. Sister of
+ * pruneOldErrorEvents (#519) and pruneOldNotifications (#520) — same
+ * fail-soft contract on ASDB-null.
+ *
+ * Defaults preserve `failed` jobs because their error context typically
+ * outlives the immediate retention window. Operators investigating an
+ * incident days later still want the failed-job rows around.
+ */
+export async function pruneOldBackgroundJobs(
+  input: PruneOldBackgroundJobsInput,
+  options: ServiceOptions = {},
+): Promise<PruneOldBackgroundJobsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return { deletedCount: 0 };
+
+  const statuses = input.statuses ?? DEFAULT_TERMINAL_STATUSES;
+  const filters = [
+    lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan),
+    inArray(agsWorkspaceBackgroundJobs.status, statuses as JobStatus[]),
+  ];
+
+  const deleted = await db
+    .delete(agsWorkspaceBackgroundJobs)
+    .where(and(...filters))
+    .returning({ id: agsWorkspaceBackgroundJobs.id });
+
+  return { deletedCount: deleted.length };
 }

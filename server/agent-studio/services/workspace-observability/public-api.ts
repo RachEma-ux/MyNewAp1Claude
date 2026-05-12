@@ -16,6 +16,7 @@ export {
   markJobCompleted,
   markJobFailed,
   markJobCancelled,
+  pruneOldBackgroundJobs,
   AsdbUnavailableError as BackgroundJobsAsdbUnavailableError,
   JobNotFoundError,
 } from "./background-jobs.js";
@@ -24,6 +25,8 @@ export type {
   ListJobsInput,
   BackgroundJobRow,
   JobStatus,
+  PruneOldBackgroundJobsInput,
+  PruneOldBackgroundJobsResult,
 } from "./background-jobs.js";
 
 export {

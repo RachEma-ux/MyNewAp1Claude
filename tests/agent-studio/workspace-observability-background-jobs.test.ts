@@ -14,6 +14,7 @@ import {
   markJobCompleted,
   markJobFailed,
   markJobCancelled,
+  pruneOldBackgroundJobs,
   AsdbUnavailableError,
   JobNotFoundError,
 } from "../../server/agent-studio/services/workspace-observability/background-jobs";
@@ -406,5 +407,71 @@ describe("state transitions — Phase 22", () => {
     await expect(
       markJobCompleted(999, { getDb: () => db as never }),
     ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+});
+
+describe("pruneOldBackgroundJobs — Phase 22 retention", () => {
+  it("returns deletedCount=0 on ASDB-null (fail-soft)", async () => {
+    const result = await pruneOldBackgroundJobs(
+      { olderThan: new Date("2026-01-01") },
+      { getDb: () => null as never },
+    );
+    expect(result.deletedCount).toBe(0);
+  });
+
+  it("returns the number of deleted rows from .returning()", async () => {
+    const captured: { whereCalled: boolean } = { whereCalled: false };
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => {
+          captured.whereCalled = true;
+          return {
+            returning: async () => [{ id: 11 }, { id: 12 }, { id: 13 }],
+          };
+        },
+      })),
+    };
+
+    const result = await pruneOldBackgroundJobs(
+      { olderThan: new Date("2026-04-01") },
+      { getDb: () => db as never },
+    );
+
+    expect(result.deletedCount).toBe(3);
+    expect(captured.whereCalled).toBe(true);
+    expect(db.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns deletedCount=0 when no rows match", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      { olderThan: new Date("2026-04-01") },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(0);
+  });
+
+  it("accepts a custom statuses filter (aggressive cleanup)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        statuses: ["completed", "failed", "cancelled"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(1);
   });
 });
