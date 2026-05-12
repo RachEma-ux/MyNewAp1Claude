@@ -14,7 +14,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceUserNotifications } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -151,6 +151,13 @@ export interface ListNotificationsInput {
   readonly unreadOnly?: boolean;
   readonly notificationKind?: string;
   readonly limit?: number;
+  /**
+   * Restrict to notifications whose `createdAt` is at-or-after this
+   * timestamp. Symmetric with `listJobs.createdSince` and
+   * `listErrorEvents.createdSince` — same date-window discipline
+   * across the three Phase 22 list surfaces.
+   */
+  readonly createdSince?: Date;
 }
 
 export async function listNotifications(
@@ -168,6 +175,11 @@ export async function listNotifications(
   if (input.notificationKind !== undefined) {
     filters.push(
       eq(agsWorkspaceUserNotifications.notificationKind, input.notificationKind),
+    );
+  }
+  if (input.createdSince !== undefined) {
+    filters.push(
+      gte(agsWorkspaceUserNotifications.createdAt, input.createdSince),
     );
   }
 

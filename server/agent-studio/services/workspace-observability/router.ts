@@ -154,6 +154,7 @@ export const workspaceObservabilityRouter = router({
           unreadOnly: z.boolean().optional(),
           notificationKind: z.string().min(1).max(100).optional(),
           limit: z.number().int().min(1).max(500).optional(),
+          createdSince: z.coerce.date().optional(),
         })
         .optional(),
     )
@@ -167,6 +168,7 @@ export const workspaceObservabilityRouter = router({
           unreadOnly: input?.unreadOnly,
           notificationKind: input?.notificationKind,
           limit: input?.limit,
+          createdSince: input?.createdSince,
         });
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
@@ -302,6 +304,7 @@ export const workspaceObservabilityRouter = router({
           errorClass: z.string().min(1).max(100).optional(),
           userId: z.number().int().positive().optional(),
           limit: z.number().int().min(1).max(500).optional(),
+          createdSince: z.coerce.date().optional(),
         })
         .optional(),
     )
