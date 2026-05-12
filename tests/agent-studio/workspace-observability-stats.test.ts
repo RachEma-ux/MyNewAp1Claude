@@ -22,6 +22,7 @@ interface SeededBuckets {
   errorEventsByDay?: { day: string; count: number }[];
   jobsByDay?: { day: string; count: number }[];
   failedJobsByDay?: { day: string; count: number }[];
+  notificationsByDay?: { day: string; count: number }[];
 }
 
 function makeFakeDb(seeded: SeededBuckets = {}) {
@@ -80,6 +81,9 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
                 jobsDayCallCount += 1;
                 if (jobsDayCallCount === 1) return seeded.jobsByDay ?? [];
                 return seeded.failedJobsByDay ?? [];
+              }
+              if (tn === "ags_workspace_user_notifications") {
+                return seeded.notificationsByDay ?? [];
               }
               return seeded.errorEventsByDay ?? [];
             default:
@@ -559,5 +563,54 @@ describe("getWorkspaceObservabilityStats — jobsCreatedByDay trend", () => {
     const jobToday = stats.jobsCreatedByDay.find((b) => b.date === today);
     expect(errToday?.count).toBe(4);
     expect(jobToday?.count).toBe(11);
+  });
+});
+
+describe("getWorkspaceObservabilityStats — notificationsByDay trend (#552)", () => {
+  it("zero-fills the 14-day window when DB returns no rows", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.notificationsByDay).toHaveLength(14);
+    expect(stats.notificationsByDay.every((b) => b.count === 0)).toBe(true);
+    const dates = stats.notificationsByDay.map((b) => b.date);
+    expect(dates).toEqual([...dates].sort());
+  });
+
+  it("merges DB day-bucket counts into the zero-filled window", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      notificationsByDay: [{ day: today, count: 6 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    const todayBucket = stats.notificationsByDay.find((b) => b.date === today);
+    expect(todayBucket?.count).toBe(6);
+    const others = stats.notificationsByDay.filter((b) => b.date !== today);
+    expect(others.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("notifications, error-events, and jobs trends are mutually independent", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      errorEventsByDay: [{ day: today, count: 2 }],
+      jobsByDay: [{ day: today, count: 5 }],
+      notificationsByDay: [{ day: today, count: 8 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByDay.find((b) => b.date === today)?.count).toBe(2);
+    expect(stats.jobsCreatedByDay.find((b) => b.date === today)?.count).toBe(5);
+    expect(stats.notificationsByDay.find((b) => b.date === today)?.count).toBe(8);
+  });
+
+  it("returns the all-zero shape on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.notificationsByDay).toEqual([]);
   });
 });
