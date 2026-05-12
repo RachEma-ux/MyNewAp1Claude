@@ -113,6 +113,21 @@ export interface WorkspaceObservabilityStats {
    * the operator to mentally roll up failed kinds themselves.
    */
   readonly failedJobsByLane: Record<string, number>;
+  /**
+   * Pending-only subset of `jobsByKind`: counts only rows where
+   * `status='pending'`, bucketed by jobKind. Pairs with
+   * `oldestPendingJobs` (#569) — that surfaces the oldest WAITING
+   * rows (when), this surfaces the deepest backlog (which kind).
+   * A kind with a high count here whose oldest sample is also old
+   * means a specific worker subsystem isn't pulling its queue.
+   */
+  readonly pendingJobsByKind: Record<string, number>;
+  /**
+   * Lane rollup of `pendingJobsByKind` — pending-only counts
+   * aggregated by first dot-segment. Sister of `failedJobsByLane`
+   * on the pending-backlog axis.
+   */
+  readonly pendingJobsByLane: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
   /**
    * Lane rollup of `notificationsByKind` by the first dot-separated
@@ -160,6 +175,8 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   jobsByLane: {},
   failedJobsByKind: {},
   failedJobsByLane: {},
+  pendingJobsByKind: {},
+  pendingJobsByLane: {},
   notificationsByKind: {},
   notificationsByLane: {},
   notificationsByDay: [],
@@ -259,6 +276,7 @@ export async function getWorkspaceObservabilityStats(
     errorEventsTrendRows,
     jobsTrendRows,
     failedJobsByKindRows,
+    pendingJobsByKindRows,
     failedJobsTrendRows,
     completedJobsTrendRows,
     notificationsTrendRows,
@@ -335,6 +353,14 @@ export async function getWorkspaceObservabilityStats(
       .groupBy(agsWorkspaceBackgroundJobs.jobKind),
     db
       .select({
+        jobKind: agsWorkspaceBackgroundJobs.jobKind,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(sql`${agsWorkspaceBackgroundJobs.status} = 'pending'`)
+      .groupBy(agsWorkspaceBackgroundJobs.jobKind),
+    db
+      .select({
         day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
         count: sql<number>`count(*)::int`,
       })
@@ -407,6 +433,7 @@ export async function getWorkspaceObservabilityStats(
   const notificationsByDay = zeroFillDayTrend(notificationsTrendMap, TREND_DAYS);
 
   const failedJobsByKind = bucketize(failedJobsByKindRows, "jobKind");
+  const pendingJobsByKind = bucketize(pendingJobsByKindRows, "jobKind");
 
   return {
     errorEventsBySourceKind,
@@ -421,6 +448,8 @@ export async function getWorkspaceObservabilityStats(
     jobsByLane: rollupByLane(jobsByKind),
     failedJobsByKind,
     failedJobsByLane: rollupByLane(failedJobsByKind),
+    pendingJobsByKind,
+    pendingJobsByLane: rollupByLane(pendingJobsByKind),
     notificationsByKind,
     notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByDay,
