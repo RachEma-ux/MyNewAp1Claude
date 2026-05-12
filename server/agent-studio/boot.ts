@@ -368,6 +368,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.15: Phase 22 follow-up #658 — graph-quality-scans retention cron.
+  // The ags_graph_quality_scans + ags_graph_quality_findings tables had
+  // no retention before #657 + #658. Default daily 12:00 UTC sweep —
+  // 10th slot in the daily-sweep ladder. Cascades findings (child) before
+  // parent scans — FK is NO ACTION, so parent-first would error.
+  // Env-flag-gated via AGS_GRAPH_QUALITY_SCANS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureGraphQualityScansRetentionCronStarted } = await import(
+      "./services/graph-quality-scans-retention-cron"
+    );
+    ensureGraphQualityScansRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-quality-scans-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
