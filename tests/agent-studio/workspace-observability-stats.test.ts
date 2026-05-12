@@ -21,6 +21,7 @@ interface SeededBuckets {
   notificationsByReadState?: { read: boolean | null; count: number }[];
   errorEventsByDay?: { day: string; count: number }[];
   jobsByDay?: { day: string; count: number }[];
+  failedJobsByDay?: { day: string; count: number }[];
 }
 
 function makeFakeDb(seeded: SeededBuckets = {}) {
@@ -40,6 +41,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     | "notifRead"
     | "day"
     | null = null;
+  let jobsDayCallCount = 0;
 
   const select = vi.fn((shape: Record<string, unknown>) => {
     if ("sourceKind" in shape) nextSelectKind = "errorSource";
@@ -72,7 +74,12 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
               return seeded.notificationsByReadState ?? [];
             case "day":
               if (tn === "ags_workspace_background_jobs") {
-                return seeded.jobsByDay ?? [];
+                // First "day" query on the jobs table is jobsCreatedByDay
+                // (status-agnostic); second is failedJobsByDay
+                // (status='failed'). Both .where(); dispatch by call order.
+                jobsDayCallCount += 1;
+                if (jobsDayCallCount === 1) return seeded.jobsByDay ?? [];
+                return seeded.failedJobsByDay ?? [];
               }
               return seeded.errorEventsByDay ?? [];
             default:
@@ -249,6 +256,51 @@ describe("rollupSourceKindsByLane — pure helper", () => {
         importScan: 7,
       }),
     ).toEqual({ projection: 4, retention: 2, importScan: 7 });
+  });
+});
+
+describe("getWorkspaceObservabilityStats — failedJobsByDay trend", () => {
+  it("zero-fills the 14-day window when no failures are recorded", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.failedJobsByDay).toHaveLength(14);
+    expect(stats.failedJobsByDay.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("merges DB day-bucket counts into the failed-jobs window", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      failedJobsByDay: [{ day: today, count: 5 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    const todayBucket = stats.failedJobsByDay.find((b) => b.date === today);
+    expect(todayBucket?.count).toBe(5);
+    const others = stats.failedJobsByDay.filter((b) => b.date !== today);
+    expect(others.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("jobs-created and jobs-failed trends are independent series", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      jobsByDay: [{ day: today, count: 50 }],
+      failedJobsByDay: [{ day: today, count: 7 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.jobsCreatedByDay.find((b) => b.date === today)?.count).toBe(50);
+    expect(stats.failedJobsByDay.find((b) => b.date === today)?.count).toBe(7);
+  });
+
+  it("returns an empty failedJobsByDay on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.failedJobsByDay).toEqual([]);
   });
 });
 
