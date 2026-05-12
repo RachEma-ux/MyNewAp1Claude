@@ -210,4 +210,36 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards recentErrorEventsUserIdIsNull=true (#595)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentErrorEventsUserIdIsNull: true });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsUserIdIsNull: true,
+    });
+  });
+
+  it("forwards recentErrorEventsUserIdIsNull=false (#595)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentErrorEventsUserIdIsNull: false });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsUserIdIsNull: false,
+    });
+  });
+
+  it("rejects non-boolean recentErrorEventsUserIdIsNull at the input layer (#595)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({
+        recentErrorEventsUserIdIsNull: "true" as never,
+      }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

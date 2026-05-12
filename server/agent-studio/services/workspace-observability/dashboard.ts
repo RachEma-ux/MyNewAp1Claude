@@ -184,6 +184,18 @@ export interface ObservabilityDashboardInput {
    * errorMessageLike (ANDed in the WHERE).
    */
   readonly errorEventsCreatedSince?: Date;
+  /**
+   * Optional tri-state forwarded to listErrorEvents's `userIdIsNull`
+   * filter (#593). Dashboard-side companion to the user-vs-system
+   * rollup stat (#594):
+   *   - `true`  → only system-driven errors (userId IS NULL)
+   *   - `false` → only user-attributable errors (userId IS NOT NULL)
+   *   - `undefined` (default) → both
+   * Operators use the stat to see the balance, then forward this
+   * flag to drill into one slice. Composes with errorClass /
+   * sourceKind / errorMessageLike / createdSince.
+   */
+  readonly recentErrorEventsUserIdIsNull?: boolean;
 }
 
 export interface ObservabilityDashboardOptions {
@@ -237,6 +249,7 @@ export async function getObservabilityDashboard(
         sourceKind: input.sourceKind,
         errorMessageLike: input.errorMessageLike,
         createdSince: input.errorEventsCreatedSince,
+        userIdIsNull: input.recentErrorEventsUserIdIsNull,
       },
       { getDb: options.getDb },
     ),

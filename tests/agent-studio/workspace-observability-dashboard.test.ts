@@ -373,6 +373,54 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards recentErrorEventsUserIdIsNull=true to listErrorEvents (#595)", async () => {
+    await getObservabilityDashboard({ recentErrorEventsUserIdIsNull: true });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: undefined,
+        sourceKind: undefined,
+        errorMessageLike: undefined,
+        createdSince: undefined,
+        userIdIsNull: true,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards recentErrorEventsUserIdIsNull=false to listErrorEvents (#595)", async () => {
+    await getObservabilityDashboard({ recentErrorEventsUserIdIsNull: false });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userIdIsNull: false }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentErrorEventsUserIdIsNull composes with errorClass + errorMessageLike (#595)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsUserIdIsNull: true,
+      errorClass: "BackgroundJobFailed",
+      errorMessageLike: "%OOM%",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: undefined,
+        errorMessageLike: "%OOM%",
+        createdSince: undefined,
+        userIdIsNull: true,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("undefined recentErrorEventsUserIdIsNull means both system+user errors are returned (#595)", async () => {
+    await getObservabilityDashboard({});
+    const args = listErrorsMock.mock.calls[0]?.[0] as { userIdIsNull?: boolean };
+    expect(args.userIdIsNull).toBeUndefined();
+  });
+
   it("recentFailedLastErrorLike scopes ONLY the failed slice, not completed (#587)", async () => {
     await getObservabilityDashboard({
       recentFailedLastErrorLike: "%OOM%",
