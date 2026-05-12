@@ -149,6 +149,18 @@ export interface WorkspaceObservabilityStats {
    */
   readonly notificationsByDay: readonly DayTrendBucket[];
   readonly notificationsByReadState: { read: number; unread: number };
+  /**
+   * Counts of error events split by whether `userId IS NULL`.
+   * Operator's first triage question on a failure spike — "is this
+   * user-driven or system-driven?" — answered at the rollup level
+   * without enumerating sourceKinds. Pairs with
+   * `listErrorEvents.userIdIsNull` (#593): the operator sees the
+   * skew here and drills into the corresponding subset via the
+   * list filter.
+   *   - `system`: NULL userId (background workers, sweeps, cron).
+   *   - `user`:   non-NULL userId (tRPC procedures with a session).
+   */
+  readonly errorEventsByUserPresence: { system: number; user: number };
   readonly totals: {
     readonly errorEvents: number;
     readonly jobs: number;
@@ -181,6 +193,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   notificationsByLane: {},
   notificationsByDay: [],
   notificationsByReadState: { read: 0, unread: 0 },
+  errorEventsByUserPresence: { system: 0, user: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
 };
 
@@ -269,6 +282,7 @@ export async function getWorkspaceObservabilityStats(
   const [
     errorEventsBySourceKindRows,
     errorEventsByErrorClassRows,
+    errorEventsByUserPresenceRows,
     jobsByStatusRows,
     jobsByKindRows,
     notificationsByKindRows,
@@ -295,6 +309,13 @@ export async function getWorkspaceObservabilityStats(
       })
       .from(agsWorkspaceErrorEvents)
       .groupBy(agsWorkspaceErrorEvents.errorClass),
+    db
+      .select({
+        isSystem: sql<boolean>`${agsWorkspaceErrorEvents.userId} IS NULL`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceErrorEvents)
+      .groupBy(sql`${agsWorkspaceErrorEvents.userId} IS NULL`),
     db
       .select({
         status: agsWorkspaceBackgroundJobs.status,
@@ -414,6 +435,17 @@ export async function getWorkspaceObservabilityStats(
     else if (r.read === false) unreadCount += c;
   }
 
+  let systemErrorCount = 0;
+  let userErrorCount = 0;
+  for (const r of errorEventsByUserPresenceRows as readonly {
+    isSystem: boolean | null;
+    count: unknown;
+  }[]) {
+    const c = Number(r.count) || 0;
+    if (r.isSystem === true) systemErrorCount += c;
+    else if (r.isSystem === false) userErrorCount += c;
+  }
+
   const errorEventsTrendMap = bucketize(errorEventsTrendRows, "day");
   const errorEventsByDay = zeroFillDayTrend(errorEventsTrendMap, TREND_DAYS);
 
@@ -454,6 +486,10 @@ export async function getWorkspaceObservabilityStats(
     notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByDay,
     notificationsByReadState: { read: readCount, unread: unreadCount },
+    errorEventsByUserPresence: {
+      system: systemErrorCount,
+      user: userErrorCount,
+    },
     totals: {
       errorEvents: sumBuckets(errorEventsBySourceKind),
       jobs: sumBuckets(jobsByStatus),
