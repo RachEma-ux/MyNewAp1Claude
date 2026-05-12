@@ -85,6 +85,67 @@ export async function pushNotification(
   return rowToNotification(row);
 }
 
+export interface PushNotificationToUsersInput {
+  /**
+   * Recipient user ids. Empty array short-circuits to a no-op (no
+   * insert). Duplicate ids produce duplicate rows by design — caller
+   * dedupes if it cares.
+   */
+  readonly userIds: readonly number[];
+  readonly notificationKind: string;
+  readonly payload?: Record<string, unknown> | null;
+}
+
+export interface PushNotificationToUsersResult {
+  readonly insertedCount: number;
+  readonly notifications: readonly NotificationRow[];
+}
+
+/**
+ * Bulk-insert the same notification body to many users in one INSERT.
+ * Operators use this for broadcasts: "graph projection rebuild
+ * complete — please review", "scheduled maintenance window starts
+ * 18:00 UTC", etc. Sister of `pushNotification` for one-to-one writes;
+ * shares the same row shape and fail-soft contract.
+ *
+ * Empty `userIds` is a no-op (returns {insertedCount: 0,
+ * notifications: []}) — saves operators from a defensive guard at the
+ * call-site when the recipient query happens to return zero rows.
+ */
+export async function pushNotificationToUsers(
+  input: PushNotificationToUsersInput,
+  options: ServiceOptions = {},
+): Promise<PushNotificationToUsersResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+  if (input.userIds.length === 0) {
+    return { insertedCount: 0, notifications: [] };
+  }
+
+  const values = input.userIds.map((userId) => ({
+    userId,
+    notificationKind: input.notificationKind,
+    payload: input.payload ?? null,
+    read: false,
+  }));
+
+  const inserted = await db
+    .insert(agsWorkspaceUserNotifications)
+    .values(values)
+    .returning({
+      id: agsWorkspaceUserNotifications.id,
+      userId: agsWorkspaceUserNotifications.userId,
+      notificationKind: agsWorkspaceUserNotifications.notificationKind,
+      payload: agsWorkspaceUserNotifications.payload,
+      read: agsWorkspaceUserNotifications.read,
+      createdAt: agsWorkspaceUserNotifications.createdAt,
+    });
+
+  const notifications = inserted.map(rowToNotification);
+  return { insertedCount: notifications.length, notifications };
+}
+
 export interface ListNotificationsInput {
   readonly userId: number;
   readonly unreadOnly?: boolean;
