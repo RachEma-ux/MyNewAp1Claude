@@ -67,8 +67,10 @@ export type {
 export {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
+  zeroFillErrorEventsTrend,
 } from "./stats.js";
 export type {
   WorkspaceObservabilityStats,
   WorkspaceObservabilityStatsOptions,
+  ErrorEventsTrendBucket,
 } from "./stats.js";

@@ -19,6 +19,12 @@ import {
   agsWorkspaceUserNotifications,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
+export interface ErrorEventsTrendBucket {
+  /** Day boundary as YYYY-MM-DD (UTC). */
+  readonly date: string;
+  readonly count: number;
+}
+
 export interface WorkspaceObservabilityStats {
   readonly errorEventsBySourceKind: Record<string, number>;
   /**
@@ -33,6 +39,14 @@ export interface WorkspaceObservabilityStats {
    */
   readonly errorEventsByLane: Record<string, number>;
   readonly errorEventsByErrorClass: Record<string, number>;
+  /**
+   * Per-day count of error events recorded in the last 14 days (UTC),
+   * oldest-first. Days with zero events are zero-filled so the dashboard
+   * sparkline renders continuously without client-side date arithmetic.
+   * Mirrors the shape of `findingsCreatedByDay` in graph-quality stats
+   * (PR #503) — the same UI sparkline component renders both.
+   */
+  readonly errorEventsByDay: readonly ErrorEventsTrendBucket[];
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
@@ -48,16 +62,45 @@ export interface WorkspaceObservabilityStatsOptions {
   readonly getDb?: typeof getAsDb;
 }
 
+const TREND_DAYS = 14;
+
 const EMPTY_STATS: WorkspaceObservabilityStats = {
   errorEventsBySourceKind: {},
   errorEventsByLane: {},
   errorEventsByErrorClass: {},
+  errorEventsByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
   notificationsByKind: {},
   notificationsByReadState: { read: 0, unread: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
 };
+
+/**
+ * Zero-fill a day-bucket sparse map into an ordered `[{date, count}]`
+ * array covering the last `windowDays` days (oldest-first, UTC). Same
+ * shape as graph-quality's `zeroFillTrend` (PR #503) — kept in this
+ * module for boundary clarity (workspace-observability shouldn't
+ * import from graph-quality).
+ */
+export function zeroFillErrorEventsTrend(
+  rawBuckets: Record<string, number>,
+  windowDays: number,
+  now: Date = new Date(),
+): ErrorEventsTrendBucket[] {
+  const filled: ErrorEventsTrendBucket[] = [];
+  const utcMidnight = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date(utcMidnight - i * 86_400_000);
+    const date = d.toISOString().slice(0, 10);
+    filled.push({ date, count: rawBuckets[date] ?? 0 });
+  }
+  return filled;
+}
 
 /**
  * Roll up a per-sourceKind bucket map into a per-lane map by the first
@@ -109,6 +152,7 @@ export async function getWorkspaceObservabilityStats(
     jobsByKindRows,
     notificationsByKindRows,
     notificationsByReadStateRows,
+    errorEventsTrendRows,
   ] = await Promise.all([
     db
       .select({
@@ -152,6 +196,16 @@ export async function getWorkspaceObservabilityStats(
       })
       .from(agsWorkspaceUserNotifications)
       .groupBy(agsWorkspaceUserNotifications.read),
+    db
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceErrorEvents.createdAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceErrorEvents)
+      .where(
+        sql`${agsWorkspaceErrorEvents.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsWorkspaceErrorEvents.createdAt}) AT TIME ZONE 'UTC'`),
   ]);
 
   const errorEventsBySourceKind = bucketize(
@@ -177,10 +231,17 @@ export async function getWorkspaceObservabilityStats(
     else if (r.read === false) unreadCount += c;
   }
 
+  const errorEventsTrendMap = bucketize(errorEventsTrendRows, "day");
+  const errorEventsByDay = zeroFillErrorEventsTrend(
+    errorEventsTrendMap,
+    TREND_DAYS,
+  );
+
   return {
     errorEventsBySourceKind,
     errorEventsByLane: rollupSourceKindsByLane(errorEventsBySourceKind),
     errorEventsByErrorClass,
+    errorEventsByDay,
     jobsByStatus,
     jobsByKind,
     notificationsByKind,
