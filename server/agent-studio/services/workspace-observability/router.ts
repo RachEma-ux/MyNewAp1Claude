@@ -22,6 +22,7 @@ import {
 } from "../../../_core/trpc.js";
 import {
   getJobById,
+  getJobsByIds,
   listJobs,
   markJobCancelled,
   retryJob,
@@ -114,6 +115,23 @@ export const workspaceObservabilityRouter = router({
         }));
       }
       return job;
+    }),
+
+  getBackgroundJobsByIds: protectedProcedure
+    .input(
+      z.object({
+        jobIds: z.array(z.number().int().positive()).min(0).max(200),
+      }),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await getJobsByIds(input.jobIds);
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
     }),
 
   cancelBackgroundJob: protectedProcedure

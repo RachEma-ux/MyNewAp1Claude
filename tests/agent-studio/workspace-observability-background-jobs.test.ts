@@ -10,6 +10,7 @@ import {
   enqueueJob,
   enqueueJobs,
   getJobById,
+  getJobsByIds,
   listJobs,
   listStaleRunningJobs,
   markJobStarted,
@@ -276,6 +277,76 @@ describe("getJobById — Phase 22", () => {
     const result = await getJobById(7, { getDb: () => db as never });
     expect(result).not.toBeNull();
     expect(result!.id).toBe(7);
+  });
+});
+
+describe("getJobsByIds — Phase 22 #559 bulk reader", () => {
+  it("short-circuits empty input with no DB call", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await getJobsByIds([], { getDb });
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("returns [] on ASDB-null with non-empty input (fail-soft)", async () => {
+    const result = await getJobsByIds([1, 2, 3], {
+      getDb: () => null as never,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("returns rows for the requested ids via SQL IN", async () => {
+    const now = new Date();
+    const rows = [
+      {
+        id: 7,
+        jobKind: "x",
+        payload: null,
+        status: "completed",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 9,
+        jobKind: "y",
+        payload: null,
+        status: "failed",
+        attempts: 2,
+        lastError: "boom",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => rows,
+        }),
+      }),
+    };
+    const result = await getJobsByIds([7, 9, 999], {
+      getDb: () => db as never,
+    });
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.id).sort()).toEqual([7, 9]);
+    // Caller diffs against the requested ids — id 999 is absent (not
+    // partitioned, just missing from the result set).
+  });
+
+  it("returns [] when no ids match (all missing)", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => [],
+        }),
+      }),
+    };
+    const result = await getJobsByIds([100, 200], {
+      getDb: () => db as never,
+    });
+    expect(result).toEqual([]);
   });
 });
 
