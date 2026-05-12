@@ -327,4 +327,27 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards recentErrorEventsUserId (#606)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentErrorEventsUserId: 42 });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsUserId: 42,
+    });
+  });
+
+  it("rejects non-positive recentErrorEventsUserId at the input layer (#606)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ recentErrorEventsUserId: 0 }),
+    ).rejects.toThrow();
+    await expect(
+      caller.getDashboard({ recentErrorEventsUserId: -1 }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });
