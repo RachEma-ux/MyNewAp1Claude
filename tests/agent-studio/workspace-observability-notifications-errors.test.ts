@@ -13,6 +13,7 @@ import {
   countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
 import {
@@ -544,5 +545,62 @@ describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
       { getDb: () => db as never },
     );
     expect(result).toEqual({ deletedCount: 0 });
+  });
+});
+
+describe("pruneOldNotifications — Phase 22 #520 retention prune", () => {
+  it("returns deletedCount=0 on ASDB-null (fail-soft)", async () => {
+    const result = await pruneOldNotifications(
+      { olderThan: new Date() },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+  });
+
+  it("returns deleted count from .returning() when readOnly omitted", async () => {
+    const deleted = [{ id: 1 }, { id: 2 }];
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => deleted,
+        }),
+      }),
+    };
+    const result = await pruneOldNotifications(
+      { olderThan: new Date("2026-04-01") },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 2 });
+  });
+
+  it("respects readOnly=true (filter assembled, .returning honored)", async () => {
+    const deleted = [{ id: 5 }];
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => deleted,
+        }),
+      }),
+    };
+    const result = await pruneOldNotifications(
+      { olderThan: new Date("2026-04-01"), readOnly: true },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(1);
+  });
+
+  it("returns deletedCount=0 when no rows match", async () => {
+    const db = {
+      delete: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    };
+    const result = await pruneOldNotifications(
+      { olderThan: new Date("2026-01-01") },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(0);
   });
 });
