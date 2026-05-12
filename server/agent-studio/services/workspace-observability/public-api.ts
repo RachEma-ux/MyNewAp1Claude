@@ -45,6 +45,7 @@ export type {
 export {
   pushNotification,
   pushNotificationToUsers,
+  getNotificationById,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,

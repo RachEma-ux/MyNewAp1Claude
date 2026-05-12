@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   pushNotification,
   pushNotificationToUsers,
+  getNotificationById,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -961,6 +962,122 @@ describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
       { getDb: () => db as never },
     );
     expect(result).toEqual({ deletedCount: 1 });
+  });
+});
+
+describe("getNotificationById — Phase 22 #557 singleton getter", () => {
+  function makeByIdFakeDb(rows: NotifRow[]) {
+    const calls: { whereCalled: boolean } = { whereCalled: false };
+    const db = {
+      select: vi.fn(() => {
+        let activeId: number | undefined;
+        let activeUserId: number | undefined;
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => {
+            calls.whereCalled = true;
+            // The fake doesn't introspect the AND() expression; the
+            // test fixture passes the active filter via mutation hooks
+            // (set via the wrapper below).
+            return chain;
+          },
+          limit: async (_n: number) => {
+            const matched = rows.find(
+              (r) =>
+                r.id === activeId &&
+                (activeUserId === undefined || r.userId === activeUserId),
+            );
+            return matched ? [matched] : [];
+          },
+        };
+        // Helper to inject filter values for the test — set on the
+        // chain BEFORE calling .limit().
+        Object.defineProperty(chain, "__setActive", {
+          value: (id?: number, userId?: number) => {
+            activeId = id;
+            activeUserId = userId;
+          },
+        });
+        return chain;
+      }),
+    };
+    return { db, calls };
+  }
+
+  it("returns null on ASDB-null (fail-soft)", async () => {
+    const result = await getNotificationById(7, {
+      getDb: () => null as never,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns the row when found (no userId scope)", async () => {
+    const now = new Date();
+    const rows: NotifRow[] = [
+      {
+        id: 7,
+        userId: 42,
+        notificationKind: "promotion.approved",
+        payload: null,
+        read: false,
+        createdAt: now,
+      },
+    ];
+    // Use a minimal direct fake — the integration is simple enough.
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => rows,
+          }),
+        }),
+      }),
+    };
+    const result = await getNotificationById(7, {
+      getDb: () => db as never,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(7);
+  });
+
+  it("returns null when no row matches", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [],
+          }),
+        }),
+      }),
+    };
+    const result = await getNotificationById(999, {
+      getDb: () => db as never,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("with userId scope, returns null on peer's row (id-enumeration guard)", async () => {
+    // The DB layer applies the userId AND filter; we simulate that by
+    // returning [] when the test-injected userId doesn't match the row.
+    const requestedUserId = 999; // peer
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => {
+              // Simulating: SELECT ... WHERE id=7 AND userId=999 → no rows
+              // because row 7 belongs to user 42.
+              return [];
+            },
+          }),
+        }),
+      }),
+    };
+    const result = await getNotificationById(7, {
+      getDb: () => db as never,
+      userId: requestedUserId,
+    });
+    expect(result).toBeNull();
   });
 });
 

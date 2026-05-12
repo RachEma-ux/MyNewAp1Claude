@@ -32,6 +32,7 @@ import {
   JobNotRetryableError,
 } from "./background-jobs.js";
 import {
+  getNotificationById,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -270,6 +271,39 @@ export const workspaceObservabilityRouter = router({
           createdSince: input?.createdSince,
         });
       } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getMyNotificationById: protectedProcedure
+    .input(z.object({ notificationId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      if (userId == null) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "NOT_FOUND",
+          message: `Notification ${input.notificationId} not found`,
+        }));
+      }
+      try {
+        // userId-scoped so a peer's notification id returns NOT_FOUND
+        // instead of leaking via the row contents.
+        const row = await getNotificationById(input.notificationId, {
+          userId,
+        });
+        if (!row) {
+          throwTrpcAndCapture(new TRPCError({
+            code: "NOT_FOUND",
+            message: `Notification ${input.notificationId} not found`,
+          }));
+        }
+        return row;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
