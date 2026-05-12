@@ -18,6 +18,7 @@ import {
   retryJob,
   retryJobs,
   cancelJobs,
+  failStaleRunningJobs,
   pruneOldBackgroundJobs,
   AsdbUnavailableError,
   JobNotFoundError,
@@ -1089,5 +1090,239 @@ describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
       getDb: () => db as never,
     });
     expect(result).toHaveLength(10);
+  });
+});
+
+describe("failStaleRunningJobs — Phase 22 #546 auto-failer", () => {
+  /**
+   * Dedicated fake: failStaleRunningJobs runs three SQL shapes in
+   * sequence — (1) SELECT id of stale running rows, (2) per-id
+   * getJobById, (3) markJobFailed (UPDATE + SELECT). The bridge to
+   * recordErrorEvent is fire-and-forget; the fake accepts inserts
+   * into either the jobs table or the error_events table.
+   */
+  function makeStaleSweepFakeDb(rows: FakeRow[]) {
+    let staleSelectCount = 0;
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => ({
+            limit: async (n: number) => {
+              // First .orderBy().limit() of the run is the stale-id
+              // SELECT — return ids of running rows past cutoff.
+              staleSelectCount++;
+              return rows.filter((r) => r.status === "running").slice(0, n);
+            },
+          }),
+          limit: async () => {
+            // .where().limit() with no orderBy = getJobById path.
+            const id = activeJobId;
+            const found = rows.find((r) => r.id === id);
+            return found ? [found] : [];
+          },
+        };
+        return chain;
+      }),
+      update: vi.fn((_t: unknown) => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const id = activeJobId;
+            const target = rows.find((r) => r.id === id);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("lastError" in vals) {
+              target.lastError =
+                vals.lastError == null ? null : String(vals.lastError);
+            }
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      })),
+      // markJobFailed bridges into error_events via insert(); accept
+      // and ignore the side-channel writes so they don't error out.
+      insert: vi.fn(() => ({
+        values: () => ({
+          returning: async () => [],
+        }),
+      })),
+    };
+    let activeJobId: number | undefined;
+    const setActive = (id: number) => {
+      activeJobId = id;
+    };
+    return { db, setActive, getStaleSelectCount: () => staleSelectCount };
+  }
+
+  it("throws AsdbUnavailableError when ASDB is unavailable", async () => {
+    await expect(
+      failStaleRunningJobs(
+        { olderThan: new Date("2026-05-12T00:00:00Z") },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("returns scanned=0 / failed=[] when no stale rows exist", async () => {
+    const rows: FakeRow[] = [];
+    const { db } = makeStaleSweepFakeDb(rows);
+    const result = await failStaleRunningJobs(
+      { olderThan: new Date("2026-05-12T00:00:00Z") },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(0);
+    expect(result.failed).toEqual([]);
+  });
+
+  it("flips stale running rows to failed with the default message", async () => {
+    // Use the canonical test infrastructure: drive a single sweep
+    // through markJobFailed with one stale row.
+    const now = new Date("2026-05-12T00:00:00Z");
+    const stale = new Date("2026-05-11T00:00:00Z");
+    const row: FakeRow = {
+      id: 42,
+      jobKind: "projection.rebuild",
+      payload: null,
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: stale,
+      updatedAt: stale,
+    };
+    // Use the global makeFakeDb pattern — staleSweep first SELECT
+    // returns one id, then getJobById returns the row, then UPDATE
+    // flips it. Wire active.jobId to 42 so the byId paths land.
+    const { db, state } = makeFakeDb({ rows: [row] });
+    // Patch select to return the stale id on the first orderBy().limit()
+    // and use the standard byId path on subsequent .limit() calls.
+    let firstOrderBy = true;
+    const origSelect = (db as { select: () => unknown }).select;
+    (db as { select: () => unknown }).select = () => {
+      const chain: Record<string, unknown> = {
+        from: () => chain,
+        where: () => chain,
+        orderBy: () => ({
+          limit: async () => {
+            if (firstOrderBy) {
+              firstOrderBy = false;
+              return [{ id: 42 }];
+            }
+            return [];
+          },
+        }),
+        limit: async () => {
+          // byId path used by getJobById + markJobFailed's transitionStatus
+          const found = state.rows.find((r) => r.id === 42);
+          return found ? [found] : [];
+        },
+      };
+      return chain;
+    };
+    state.active.jobId = 42;
+
+    const result = await failStaleRunningJobs(
+      { olderThan: now },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(1);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].status).toBe("failed");
+    expect(result.failed[0].lastError).toContain("auto-failed");
+    // Suppress unused-var warning on origSelect.
+    void origSelect;
+  });
+
+  it("respects a custom errorMessage", async () => {
+    const now = new Date("2026-05-12T00:00:00Z");
+    const stale = new Date("2026-05-11T00:00:00Z");
+    const row: FakeRow = {
+      id: 7,
+      jobKind: "x",
+      payload: null,
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: stale,
+      updatedAt: stale,
+    };
+    const { db, state } = makeFakeDb({ rows: [row] });
+    let firstOrderBy = true;
+    (db as { select: () => unknown }).select = () => {
+      const chain: Record<string, unknown> = {
+        from: () => chain,
+        where: () => chain,
+        orderBy: () => ({
+          limit: async () => {
+            if (firstOrderBy) {
+              firstOrderBy = false;
+              return [{ id: 7 }];
+            }
+            return [];
+          },
+        }),
+        limit: async () => {
+          const found = state.rows.find((r) => r.id === 7);
+          return found ? [found] : [];
+        },
+      };
+      return chain;
+    };
+    state.active.jobId = 7;
+
+    const result = await failStaleRunningJobs(
+      { olderThan: now, errorMessage: "stuck after 30m" },
+      { getDb: () => db as never },
+    );
+    expect(result.failed[0].lastError).toBe("stuck after 30m");
+  });
+
+  it("skips rows whose status flipped between SELECT and UPDATE", async () => {
+    // Race-condition guard: SELECT returned id=99 as stale, but by
+    // the time the per-id getJobById fires, the worker has flipped
+    // the row to completed. The sweep must not overwrite that.
+    const now = new Date("2026-05-12T00:00:00Z");
+    const finished = new Date("2026-05-11T00:00:00Z");
+    const row: FakeRow = {
+      id: 99,
+      jobKind: "x",
+      payload: null,
+      status: "completed", // already finished
+      attempts: 1,
+      lastError: null,
+      createdAt: finished,
+      updatedAt: finished,
+    };
+    const { db, state } = makeFakeDb({ rows: [row] });
+    let firstOrderBy = true;
+    (db as { select: () => unknown }).select = () => {
+      const chain: Record<string, unknown> = {
+        from: () => chain,
+        where: () => chain,
+        orderBy: () => ({
+          limit: async () => {
+            if (firstOrderBy) {
+              firstOrderBy = false;
+              return [{ id: 99 }];
+            }
+            return [];
+          },
+        }),
+        limit: async () => {
+          const found = state.rows.find((r) => r.id === 99);
+          return found ? [found] : [];
+        },
+      };
+      return chain;
+    };
+    state.active.jobId = 99;
+
+    const result = await failStaleRunningJobs(
+      { olderThan: now },
+      { getDb: () => db as never },
+    );
+    expect(result.scanned).toBe(1); // SELECT still returned 1
+    expect(result.failed).toEqual([]); // but skipped because no longer running
+    expect(state.rows[0].status).toBe("completed"); // untouched
   });
 });

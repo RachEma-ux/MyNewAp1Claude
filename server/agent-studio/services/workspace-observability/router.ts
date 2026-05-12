@@ -27,6 +27,7 @@ import {
   retryJob,
   retryJobs,
   cancelJobs,
+  failStaleRunningJobs,
   JobNotFoundError,
   JobNotRetryableError,
 } from "./background-jobs.js";
@@ -527,6 +528,36 @@ export const workspaceObservabilityRouter = router({
     .mutation(async ({ input }) => {
       try {
         return await runRetentionSweep(input ?? {});
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // ============================================================
+  // Stale-running auto-failer (operator-triggered, admin-only)
+  //
+  // Pair of `listStaleRunningJobs` (#545) — the listing puts the
+  // problem on the dashboard; this surface unsticks the rows by
+  // force-failing them. Each transition flows through markJobFailed,
+  // which mirrors into the error_events stream so the operator gets
+  // drilldown rows instead of a silent flip. Cron callers can hit
+  // the service helper directly.
+  // ============================================================
+
+  failStaleRunningBackgroundJobs: adminProcedure
+    .input(
+      z.object({
+        olderThan: z.coerce.date(),
+        limit: z.number().int().min(1).max(500).optional(),
+        errorMessage: z.string().min(1).max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await failStaleRunningJobs(input);
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

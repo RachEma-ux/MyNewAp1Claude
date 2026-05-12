@@ -423,6 +423,84 @@ export async function cancelJobs(
   return { cancelled, skipped };
 }
 
+export interface FailStaleRunningJobsInput {
+  /**
+   * Cutoff timestamp — any job in `status='running'` whose `updatedAt`
+   * is strictly older than this is treated as stale and force-failed.
+   * Callers compute this from a stale-after duration (e.g.
+   * `Date.now() - 30*60*1000`).
+   */
+  readonly olderThan: Date;
+  /**
+   * Optional cap on rows scanned per sweep. Defaults to 100 — same
+   * page size as listJobs. The sweep is meant to be invoked
+   * periodically, so an aggressive single-batch cap keeps each pass
+   * bounded and preserves the next sweep's chance to catch
+   * additional rows.
+   */
+  readonly limit?: number;
+  /**
+   * Error message recorded against each stale row's `lastError` and
+   * mirrored to the error_events stream (markJobFailed already does
+   * the bridge). Defaults to a generic "stale" reason.
+   */
+  readonly errorMessage?: string;
+}
+
+export interface FailStaleRunningJobsResult {
+  readonly failed: readonly BackgroundJobRow[];
+  readonly scanned: number;
+}
+
+const DEFAULT_FAIL_STALE_MESSAGE =
+  "Background job auto-failed by stale-running sweep (no markJobStarted/markJobCompleted bump within the staleness window)";
+
+/**
+ * Operator/cron sweep that auto-fails jobs stuck in `status='running'`.
+ * Complements `listStaleRunningJobs` (#545): the listing surfaces the
+ * problem to the dashboard, this surface unsticks the rows so the
+ * worker queue isn't starved by phantom in-flight work.
+ *
+ * Each row is failed via `markJobFailed`, which also bridges into the
+ * error_events stream — so a sweep produces visible drilldown rows
+ * for the operator to triage, not silent state flips.
+ */
+export async function failStaleRunningJobs(
+  input: FailStaleRunningJobsInput,
+  options: ServiceOptions = {},
+): Promise<FailStaleRunningJobsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const limit = input.limit ?? 100;
+  const errorMessage = input.errorMessage ?? DEFAULT_FAIL_STALE_MESSAGE;
+
+  const stale = await db
+    .select({ id: agsWorkspaceBackgroundJobs.id })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(
+      and(
+        eq(agsWorkspaceBackgroundJobs.status, "running"),
+        lt(agsWorkspaceBackgroundJobs.updatedAt, input.olderThan),
+      ),
+    )
+    .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // oldest first
+    .limit(limit);
+
+  const failed: BackgroundJobRow[] = [];
+  for (const { id } of stale) {
+    // Re-check status — the row may have completed between the SELECT
+    // and the UPDATE. markJobFailed force-flips regardless, but
+    // skipping here keeps the result count honest.
+    const current = await getJobById(id, options);
+    if (!current || current.status !== "running") continue;
+    const row = await markJobFailed(id, errorMessage, options);
+    failed.push(row);
+  }
+  return { failed, scanned: stale.length };
+}
+
 export class JobNotRetryableError extends Error {
   constructor(
     public readonly jobId: number,
