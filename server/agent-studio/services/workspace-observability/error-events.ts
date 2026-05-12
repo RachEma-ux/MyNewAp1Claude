@@ -252,6 +252,20 @@ export interface ListErrorEventsInput {
    */
   readonly sourceKindLike?: string;
   /**
+   * Single `sourceId` to filter by (exact `eq`) or an array (`IN`).
+   * `sourceId` is the specific identifier the recorder logged with
+   * the event — e.g. a trace ID, request ID, jobId, or document ID.
+   * Operator gesture: "I have one bad trace ID from an alert — show
+   * me all error events tied to it" — without a separate ad-hoc
+   * SQL query. Mutually compatible with `sourceKind` (different
+   * axes: kind is the category, id is the instance); ANDed in the
+   * WHERE clause.
+   *
+   * Empty array short-circuits to `[]` (vacuous IN). NULL sourceIds
+   * are never matched (SQL `eq`/`IN` exclude NULL).
+   */
+  readonly sourceId?: string | readonly string[];
+  /**
    * Single errorClass to filter by, or an array (OR semantics via
    * SQL IN). Operators triaging an incident often want to look at
    * multiple related classes at once — e.g. ["TRPCError:UNAUTHORIZED",
@@ -307,6 +321,10 @@ export async function listErrorEvents(
   if (Array.isArray(input.sourceKind) && input.sourceKind.length === 0) {
     return [];
   }
+  // Empty sourceId array → vacuous IN; short-circuit (same contract).
+  if (Array.isArray(input.sourceId) && input.sourceId.length === 0) {
+    return [];
+  }
 
   const filters = [];
   const sourceKindInput = input.sourceKind;
@@ -325,6 +343,18 @@ export async function listErrorEvents(
     }
   } else if (input.sourceKindLike !== undefined) {
     filters.push(like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike));
+  }
+  const sourceIdInput = input.sourceId;
+  if (sourceIdInput !== undefined) {
+    if (Array.isArray(sourceIdInput)) {
+      filters.push(
+        inArray(agsWorkspaceErrorEvents.sourceId, sourceIdInput as string[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.sourceId, sourceIdInput as string),
+      );
+    }
   }
   const errorClassInput = input.errorClass;
   if (errorClassInput !== undefined) {
