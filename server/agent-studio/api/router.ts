@@ -750,6 +750,66 @@ const simulationRouter = router({
         caseName: created.name,
       };
     }),
+
+  // ── Retention (Phase 22 follow-up #649 + #650 + #651) ────────────
+  //
+  // Operator surface for `ags_simulation_runs` retention. Sister of
+  // `runs.pruneRetention` (#623), `runs.pruneToolCallTracesRetention`
+  // (#627), `mcp.pruneTransitionsRetention` (#631),
+  // `catalogSyncLog.pruneRetention` (#635), `racTrace.pruneRetention`
+  // (#640), `cag.pruneEventsRetention` (#647). adminProcedure because
+  // the cron + sweep operate across all agents/scenarios.
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "queued",
+                "running",
+                "passed",
+                "failed",
+                "cancelled",
+              ]),
+            )
+            .max(5)
+            .optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          scenarioId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldSimulationRuns } = await import(
+        "../services/simulation-runs-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldSimulationRuns({
+        olderThan,
+        statuses: input?.statuses,
+        agentId: input?.agentId,
+        scenarioId: input?.scenarioId,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getSimulationRunsRetentionCronStatus } = await import(
+      "../services/simulation-runs-retention-cron"
+    );
+    return getSimulationRunsRetentionCronStatus();
+  }),
 });
 
 // ── Testing ─────────────────────────────────────────────────────────────────
