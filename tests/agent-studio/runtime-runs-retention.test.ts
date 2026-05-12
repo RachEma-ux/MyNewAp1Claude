@@ -1,19 +1,18 @@
 /**
- * Phase 22 follow-up #621 — pruneOldRuntimeRuns service primitive.
- * Sister of pruneOldBackgroundJobs (#522) on the runtime_runs table
- * with cascade-delete to runtime_run_steps.
+ * Phase 22 follow-up #621 + #637 — pruneOldRuntimeRuns service.
  *
- * Covers: filter shapes, empty-array short-circuits, fail-soft on
- * ASDB-null, cascade step deletion, default terminal statuses.
+ * #621 shipped the prune primitive with cascade-delete to
+ * agsRuntimeRunSteps only.
+ *
+ * #637 extended cascade to 4 sibling tables (agsRuntimeToolCalls,
+ * agsRuntimeMemoryEvents, agsRuntimePolicyEvents,
+ * agsRuntimeHookExecutions) that key on runId. Tests rewritten to
+ * cover the full 6-table cascade.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { dbMock, selectMock, deleteMock } = vi.hoisted(() => ({
-  dbMock: vi.fn(),
-  selectMock: vi.fn(),
-  deleteMock: vi.fn(),
-}));
+const { dbMock } = vi.hoisted(() => ({ dbMock: vi.fn() }));
 
 vi.mock("../../server/agent-studio/db/connection.js", () => ({
   getAsDb: dbMock,
@@ -23,17 +22,21 @@ import { pruneOldRuntimeRuns } from "../../server/agent-studio/services/runtime-
 
 interface FakeState {
   selectResult: Array<{ id: number }>;
-  deleteRunsResult: Array<{ id: number }>;
-  deleteStepsResult: Array<{ id: number }>;
+  /**
+   * Per-delete-call results. The production code issues 6 deletes per
+   * sweep in this order:
+   *  0: steps      (parallel cascade)
+   *  1: toolCalls  (parallel cascade)
+   *  2: memoryEvts (parallel cascade)
+   *  3: policyEvts (parallel cascade)
+   *  4: hookExecs  (parallel cascade)
+   *  5: runs       (parent, sequentially after the children resolve)
+   */
+  deleteResults: Array<Array<{ id: number }>>;
   selectFilters: any[];
-  deleteRunIdsCaptured: number[][];
-  deleteStepRunIdsCaptured: number[][];
 }
 
 function makeFakeDb(state: FakeState) {
-  // The production code does sequential deletes in a fixed order:
-  // (1) steps first, (2) runs second. Track call order rather than
-  // try to introspect the Drizzle table identity (which is opaque).
   let deleteCallCount = 0;
   return {
     select: () => ({
@@ -47,16 +50,14 @@ function makeFakeDb(state: FakeState) {
       },
     }),
     delete: (_table: any) => {
-      const isStepsCall = deleteCallCount === 0;
-      deleteCallCount++;
+      const callIdx = deleteCallCount++;
       return {
         where: (_cond: any) => {
           return {
             returning: (_proj: unknown) => {
-              if (isStepsCall) {
-                return Promise.resolve(state.deleteStepsResult);
-              }
-              return Promise.resolve(state.deleteRunsResult);
+              return Promise.resolve(
+                state.deleteResults[callIdx] ?? [],
+              );
             },
           };
         },
@@ -68,42 +69,36 @@ function makeFakeDb(state: FakeState) {
 function fresh(): FakeState {
   return {
     selectResult: [],
-    deleteRunsResult: [],
-    deleteStepsResult: [],
+    deleteResults: [],
     selectFilters: [],
-    deleteRunIdsCaptured: [],
-    deleteStepRunIdsCaptured: [],
   };
 }
 
 beforeEach(() => {
   dbMock.mockReset();
-  selectMock.mockReset();
-  deleteMock.mockReset();
 });
 
+const ZERO_RESULT = {
+  deletedRunsCount: 0,
+  deletedStepsCount: 0,
+  deletedToolCallsCount: 0,
+  deletedMemoryEventsCount: 0,
+  deletedPolicyEventsCount: 0,
+  deletedHookExecutionsCount: 0,
+};
+
 describe("pruneOldRuntimeRuns — fail-soft on ASDB null", () => {
-  it("returns zeros without throwing when getAsDb returns null", async () => {
+  it("returns ZERO_RESULT when getAsDb returns null", async () => {
     dbMock.mockReturnValue(null);
     const result = await pruneOldRuntimeRuns({
       olderThan: new Date("2026-01-01T00:00:00Z"),
     });
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
-  });
-
-  it("honors options.getDb override", async () => {
-    const state = fresh();
-    state.selectResult = [];
-    const result = await pruneOldRuntimeRuns(
-      { olderThan: new Date() },
-      { getDb: () => makeFakeDb(state) as any },
-    );
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
+    expect(result).toEqual(ZERO_RESULT);
   });
 });
 
 describe("pruneOldRuntimeRuns — empty-array short-circuits", () => {
-  it("empty agentId array → zeros, no DB call", async () => {
+  it("empty agentId array → ZERO_RESULT, no DB call", async () => {
     dbMock.mockImplementation(() => {
       throw new Error("DB should not be probed");
     });
@@ -111,10 +106,10 @@ describe("pruneOldRuntimeRuns — empty-array short-circuits", () => {
       olderThan: new Date(),
       agentId: [],
     });
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
+    expect(result).toEqual(ZERO_RESULT);
   });
 
-  it("empty environment array → zeros, no DB call", async () => {
+  it("empty environment array → ZERO_RESULT, no DB call", async () => {
     dbMock.mockImplementation(() => {
       throw new Error("DB should not be probed");
     });
@@ -122,10 +117,10 @@ describe("pruneOldRuntimeRuns — empty-array short-circuits", () => {
       olderThan: new Date(),
       environment: [],
     });
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
+    expect(result).toEqual(ZERO_RESULT);
   });
 
-  it("empty statuses array → zeros, no DB call", async () => {
+  it("empty statuses array → ZERO_RESULT, no DB call", async () => {
     dbMock.mockImplementation(() => {
       throw new Error("DB should not be probed");
     });
@@ -133,35 +128,32 @@ describe("pruneOldRuntimeRuns — empty-array short-circuits", () => {
       olderThan: new Date(),
       statuses: [],
     });
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
+    expect(result).toEqual(ZERO_RESULT);
   });
 });
 
 describe("pruneOldRuntimeRuns — happy path", () => {
-  it("returns zeros when no rows match (SELECT returns empty)", async () => {
+  it("returns ZERO_RESULT when no rows match (SELECT empty)", async () => {
     const state = fresh();
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date() },
       { getDb: () => makeFakeDb(state) as any },
     );
-    expect(result).toEqual({ deletedRunsCount: 0, deletedStepsCount: 0 });
-    // SELECT happened; no DELETE
+    expect(result).toEqual(ZERO_RESULT);
     expect(state.selectFilters).toHaveLength(1);
-    expect(state.deleteRunIdsCaptured).toHaveLength(0);
-    expect(state.deleteStepRunIdsCaptured).toHaveLength(0);
   });
 
-  it("cascades steps + runs delete when rows match", async () => {
+  it("cascade-deletes all 5 sibling tables + runs (#637)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 10 }, { id: 11 }, { id: 12 }];
-    state.deleteStepsResult = [
-      { id: 100 },
-      { id: 101 },
-      { id: 102 },
-      { id: 103 },
-      { id: 104 },
-    ]; // 5 step rows across 3 runs
-    state.deleteRunsResult = [{ id: 10 }, { id: 11 }, { id: 12 }];
+    state.deleteResults = [
+      [{ id: 100 }, { id: 101 }, { id: 102 }, { id: 103 }, { id: 104 }], // steps (5)
+      [{ id: 200 }, { id: 201 }], // toolCalls (2)
+      [{ id: 300 }, { id: 301 }, { id: 302 }], // memoryEvents (3)
+      [{ id: 400 }], // policyEvents (1)
+      [{ id: 500 }, { id: 501 }, { id: 502 }, { id: 503 }], // hookExecutions (4)
+      [{ id: 10 }, { id: 11 }, { id: 12 }], // runs (3)
+    ];
 
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date() },
@@ -170,25 +162,41 @@ describe("pruneOldRuntimeRuns — happy path", () => {
 
     expect(result.deletedRunsCount).toBe(3);
     expect(result.deletedStepsCount).toBe(5);
+    expect(result.deletedToolCallsCount).toBe(2);
+    expect(result.deletedMemoryEventsCount).toBe(3);
+    expect(result.deletedPolicyEventsCount).toBe(1);
+    expect(result.deletedHookExecutionsCount).toBe(4);
   });
 
-  it("uses default terminal statuses when statuses omitted", async () => {
+  it("returns 0 for sibling tables that had no rows for the deleted runs", async () => {
     const state = fresh();
-    // We can't easily introspect the inArray-formatted statuses
-    // condition through the fake-DB stub, but we CAN verify that the
-    // SELECT path was invoked (i.e. defaults didn't short-circuit
-    // the function via the empty-array guard).
-    await pruneOldRuntimeRuns(
+    state.selectResult = [{ id: 9 }];
+    state.deleteResults = [
+      [], // steps
+      [], // toolCalls
+      [], // memoryEvents
+      [], // policyEvents
+      [], // hookExecutions
+      [{ id: 9 }], // runs
+    ];
+
+    const result = await pruneOldRuntimeRuns(
       { olderThan: new Date() },
       { getDb: () => makeFakeDb(state) as any },
     );
-    expect(state.selectFilters).toHaveLength(1);
+
+    expect(result.deletedRunsCount).toBe(1);
+    expect(result.deletedStepsCount).toBe(0);
+    expect(result.deletedToolCallsCount).toBe(0);
+    expect(result.deletedMemoryEventsCount).toBe(0);
+    expect(result.deletedPolicyEventsCount).toBe(0);
+    expect(result.deletedHookExecutionsCount).toBe(0);
   });
 
   it("accepts a single agentId (eq form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 5 }];
-    state.deleteRunsResult = [{ id: 5 }];
+    state.deleteResults = [[], [], [], [], [], [{ id: 5 }]];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), agentId: 42 },
       { getDb: () => makeFakeDb(state) as any },
@@ -199,7 +207,14 @@ describe("pruneOldRuntimeRuns — happy path", () => {
   it("accepts an agentId array (inArray form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 5 }, { id: 6 }];
-    state.deleteRunsResult = [{ id: 5 }, { id: 6 }];
+    state.deleteResults = [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [{ id: 5 }, { id: 6 }],
+    ];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), agentId: [42, 43] },
       { getDb: () => makeFakeDb(state) as any },
@@ -210,7 +225,7 @@ describe("pruneOldRuntimeRuns — happy path", () => {
   it("accepts a single environment (eq form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 7 }];
-    state.deleteRunsResult = [{ id: 7 }];
+    state.deleteResults = [[], [], [], [], [], [{ id: 7 }]];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), environment: "draft" },
       { getDb: () => makeFakeDb(state) as any },
@@ -221,25 +236,19 @@ describe("pruneOldRuntimeRuns — happy path", () => {
   it("accepts an environment array (inArray form)", async () => {
     const state = fresh();
     state.selectResult = [{ id: 7 }, { id: 8 }];
-    state.deleteRunsResult = [{ id: 7 }, { id: 8 }];
+    state.deleteResults = [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [{ id: 7 }, { id: 8 }],
+    ];
     const result = await pruneOldRuntimeRuns(
       { olderThan: new Date(), environment: ["draft", "staging"] },
       { getDb: () => makeFakeDb(state) as any },
     );
     expect(result.deletedRunsCount).toBe(2);
-  });
-
-  it("returns steps=0 when matched runs had no step rows", async () => {
-    const state = fresh();
-    state.selectResult = [{ id: 9 }];
-    state.deleteStepsResult = []; // no steps
-    state.deleteRunsResult = [{ id: 9 }];
-    const result = await pruneOldRuntimeRuns(
-      { olderThan: new Date() },
-      { getDb: () => makeFakeDb(state) as any },
-    );
-    expect(result.deletedRunsCount).toBe(1);
-    expect(result.deletedStepsCount).toBe(0);
   });
 });
 
@@ -247,7 +256,7 @@ describe("pruneOldRuntimeRuns — composability", () => {
   it("composes agentId + environment + statuses filters in one pass", async () => {
     const state = fresh();
     state.selectResult = [{ id: 1 }];
-    state.deleteRunsResult = [{ id: 1 }];
+    state.deleteResults = [[], [], [], [], [], [{ id: 1 }]];
     const result = await pruneOldRuntimeRuns(
       {
         olderThan: new Date(),
