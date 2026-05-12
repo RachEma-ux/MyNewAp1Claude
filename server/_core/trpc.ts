@@ -6,6 +6,7 @@ import { requireGovernedAction, type GovernanceReceipt } from "../governance/req
 import { resolveActionKey } from "../governance/action-key-map";
 import { isFrozen } from "../governance/scorecard";
 import { getAppBlockerFromTRPCError, toTRPCError } from "./blockers";
+import { captureUnexpectedTrpcError } from "../agent-studio/services/workspace-observability/public-api";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -24,8 +25,51 @@ const t = initTRPC.context<TrpcContext>().create({
   },
 });
 
+/**
+ * Auto-capture middleware: every tRPC procedure error flows through here
+ * so the dashboard sees real backend failures even from procedures that
+ * never opted into per-router throwTrpcAndCapture wrapping (#490–#512
+ * covered the agent-studio side; this catches every other procedure
+ * across the whole tRPC tree — chat, providers, automation, modules,
+ * data-analysis, etc.).
+ *
+ * The classifier inside captureUnexpectedTrpcError filters out expected
+ * operator-side codes (BAD_REQUEST, NOT_FOUND, CONFLICT, etc.); only
+ * INTERNAL_SERVER_ERROR + raw Error instances are persisted. Fail-soft:
+ * a recorder failure can never escalate the original error.
+ *
+ * Per-router throwTrpcAndCapture wrappers remain valuable because they
+ * carry richer per-router context (sourceKind = "vault.router" vs the
+ * generic "trpc.<path>" emitted here). The middleware is the safety
+ * net; the per-router wrappers are the precision instruments.
+ */
+const autoCaptureErrors = t.middleware(async (opts) => {
+  let result;
+  try {
+    result = await opts.next();
+  } catch (err) {
+    // Some middlewares throw rather than returning {ok:false}; cover both.
+    const sourceKind = `trpc.${opts.path || "unknown"}`;
+    const ctxAny = opts.ctx as unknown as { user?: { id?: number } };
+    void captureUnexpectedTrpcError(sourceKind, err, {
+      userId: ctxAny.user?.id ?? null,
+      metadata: { trpcPath: opts.path, type: opts.type },
+    });
+    throw err;
+  }
+  if (!result.ok) {
+    const sourceKind = `trpc.${opts.path || "unknown"}`;
+    const ctxAny = opts.ctx as unknown as { user?: { id?: number } };
+    void captureUnexpectedTrpcError(sourceKind, (result as { error: unknown }).error, {
+      userId: ctxAny.user?.id ?? null,
+      metadata: { trpcPath: opts.path, type: opts.type },
+    });
+  }
+  return result;
+});
+
 export const router = t.router;
-export const publicProcedure = t.procedure;
+export const publicProcedure = t.procedure.use(autoCaptureErrors);
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
@@ -42,9 +86,9 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = t.procedure.use(autoCaptureErrors).use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = t.procedure.use(autoCaptureErrors).use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -133,9 +177,9 @@ const requireGovernance = t.middleware(async (opts) => {
   });
 });
 
-export const governedProcedure = t.procedure.use(requireUser).use(requireGovernance);
+export const governedProcedure = t.procedure.use(autoCaptureErrors).use(requireUser).use(requireGovernance);
 
-export const governedAdminProcedure = t.procedure.use(
+export const governedAdminProcedure = t.procedure.use(autoCaptureErrors).use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
     if (!ctx.user || ctx.user.role !== 'admin') {
