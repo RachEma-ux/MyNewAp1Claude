@@ -107,6 +107,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="tool-call-traces-retention">Tool Call Traces Retention</TabsTrigger>
           <TabsTrigger value="mcp-transitions-retention">MCP Transitions Retention</TabsTrigger>
           <TabsTrigger value="catalog-sync-log-retention">Catalog Sync Log Retention</TabsTrigger>
+          <TabsTrigger value="rac-runtime-traces-retention">RAC Runtime Traces Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -150,6 +151,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="catalog-sync-log-retention">
           <CatalogSyncLogRetentionPanel />
+        </TabsContent>
+        <TabsContent value="rac-runtime-traces-retention">
+          <RacRuntimeTracesRetentionPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -2131,6 +2135,196 @@ function CatalogSyncLogRetentionPanel() {
             <div className="rounded border border-zinc-800 p-3 text-xs">
               <div className="text-zinc-400 uppercase mb-1">Last manual run</div>
               <div>rows deleted: {manualResult.deletedCount}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── RAC Runtime Traces Retention (Phase 22 follow-up #641) ────────────
+//
+// Operator UI for the rac-runtime-traces retention mini-arc (#638 prune
+// + #639 cron + #640 tRPC + #641 UI). Last slot in the daily-sweep
+// ladder (08:00 UTC). Cascades agsRacContextBlocks before agsRac
+// RuntimeTraces, so the result UI surfaces both counters distinctly.
+// Inputs are optional workspaceId / agentId CSVs (parsed to number[])
+// for tenant-scoped sweeps when an operator needs to target one
+// workspace/agent without affecting cross-tenant rows.
+
+function RacRuntimeTracesRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.racTrace.getRetentionCronStatus.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
+  const [retentionDays, setRetentionDays] = useState("30");
+  const [workspaceIdInput, setWorkspaceIdInput] = useState("");
+  const [agentIdInput, setAgentIdInput] = useState("");
+  const [manualResult, setManualResult] = useState<{
+    deletedTracesCount: number;
+    deletedContextBlocksCount: number;
+  } | null>(null);
+
+  const pruneMut = trpc.agentStudio.racTrace.pruneRetention.useMutation({
+    onSuccess: (data) => {
+      setManualResult({
+        deletedTracesCount: data.deletedTracesCount,
+        deletedContextBlocksCount: data.deletedContextBlocksCount,
+      });
+      toast.success(
+        `RAC traces sweep complete — ${data.deletedTracesCount} trace(s), ${data.deletedContextBlocksCount} context block(s) deleted`,
+      );
+      void statusQuery.refetch();
+    },
+    onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+  });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 30);
+  const status = statusQuery.data;
+
+  function parseIdList(raw: string): number[] | undefined {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) return undefined;
+    const parts = trimmed
+      .split(/[\s,]+/)
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    return parts.length > 0 ? parts : undefined;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>RAC runtime traces retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 08:00 UTC (env:
+            AGS_RAC_RUNTIME_TRACES_RETENTION_CRON_EXPR /
+            AGS_RAC_RUNTIME_TRACES_RETENTION_DAYS). Sweeps
+            `ags_rac_runtime_traces` + cascades
+            `ags_rac_context_blocks`. 6th slot in the daily-sweep
+            ladder (03/04/05/06/07/08 UTC).
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">traces deleted</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? status.lastResult.deletedTracesCount
+                  : "—"}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">blocks deleted</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? status.lastResult.deletedContextBlocksCount
+                  : "—"}
+              </div>
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Optional tenant filters: comma- or space-separated
+            workspaceId / agentId lists. Leave blank to sweep across
+            all tenants.
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">retentionDays</Label>
+              <Input
+                type="number"
+                value={retentionDays}
+                onChange={(e) => setRetentionDays(e.target.value)}
+                min={1}
+                max={3650}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">workspaceId (optional)</Label>
+              <Input
+                type="text"
+                value={workspaceIdInput}
+                onChange={(e) => setWorkspaceIdInput(e.target.value)}
+                placeholder="e.g. 11, 22"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">agentId (optional)</Label>
+              <Input
+                type="text"
+                value={agentIdInput}
+                onChange={(e) => setAgentIdInput(e.target.value)}
+                placeholder="e.g. 42"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              const wsIds = parseIdList(workspaceIdInput);
+              const agentIds = parseIdList(agentIdInput);
+              const scope =
+                wsIds || agentIds
+                  ? `workspaceId=${wsIds?.join(",") ?? "any"} agentId=${agentIds?.join(",") ?? "any"}`
+                  : "all tenants";
+              if (
+                window.confirm(
+                  `Delete RAC runtime traces older than ${parsedDays} days (${scope})?`,
+                )
+              ) {
+                pruneMut.mutate({
+                  retentionDays: parsedDays,
+                  workspaceId:
+                    wsIds && wsIds.length === 1 ? wsIds[0] : wsIds,
+                  agentId:
+                    agentIds && agentIds.length === 1
+                      ? agentIds[0]
+                      : agentIds,
+                });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>traces deleted: {manualResult.deletedTracesCount}</div>
+              <div>
+                context blocks deleted:{" "}
+                {manualResult.deletedContextBlocksCount}
+              </div>
             </div>
           ) : null}
         </CardContent>
