@@ -85,6 +85,16 @@ export interface RunRetentionSweepInput {
    * the singular prune call.
    */
   readonly backgroundJobsLastErrorLike?: string;
+  /**
+   * Optional SQL LIKE-style prefix filter on `jobKind` for the
+   * background-jobs sweep. Mirrors `pruneOldBackgroundJobs.jobKindLike`
+   * (#602) — cron callers can prune by worker-family prefix (e.g.
+   * `"projection.%"`) without enumerating each sub-kind. Mutually
+   * exclusive with `backgroundJobsJobKind` (exact wins — same
+   * precedence convention as the listJobs/pruneOldBackgroundJobs
+   * surface).
+   */
+  readonly backgroundJobsJobKindLike?: string;
 }
 
 export interface RunRetentionSweepResult {
@@ -143,6 +153,7 @@ export async function runRetentionSweep(
         olderThan: backgroundJobsCutoff,
         statuses: input.backgroundJobsStatuses,
         jobKind: input.backgroundJobsJobKind,
+        jobKindLike: input.backgroundJobsJobKindLike,
         lastErrorLike: input.backgroundJobsLastErrorLike,
       },
       { getDb: options.getDb },
