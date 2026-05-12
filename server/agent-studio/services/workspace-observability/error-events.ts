@@ -12,7 +12,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, gte, like, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -108,7 +108,15 @@ export interface ListErrorEventsInput {
    * match wins if both are set, since it's narrower).
    */
   readonly sourceKindLike?: string;
-  readonly errorClass?: string;
+  /**
+   * Single errorClass to filter by, or an array (OR semantics via
+   * SQL IN). Operators triaging an incident often want to look at
+   * multiple related classes at once — e.g. ["TRPCError:UNAUTHORIZED",
+   * "TRPCError:FORBIDDEN"] for an auth incident, or
+   * ["BackgroundJobFailed", "ZodError"] for a worker-tier sweep.
+   * Empty array short-circuits to [] (vacuous IN).
+   */
+  readonly errorClass?: string | readonly string[];
   readonly userId?: number;
   readonly limit?: number;
   /**
@@ -134,8 +142,18 @@ export async function listErrorEvents(
   } else if (input.sourceKindLike !== undefined) {
     filters.push(like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike));
   }
-  if (input.errorClass !== undefined) {
-    filters.push(eq(agsWorkspaceErrorEvents.errorClass, input.errorClass));
+  const errorClassInput = input.errorClass;
+  if (errorClassInput !== undefined) {
+    if (Array.isArray(errorClassInput)) {
+      if (errorClassInput.length === 0) return [];
+      filters.push(
+        inArray(agsWorkspaceErrorEvents.errorClass, errorClassInput as string[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.errorClass, errorClassInput as string),
+      );
+    }
   }
   if (input.userId !== undefined) {
     filters.push(eq(agsWorkspaceErrorEvents.userId, input.userId));

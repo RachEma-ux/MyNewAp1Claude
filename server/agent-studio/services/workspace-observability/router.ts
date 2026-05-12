@@ -303,7 +303,12 @@ export const workspaceObservabilityRouter = router({
         .object({
           sourceKind: z.string().min(1).max(100).optional(),
           sourceKindLike: z.string().min(1).max(100).optional(),
-          errorClass: z.string().min(1).max(100).optional(),
+          errorClass: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           userId: z.number().int().positive().optional(),
           limit: z.number().int().min(1).max(500).optional(),
           createdSince: z.coerce.date().optional(),
