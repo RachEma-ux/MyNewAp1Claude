@@ -17,6 +17,7 @@ import {
   markJobCompleted,
   markJobFailed,
   markJobCancelled,
+  bumpJobHeartbeat,
   retryJob,
   retryJobs,
   cancelJobs,
@@ -25,6 +26,7 @@ import {
   AsdbUnavailableError,
   JobNotFoundError,
   JobNotRetryableError,
+  JobNotRunningError,
 } from "../../server/agent-studio/services/workspace-observability/background-jobs";
 
 interface FakeRow {
@@ -1689,5 +1691,73 @@ describe("failStaleRunningJobs — Phase 22 #546 auto-failer", () => {
     );
     expect(result.scanned).toBe(0);
     expect(result.failed).toEqual([]);
+  });
+});
+
+describe("bumpJobHeartbeat — Phase 22 #562 worker heartbeat", () => {
+  it("throws AsdbUnavailableError when getJobById hits null DB", async () => {
+    // getJobById fail-soft returns null on null DB → bumpJobHeartbeat
+    // sees no row → throws JobNotFoundError.
+    await expect(
+      bumpJobHeartbeat(7, { getDb: () => null as never }),
+    ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+
+  it("throws JobNotFoundError when the row doesn't exist", async () => {
+    const { db, state } = makeFakeDb();
+    state.selectQueue.push("byId");
+    state.active.jobId = 999;
+    await expect(
+      bumpJobHeartbeat(999, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+
+  it("throws JobNotRunningError when status is not 'running' (refuses to heartbeat terminal rows)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    await expect(
+      bumpJobHeartbeat(7, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotRunningError);
+  });
+
+  it("refreshes updatedAt on a running row without changing status/attempts", async () => {
+    const earlier = new Date("2026-05-12T00:00:00Z");
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "projection.rebuild",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: earlier,
+          updatedAt: earlier,
+        },
+      ],
+    });
+    state.selectQueue.push("byId", "byId");
+    state.active.jobId = 7;
+    const result = await bumpJobHeartbeat(7, { getDb: () => db as never });
+    expect(result.status).toBe("running");
+    expect(result.attempts).toBe(1);
+    expect(result.lastError).toBeNull();
+    // updatedAt was bumped (the fake sets it to new Date() via transitionStatus).
+    expect(state.rows[0].updatedAt.getTime()).toBeGreaterThan(earlier.getTime());
   });
 });
