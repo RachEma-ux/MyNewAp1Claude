@@ -22,6 +22,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceBackgroundJobs } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
+import { recordErrorEvent } from "./error-events.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -228,11 +229,29 @@ export async function markJobFailed(
   errorMessage: string,
   options: ServiceOptions = {},
 ): Promise<BackgroundJobRow> {
-  return transitionStatus(
+  const row = await transitionStatus(
     jobId,
     { status: "failed", lastError: errorMessage },
     options,
   );
+  // Bridge to the error_events stream so failed background jobs show
+  // up in the dashboard's error feed alongside tRPC failures captured
+  // by #513's middleware. Fire-and-forget — observability writes never
+  // mask the original failure-status update. Operators can correlate
+  // via metadata.jobId when triaging.
+  void recordErrorEvent(
+    {
+      sourceKind: `backgroundJob.${row.jobKind}`,
+      sourceId: String(jobId),
+      errorClass: "BackgroundJobFailed",
+      errorMessage,
+      metadata: { jobId, jobKind: row.jobKind, payload: row.payload ?? null },
+    },
+    { getDb: options.getDb },
+  ).catch(() => {
+    // Fail-soft: an observability write failure must not propagate.
+  });
+  return row;
 }
 
 export async function markJobCancelled(
