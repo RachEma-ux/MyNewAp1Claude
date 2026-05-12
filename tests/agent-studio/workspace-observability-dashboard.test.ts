@@ -9,14 +9,19 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { statsMock, listJobsMock, listErrorsMock, listStaleMock } = vi.hoisted(
-  () => ({
-    statsMock: vi.fn(),
-    listJobsMock: vi.fn(),
-    listErrorsMock: vi.fn(),
-    listStaleMock: vi.fn(),
-  }),
-);
+const {
+  statsMock,
+  listJobsMock,
+  listErrorsMock,
+  listStaleMock,
+  listPendingMock,
+} = vi.hoisted(() => ({
+  statsMock: vi.fn(),
+  listJobsMock: vi.fn(),
+  listErrorsMock: vi.fn(),
+  listStaleMock: vi.fn(),
+  listPendingMock: vi.fn(),
+}));
 
 vi.mock(
   "../../server/agent-studio/services/workspace-observability/stats.js",
@@ -33,6 +38,7 @@ vi.mock(
       ...real,
       listJobs: listJobsMock,
       listStaleRunningJobs: listStaleMock,
+      listOldestPendingJobs: listPendingMock,
     };
   },
 );
@@ -68,14 +74,16 @@ beforeEach(() => {
   listJobsMock.mockReset();
   listErrorsMock.mockReset();
   listStaleMock.mockReset();
+  listPendingMock.mockReset();
   statsMock.mockResolvedValue(STATS_FIXTURE);
   listJobsMock.mockResolvedValue([]);
   listErrorsMock.mockResolvedValue([]);
   listStaleMock.mockResolvedValue([]);
+  listPendingMock.mockResolvedValue([]);
 });
 
 describe("getObservabilityDashboard", () => {
-  it("returns the bundled payload from all four underlying calls", async () => {
+  it("returns the bundled payload from all five underlying calls", async () => {
     statsMock.mockResolvedValueOnce(STATS_FIXTURE);
     listJobsMock.mockResolvedValueOnce([
       { id: 1, jobKind: "k", status: "failed" } as never,
@@ -87,6 +95,10 @@ describe("getObservabilityDashboard", () => {
     listStaleMock.mockResolvedValueOnce([
       { id: 99, jobKind: "k", status: "running" } as never,
     ]);
+    listPendingMock.mockResolvedValueOnce([
+      { id: 200, jobKind: "k", status: "pending" } as never,
+      { id: 201, jobKind: "k", status: "pending" } as never,
+    ]);
 
     const payload = await getObservabilityDashboard();
 
@@ -94,9 +106,10 @@ describe("getObservabilityDashboard", () => {
     expect(payload.recentFailedJobs).toHaveLength(2);
     expect(payload.recentErrorEvents).toHaveLength(1);
     expect(payload.staleRunningJobs).toHaveLength(1);
+    expect(payload.oldestPendingJobs).toHaveLength(2);
   });
 
-  it("defaults the recent slices to limit=20 and status='failed', stale to 10", async () => {
+  it("defaults the recent slices to limit=20 and status='failed', stale to 10, pending to 10", async () => {
     await getObservabilityDashboard();
     expect(listJobsMock).toHaveBeenCalledWith(
       { status: "failed", limit: 20 },
@@ -108,6 +121,28 @@ describe("getObservabilityDashboard", () => {
     );
     expect(listStaleMock).toHaveBeenCalledWith(
       { limit: 10, jobKind: undefined },
+      expect.any(Object),
+    );
+    expect(listPendingMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
+  it("respects a custom pendingLimit on the pending-backlog slice (#569)", async () => {
+    await getObservabilityDashboard({ pendingLimit: 3 });
+    expect(listPendingMock).toHaveBeenCalledWith(
+      { limit: 3, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards pendingJobKind to listOldestPendingJobs (#569)", async () => {
+    await getObservabilityDashboard({
+      pendingJobKind: "projection.rebuild",
+    });
+    expect(listPendingMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: "projection.rebuild" },
       expect.any(Object),
     );
   });
@@ -144,7 +179,7 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
-  it("fans all four underlying calls out in parallel (Promise.all)", async () => {
+  it("fans all five underlying calls out in parallel (Promise.all)", async () => {
     const order: string[] = [];
     statsMock.mockImplementationOnce(async () => {
       order.push("stats:start");
@@ -170,6 +205,12 @@ describe("getObservabilityDashboard", () => {
       order.push("stale:end");
       return [];
     });
+    listPendingMock.mockImplementationOnce(async () => {
+      order.push("pending:start");
+      await new Promise((r) => setTimeout(r, 25));
+      order.push("pending:end");
+      return [];
+    });
 
     await getObservabilityDashboard();
 
@@ -178,12 +219,14 @@ describe("getObservabilityDashboard", () => {
       order.indexOf("jobs:start"),
       order.indexOf("errors:start"),
       order.indexOf("stale:start"),
+      order.indexOf("pending:start"),
     ];
     const ends = [
       order.indexOf("stats:end"),
       order.indexOf("jobs:end"),
       order.indexOf("errors:end"),
       order.indexOf("stale:end"),
+      order.indexOf("pending:end"),
     ];
     expect(Math.max(...starts)).toBeLessThan(Math.min(...ends));
   });

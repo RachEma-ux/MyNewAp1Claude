@@ -607,6 +607,13 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          pendingLimit: z.number().int().min(1).max(100).optional(),
+          pendingJobKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
         })
         .optional(),
     )

@@ -25,6 +25,7 @@ const PAYLOAD_FIXTURE = {
   recentFailedJobs: [],
   recentErrorEvents: [],
   staleRunningJobs: [],
+  oldestPendingJobs: [],
 };
 
 beforeEach(() => {
@@ -121,6 +122,37 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     const oversized = Array.from({ length: 21 }, (_, i) => `k${i}`);
     await expect(
       caller.getDashboard({ staleJobKind: oversized }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards pendingLimit when supplied (#569)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ pendingLimit: 5 });
+    expect(dashboardMock).toHaveBeenCalledWith({ pendingLimit: 5 });
+  });
+
+  it("forwards pendingJobKind when supplied (#569)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ pendingJobKind: "projection.rebuild" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      pendingJobKind: "projection.rebuild",
+    });
+  });
+
+  it("rejects out-of-range pendingLimit at the input layer (#569)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ pendingLimit: 0 }),
+    ).rejects.toThrow();
+    await expect(
+      caller.getDashboard({ pendingLimit: 500 }),
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });

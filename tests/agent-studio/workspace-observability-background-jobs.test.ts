@@ -13,6 +13,7 @@ import {
   getJobsByIds,
   listJobs,
   listStaleRunningJobs,
+  listOldestPendingJobs,
   markJobStarted,
   markJobsStarted,
   markJobCompleted,
@@ -2230,5 +2231,160 @@ describe("markJobsStarted — Phase 22 #566 bulk worker-pool claim", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("not_pending");
     expect(result.skipped[0].currentStatus).toBe("completed");
+  });
+});
+
+describe("listOldestPendingJobs — Phase 22 #569 dashboard helper", () => {
+  // Dedicated fake — pending-queue backlog sorts ASC by createdAt.
+  function makePendingFakeDb(rows: FakeRow[]) {
+    const calls: { whereCalled: boolean; orderByCalled: boolean } = {
+      whereCalled: false,
+      orderByCalled: false,
+    };
+    const db = {
+      select: vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => {
+            calls.whereCalled = true;
+            return chain;
+          },
+          orderBy: () => {
+            calls.orderByCalled = true;
+            return {
+              limit: async (n: number) => {
+                const pending = rows.filter((r) => r.status === "pending");
+                pending.sort(
+                  (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+                );
+                return pending.slice(0, n);
+              },
+            };
+          },
+        };
+        return chain;
+      }),
+    };
+    return { db, calls };
+  }
+
+  it("fail-soft returns [] when ASDB is unavailable", async () => {
+    const result = await listOldestPendingJobs(
+      { limit: 10 },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("returns pending rows sorted oldest-enqueued first", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 5000),
+        updatedAt: new Date(base + 5000),
+      },
+      {
+        id: 2,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 1000),
+        updatedAt: new Date(base + 1000),
+      },
+      {
+        id: 3,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 3000),
+        updatedAt: new Date(base + 3000),
+      },
+      {
+        id: 4,
+        jobKind: "k",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base),
+      },
+    ];
+    const { db, calls } = makePendingFakeDb(rows);
+    const result = await listOldestPendingJobs(
+      { limit: 10 },
+      { getDb: () => db as never },
+    );
+    expect(calls.whereCalled).toBe(true);
+    expect(calls.orderByCalled).toBe(true);
+    // Pending only, oldest first: ids 2, 3, 1.
+    expect(result.map((r) => r.id)).toEqual([2, 3, 1]);
+  });
+
+  it("honors limit", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 5000),
+        updatedAt: new Date(base + 5000),
+      },
+      {
+        id: 2,
+        jobKind: "k",
+        payload: null,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        createdAt: new Date(base + 1000),
+        updatedAt: new Date(base + 1000),
+      },
+    ];
+    const { db } = makePendingFakeDb(rows);
+    const result = await listOldestPendingJobs(
+      { limit: 1 },
+      { getDb: () => db as never },
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(2);
+  });
+
+  it("short-circuits empty jobKind array BEFORE the ASDB probe", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await listOldestPendingJobs({ jobKind: [] }, { getDb });
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("defaults to limit=10 when no input provided", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = Array.from({ length: 15 }, (_, i) => ({
+      id: i + 1,
+      jobKind: "k",
+      payload: null,
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      createdAt: new Date(base + i * 1000),
+      updatedAt: new Date(base + i * 1000),
+    }));
+    const { db } = makePendingFakeDb(rows);
+    const result = await listOldestPendingJobs({}, { getDb: () => db as never });
+    expect(result).toHaveLength(10);
   });
 });

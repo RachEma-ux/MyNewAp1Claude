@@ -35,6 +35,7 @@ import {
 import {
   listJobs,
   listStaleRunningJobs,
+  listOldestPendingJobs,
   type BackgroundJobRow,
 } from "./background-jobs.js";
 import {
@@ -47,6 +48,15 @@ export interface ObservabilityDashboardPayload {
   readonly recentFailedJobs: readonly BackgroundJobRow[];
   readonly recentErrorEvents: readonly ErrorEventRow[];
   readonly staleRunningJobs: readonly BackgroundJobRow[];
+  /**
+   * Pending-queue backlog: oldest `status='pending'` rows by
+   * `createdAt` ASC. Sister of `staleRunningJobs` — that surfaces
+   * workers that *started but never finished*; this surfaces
+   * workers that *never started at all* (queue starvation). A
+   * jobKind concentration here is the operator's signal that a
+   * worker subsystem isn't pulling its queue.
+   */
+  readonly oldestPendingJobs: readonly BackgroundJobRow[];
 }
 
 export interface ObservabilityDashboardInput {
@@ -67,6 +77,17 @@ export interface ObservabilityDashboardInput {
    * worker subsystem when triaging.
    */
   readonly staleJobKind?: string | readonly string[];
+  /**
+   * Cap on `oldestPendingJobs`. Default 10 — operators want a short
+   * "what's waiting" list, not a full pending-queue dump.
+   */
+  readonly pendingLimit?: number;
+  /**
+   * Optional jobKind filter forwarded to listOldestPendingJobs
+   * (#569). Same scoping use as `staleJobKind` but for the pending
+   * backlog.
+   */
+  readonly pendingJobKind?: string | readonly string[];
 }
 
 export interface ObservabilityDashboardOptions {
@@ -75,6 +96,7 @@ export interface ObservabilityDashboardOptions {
 
 const DEFAULT_RECENT_LIMIT = 20;
 const DEFAULT_STALE_LIMIT = 10;
+const DEFAULT_PENDING_LIMIT = 10;
 
 export async function getObservabilityDashboard(
   input: ObservabilityDashboardInput = {},
@@ -82,20 +104,36 @@ export async function getObservabilityDashboard(
 ): Promise<ObservabilityDashboardPayload> {
   const recentLimit = input.recentLimit ?? DEFAULT_RECENT_LIMIT;
   const staleLimit = input.staleLimit ?? DEFAULT_STALE_LIMIT;
+  const pendingLimit = input.pendingLimit ?? DEFAULT_PENDING_LIMIT;
 
-  const [stats, recentFailedJobs, recentErrorEvents, staleRunningJobs] =
-    await Promise.all([
-      getWorkspaceObservabilityStats({ getDb: options.getDb }),
-      listJobs(
-        { status: "failed", limit: recentLimit },
-        { getDb: options.getDb },
-      ),
-      listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
-      listStaleRunningJobs(
-        { limit: staleLimit, jobKind: input.staleJobKind },
-        { getDb: options.getDb },
-      ),
-    ]);
+  const [
+    stats,
+    recentFailedJobs,
+    recentErrorEvents,
+    staleRunningJobs,
+    oldestPendingJobs,
+  ] = await Promise.all([
+    getWorkspaceObservabilityStats({ getDb: options.getDb }),
+    listJobs(
+      { status: "failed", limit: recentLimit },
+      { getDb: options.getDb },
+    ),
+    listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
+    listStaleRunningJobs(
+      { limit: staleLimit, jobKind: input.staleJobKind },
+      { getDb: options.getDb },
+    ),
+    listOldestPendingJobs(
+      { limit: pendingLimit, jobKind: input.pendingJobKind },
+      { getDb: options.getDb },
+    ),
+  ]);
 
-  return { stats, recentFailedJobs, recentErrorEvents, staleRunningJobs };
+  return {
+    stats,
+    recentFailedJobs,
+    recentErrorEvents,
+    staleRunningJobs,
+    oldestPendingJobs,
+  };
 }
