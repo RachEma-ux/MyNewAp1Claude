@@ -55,6 +55,7 @@ describe("getInboxComposite", () => {
         unreadOnly: true,
         notificationKind: "promotion.approved",
         limit: 50,
+        createdSince: undefined,
       },
       {},
     );
@@ -64,6 +65,16 @@ describe("getInboxComposite", () => {
   it("respects an explicit limit", async () => {
     await getInboxComposite({ userId: 42, limit: 5 });
     expect(listMock.mock.calls[0][0].limit).toBe(5);
+  });
+
+  it("forwards createdSince to listNotifications but NOT to the unread count (#555)", async () => {
+    const cutoff = new Date("2026-05-12T00:00:00Z");
+    await getInboxComposite({ userId: 42, createdSince: cutoff });
+    // listNotifications gets the filter…
+    expect(listMock.mock.calls[0][0].createdSince).toBe(cutoff);
+    // …but the unread badge ignores it (countUnreadNotifications takes
+    // only userId + options — total-unread is the contract).
+    expect(countMock).toHaveBeenCalledWith(42, {});
   });
 
   it("fans the two calls out in parallel (Promise.all)", async () => {

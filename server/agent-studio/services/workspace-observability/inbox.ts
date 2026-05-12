@@ -29,6 +29,15 @@ export interface InboxCompositeInput {
   readonly unreadOnly?: boolean;
   readonly notificationKind?: string | readonly string[];
   readonly limit?: number;
+  /**
+   * Restrict to notifications whose `createdAt` is at-or-after this
+   * timestamp. Forwarded to `listNotifications` (#537-era support).
+   * Lets the client say "give me my inbox since I last polled" in
+   * one round-trip instead of fetching all and filtering client-side.
+   * The unread-count leg ignores this filter intentionally — the
+   * inbox badge should reflect TOTAL unread, not "unread since X".
+   */
+  readonly createdSince?: Date;
 }
 
 const DEFAULT_INBOX_LIMIT = 50;
@@ -42,6 +51,7 @@ export async function getInboxComposite(
     unreadOnly: input.unreadOnly,
     notificationKind: input.notificationKind,
     limit: input.limit ?? DEFAULT_INBOX_LIMIT,
+    createdSince: input.createdSince,
   };
 
   const [notifications, unreadCount] = await Promise.all([
