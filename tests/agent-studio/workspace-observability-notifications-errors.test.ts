@@ -51,7 +51,12 @@ interface ErrState {
   rows: ErrEventRow[];
   nextId: number;
   selectQueue: Array<"list">;
-  active: { sourceKind?: string; errorClass?: string; userId?: number };
+  active: {
+    sourceKind?: string;
+    sourceKindLike?: string;
+    errorClass?: string;
+    userId?: number;
+  };
 }
 
 function makeNotifFakeDb(initial?: Partial<NotifState>) {
@@ -300,6 +305,15 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
           let rows = state.rows;
           if (state.active.sourceKind !== undefined) {
             rows = rows.filter((r) => r.sourceKind === state.active.sourceKind);
+          } else if (state.active.sourceKindLike !== undefined) {
+            // Simple LIKE-prefix simulation: trailing "%" → startsWith.
+            const pattern = state.active.sourceKindLike;
+            if (pattern.endsWith("%")) {
+              const prefix = pattern.slice(0, -1);
+              rows = rows.filter((r) => r.sourceKind.startsWith(prefix));
+            } else {
+              rows = rows.filter((r) => r.sourceKind === pattern);
+            }
           }
           if (state.active.errorClass !== undefined) {
             rows = rows.filter((r) => r.errorClass === state.active.errorClass);
@@ -427,6 +441,65 @@ describe("error-events — Phase 22", () => {
     const result = await listErrorEvents(
       {},
       { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
+  });
+});
+
+describe("listErrorEvents — sourceKindLike prefix filter (Phase 22 #514)", () => {
+  it("returns rows whose sourceKind starts with the LIKE prefix", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "Error", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.list", sourceId: null, userId: null, errorClass: "Error", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "trpc.providers.list", sourceId: null, userId: null, errorClass: "Error", errorMessage: "c", metadata: null, createdAt: now },
+        { id: 4, sourceKind: "vault.router", sourceId: null, userId: null, errorClass: "Error", errorMessage: "d", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKindLike = "trpc.chat.%";
+
+    const result = await listErrorEvents(
+      { sourceKindLike: "trpc.chat.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2]);
+  });
+
+  it("exact sourceKind wins when both filters are set (narrower)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "Error", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.list", sourceId: null, userId: null, errorClass: "Error", errorMessage: "b", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKind = "trpc.chat.send";
+    // sourceKindLike is ignored when sourceKind is set.
+
+    const result = await listErrorEvents(
+      { sourceKind: "trpc.chat.send", sourceKindLike: "trpc.%" },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(1);
+  });
+
+  it("returns no rows when prefix matches nothing", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "vault.router", sourceId: null, userId: null, errorClass: "Error", errorMessage: "x", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKindLike = "trpc.%";
+
+    const result = await listErrorEvents(
+      { sourceKindLike: "trpc.%" },
+      { getDb: () => db as never },
     );
     expect(result).toEqual([]);
   });

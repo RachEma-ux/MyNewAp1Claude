@@ -12,7 +12,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -99,6 +99,15 @@ export async function recordErrorEvent(
 
 export interface ListErrorEventsInput {
   readonly sourceKind?: string;
+  /**
+   * SQL LIKE-style prefix match on `sourceKind` (caller supplies the
+   * trailing `%`). Useful with the auto-capture middleware (#513) that
+   * emits sourceKinds like `trpc.chat.send`, `trpc.providers.list`,
+   * etc. — operators can group by `trpc.chat.%` or `trpc.providers.%`
+   * to triage by lane. Mutually compatible with `sourceKind` (exact
+   * match wins if both are set, since it's narrower).
+   */
+  readonly sourceKindLike?: string;
   readonly errorClass?: string;
   readonly userId?: number;
   readonly limit?: number;
@@ -115,6 +124,8 @@ export async function listErrorEvents(
   const filters = [];
   if (input.sourceKind !== undefined) {
     filters.push(eq(agsWorkspaceErrorEvents.sourceKind, input.sourceKind));
+  } else if (input.sourceKindLike !== undefined) {
+    filters.push(like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike));
   }
   if (input.errorClass !== undefined) {
     filters.push(eq(agsWorkspaceErrorEvents.errorClass, input.errorClass));
