@@ -19,7 +19,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceBackgroundJobs } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 import {
@@ -259,6 +259,16 @@ export interface ListJobsInput {
    * jobs or recent failure flips.
    */
   readonly updatedSince?: Date;
+  /**
+   * SQL LIKE-style search on `lastError` (caller supplies the
+   * wildcards — typically `%foo%` for substring). Operator gesture
+   * for grep-style failure triage — "find all failed jobs whose
+   * lastError mentions 'OOM'" — sister of `errorMessageLike` on
+   * listErrorEvents (#579). Composes with the other filters
+   * (ANDed in the WHERE clause). Rows with `lastError = NULL`
+   * never match (SQL LIKE on NULL returns NULL).
+   */
+  readonly lastErrorLike?: string;
 }
 
 export interface ListStaleRunningJobsInput {
@@ -461,6 +471,11 @@ export async function listJobs(
   }
   if (input.updatedSince !== undefined) {
     filters.push(gte(agsWorkspaceBackgroundJobs.updatedAt, input.updatedSince));
+  }
+  if (input.lastErrorLike !== undefined) {
+    filters.push(
+      like(agsWorkspaceBackgroundJobs.lastError, input.lastErrorLike),
+    );
   }
 
   const rows = await db
