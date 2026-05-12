@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   pushNotification,
+  pushNotificationToUsers,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -102,22 +103,27 @@ function makeNotifFakeDb(initial?: Partial<NotifState>) {
   const insert = vi.fn((table: unknown) => {
     const name = tableName(table);
     return {
-      values: (vals: Record<string, unknown>) => ({
+      values: (vals: Record<string, unknown> | Record<string, unknown>[]) => ({
         returning: async () => {
           if (name !== "ags_workspace_user_notifications") return [];
-          const id = state.nextId++;
-          const row: NotifRow = {
-            id,
-            userId: Number(vals.userId),
-            notificationKind: String(vals.notificationKind),
-            payload:
-              (vals.payload as Record<string, unknown> | null | undefined) ??
-              null,
-            read: Boolean(vals.read ?? false),
-            createdAt: new Date(),
-          };
-          state.rows.push(row);
-          return [row];
+          const list = Array.isArray(vals) ? vals : [vals];
+          const inserted: NotifRow[] = [];
+          for (const v of list) {
+            const id = state.nextId++;
+            const row: NotifRow = {
+              id,
+              userId: Number(v.userId),
+              notificationKind: String(v.notificationKind),
+              payload:
+                (v.payload as Record<string, unknown> | null | undefined) ??
+                null,
+              read: Boolean(v.read ?? false),
+              createdAt: new Date(),
+            };
+            state.rows.push(row);
+            inserted.push(row);
+          }
+          return inserted;
         },
       }),
     };
@@ -161,6 +167,60 @@ describe("user-notifications — Phase 22", () => {
     expect(result.read).toBe(false);
     expect(result.notificationKind).toBe("promotion_approved");
     expect(state.rows.length).toBe(1);
+  });
+
+  it("pushNotificationToUsers throws AsdbUnavailableError on null DB", async () => {
+    await expect(
+      pushNotificationToUsers(
+        { userIds: [1, 2], notificationKind: "x" },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("pushNotificationToUsers short-circuits to no-op on empty userIds", async () => {
+    const { db, state } = makeNotifFakeDb();
+    const result = await pushNotificationToUsers(
+      { userIds: [], notificationKind: "broadcast" },
+      { getDb: () => db as never },
+    );
+    expect(result.insertedCount).toBe(0);
+    expect(result.notifications).toEqual([]);
+    expect(state.rows.length).toBe(0);
+  });
+
+  it("pushNotificationToUsers inserts one unread row per user with the same body", async () => {
+    const { db, state } = makeNotifFakeDb();
+    const result = await pushNotificationToUsers(
+      {
+        userIds: [11, 22, 33],
+        notificationKind: "maintenance_window",
+        payload: { startsAt: "18:00Z" },
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.insertedCount).toBe(3);
+    expect(state.rows.length).toBe(3);
+    expect(result.notifications.map((n) => n.userId)).toEqual([11, 22, 33]);
+    expect(
+      result.notifications.every(
+        (n) =>
+          n.notificationKind === "maintenance_window" &&
+          n.read === false &&
+          (n.payload as Record<string, unknown>).startsAt === "18:00Z",
+      ),
+    ).toBe(true);
+  });
+
+  it("pushNotificationToUsers preserves duplicate userIds (caller dedupes)", async () => {
+    const { db, state } = makeNotifFakeDb();
+    const result = await pushNotificationToUsers(
+      { userIds: [7, 7, 7], notificationKind: "x" },
+      { getDb: () => db as never },
+    );
+    expect(result.insertedCount).toBe(3);
+    expect(state.rows.length).toBe(3);
+    expect(state.rows.every((r) => r.userId === 7)).toBe(true);
   });
 
   it("listNotifications filters by user + unreadOnly + kind", async () => {

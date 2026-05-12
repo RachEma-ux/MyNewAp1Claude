@@ -31,6 +31,7 @@ export type {
 
 export {
   pushNotification,
+  pushNotificationToUsers,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -40,6 +41,8 @@ export {
 } from "./user-notifications.js";
 export type {
   PushNotificationInput,
+  PushNotificationToUsersInput,
+  PushNotificationToUsersResult,
   ListNotificationsInput,
   NotificationRow,
   UnreadNotificationCount,
