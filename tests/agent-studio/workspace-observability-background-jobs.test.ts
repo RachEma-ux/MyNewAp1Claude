@@ -59,6 +59,7 @@ interface FakeState {
     jobKinds?: readonly string[];
     createdSince?: Date;
     updatedSince?: Date;
+    lastErrorLike?: string;
   };
 }
 
@@ -99,6 +100,25 @@ function makeFakeDb(initial?: Partial<FakeState>) {
           if (state.active.updatedSince !== undefined) {
             const cutoff = state.active.updatedSince.getTime();
             rows = rows.filter((r) => r.updatedAt.getTime() >= cutoff);
+          }
+          if (state.active.lastErrorLike !== undefined) {
+            // Simulate SQL LIKE with %wildcards%. NULL lastError never
+            // matches (matches SQL semantics).
+            const pattern = state.active.lastErrorLike;
+            const startsWild = pattern.startsWith("%");
+            const endsWild = pattern.endsWith("%");
+            const core = pattern.slice(
+              startsWild ? 1 : 0,
+              endsWild ? pattern.length - 1 : pattern.length,
+            );
+            rows = rows.filter((r) => {
+              if (r.lastError == null) return false;
+              const msg = r.lastError;
+              if (startsWild && endsWild) return msg.includes(core);
+              if (startsWild) return msg.endsWith(core);
+              if (endsWild) return msg.startsWith(core);
+              return msg === core;
+            });
           }
           return {
             limit: async () =>
@@ -668,6 +688,86 @@ describe("listJobs — Phase 22", () => {
     );
     expect(result.length).toBe(1);
     expect(result[0].id).toBe(2);
+  });
+
+  it("lastErrorLike returns rows whose lastError contains the substring (#580)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "OOMKilled by linux", createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "timeout exceeded", createdAt: now, updatedAt: now },
+        { id: 3, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "OOMKilled (cgroup limit)", createdAt: now, updatedAt: now },
+        // NULL lastError row — must NOT match LIKE.
+        { id: 4, jobKind: "x", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.lastErrorLike = "%OOMKilled%";
+
+    const result = await listJobs(
+      { lastErrorLike: "%OOMKilled%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("lastErrorLike prefix anchors at start (#580)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "FATAL: gateway down", createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "warning: slow query", createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.lastErrorLike = "FATAL%";
+
+    const result = await listJobs(
+      { lastErrorLike: "FATAL%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("lastErrorLike composes with status filter (ANDed) (#580)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        // Right substring but wrong status: filtered out.
+        { id: 1, jobKind: "x", payload: null, status: "pending", attempts: 0, lastError: "OOMKilled", createdAt: now, updatedAt: now },
+        // Wrong substring but right status: filtered out.
+        { id: 2, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "timeout", createdAt: now, updatedAt: now },
+        // Both right: matches.
+        { id: 3, jobKind: "x", payload: null, status: "failed", attempts: 1, lastError: "OOMKilled mid-run", createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.status = "failed";
+    state.active.lastErrorLike = "%OOMKilled%";
+
+    const result = await listJobs(
+      { status: "failed", lastErrorLike: "%OOMKilled%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([3]);
+  });
+
+  it("lastErrorLike never matches NULL lastError rows (#580)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        { id: 1, jobKind: "x", payload: null, status: "pending", attempts: 0, lastError: null, createdAt: now, updatedAt: now },
+        { id: 2, jobKind: "x", payload: null, status: "running", attempts: 1, lastError: null, createdAt: now, updatedAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.lastErrorLike = "%anything%";
+
+    const result = await listJobs(
+      { lastErrorLike: "%anything%" },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
   });
 });
 

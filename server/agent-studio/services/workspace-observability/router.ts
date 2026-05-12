@@ -100,6 +100,7 @@ export const workspaceObservabilityRouter = router({
           limit: z.number().int().min(1).max(500).optional(),
           createdSince: z.coerce.date().optional(),
           updatedSince: z.coerce.date().optional(),
+          lastErrorLike: z.string().min(1).max(200).optional(),
         })
         .optional(),
     )
