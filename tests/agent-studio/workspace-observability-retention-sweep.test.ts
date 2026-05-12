@@ -221,6 +221,27 @@ describe("runRetentionSweep", () => {
     expect(pruneErrorMock.mock.calls[0][0].sourceKindLike).toBe("trpc.chat.%");
   });
 
+  it("passes errorEventsSourceKind through to the errors prune (single, #611)", async () => {
+    await runRetentionSweep(
+      { errorEventsSourceKind: "trpc.chat.send" },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0].sourceKind).toBe("trpc.chat.send");
+  });
+
+  it("passes errorEventsSourceKind through to the errors prune (array, #611)", async () => {
+    await runRetentionSweep(
+      {
+        errorEventsSourceKind: ["trpc.chat.send", "trpc.chat.list"],
+      },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0].sourceKind).toEqual([
+      "trpc.chat.send",
+      "trpc.chat.list",
+    ]);
+  });
+
   it("ANDs errorEventsSourceKindLike with errorEventsErrorClass (#604)", async () => {
     await runRetentionSweep(
       {

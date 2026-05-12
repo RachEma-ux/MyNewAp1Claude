@@ -447,6 +447,19 @@ export interface PruneOldErrorEventsInput {
    */
   readonly errorClass?: string | readonly string[];
   /**
+   * Optional `sourceKind` exact filter — single string (`eq`) or
+   * array (`IN`). Sister of `listErrorEvents.sourceKind` (#553) on
+   * the retention side. Narrower than `sourceKindLike` (#604): lets
+   * a cron prune ONE specific procedure's errors (`trpc.chat.send`)
+   * without affecting siblings like `trpc.chat.list`. Mutually
+   * exclusive with `sourceKindLike` (exact match wins — same
+   * precedence convention as listErrorEvents).
+   *
+   * Empty array short-circuits to `{deletedCount: 0}` (vacuous IN),
+   * with no DB call.
+   */
+  readonly sourceKind?: string | readonly string[];
+  /**
    * SQL LIKE-style filter on `errorMessage` (caller supplies the
    * wildcards — typically `%foo%` for substring). Sister of
    * `listErrorEvents.errorMessageLike` (#579) but for the retention
@@ -493,6 +506,10 @@ export async function pruneOldErrorEvents(
   if (Array.isArray(input.errorClass) && input.errorClass.length === 0) {
     return { deletedCount: 0 };
   }
+  // Empty sourceKind array → vacuous IN; same short-circuit contract.
+  if (Array.isArray(input.sourceKind) && input.sourceKind.length === 0) {
+    return { deletedCount: 0 };
+  }
 
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
@@ -516,7 +533,21 @@ export async function pruneOldErrorEvents(
       like(agsWorkspaceErrorEvents.errorMessage, input.errorMessageLike),
     );
   }
-  if (input.sourceKindLike !== undefined) {
+  const sourceKindInput = input.sourceKind;
+  if (sourceKindInput !== undefined) {
+    if (Array.isArray(sourceKindInput)) {
+      filters.push(
+        inArray(
+          agsWorkspaceErrorEvents.sourceKind,
+          sourceKindInput as string[],
+        ),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceErrorEvents.sourceKind, sourceKindInput as string),
+      );
+    }
+  } else if (input.sourceKindLike !== undefined) {
     filters.push(
       like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike),
     );

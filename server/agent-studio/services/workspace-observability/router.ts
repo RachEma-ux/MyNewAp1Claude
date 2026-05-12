@@ -815,6 +815,12 @@ export const workspaceObservabilityRouter = router({
             ])
             .optional(),
           errorEventsErrorMessageLike: z.string().min(1).max(200).optional(),
+          errorEventsSourceKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           errorEventsSourceKindLike: z.string().min(1).max(100).optional(),
           notificationsRetentionDays: z
             .number()

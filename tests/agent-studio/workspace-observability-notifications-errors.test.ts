@@ -1903,6 +1903,83 @@ describe("pruneOldErrorEvents — Phase 22 #519 retention prune", () => {
     expect(db.delete).toHaveBeenCalledOnce();
   });
 
+  it("accepts sourceKind exact filter (single) on retention prune (#611)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }],
+        }),
+      })),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        sourceKind: "trpc.chat.send",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 2 });
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("accepts sourceKind exact filter (array) on retention prune (#611)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }),
+      })),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        sourceKind: ["trpc.chat.send", "trpc.chat.list"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 3 });
+  });
+
+  it("empty sourceKind array short-circuits to deletedCount=0 (#611)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }],
+        }),
+      })),
+    };
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        sourceKind: [],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it("exact sourceKind takes precedence over sourceKindLike (#611)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }],
+        }),
+      })),
+    };
+    // Both set — exact sourceKind wins (no error, both accepted at input
+    // layer; service-tier applies only the exact filter).
+    const result = await pruneOldErrorEvents(
+      {
+        olderThan: new Date("2026-04-01"),
+        sourceKind: "trpc.chat.send",
+        sourceKindLike: "trpc.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 1 });
+  });
+
   it("sourceKindLike returns deletedCount=0 on ASDB-null (fail-soft, #604)", async () => {
     const result = await pruneOldErrorEvents(
       {
