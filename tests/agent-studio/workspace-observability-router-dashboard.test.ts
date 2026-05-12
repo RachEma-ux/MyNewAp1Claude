@@ -190,4 +190,24 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards errorMessageLike when supplied (#586)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ errorMessageLike: "%timeout%" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      errorMessageLike: "%timeout%",
+    });
+  });
+
+  it("rejects empty errorMessageLike at the input layer (#586)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ errorMessageLike: "" }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

@@ -255,6 +255,38 @@ describe("getObservabilityDashboard", () => {
     );
   });
 
+  it("forwards errorMessageLike to listErrorEvents (#586)", async () => {
+    await getObservabilityDashboard({
+      errorMessageLike: "%connection refused%",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: undefined,
+        sourceKind: undefined,
+        errorMessageLike: "%connection refused%",
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("errorMessageLike composes with errorClass + sourceKind (#586)", async () => {
+    await getObservabilityDashboard({
+      errorClass: "BackgroundJobFailed",
+      sourceKind: "backgroundJob.projection.rebuild",
+      errorMessageLike: "%OOM%",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: "backgroundJob.projection.rebuild",
+        errorMessageLike: "%OOM%",
+      },
+      expect.any(Object),
+    );
+  });
+
   it("respects a custom pendingLimit on the pending-backlog slice (#569)", async () => {
     await getObservabilityDashboard({ pendingLimit: 3 });
     expect(listPendingMock).toHaveBeenCalledWith(
