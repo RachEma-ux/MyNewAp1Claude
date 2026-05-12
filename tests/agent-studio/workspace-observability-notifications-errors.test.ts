@@ -2076,6 +2076,55 @@ describe("pruneOldNotifications — Phase 22 #520 retention prune", () => {
     );
     expect(result).toEqual({ deletedCount: 1 });
   });
+
+  it("accepts notificationKindLike (prefix LIKE) on retention prune (#603)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }),
+      })),
+    };
+    const result = await pruneOldNotifications(
+      {
+        olderThan: new Date("2026-04-01"),
+        notificationKindLike: "promotion.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 3 });
+    expect(db.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("exact notificationKind takes precedence over notificationKindLike on retention prune (#603)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }],
+        }),
+      })),
+    };
+    const result = await pruneOldNotifications(
+      {
+        olderThan: new Date("2026-04-01"),
+        notificationKind: "promotion.approved",
+        notificationKindLike: "promotion.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual({ deletedCount: 1 });
+  });
+
+  it("notificationKindLike returns deletedCount=0 on ASDB-null (fail-soft, #603)", async () => {
+    const result = await pruneOldNotifications(
+      {
+        olderThan: new Date("2026-04-01"),
+        notificationKindLike: "promotion.%",
+      },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual({ deletedCount: 0 });
+  });
 });
 
 describe("listNotifications — notificationKindLike prefix filter (Phase 22 #599)", () => {

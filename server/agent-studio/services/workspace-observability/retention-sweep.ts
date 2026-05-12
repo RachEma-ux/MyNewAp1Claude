@@ -61,6 +61,16 @@ export interface RunRetentionSweepInput {
    */
   readonly notificationsNotificationKind?: string | readonly string[];
   /**
+   * Optional SQL LIKE-style prefix filter on notificationKind for
+   * the notifications sweep. Mirrors
+   * `pruneOldNotifications.notificationKindLike` (#603) and
+   * `backgroundJobsJobKindLike` (#602) — cron callers can prune by
+   * kind prefix (`promotion.%`, `import.%`) without enumerating each
+   * sub-kind. Mutually exclusive with `notificationsNotificationKind`
+   * (exact wins).
+   */
+  readonly notificationsNotificationKindLike?: string;
+  /**
    * Days to retain in `ags_workspace_background_jobs`. Default 30.
    */
   readonly backgroundJobsRetentionDays?: number;
@@ -145,6 +155,7 @@ export async function runRetentionSweep(
         olderThan: notificationsCutoff,
         readOnly: input.notificationsReadOnly,
         notificationKind: input.notificationsNotificationKind,
+        notificationKindLike: input.notificationsNotificationKindLike,
       },
       { getDb: options.getDb },
     ),

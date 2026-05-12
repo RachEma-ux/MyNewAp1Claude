@@ -170,6 +170,30 @@ describe("runRetentionSweep", () => {
     });
   });
 
+  it("passes notificationsNotificationKindLike through to the notifications prune (#603)", async () => {
+    await runRetentionSweep(
+      { notificationsNotificationKindLike: "promotion.%" },
+      { now: new Date() },
+    );
+    expect(pruneNotifMock.mock.calls[0][0].notificationKindLike).toBe(
+      "promotion.%",
+    );
+  });
+
+  it("ANDs notificationsNotificationKindLike with notificationsReadOnly (#603)", async () => {
+    await runRetentionSweep(
+      {
+        notificationsNotificationKindLike: "import.%",
+        notificationsReadOnly: true,
+      },
+      { now: new Date() },
+    );
+    expect(pruneNotifMock.mock.calls[0][0]).toMatchObject({
+      notificationKindLike: "import.%",
+      readOnly: true,
+    });
+  });
+
   it("passes errorEventsErrorClass through to the errors prune (single, #550)", async () => {
     await runRetentionSweep(
       { errorEventsErrorClass: "ValidationError" },

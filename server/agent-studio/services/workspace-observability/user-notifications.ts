@@ -795,8 +795,22 @@ export interface PruneOldNotificationsInput {
    * pruneOldErrorEvents.errorClass (#550).
    *
    * Empty array short-circuits to `{deletedCount: 0}` with no DB call.
+   *
+   * Mutually exclusive with `notificationKindLike` (exact match wins
+   * when both are set — matches the listNotifications precedence
+   * convention from #599).
    */
   readonly notificationKind?: string | readonly string[];
+  /**
+   * SQL LIKE-style prefix filter on `notificationKind`. Sister of
+   * `listNotifications.notificationKindLike` (#599) and
+   * `pruneOldBackgroundJobs.jobKindLike` (#602) on the retention
+   * side. Lets cron sweeps prune by kind prefix — e.g.
+   * `promotion.%` to clear all promotion-family notifications older
+   * than N days. Composes with `readOnly` + `olderThan`. Mutually
+   * exclusive with `notificationKind` (exact wins).
+   */
+  readonly notificationKindLike?: string;
 }
 
 export interface PruneOldNotificationsResult {
@@ -852,6 +866,13 @@ export async function pruneOldNotifications(
         ),
       );
     }
+  } else if (input.notificationKindLike !== undefined) {
+    filters.push(
+      like(
+        agsWorkspaceUserNotifications.notificationKind,
+        input.notificationKindLike,
+      ),
+    );
   }
 
   const deleted = await db
