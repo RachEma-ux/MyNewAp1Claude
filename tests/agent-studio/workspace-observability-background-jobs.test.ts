@@ -1269,6 +1269,83 @@ describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
     });
     expect(result).toHaveLength(10);
   });
+
+  it("accepts the object-input form with limit (#556 back-compat)", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = Array.from({ length: 3 }, (_, i) => ({
+      id: i + 1,
+      jobKind: "k",
+      payload: null,
+      status: "running",
+      attempts: 1,
+      lastError: null,
+      createdAt: new Date(base),
+      updatedAt: new Date(base + i * 1000),
+    }));
+    const { db } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(
+      { limit: 2 },
+      { getDb: () => db as never },
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it("short-circuits empty jobKind array with no DB call (#556)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await listStaleRunningJobs(
+      { jobKind: [] },
+      { getDb },
+    );
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("accepts single-string jobKind filter (#556)", async () => {
+    // The dedicated stale fake doesn't introspect the WHERE filter, so
+    // we verify the input shape is accepted without throw.
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "projection.rebuild",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base),
+      },
+    ];
+    const { db } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(
+      { jobKind: "projection.rebuild" },
+      { getDb: () => db as never },
+    );
+    // The fake ignores WHERE filters and returns all running rows.
+    expect(result).toHaveLength(1);
+  });
+
+  it("accepts array-form jobKind filter (#556)", async () => {
+    const base = new Date("2026-05-12T00:00:00Z").getTime();
+    const rows: FakeRow[] = [
+      {
+        id: 1,
+        jobKind: "projection.rebuild",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: new Date(base),
+        updatedAt: new Date(base),
+      },
+    ];
+    const { db } = makeStaleFakeDb(rows);
+    const result = await listStaleRunningJobs(
+      { jobKind: ["projection.rebuild", "import.scan"] },
+      { getDb: () => db as never },
+    );
+    expect(result).toHaveLength(1);
+  });
 });
 
 describe("failStaleRunningJobs — Phase 22 #546 auto-failer", () => {

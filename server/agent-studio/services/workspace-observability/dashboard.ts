@@ -61,6 +61,12 @@ export interface ObservabilityDashboardInput {
    * "what's stuck" list, not a full running-job dump.
    */
   readonly staleLimit?: number;
+  /**
+   * Optional jobKind filter forwarded to listStaleRunningJobs (#556).
+   * Lets the dashboard scope the stale-running list to a specific
+   * worker subsystem when triaging.
+   */
+  readonly staleJobKind?: string | readonly string[];
 }
 
 export interface ObservabilityDashboardOptions {
@@ -85,7 +91,10 @@ export async function getObservabilityDashboard(
         { getDb: options.getDb },
       ),
       listErrorEvents({ limit: recentLimit }, { getDb: options.getDb }),
-      listStaleRunningJobs(staleLimit, { getDb: options.getDb }),
+      listStaleRunningJobs(
+        { limit: staleLimit, jobKind: input.staleJobKind },
+        { getDb: options.getDb },
+      ),
     ]);
 
   return { stats, recentFailedJobs, recentErrorEvents, staleRunningJobs };

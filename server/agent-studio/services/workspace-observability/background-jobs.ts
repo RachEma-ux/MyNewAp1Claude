@@ -220,6 +220,23 @@ export interface ListJobsInput {
   readonly updatedSince?: Date;
 }
 
+export interface ListStaleRunningJobsInput {
+  /**
+   * Cap on rows returned. Defaults to 10 — operators want a short
+   * "what's stuck" list on the dashboard, not a full running-job
+   * dump.
+   */
+  readonly limit?: number;
+  /**
+   * Optional jobKind filter — single string (`eq`) or array (`IN`).
+   * Lets the dashboard scope to one worker's stuck rows when an
+   * operator is triaging a single subsystem. Mirrors the same filter
+   * on failStaleRunningJobs (#548). Empty array → vacuous IN
+   * short-circuit (returns []).
+   */
+  readonly jobKind?: string | readonly string[];
+}
+
 /**
  * "Stale running" oldest-updated-first selector for the operator
  * dashboard. listJobs orders by `desc(updatedAt)` (most-recently-
@@ -227,14 +244,44 @@ export interface ListJobsInput {
  * detection — operators want the running rows whose updatedAt is
  * oldest, since those have been running the longest without a
  * markJobStarted/markJobCompleted bump.
+ *
+ * Accepts either a bare `limit` number (back-compat with the
+ * pre-#556 signature) or an `{limit, jobKind}` object (preferred
+ * going forward).
  */
 export async function listStaleRunningJobs(
-  limit = 10,
+  inputOrLimit?: ListStaleRunningJobsInput | number,
   options: ServiceOptions = {},
 ): Promise<BackgroundJobRow[]> {
+  const input: ListStaleRunningJobsInput =
+    typeof inputOrLimit === "number"
+      ? { limit: inputOrLimit }
+      : (inputOrLimit ?? {});
+  const limit = input.limit ?? 10;
+
+  // Empty jobKind array → vacuous IN; short-circuit before the ASDB
+  // probe so a no-op operator filter doesn't fail when the DB is down.
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return [];
+  }
+
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) return [];
+
+  const filters = [eq(agsWorkspaceBackgroundJobs.status, "running")];
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(
+        inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
 
   const rows = await db
     .select({
@@ -248,7 +295,7 @@ export async function listStaleRunningJobs(
       updatedAt: agsWorkspaceBackgroundJobs.updatedAt,
     })
     .from(agsWorkspaceBackgroundJobs)
-    .where(eq(agsWorkspaceBackgroundJobs.status, "running"))
+    .where(filters.length === 1 ? filters[0] : and(...filters))
     .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // ASC = oldest-touched first
     .limit(limit);
   return rows.map(rowToJob);

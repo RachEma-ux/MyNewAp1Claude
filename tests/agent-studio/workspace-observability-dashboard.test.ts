@@ -106,7 +106,10 @@ describe("getObservabilityDashboard", () => {
       { limit: 20 },
       expect.any(Object),
     );
-    expect(listStaleMock).toHaveBeenCalledWith(10, expect.any(Object));
+    expect(listStaleMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: undefined },
+      expect.any(Object),
+    );
   });
 
   it("respects a custom recentLimit on both recent slices", async () => {
@@ -117,7 +120,28 @@ describe("getObservabilityDashboard", () => {
 
   it("respects a custom staleLimit on the stale-running slice", async () => {
     await getObservabilityDashboard({ staleLimit: 3 });
-    expect(listStaleMock).toHaveBeenCalledWith(3, expect.any(Object));
+    expect(listStaleMock).toHaveBeenCalledWith(
+      { limit: 3, jobKind: undefined },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards staleJobKind to listStaleRunningJobs (#556)", async () => {
+    await getObservabilityDashboard({ staleJobKind: "projection.rebuild" });
+    expect(listStaleMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: "projection.rebuild" },
+      expect.any(Object),
+    );
+  });
+
+  it("forwards array-form staleJobKind (#556)", async () => {
+    await getObservabilityDashboard({
+      staleJobKind: ["projection.rebuild", "import.scan"],
+    });
+    expect(listStaleMock).toHaveBeenCalledWith(
+      { limit: 10, jobKind: ["projection.rebuild", "import.scan"] },
+      expect.any(Object),
+    );
   });
 
   it("fans all four underlying calls out in parallel (Promise.all)", async () => {
