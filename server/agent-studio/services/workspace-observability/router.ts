@@ -517,6 +517,12 @@ export const workspaceObservabilityRouter = router({
             .max(3650)
             .optional(),
           notificationsReadOnly: z.boolean().optional(),
+          notificationsNotificationKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
           backgroundJobsRetentionDays: z
             .number()
             .int()

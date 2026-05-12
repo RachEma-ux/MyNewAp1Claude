@@ -46,6 +46,13 @@ export interface RunRetentionSweepInput {
    */
   readonly notificationsReadOnly?: boolean;
   /**
+   * Restrict notification deletion to this kind (string) or kinds
+   * (array). Mirrors the filter on pruneOldNotifications (#551) —
+   * lets cron callers shed noisy kinds aggressively while preserving
+   * rare ones.
+   */
+  readonly notificationsNotificationKind?: string | readonly string[];
+  /**
    * Days to retain in `ags_workspace_background_jobs`. Default 30.
    */
   readonly backgroundJobsRetentionDays?: number;
@@ -110,6 +117,7 @@ export async function runRetentionSweep(
       {
         olderThan: notificationsCutoff,
         readOnly: input.notificationsReadOnly,
+        notificationKind: input.notificationsNotificationKind,
       },
       { getDb: options.getDb },
     ),

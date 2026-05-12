@@ -178,4 +178,45 @@ describe("workspaceObservabilityRouter.runRetentionSweep", () => {
     ).rejects.toThrow();
     expect(sweepMock).not.toHaveBeenCalled();
   });
+
+  it("forwards single-string notificationsNotificationKind (#551)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      notificationsNotificationKind: "graph_quality_run_completed",
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      notificationsNotificationKind: "graph_quality_run_completed",
+    });
+  });
+
+  it("forwards array-form notificationsNotificationKind (#551)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    await caller.runRetentionSweep({
+      notificationsNotificationKind: [
+        "graph_quality_run_completed",
+        "import_complete",
+      ],
+    });
+    expect(sweepMock).toHaveBeenCalledWith({
+      notificationsNotificationKind: [
+        "graph_quality_run_completed",
+        "import_complete",
+      ],
+    });
+  });
+
+  it("rejects oversized notificationsNotificationKind array (#551)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    } as never);
+    const oversized = Array.from({ length: 21 }, (_, i) => `kind${i}`);
+    await expect(
+      caller.runRetentionSweep({ notificationsNotificationKind: oversized }),
+    ).rejects.toThrow();
+    expect(sweepMock).not.toHaveBeenCalled();
+  });
 });

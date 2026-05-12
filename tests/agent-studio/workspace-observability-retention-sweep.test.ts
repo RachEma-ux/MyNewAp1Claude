@@ -89,6 +89,32 @@ describe("runRetentionSweep", () => {
     expect(pruneNotifMock.mock.calls[0][0].readOnly).toBe(true);
   });
 
+  it("passes notificationsNotificationKind through (single, #551)", async () => {
+    await runRetentionSweep(
+      { notificationsNotificationKind: "graph_quality_run_completed" },
+      { now: new Date() },
+    );
+    expect(pruneNotifMock.mock.calls[0][0].notificationKind).toBe(
+      "graph_quality_run_completed",
+    );
+  });
+
+  it("passes notificationsNotificationKind through (array, #551)", async () => {
+    await runRetentionSweep(
+      {
+        notificationsNotificationKind: [
+          "graph_quality_run_completed",
+          "import_complete",
+        ],
+      },
+      { now: new Date() },
+    );
+    expect(pruneNotifMock.mock.calls[0][0].notificationKind).toEqual([
+      "graph_quality_run_completed",
+      "import_complete",
+    ]);
+  });
+
   it("passes backgroundJobsStatuses through to the jobs prune (aggressive cleanup)", async () => {
     await runRetentionSweep(
       { backgroundJobsStatuses: ["completed", "failed", "cancelled"] },
