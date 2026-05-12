@@ -12,7 +12,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, gte, inArray, like, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -278,6 +278,20 @@ export interface ListErrorEventsInput {
    * with the other filters; ANDed in the WHERE clause.
    */
   readonly errorMessageLike?: string;
+  /**
+   * Tri-state filter on whether `userId IS NULL`:
+   *   - `true`:  only system-driven errors (background workers,
+   *              sweeps, cron — no associated session user).
+   *   - `false`: only user-driven errors (tRPC procedures
+   *              invoked by an authenticated session).
+   *   - `undefined` (default): no filter.
+   * Operator's first triage question on a captured error is
+   * usually "is this a user-driven incident or a system-driven
+   * one?" — this filter answers it without forcing the operator
+   * to enumerate user ids. Mutually exclusive with the
+   * specific-`userId` filter (caller specifies one or the other).
+   */
+  readonly userIdIsNull?: boolean;
 }
 
 export async function listErrorEvents(
@@ -327,6 +341,10 @@ export async function listErrorEvents(
   }
   if (input.userId !== undefined) {
     filters.push(eq(agsWorkspaceErrorEvents.userId, input.userId));
+  } else if (input.userIdIsNull === true) {
+    filters.push(isNull(agsWorkspaceErrorEvents.userId));
+  } else if (input.userIdIsNull === false) {
+    filters.push(isNotNull(agsWorkspaceErrorEvents.userId));
   }
   if (input.createdSince !== undefined) {
     filters.push(gte(agsWorkspaceErrorEvents.createdAt, input.createdSince));

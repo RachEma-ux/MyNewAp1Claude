@@ -80,6 +80,7 @@ interface ErrState {
     userId?: number;
     createdSince?: Date;
     errorMessageLike?: string;
+    userIdIsNull?: boolean;
   };
 }
 
@@ -847,6 +848,14 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
             const cutoff = state.active.createdSince.getTime();
             rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
           }
+          // userId precedence: specific userId narrower than IS NULL.
+          if (state.active.userId !== undefined) {
+            rows = rows.filter((r) => r.userId === state.active.userId);
+          } else if (state.active.userIdIsNull === true) {
+            rows = rows.filter((r) => r.userId === null);
+          } else if (state.active.userIdIsNull === false) {
+            rows = rows.filter((r) => r.userId !== null);
+          }
           if (state.active.errorMessageLike !== undefined) {
             // Simulate SQL LIKE with %wildcards%. Leading/trailing `%`
             // controls anchored vs unanchored matching.
@@ -1203,6 +1212,66 @@ describe("listErrorEvents — errorMessageLike grep filter (Phase 22 #579)", () 
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("listErrorEvents — userIdIsNull tri-state filter (Phase 22 #593)", () => {
+  it("userIdIsNull=true returns only system-driven (NULL userId) errors", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "system-1", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: 7, errorClass: "E", errorMessage: "user-7", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "system-2", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userIdIsNull = true;
+
+    const result = await listErrorEvents(
+      { userIdIsNull: true },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("userIdIsNull=false returns only user-driven (non-NULL userId) errors", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "system", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: 7, errorClass: "E", errorMessage: "user-7", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "x", sourceId: null, userId: 9, errorClass: "E", errorMessage: "user-9", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userIdIsNull = false;
+
+    const result = await listErrorEvents(
+      { userIdIsNull: false },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([2, 3]);
+  });
+
+  it("specific userId takes precedence over userIdIsNull (#593)", async () => {
+    // When both are set the explicit userId wins (eq narrower than IS NULL).
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "sys", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: 7, errorClass: "E", errorMessage: "u7", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 7;
+    // userIdIsNull is intentionally not applied by the service when userId is set.
+
+    const result = await listErrorEvents(
+      { userId: 7, userIdIsNull: true },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([2]);
   });
 });
 
