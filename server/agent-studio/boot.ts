@@ -299,6 +299,23 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.11: Phase 22 follow-up #639 — rac-runtime-traces retention cron.
+  // The ags_rac_runtime_traces + ags_rac_context_blocks tables had no
+  // retention before #638 + #639. Default daily 08:00 UTC sweep — 6th
+  // slot in the daily-sweep ladder. Cascades blocks before traces.
+  // Env-flag-gated via AGS_RAC_RUNTIME_TRACES_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureRacRuntimeTracesRetentionCronStarted } = await import(
+      "./services/rac-runtime-traces-retention-cron"
+    );
+    ensureRacRuntimeTracesRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-rac-runtime-traces-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
