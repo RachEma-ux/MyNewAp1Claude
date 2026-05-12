@@ -78,6 +78,7 @@ interface ErrState {
     errorClasses?: readonly string[];
     userId?: number;
     createdSince?: Date;
+    errorMessageLike?: string;
   };
 }
 
@@ -770,6 +771,24 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
             const cutoff = state.active.createdSince.getTime();
             rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
           }
+          if (state.active.errorMessageLike !== undefined) {
+            // Simulate SQL LIKE with %wildcards%. Leading/trailing `%`
+            // controls anchored vs unanchored matching.
+            const pattern = state.active.errorMessageLike;
+            const startsWild = pattern.startsWith("%");
+            const endsWild = pattern.endsWith("%");
+            const core = pattern.slice(
+              startsWild ? 1 : 0,
+              endsWild ? pattern.length - 1 : pattern.length,
+            );
+            rows = rows.filter((r) => {
+              if (startsWild && endsWild)
+                return r.errorMessage.includes(core);
+              if (startsWild) return r.errorMessage.endsWith(core);
+              if (endsWild) return r.errorMessage.startsWith(core);
+              return r.errorMessage === core;
+            });
+          }
           return rows.sort(
             (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
           );
@@ -1017,6 +1036,94 @@ describe("listErrorEvents — sourceKindLike prefix filter (Phase 22 #514)", () 
 
     const result = await listErrorEvents(
       { sourceKindLike: "trpc.%" },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+});
+
+describe("listErrorEvents — errorMessageLike grep filter (Phase 22 #579)", () => {
+  it("returns rows whose errorMessage contains the substring (#579)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "connection refused: db", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "timeout exceeded", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "connection refused: redis", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.errorMessageLike = "%connection refused%";
+
+    const result = await listErrorEvents(
+      { errorMessageLike: "%connection refused%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("returns rows whose errorMessage starts with the prefix (#579)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "FATAL: db is gone", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "warning: db is slow", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.errorMessageLike = "FATAL%";
+
+    const result = await listErrorEvents(
+      { errorMessageLike: "FATAL%" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("composes with errorClass + createdSince filters (ANDed) (#579)", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const cutoff = new Date("2026-04-01T00:00:00Z");
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        // Wrong errorClass: filtered out by errorClass
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "Other", errorMessage: "connection refused", metadata: null, createdAt: recent },
+        // Wrong age: filtered out by createdSince
+        { id: 2, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "connection refused", metadata: null, createdAt: old },
+        // Wrong message: filtered out by errorMessageLike
+        { id: 3, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "unrelated", metadata: null, createdAt: recent },
+        // Matches all three
+        { id: 4, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "connection refused: db", metadata: null, createdAt: recent },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.errorClass = "E";
+    state.active.createdSince = cutoff;
+    state.active.errorMessageLike = "%connection refused%";
+
+    const result = await listErrorEvents(
+      {
+        errorClass: "E",
+        createdSince: cutoff,
+        errorMessageLike: "%connection refused%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([4]);
+  });
+
+  it("returns no rows when the pattern matches nothing (#579)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "ok", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.errorMessageLike = "%nope%";
+
+    const result = await listErrorEvents(
+      { errorMessageLike: "%nope%" },
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
