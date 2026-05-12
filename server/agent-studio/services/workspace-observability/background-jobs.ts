@@ -1092,17 +1092,17 @@ export async function failStaleRunningJobs(
     .orderBy(agsWorkspaceBackgroundJobs.updatedAt) // oldest first
     .limit(limit);
 
-  const failed: BackgroundJobRow[] = [];
-  for (const { id } of stale) {
-    // Re-check status — the row may have completed between the SELECT
-    // and the UPDATE. markJobFailed force-flips regardless, but
-    // skipping here keeps the result count honest.
-    const current = await getJobById(id, options);
-    if (!current || current.status !== "running") continue;
-    const row = await markJobFailed(id, errorMessage, options);
-    failed.push(row);
-  }
-  return { failed, scanned: stale.length };
+  // Delegate per-row state-flip + error_events bridge to markJobsFailed
+  // (#565/#571). The bulk path handles the row-completed-mid-sweep race
+  // via its `not_running` skip, and emits ONE batched error_events
+  // INSERT for all failed rows instead of N — a meaningful round-trip
+  // reduction for cron sweeps. The `scanned` count remains the
+  // pre-flip select size; `failed` is just the successful subset.
+  const bulkResult = await markJobsFailed(
+    stale.map(({ id }) => ({ jobId: id, errorMessage })),
+    options,
+  );
+  return { failed: [...bulkResult.failed], scanned: stale.length };
 }
 
 export class JobNotRetryableError extends Error {
