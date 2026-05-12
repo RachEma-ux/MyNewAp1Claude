@@ -45,6 +45,14 @@ export interface RunRetentionSweepInput {
    */
   readonly errorEventsErrorMessageLike?: string;
   /**
+   * Optional SQL LIKE-style prefix filter on sourceKind for the
+   * error-events sweep. Mirrors `pruneOldErrorEvents.sourceKindLike`
+   * (#604) — cron callers can prune by source-family prefix
+   * (`trpc.chat.%`, `vault.%`) without enumerating each procedure.
+   * Composes with the other error-events sweep filters (ANDed).
+   */
+  readonly errorEventsSourceKindLike?: string;
+  /**
    * Days to retain in `ags_workspace_user_notifications`. Default 30.
    */
   readonly notificationsRetentionDays?: number;
@@ -147,6 +155,7 @@ export async function runRetentionSweep(
         olderThan: errorEventsCutoff,
         errorClass: input.errorEventsErrorClass,
         errorMessageLike: input.errorEventsErrorMessageLike,
+        sourceKindLike: input.errorEventsSourceKindLike,
       },
       { getDb: options.getDb },
     ),

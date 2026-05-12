@@ -439,6 +439,18 @@ export interface PruneOldErrorEventsInput {
    * (ANDed). Rows whose `errorMessage` is empty match `""` only.
    */
   readonly errorMessageLike?: string;
+  /**
+   * SQL LIKE-style prefix filter on `sourceKind`. Sister of
+   * `listErrorEvents.sourceKindLike` (#514) and
+   * `pruneOldBackgroundJobs.jobKindLike` (#602) +
+   * `pruneOldNotifications.notificationKindLike` (#603) on the
+   * retention side — closes the LIKE-by-kind triad on retention.
+   * Cron sweeps can prune by source-family prefix (`trpc.chat.%`,
+   * `vault.%`) without enumerating each procedure. Composes with
+   * the other filters (ANDed). NULL sourceKind is impossible
+   * (NOT NULL column) so no NULL-exclusion caveat.
+   */
+  readonly sourceKindLike?: string;
 }
 
 export interface PruneOldErrorEventsResult {
@@ -485,6 +497,11 @@ export async function pruneOldErrorEvents(
   if (input.errorMessageLike !== undefined) {
     filters.push(
       like(agsWorkspaceErrorEvents.errorMessage, input.errorMessageLike),
+    );
+  }
+  if (input.sourceKindLike !== undefined) {
+    filters.push(
+      like(agsWorkspaceErrorEvents.sourceKind, input.sourceKindLike),
     );
   }
 
