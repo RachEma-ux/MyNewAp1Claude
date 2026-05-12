@@ -14,7 +14,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceUserNotifications } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -206,4 +206,56 @@ export async function markAllNotificationsRead(
         eq(agsWorkspaceUserNotifications.read, false),
       ),
     );
+}
+
+// ---------- retention prune ----------
+
+export interface PruneOldNotificationsInput {
+  /**
+   * Delete notifications whose createdAt is strictly older than this
+   * cutoff. Caller controls the policy.
+   */
+  readonly olderThan: Date;
+  /**
+   * If true, only deletes notifications that have already been read.
+   * Default false (deletes both read and unread). Setting true is the
+   * safer policy — operators may not have triaged unread rows yet.
+   */
+  readonly readOnly?: boolean;
+}
+
+export interface PruneOldNotificationsResult {
+  readonly deletedCount: number;
+}
+
+/**
+ * Bulk-delete user notifications older than the given cutoff. Symmetric
+ * to `pruneOldErrorEvents` (PR #519) — same fail-soft contract on
+ * ASDB-null, same caller-controlled retention policy.
+ *
+ * Default `readOnly=false` deletes both read and unread rows because
+ * notifications past the cutoff are unlikely to still be useful even
+ * if unread (operator missed them; a stale "graph_quality_run_completed"
+ * from 60 days ago has no actionable signal). Operators who want to
+ * preserve unread rows pass `readOnly: true`.
+ */
+export async function pruneOldNotifications(
+  input: PruneOldNotificationsInput,
+  options: ServiceOptions = {},
+): Promise<PruneOldNotificationsResult> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return { deletedCount: 0 };
+
+  const filters = [lt(agsWorkspaceUserNotifications.createdAt, input.olderThan)];
+  if (input.readOnly) {
+    filters.push(eq(agsWorkspaceUserNotifications.read, true));
+  }
+
+  const deleted = await db
+    .delete(agsWorkspaceUserNotifications)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .returning({ id: agsWorkspaceUserNotifications.id });
+
+  return { deletedCount: deleted.length };
 }

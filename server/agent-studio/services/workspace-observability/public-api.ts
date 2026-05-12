@@ -32,6 +32,7 @@ export {
   countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  pruneOldNotifications,
   AsdbUnavailableError as UserNotificationsAsdbUnavailableError,
 } from "./user-notifications.js";
 export type {
@@ -39,6 +40,8 @@ export type {
   ListNotificationsInput,
   NotificationRow,
   UnreadNotificationCount,
+  PruneOldNotificationsInput,
+  PruneOldNotificationsResult,
 } from "./user-notifications.js";
 
 export {
