@@ -24,7 +24,9 @@ import {
   getJobById,
   listJobs,
   markJobCancelled,
+  retryJob,
   JobNotFoundError,
+  JobNotRetryableError,
 } from "./background-jobs.js";
 import {
   listNotifications,
@@ -106,6 +108,31 @@ export const workspaceObservabilityRouter = router({
       } catch (e) {
         if (e instanceof JobNotFoundError) {
           throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
+        }
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  retryBackgroundJob: protectedProcedure
+    .input(z.object({ jobId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await retryJob(input.jobId);
+      } catch (e) {
+        if (e instanceof JobNotFoundError) {
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
+        }
+        if (e instanceof JobNotRetryableError) {
+          // The status invariant is part of the operator contract;
+          // surface PRECONDITION_FAILED so the UI can render a clean
+          // "only failed jobs can be retried" message.
+          throwTrpcAndCapture(new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: e.message,
+          }));
         }
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

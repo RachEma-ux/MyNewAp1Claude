@@ -261,6 +261,47 @@ export async function markJobCancelled(
   return transitionStatus(jobId, { status: "cancelled" }, options);
 }
 
+export class JobNotRetryableError extends Error {
+  constructor(
+    public readonly jobId: number,
+    public readonly currentStatus: JobStatus,
+  ) {
+    super(
+      `Background job ${jobId} cannot be retried (status='${currentStatus}'); only 'failed' jobs are retryable`,
+    );
+    this.name = "JobNotRetryableError";
+  }
+}
+
+/**
+ * Operator-triggered retry: flip a `failed` job back to `pending`
+ * so the next worker pickup re-attempts it. The original row is
+ * preserved (no new INSERT) and its `lastError` is cleared, but
+ * `attempts` is left intact so the retry-storm signal that
+ * `markJobStarted` increments stays accurate over the job's
+ * lifetime.
+ *
+ * Refuses to retry jobs that aren't currently `failed` —
+ * re-pendifying a `running` or `completed` job would shadow
+ * in-flight work or lose terminal state. Operators retry
+ * `cancelled` jobs by re-enqueuing instead (different intent).
+ */
+export async function retryJob(
+  jobId: number,
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow> {
+  const current = await getJobById(jobId, options);
+  if (!current) throw new JobNotFoundError(jobId);
+  if (current.status !== "failed") {
+    throw new JobNotRetryableError(jobId, current.status);
+  }
+  return transitionStatus(
+    jobId,
+    { status: "pending", lastError: null },
+    options,
+  );
+}
+
 // ---------- retention prune ----------
 
 export interface PruneOldBackgroundJobsInput {

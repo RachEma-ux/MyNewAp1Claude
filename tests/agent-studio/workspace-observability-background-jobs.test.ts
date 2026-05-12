@@ -14,9 +14,11 @@ import {
   markJobCompleted,
   markJobFailed,
   markJobCancelled,
+  retryJob,
   pruneOldBackgroundJobs,
   AsdbUnavailableError,
   JobNotFoundError,
+  JobNotRetryableError,
 } from "../../server/agent-studio/services/workspace-observability/background-jobs";
 
 interface FakeRow {
@@ -398,6 +400,86 @@ describe("state transitions — Phase 22", () => {
     state.active.jobId = 7;
     const result = await markJobCancelled(7, { getDb: () => db as never });
     expect(result.status).toBe("cancelled");
+  });
+
+  it("retryJob flips a failed job back to pending + clears lastError, attempts unchanged", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "failed",
+          attempts: 3,
+          lastError: "boom",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId", "byId");
+    state.active.jobId = 7;
+    const result = await retryJob(7, { getDb: () => db as never });
+    expect(result.status).toBe("pending");
+    expect(result.lastError).toBeNull();
+    // attempts is preserved by retryJob; markJobStarted bumps it on next pickup.
+    expect(result.attempts).toBe(3);
+  });
+
+  it("retryJob throws JobNotFoundError when row is missing", async () => {
+    const { db, state } = makeFakeDb({});
+    state.selectQueue.push("byId");
+    state.active.jobId = 999;
+    await expect(
+      retryJob(999, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotFoundError);
+  });
+
+  it("retryJob refuses to retry a non-failed job (running)", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "running",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    await expect(
+      retryJob(7, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotRetryableError);
+  });
+
+  it("retryJob refuses to retry a completed job", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "completed",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    await expect(
+      retryJob(7, { getDb: () => db as never }),
+    ).rejects.toBeInstanceOf(JobNotRetryableError);
   });
 
   it("transition throws JobNotFoundError when row is missing", async () => {
