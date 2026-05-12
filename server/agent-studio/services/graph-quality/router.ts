@@ -35,7 +35,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull, isNotNull, inArray } from "drizzle-orm";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../../../_core/trpc.js";
 import { getAsDb } from "../../db/connection.js";
 import {
   agsGraphQualityScans,
@@ -593,6 +593,64 @@ export const graphQualityRouter = router({
       }
       return trail;
     }),
+
+  // ── Retention (Phase 22 follow-up #657 + #658 + #659) ────────────
+  //
+  // Operator surface for `ags_graph_quality_scans` retention. Sister
+  // of `runs.pruneRetention` (#623), `simulation.pruneRetention`
+  // (#651), `testing.pruneRetention` (#655). adminProcedure because
+  // the cron + sweep operate across all scanners.
+  pruneScansRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "pending",
+                "running",
+                "completed",
+                "failed",
+                "cancelled",
+              ]),
+            )
+            .max(5)
+            .optional(),
+          scanKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+          scope: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldGraphQualityScans } = await import(
+        "../graph-quality-scans-retention.js"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldGraphQualityScans({
+        olderThan,
+        statuses: input?.statuses,
+        scanKind: input?.scanKind,
+        scope: input?.scope,
+      });
+    }),
+  getScansRetentionCronStatus: adminProcedure.query(async () => {
+    const { getGraphQualityScansRetentionCronStatus } = await import(
+      "../graph-quality-scans-retention-cron.js"
+    );
+    return getGraphQualityScansRetentionCronStatus();
+  }),
 });
 
 export type GraphQualityRouter = typeof graphQualityRouter;
