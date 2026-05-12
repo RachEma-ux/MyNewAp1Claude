@@ -265,6 +265,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.9: Phase 22 follow-up #630 — mcp-transitions retention cron.
+  // The ags_mcp_transitions table had no retention before #629 + #630.
+  // Default daily 06:00 UTC sweep — 4th slot in the daily-sweep ladder
+  // (03:00 ws-obs / 04:00 runtime-runs / 05:00 tool-call-traces /
+  // 06:00 mcp-transitions). Env-flag-gated via
+  // AGS_MCP_TRANSITIONS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureMcpTransitionsRetentionCronStarted } = await import(
+      "./services/mcp-transitions-retention-cron"
+    );
+    ensureMcpTransitionsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-mcp-transitions-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
