@@ -952,6 +952,56 @@ const runsRouter = router({
     );
     return getRuntimeRunsRetentionCronStatus();
   }),
+
+  // ── Tool-call-traces retention (Phase 22 follow-up #625 + #626 + #627) ──
+  //
+  // Sister of runs.pruneRetention / runs.getRetentionCronStatus on the
+  // ags_tool_call_traces table. Same adminProcedure pattern + same
+  // shape conventions. dispatchResults filter defaults to ["ok"] on
+  // the service side (forensic-preserving — see #625 doc-block).
+  pruneToolCallTracesRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          dispatchResults: z
+            .array(z.enum(["ok", "error", "blocked"]))
+            .max(3)
+            .optional(),
+          workspaceId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldToolCallTraces } = await import(
+        "../services/tool-call-traces-retention"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldToolCallTraces({
+        olderThan,
+        dispatchResults: input?.dispatchResults,
+        workspaceId: input?.workspaceId,
+        agentId: input?.agentId,
+      });
+    }),
+  getToolCallTracesRetentionCronStatus: adminProcedure.query(async () => {
+    const { getToolCallTracesRetentionCronStatus } = await import(
+      "../services/tool-call-traces-retention-cron"
+    );
+    return getToolCallTracesRetentionCronStatus();
+  }),
 });
 
 // ── Versions ────────────────────────────────────────────────────────────────
