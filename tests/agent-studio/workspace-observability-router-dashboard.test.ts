@@ -305,4 +305,26 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards recentErrorEventsSourceKindLike (#601)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({
+      recentErrorEventsSourceKindLike: "trpc.chat.%",
+    });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsSourceKindLike: "trpc.chat.%",
+    });
+  });
+
+  it("rejects empty recentErrorEventsSourceKindLike at the input layer (#601)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await expect(
+      caller.getDashboard({ recentErrorEventsSourceKindLike: "" }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

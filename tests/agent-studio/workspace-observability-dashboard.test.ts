@@ -515,6 +515,43 @@ describe("getObservabilityDashboard", () => {
     expect(args.sourceId).toBeUndefined();
   });
 
+  it("forwards recentErrorEventsSourceKindLike to listErrorEvents (#601)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsSourceKindLike: "trpc.chat.%",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKindLike: "trpc.chat.%" }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentErrorEventsSourceKindLike composes with errorClass + errorMessageLike (#601)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsSourceKindLike: "trpc.%",
+      errorClass: "BackgroundJobFailed",
+      errorMessageLike: "%timeout%",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      {
+        limit: 20,
+        errorClass: "BackgroundJobFailed",
+        sourceKind: undefined,
+        sourceKindLike: "trpc.%",
+        errorMessageLike: "%timeout%",
+        createdSince: undefined,
+        userIdIsNull: undefined,
+        sourceId: undefined,
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("undefined recentErrorEventsSourceKindLike means no sourceKindLike filter (#601)", async () => {
+    await getObservabilityDashboard({});
+    const args = listErrorsMock.mock.calls[0]?.[0] as { sourceKindLike?: string };
+    expect(args.sourceKindLike).toBeUndefined();
+  });
+
   it("recentFailedLastErrorLike scopes ONLY the failed slice, not completed (#587)", async () => {
     await getObservabilityDashboard({
       recentFailedLastErrorLike: "%OOM%",
