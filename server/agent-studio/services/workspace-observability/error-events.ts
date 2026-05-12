@@ -12,7 +12,7 @@
  * ADR: docs/architecture/agent-studio-native-graph-workspace.md
  */
 
-import { and, desc, eq, like, lt } from "drizzle-orm";
+import { and, desc, eq, gte, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
 
@@ -111,6 +111,13 @@ export interface ListErrorEventsInput {
   readonly errorClass?: string;
   readonly userId?: number;
   readonly limit?: number;
+  /**
+   * Restrict to events whose `createdAt` is at-or-after this
+   * timestamp. Symmetric with `listJobs.createdSince` (#536) — lets
+   * operators query "what error events have we captured since the
+   * last incident report" without computing the cutoff client-side.
+   */
+  readonly createdSince?: Date;
 }
 
 export async function listErrorEvents(
@@ -132,6 +139,9 @@ export async function listErrorEvents(
   }
   if (input.userId !== undefined) {
     filters.push(eq(agsWorkspaceErrorEvents.userId, input.userId));
+  }
+  if (input.createdSince !== undefined) {
+    filters.push(gte(agsWorkspaceErrorEvents.createdAt, input.createdSince));
   }
 
   const rows = await db

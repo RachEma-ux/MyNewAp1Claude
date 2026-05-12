@@ -48,7 +48,12 @@ interface NotifState {
   rows: NotifRow[];
   nextId: number;
   selectQueue: Array<"list">;
-  active: { userId?: number; unreadOnly?: boolean; kind?: string };
+  active: {
+    userId?: number;
+    unreadOnly?: boolean;
+    kind?: string;
+    createdSince?: Date;
+  };
 }
 
 interface ErrState {
@@ -60,6 +65,7 @@ interface ErrState {
     sourceKindLike?: string;
     errorClass?: string;
     userId?: number;
+    createdSince?: Date;
   };
 }
 
@@ -91,6 +97,10 @@ function makeNotifFakeDb(initial?: Partial<NotifState>) {
           if (state.active.unreadOnly) rows = rows.filter((r) => !r.read);
           if (state.active.kind !== undefined) {
             rows = rows.filter((r) => r.notificationKind === state.active.kind);
+          }
+          if (state.active.createdSince !== undefined) {
+            const cutoff = state.active.createdSince.getTime();
+            rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
           }
           return rows.sort(
             (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
@@ -222,6 +232,40 @@ describe("user-notifications — Phase 22", () => {
     expect(result.insertedCount).toBe(3);
     expect(state.rows.length).toBe(3);
     expect(state.rows.every((r) => r.userId === 7)).toBe(true);
+  });
+
+  it("listNotifications filters by createdSince when supplied", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const { db, state } = makeNotifFakeDb({
+      rows: [
+        {
+          id: 1,
+          userId: 42,
+          notificationKind: "x",
+          payload: null,
+          read: false,
+          createdAt: old,
+        },
+        {
+          id: 2,
+          userId: 42,
+          notificationKind: "x",
+          payload: null,
+          read: false,
+          createdAt: recent,
+        },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.userId = 42;
+    state.active.createdSince = new Date("2026-04-01T00:00:00Z");
+    const result = await listNotifications(
+      { userId: 42, createdSince: new Date("2026-04-01T00:00:00Z") },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
   });
 
   it("listNotifications filters by user + unreadOnly + kind", async () => {
@@ -423,6 +467,10 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
           if (state.active.errorClass !== undefined) {
             rows = rows.filter((r) => r.errorClass === state.active.errorClass);
           }
+          if (state.active.createdSince !== undefined) {
+            const cutoff = state.active.createdSince.getTime();
+            rows = rows.filter((r) => r.createdAt.getTime() >= cutoff);
+          }
           return rows.sort(
             (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
           );
@@ -607,6 +655,49 @@ describe("listErrorEvents — sourceKindLike prefix filter (Phase 22 #514)", () 
       { getDb: () => db as never },
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("listErrorEvents — createdSince date-window filter (Phase 22 #537)", () => {
+  it("returns only rows whose createdAt is at-or-after the cutoff", async () => {
+    const old = new Date("2026-01-01T00:00:00Z");
+    const recent = new Date("2026-05-12T00:00:00Z");
+    const cutoff = new Date("2026-04-01T00:00:00Z");
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "old", metadata: null, createdAt: old },
+        { id: 2, sourceKind: "x", sourceId: null, userId: null, errorClass: "E", errorMessage: "recent", metadata: null, createdAt: recent },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.createdSince = cutoff;
+    const result = await listErrorEvents(
+      { createdSince: cutoff },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
+  });
+
+  it("composes with sourceKindLike (AND semantics)", async () => {
+    const now = new Date();
+    const old = new Date(now.getTime() - 1_000_000_000);
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "E", errorMessage: "old-trpc", metadata: null, createdAt: old },
+        { id: 2, sourceKind: "trpc.chat.send", sourceId: null, userId: null, errorClass: "E", errorMessage: "fresh-trpc", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "vault.router", sourceId: null, userId: null, errorClass: "E", errorMessage: "fresh-vault", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKindLike = "trpc.%";
+    state.active.createdSince = new Date(now.getTime() - 100_000);
+    const result = await listErrorEvents(
+      { sourceKindLike: "trpc.%", createdSince: new Date(now.getTime() - 100_000) },
+      { getDb: () => db as never },
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(2);
   });
 });
 
