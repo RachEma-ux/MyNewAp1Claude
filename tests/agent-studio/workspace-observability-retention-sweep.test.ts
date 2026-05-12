@@ -213,6 +213,28 @@ describe("runRetentionSweep", () => {
     ]);
   });
 
+  it("passes errorEventsSourceKindLike through to the errors prune (#604)", async () => {
+    await runRetentionSweep(
+      { errorEventsSourceKindLike: "trpc.chat.%" },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0].sourceKindLike).toBe("trpc.chat.%");
+  });
+
+  it("ANDs errorEventsSourceKindLike with errorEventsErrorClass (#604)", async () => {
+    await runRetentionSweep(
+      {
+        errorEventsSourceKindLike: "vault.%",
+        errorEventsErrorClass: "ValidationError",
+      },
+      { now: new Date() },
+    );
+    expect(pruneErrorMock.mock.calls[0][0]).toMatchObject({
+      sourceKindLike: "vault.%",
+      errorClass: "ValidationError",
+    });
+  });
+
   it("runs all three prunes in parallel (not serially)", async () => {
     const callOrder: string[] = [];
     pruneErrorMock.mockImplementationOnce(async () => {
