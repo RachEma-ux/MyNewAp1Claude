@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
+  zeroFillErrorEventsTrend,
 } from "../../server/agent-studio/services/workspace-observability/stats";
 
 interface SeededBuckets {
@@ -15,6 +16,7 @@ interface SeededBuckets {
   jobsByKind?: { jobKind: string; count: number }[];
   notificationsByKind?: { notificationKind: string; count: number }[];
   notificationsByReadState?: { read: boolean | null; count: number }[];
+  errorEventsByDay?: { day: string; count: number }[];
 }
 
 function makeFakeDb(seeded: SeededBuckets = {}) {
@@ -32,6 +34,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     | "jobKind"
     | "notifKind"
     | "notifRead"
+    | "errorDay"
     | null = null;
 
   const select = vi.fn((shape: Record<string, unknown>) => {
@@ -41,10 +44,11 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     else if ("jobKind" in shape) nextSelectKind = "jobKind";
     else if ("notificationKind" in shape) nextSelectKind = "notifKind";
     else if ("read" in shape) nextSelectKind = "notifRead";
+    else if ("day" in shape) nextSelectKind = "errorDay";
 
     return {
-      from: (_t: unknown) => ({
-        groupBy: async (_g: unknown) => {
+      from: (_t: unknown) => {
+        const resolver = async () => {
           switch (nextSelectKind) {
             case "errorSource":
               return seeded.errorEventsBySourceKind ?? [];
@@ -58,11 +62,17 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
               return seeded.notificationsByKind ?? [];
             case "notifRead":
               return seeded.notificationsByReadState ?? [];
+            case "errorDay":
+              return seeded.errorEventsByDay ?? [];
             default:
               return [];
           }
-        },
-      }),
+        };
+        return {
+          groupBy: resolver,
+          where: () => ({ groupBy: resolver }),
+        };
+      },
     };
   });
 
@@ -217,5 +227,58 @@ describe("rollupSourceKindsByLane — pure helper", () => {
         "graphQuality.scanOrchestrator": 2,
       }),
     ).toEqual({ trpc: 5, vault: 3, graphQuality: 2 });
+  });
+});
+
+describe("getWorkspaceObservabilityStats — errorEventsByDay trend", () => {
+  it("zero-fills the 14-day window when DB returns no rows", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByDay).toHaveLength(14);
+    expect(stats.errorEventsByDay.every((b) => b.count === 0)).toBe(true);
+    const dates = stats.errorEventsByDay.map((b) => b.date);
+    expect(dates).toEqual([...dates].sort());
+  });
+
+  it("merges DB day-bucket counts into the zero-filled window", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      errorEventsByDay: [{ day: today, count: 4 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    const todayBucket = stats.errorEventsByDay.find((b) => b.date === today);
+    expect(todayBucket?.count).toBe(4);
+    const others = stats.errorEventsByDay.filter((b) => b.date !== today);
+    expect(others.every((b) => b.count === 0)).toBe(true);
+  });
+});
+
+describe("zeroFillErrorEventsTrend — pure helper", () => {
+  const now = new Date("2026-05-12T08:00:00Z");
+
+  it("returns N consecutive days oldest-first, all zero when raw is empty", () => {
+    const result = zeroFillErrorEventsTrend({}, 3, now);
+    expect(result).toEqual([
+      { date: "2026-05-10", count: 0 },
+      { date: "2026-05-11", count: 0 },
+      { date: "2026-05-12", count: 0 },
+    ]);
+  });
+
+  it("merges raw counts onto matching date keys + drops out-of-window entries", () => {
+    const result = zeroFillErrorEventsTrend(
+      { "2026-04-15": 999, "2026-05-11": 7, "2026-05-12": 3 },
+      3,
+      now,
+    );
+    expect(result).toEqual([
+      { date: "2026-05-10", count: 0 },
+      { date: "2026-05-11", count: 7 },
+      { date: "2026-05-12", count: 3 },
+    ]);
   });
 });
