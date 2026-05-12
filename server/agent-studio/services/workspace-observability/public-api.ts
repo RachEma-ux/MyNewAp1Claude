@@ -47,6 +47,7 @@ export {
   pushNotification,
   pushNotificationToUsers,
   getNotificationById,
+  getNotificationsByIds,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,

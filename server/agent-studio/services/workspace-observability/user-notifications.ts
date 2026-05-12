@@ -126,6 +126,46 @@ export async function getNotificationById(
   return rowToNotification(rows[0]);
 }
 
+/**
+ * Bulk reader sibling of getNotificationById (#557). Sister of
+ * getJobsByIds (#559) on the notifications surface. Lets a UI fetch
+ * row payloads for a multi-select in one round-trip.
+ *
+ * Empty input short-circuits to [] with no DB call. The optional
+ * userId scope applies the same id-enumeration guard as the singleton:
+ * peer rows are silently excluded from the result (indistinguishable
+ * from "not found").
+ */
+export async function getNotificationsByIds(
+  notificationIds: readonly number[],
+  options: ServiceOptions & { readonly userId?: number } = {},
+): Promise<NotificationRow[]> {
+  if (notificationIds.length === 0) return [];
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const filters = [
+    inArray(agsWorkspaceUserNotifications.id, notificationIds as number[]),
+  ];
+  if (options.userId !== undefined) {
+    filters.push(eq(agsWorkspaceUserNotifications.userId, options.userId));
+  }
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceUserNotifications.id,
+      userId: agsWorkspaceUserNotifications.userId,
+      notificationKind: agsWorkspaceUserNotifications.notificationKind,
+      payload: agsWorkspaceUserNotifications.payload,
+      read: agsWorkspaceUserNotifications.read,
+      createdAt: agsWorkspaceUserNotifications.createdAt,
+    })
+    .from(agsWorkspaceUserNotifications)
+    .where(filters.length === 1 ? filters[0] : and(...filters));
+  return rows.map(rowToNotification);
+}
+
 export interface PushNotificationToUsersInput {
   /**
    * Recipient user ids. Empty array short-circuits to a no-op (no

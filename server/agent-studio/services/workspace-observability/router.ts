@@ -34,6 +34,7 @@ import {
 } from "./background-jobs.js";
 import {
   getNotificationById,
+  getNotificationsByIds,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -322,6 +323,30 @@ export const workspaceObservabilityRouter = router({
         return row;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getMyNotificationsByIds: protectedProcedure
+    .input(
+      z.object({
+        notificationIds: z.array(z.number().int().positive()).min(0).max(200),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id;
+      // userId-scoped — peer rows silently excluded from result (#557
+      // id-enumeration guard).
+      if (userId == null) return [];
+      try {
+        return await getNotificationsByIds(input.notificationIds, {
+          userId,
+        });
+      } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),

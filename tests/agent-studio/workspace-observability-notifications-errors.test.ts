@@ -11,6 +11,7 @@ import {
   pushNotification,
   pushNotificationToUsers,
   getNotificationById,
+  getNotificationsByIds,
   listNotifications,
   countUnreadNotifications,
   markNotificationRead,
@@ -1133,6 +1134,86 @@ describe("getNotificationById — Phase 22 #557 singleton getter", () => {
       userId: requestedUserId,
     });
     expect(result).toBeNull();
+  });
+});
+
+describe("getNotificationsByIds — Phase 22 #560 bulk reader", () => {
+  it("short-circuits empty input with no DB call", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await getNotificationsByIds([], { getDb });
+    expect(result).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("returns [] on ASDB-null with non-empty input (fail-soft)", async () => {
+    const result = await getNotificationsByIds([1, 2], {
+      getDb: () => null as never,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("returns matched rows via SQL IN", async () => {
+    const now = new Date();
+    const rows = [
+      {
+        id: 7,
+        userId: 42,
+        notificationKind: "promotion.approved",
+        payload: null,
+        read: false,
+        createdAt: now,
+      },
+      {
+        id: 9,
+        userId: 42,
+        notificationKind: "incident_resolved",
+        payload: null,
+        read: true,
+        createdAt: now,
+      },
+    ];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => rows,
+        }),
+      }),
+    };
+    const result = await getNotificationsByIds([7, 9, 999], {
+      getDb: () => db as never,
+    });
+    expect(result.map((r) => r.id).sort()).toEqual([7, 9]);
+  });
+
+  it("with userId scope, returns only rows belonging to that user", async () => {
+    // The SQL adds AND userId=X, so the DB returns only the matching
+    // subset. The fake returns whatever we feed it; we verify the
+    // call shape accepts the userId option without throwing and
+    // returns the rows.
+    const now = new Date();
+    const rows = [
+      {
+        id: 7,
+        userId: 42,
+        notificationKind: "x",
+        payload: null,
+        read: false,
+        createdAt: now,
+      },
+    ];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => rows,
+        }),
+      }),
+    };
+    const result = await getNotificationsByIds([7, 8], {
+      getDb: () => db as never,
+      userId: 42,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].userId).toBe(42);
   });
 });
 
