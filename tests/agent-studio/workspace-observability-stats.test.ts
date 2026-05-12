@@ -16,6 +16,7 @@ interface SeededBuckets {
   errorEventsByErrorClass?: { errorClass: string; count: number }[];
   jobsByStatus?: { status: string; count: number }[];
   jobsByKind?: { jobKind: string; count: number }[];
+  failedJobsByKind?: { jobKind: string; count: number }[];
   notificationsByKind?: { notificationKind: string; count: number }[];
   notificationsByReadState?: { read: boolean | null; count: number }[];
   errorEventsByDay?: { day: string; count: number }[];
@@ -52,7 +53,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     return {
       from: (t: unknown) => {
         const tn = tableName(t);
-        const resolver = async () => {
+        const make = (whereCalled: boolean) => async () => {
           switch (nextSelectKind) {
             case "errorSource":
               return seeded.errorEventsBySourceKind ?? [];
@@ -61,6 +62,9 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
             case "jobStatus":
               return seeded.jobsByStatus ?? [];
             case "jobKind":
+              // The failed-only jobsByKind query uses .where(); the
+              // total-jobsByKind query doesn't. Use that to dispatch.
+              if (whereCalled) return seeded.failedJobsByKind ?? [];
               return seeded.jobsByKind ?? [];
             case "notifKind":
               return seeded.notificationsByKind ?? [];
@@ -76,8 +80,8 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
           }
         };
         return {
-          groupBy: resolver,
-          where: () => ({ groupBy: resolver }),
+          groupBy: make(false),
+          where: () => ({ groupBy: make(true) }),
         };
       },
     };
@@ -245,6 +249,51 @@ describe("rollupSourceKindsByLane — pure helper", () => {
         importScan: 7,
       }),
     ).toEqual({ projection: 4, retention: 2, importScan: 7 });
+  });
+});
+
+describe("getWorkspaceObservabilityStats — failedJobsByKind sub-stat", () => {
+  it("buckets only the failed-status rows by jobKind", async () => {
+    const { db } = makeFakeDb({
+      jobsByKind: [
+        { jobKind: "projection.rebuild", count: 12 },
+        { jobKind: "projection.sync", count: 4 },
+        { jobKind: "retention.sweep", count: 2 },
+      ],
+      failedJobsByKind: [
+        { jobKind: "projection.rebuild", count: 3 },
+        { jobKind: "retention.sweep", count: 1 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    // Total-of-kind unchanged
+    expect(stats.jobsByKind).toEqual({
+      "projection.rebuild": 12,
+      "projection.sync": 4,
+      "retention.sweep": 2,
+    });
+    // Failed-of-kind shows the breakage subset only
+    expect(stats.failedJobsByKind).toEqual({
+      "projection.rebuild": 3,
+      "retention.sweep": 1,
+    });
+  });
+
+  it("returns an empty failedJobsByKind when nothing is failed", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.failedJobsByKind).toEqual({});
+  });
+
+  it("returns an empty failedJobsByKind on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.failedJobsByKind).toEqual({});
   });
 });
 

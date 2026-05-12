@@ -74,6 +74,14 @@ export interface WorkspaceObservabilityStats {
    *   importScan → "importScan" + 1 (no dot → key is itself)
    */
   readonly jobsByLane: Record<string, number>;
+  /**
+   * Failed-only subset of `jobsByKind`: counts only rows where
+   * `status='failed'`, bucketed by jobKind. Lets the dashboard answer
+   * "which kinds of jobs are breaking right now" without the operator
+   * having to mentally subtract completed-of-kind from total-of-kind.
+   * Empty `{}` when no failed jobs are recorded.
+   */
+  readonly failedJobsByKind: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
   /**
    * Lane rollup of `notificationsByKind` by the first dot-separated
@@ -108,6 +116,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   jobsByStatus: {},
   jobsByKind: {},
   jobsByLane: {},
+  failedJobsByKind: {},
   notificationsByKind: {},
   notificationsByLane: {},
   notificationsByReadState: { read: 0, unread: 0 },
@@ -205,6 +214,7 @@ export async function getWorkspaceObservabilityStats(
     notificationsByReadStateRows,
     errorEventsTrendRows,
     jobsTrendRows,
+    failedJobsByKindRows,
   ] = await Promise.all([
     db
       .select({
@@ -268,6 +278,14 @@ export async function getWorkspaceObservabilityStats(
         sql`${agsWorkspaceBackgroundJobs.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
       )
       .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.createdAt}) AT TIME ZONE 'UTC'`),
+    db
+      .select({
+        jobKind: agsWorkspaceBackgroundJobs.jobKind,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(sql`${agsWorkspaceBackgroundJobs.status} = 'failed'`)
+      .groupBy(agsWorkspaceBackgroundJobs.jobKind),
   ]);
 
   const errorEventsBySourceKind = bucketize(
@@ -308,6 +326,7 @@ export async function getWorkspaceObservabilityStats(
     jobsByStatus,
     jobsByKind,
     jobsByLane: rollupByLane(jobsByKind),
+    failedJobsByKind: bucketize(failedJobsByKindRows, "jobKind"),
     notificationsByKind,
     notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByReadState: { read: readCount, unread: unreadCount },
