@@ -101,6 +101,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="cron-status">Cron Status</TabsTrigger>
           <TabsTrigger value="observability-stats">Observability Stats</TabsTrigger>
           <TabsTrigger value="observability-dashboard">Observability Dashboard</TabsTrigger>
+          <TabsTrigger value="admin-sweeps">Admin Sweeps</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -126,6 +127,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="observability-dashboard">
           <ObservabilityDashboardPanel />
+        </TabsContent>
+        <TabsContent value="admin-sweeps">
+          <AdminSweepsPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -1156,6 +1160,134 @@ function ObservabilityDashboardPanel() {
           )}
         />
       </div>
+    </div>
+  );
+}
+
+// ── Admin Sweeps (Phase 22 follow-up #618) ────────────────────────────
+//
+// Operator-triggered "Run Now" buttons for the two scheduled sweep
+// crons. The crons fire on their own (#612 daily 03:00, #613 every
+// 10 min), but operators occasionally want to flush rows on demand
+// (post-incident cleanup, pre-demo prep, e2e test seeding). Bypasses
+// the cron schedule + dedup contract — every click is a fresh sweep.
+//
+// Confirmation dialog on each click since these are destructive
+// (retention DELETEs rows; stale-running flips running→failed and
+// bridges into error_events). Result toast shows the row counts so
+// operators can verify the sweep did what they expected.
+
+function AdminSweepsPanel() {
+  const [retentionResult, setRetentionResult] = useState<
+    { errorEventsDeleted: number; notificationsDeleted: number; backgroundJobsDeleted: number } | null
+  >(null);
+  const [staleResult, setStaleResult] = useState<
+    { scanned: number; failedCount: number } | null
+  >(null);
+
+  const retentionMut =
+    trpc.agentStudio.workspaceObservability.runRetentionSweep.useMutation({
+      onSuccess: (data) => {
+        setRetentionResult({
+          errorEventsDeleted: data.errorEventsDeleted,
+          notificationsDeleted: data.notificationsDeleted,
+          backgroundJobsDeleted: data.backgroundJobsDeleted,
+        });
+        toast.success(
+          `Retention sweep complete — ${
+            data.errorEventsDeleted + data.notificationsDeleted + data.backgroundJobsDeleted
+          } row(s) deleted`,
+        );
+      },
+      onError: (err) =>
+        toast.error(`Retention sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  const staleMut =
+    trpc.agentStudio.workspaceObservability.failStaleRunningBackgroundJobs.useMutation({
+      onSuccess: (data) => {
+        setStaleResult({ scanned: data.scanned, failedCount: data.failed.length });
+        toast.success(
+          `Stale-running sweep complete — ${data.failed.length} job(s) auto-failed (of ${data.scanned} scanned)`,
+        );
+      },
+      onError: (err) =>
+        toast.error(`Stale-running sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Retention sweep card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Retention sweep (manual)</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Bypasses the daily 03:00 UTC cron. Uses default 30-day windows
+            on all three tables (error_events / notifications / background_jobs).
+            Bypasses cron dedup — fires a fresh sweep regardless of when
+            the schedule last ran.
+          </div>
+          <Button
+            size="sm"
+            disabled={retentionMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Run a 30-day retention sweep now? This DELETEs rows older than the cutoff from all three workspace-observability tables.",
+                )
+              ) {
+                retentionMut.mutate({});
+              }
+            }}
+          >
+            {retentionMut.isPending ? "Sweeping…" : "Run retention sweep now"}
+          </Button>
+          {retentionResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs">
+              <div className="text-zinc-400 uppercase mb-1">Last run</div>
+              <div>error_events deleted: {retentionResult.errorEventsDeleted}</div>
+              <div>notifications deleted: {retentionResult.notificationsDeleted}</div>
+              <div>background_jobs deleted: {retentionResult.backgroundJobsDeleted}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Stale-running sweep card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Stale-running sweep (manual)</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Bypasses the 10-minute cron. Uses default 30-minute staleness
+            threshold — running rows with no heartbeat older than now-30min
+            are flipped to `failed` and a bridging error_event row is recorded.
+          </div>
+          <Button
+            size="sm"
+            disabled={staleMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Run a stale-running sweep now? This auto-FAILS background jobs stuck in status='running' with no heartbeat in the last 30 minutes.",
+                )
+              ) {
+                staleMut.mutate({
+                  olderThan: new Date(Date.now() - 30 * 60_000),
+                });
+              }
+            }}
+          >
+            {staleMut.isPending ? "Sweeping…" : "Run stale-running sweep now"}
+          </Button>
+          {staleResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs">
+              <div className="text-zinc-400 uppercase mb-1">Last run</div>
+              <div>scanned: {staleResult.scanned}</div>
+              <div>jobs auto-failed: {staleResult.failedCount}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
