@@ -75,6 +75,13 @@ export {
   rollupSourceKindsByLane,
   zeroFillErrorEventsTrend,
 } from "./stats.js";
+
+export { runRetentionSweep } from "./retention-sweep.js";
+export type {
+  RunRetentionSweepInput,
+  RunRetentionSweepResult,
+  RunRetentionSweepOptions,
+} from "./retention-sweep.js";
 export type {
   WorkspaceObservabilityStats,
   WorkspaceObservabilityStatsOptions,
