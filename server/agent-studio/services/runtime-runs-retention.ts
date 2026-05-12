@@ -16,12 +16,15 @@
  *    (`completed`, `failed`, `cancelled` — runtime runs can ALSO
  *    finish in `awaiting_approval` permanently if abandoned, but
  *    operators want those preserved for audit)
- *  - Cascade-deletes 5 sibling tables that key on `runId`:
- *      agsRuntimeRunSteps     (per-step trace)
- *      agsRuntimeToolCalls    (tool dispatch trace)
- *      agsRuntimeMemoryEvents (memory writes per run)
- *      agsRuntimePolicyEvents (governance decisions per run)
+ *  - Cascade-deletes 6 sibling tables that key on `runtimeRunId`:
+ *      agsRuntimeRunSteps       (per-step trace)
+ *      agsRuntimeToolCalls      (tool dispatch trace)
+ *      agsRuntimeMemoryEvents   (memory writes per run)
+ *      agsRuntimePolicyEvents   (governance decisions per run)
  *      agsRuntimeHookExecutions (hook invocations per run)
+ *      agsRuntimeGraphEvents    (Phase 14 Native Graph Workspace
+ *                                projection events emitted by the
+ *                                graph-agent per runtime trace)
  *    Deletion order: children first, then parent (no FK constraint,
  *    but orphans are visually confusing in the operator UI when a
  *    sub-table query returns rows for a non-existent run).
@@ -30,6 +33,12 @@
  *    Tool calls / memory events / policy events / hook executions
  *    were silently orphaned on every sweep. Operators querying the
  *    sub-tables would see rows pointing at deleted runIds.
+ *  - **#643 fix:** same shape as #637, this time for
+ *    `agsRuntimeGraphEvents` — the Native Graph Workspace (Phase 14)
+ *    added this table after the #637 audit, and it was missed by the
+ *    initial cascade extension. The graph-agent writes one row per
+ *    runtime trace + decision trace event; without this cascade,
+ *    every sweep silently orphans graph-event rows.
  *  - Adds `environment` filter — runtime runs are partitioned across
  *    `draft` / `staging` / `production` and operators usually want
  *    distinct retention windows per environment (longer for prod)
@@ -51,6 +60,7 @@ import {
   agsRuntimePolicyEvents,
   agsRuntimeHookExecutions,
 } from "../../../drizzle/tables/agent-studio.js";
+import { agsRuntimeGraphEvents } from "../../../drizzle/tables/agent-studio-graph-projection.js";
 
 export type RuntimeRunStatus =
   | "queued"
@@ -76,6 +86,7 @@ const ZERO_RESULT: PruneOldRuntimeRunsResult = {
   deletedMemoryEventsCount: 0,
   deletedPolicyEventsCount: 0,
   deletedHookExecutionsCount: 0,
+  deletedGraphEventsCount: 0,
 };
 
 export interface PruneOldRuntimeRunsInput {
@@ -129,6 +140,12 @@ export interface PruneOldRuntimeRunsResult {
   readonly deletedMemoryEventsCount: number;
   readonly deletedPolicyEventsCount: number;
   readonly deletedHookExecutionsCount: number;
+  /**
+   * #643 cascade-delete sub-count. `agsRuntimeGraphEvents` rows
+   * whose `runtimeRunId` matched one of the deleted runs. Always
+   * `>= 0`.
+   */
+  readonly deletedGraphEventsCount: number;
 }
 
 export interface PruneOldRuntimeRunsOptions {
@@ -202,15 +219,16 @@ export async function pruneOldRuntimeRuns(
   const runIds = candidates.map((r) => Number(r.id));
 
   // Cascade-delete children first so we don't leave orphans.
-  // Five sibling tables key on runId (#637 fixed the original
-  // #621 oversight that only cascaded to steps). Issue them in
-  // parallel via Promise.all since they're independent of each other.
+  // Six sibling tables key on runtimeRunId (#637 extended to 5, #643
+  // added agsRuntimeGraphEvents). Issue them in parallel via
+  // Promise.all since they're independent of each other.
   const [
     deletedSteps,
     deletedToolCalls,
     deletedMemoryEvents,
     deletedPolicyEvents,
     deletedHookExecutions,
+    deletedGraphEvents,
   ] = await Promise.all([
     db
       .delete(agsRuntimeRunSteps)
@@ -232,6 +250,10 @@ export async function pruneOldRuntimeRuns(
       .delete(agsRuntimeHookExecutions)
       .where(inArray(agsRuntimeHookExecutions.runId, runIds))
       .returning({ id: agsRuntimeHookExecutions.id }),
+    db
+      .delete(agsRuntimeGraphEvents)
+      .where(inArray(agsRuntimeGraphEvents.runtimeRunId, runIds))
+      .returning({ id: agsRuntimeGraphEvents.id }),
   ]);
 
   const deletedRuns = await db
@@ -246,5 +268,6 @@ export async function pruneOldRuntimeRuns(
     deletedMemoryEventsCount: deletedMemoryEvents.length,
     deletedPolicyEventsCount: deletedPolicyEvents.length,
     deletedHookExecutionsCount: deletedHookExecutions.length,
+    deletedGraphEventsCount: deletedGraphEvents.length,
   };
 }
