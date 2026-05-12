@@ -304,6 +304,42 @@ describe("getWorkspaceObservabilityStats — failedJobsByDay trend", () => {
   });
 });
 
+describe("getWorkspaceObservabilityStats — failedJobsByLane rollup", () => {
+  it("rolls failedJobsByKind up by first dot-segment", async () => {
+    const { db } = makeFakeDb({
+      failedJobsByKind: [
+        { jobKind: "projection.rebuild", count: 3 },
+        { jobKind: "projection.sync", count: 1 },
+        { jobKind: "retention.sweep", count: 2 },
+        { jobKind: "importScan", count: 5 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.failedJobsByLane).toEqual({
+      projection: 4,
+      retention: 2,
+      importScan: 5,
+    });
+  });
+
+  it("returns an empty failedJobsByLane when nothing is failed", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.failedJobsByLane).toEqual({});
+  });
+
+  it("returns an empty failedJobsByLane on ASDB-null", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.failedJobsByLane).toEqual({});
+  });
+});
+
 describe("getWorkspaceObservabilityStats — failedJobsByKind sub-stat", () => {
   it("buckets only the failed-status rows by jobKind", async () => {
     const { db } = makeFakeDb({

@@ -91,6 +91,15 @@ export interface WorkspaceObservabilityStats {
    * Empty `{}` when no failed jobs are recorded.
    */
   readonly failedJobsByKind: Record<string, number>;
+  /**
+   * Lane rollup of `failedJobsByKind` — failed-only counts
+   * aggregated by first dot-segment. The intersection of the
+   * lane-rollup pattern (#526) and the failed-only sub-stat
+   * (#531). Lets the dashboard show "which modules are breaking"
+   * at the same granularity as the totals card without forcing
+   * the operator to mentally roll up failed kinds themselves.
+   */
+  readonly failedJobsByLane: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
   /**
    * Lane rollup of `notificationsByKind` by the first dot-separated
@@ -127,6 +136,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   jobsByKind: {},
   jobsByLane: {},
   failedJobsByKind: {},
+  failedJobsByLane: {},
   notificationsByKind: {},
   notificationsByLane: {},
   notificationsByReadState: { read: 0, unread: 0 },
@@ -341,6 +351,8 @@ export async function getWorkspaceObservabilityStats(
   const failedJobsTrendMap = bucketize(failedJobsTrendRows, "day");
   const failedJobsByDay = zeroFillDayTrend(failedJobsTrendMap, TREND_DAYS);
 
+  const failedJobsByKind = bucketize(failedJobsByKindRows, "jobKind");
+
   return {
     errorEventsBySourceKind,
     errorEventsByLane: rollupByLane(errorEventsBySourceKind),
@@ -351,7 +363,8 @@ export async function getWorkspaceObservabilityStats(
     jobsByStatus,
     jobsByKind,
     jobsByLane: rollupByLane(jobsByKind),
-    failedJobsByKind: bucketize(failedJobsByKindRows, "jobKind"),
+    failedJobsByKind,
+    failedJobsByLane: rollupByLane(failedJobsByKind),
     notificationsByKind,
     notificationsByLane: rollupByLane(notificationsByKind),
     notificationsByReadState: { read: readCount, unread: unreadCount },
