@@ -85,6 +85,47 @@ export async function pushNotification(
   return rowToNotification(row);
 }
 
+/**
+ * Singleton getter — sister of `getJobById` (#511-era). The
+ * notifications surface previously only exposed list/count/markRead/
+ * dismiss; clients deeplinking to a specific notification had to
+ * list-all-and-filter. This is the direct lookup.
+ *
+ * Returns `null` on ASDB-null (fail-soft, matches getJobById) and on
+ * not-found. The optional `userId` arg scopes the lookup so a
+ * user-facing surface can prevent ID-enumeration escalation — passing
+ * userId returns `null` if the row exists but belongs to someone
+ * else, indistinguishable from "not found".
+ */
+export async function getNotificationById(
+  notificationId: number,
+  options: ServiceOptions & { readonly userId?: number } = {},
+): Promise<NotificationRow | null> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return null;
+
+  const filters = [eq(agsWorkspaceUserNotifications.id, notificationId)];
+  if (options.userId !== undefined) {
+    filters.push(eq(agsWorkspaceUserNotifications.userId, options.userId));
+  }
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceUserNotifications.id,
+      userId: agsWorkspaceUserNotifications.userId,
+      notificationKind: agsWorkspaceUserNotifications.notificationKind,
+      payload: agsWorkspaceUserNotifications.payload,
+      read: agsWorkspaceUserNotifications.read,
+      createdAt: agsWorkspaceUserNotifications.createdAt,
+    })
+    .from(agsWorkspaceUserNotifications)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .limit(1);
+  if (rows.length === 0) return null;
+  return rowToNotification(rows[0]);
+}
+
 export interface PushNotificationToUsersInput {
   /**
    * Recipient user ids. Empty array short-circuits to a no-op (no
