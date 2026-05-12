@@ -15,7 +15,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../../../_core/trpc.js";
 import {
   submitCorrectionProposal,
   getProposalById,
@@ -340,6 +340,66 @@ export const graphCorrectionRouter = router({
     .query(async ({ input }) => {
       return await listAuditEvents(input.proposalId);
     }),
+
+  // ── Retention (Phase 22 follow-up #661 + #662 + #663) ────────────
+  //
+  // Operator surface for `ags_graph_correction_proposals` retention.
+  // Sister of `runs.pruneRetention` (#623), `graphQuality.pruneScans
+  // Retention` (#659). Procedure names use `ProposalsRetention` to
+  // disambiguate from existing proposal-CRUD on this sub-router.
+  // adminProcedure because the cron + sweep operate across all
+  // proposal kinds.
+  pruneProposalsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "pending",
+                "approved",
+                "rejected",
+                "applied",
+                "superseded",
+              ]),
+            )
+            .max(5)
+            .optional(),
+          proposalKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+          targetTypeKey: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldGraphCorrectionProposals } = await import(
+        "../graph-correction-proposals-retention.js"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldGraphCorrectionProposals({
+        olderThan,
+        statuses: input?.statuses,
+        proposalKind: input?.proposalKind,
+        targetTypeKey: input?.targetTypeKey,
+      });
+    }),
+  getProposalsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getGraphCorrectionProposalsRetentionCronStatus } = await import(
+      "../graph-correction-proposals-retention-cron.js"
+    );
+    return getGraphCorrectionProposalsRetentionCronStatus();
+  }),
 });
 
 export type GraphCorrectionRouter = typeof graphCorrectionRouter;
