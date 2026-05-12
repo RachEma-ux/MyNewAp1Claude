@@ -75,6 +75,8 @@ interface ErrState {
     sourceKind?: string;
     sourceKinds?: readonly string[];
     sourceKindLike?: string;
+    sourceId?: string;
+    sourceIds?: readonly string[];
     errorClass?: string;
     errorClasses?: readonly string[];
     userId?: number;
@@ -837,6 +839,14 @@ function makeErrFakeDb(initial?: Partial<ErrState>) {
               rows = rows.filter((r) => r.sourceKind === pattern);
             }
           }
+          if (state.active.sourceId !== undefined) {
+            rows = rows.filter((r) => r.sourceId === state.active.sourceId);
+          } else if (state.active.sourceIds !== undefined) {
+            const set = new Set(state.active.sourceIds);
+            rows = rows.filter(
+              (r) => r.sourceId !== null && set.has(r.sourceId),
+            );
+          }
           if (state.active.errorClass !== undefined) {
             rows = rows.filter((r) => r.errorClass === state.active.errorClass);
           }
@@ -1402,6 +1412,108 @@ describe("listErrorEvents — sourceKind array filter (#553)", () => {
 
     const result = await listErrorEvents(
       { sourceKind: "trpc.chat.send" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+});
+
+describe("listErrorEvents — sourceId filter (Phase 22 #596)", () => {
+  it("filters by a single sourceId (exact eq)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: "trace-A", userId: null, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.send", sourceId: "trace-B", userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "trpc.chat.send", sourceId: "trace-A", userId: null, errorClass: "E", errorMessage: "c", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceId = "trace-A";
+
+    const result = await listErrorEvents(
+      { sourceId: "trace-A" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("filters by an array of sourceIds (OR semantics via IN)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: "trace-A", userId: null, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "k", sourceId: "trace-B", userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "k", sourceId: "trace-C", userId: null, errorClass: "E", errorMessage: "c", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceIds = ["trace-A", "trace-C"];
+
+    const result = await listErrorEvents(
+      { sourceId: ["trace-A", "trace-C"] },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id).sort()).toEqual([1, 3]);
+  });
+
+  it("returns [] when sourceId array is empty (vacuous IN)", async () => {
+    const now = new Date();
+    const { db } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: "trace-A", userId: null, errorClass: "E", errorMessage: "x", metadata: null, createdAt: now },
+      ],
+    });
+    const result = await listErrorEvents(
+      { sourceId: [] },
+      { getDb: () => db as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("returns [] on ASDB-null (fail-soft, no DB probe)", async () => {
+    const result = await listErrorEvents(
+      { sourceId: "trace-A" },
+      { getDb: () => null as never },
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("ANDs sourceId with sourceKind + errorClass", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "trpc.chat.send", sourceId: "trace-A", userId: null, errorClass: "E1", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "trpc.chat.send", sourceId: "trace-A", userId: null, errorClass: "E2", errorMessage: "b", metadata: null, createdAt: now },
+        { id: 3, sourceKind: "trpc.chat.list", sourceId: "trace-A", userId: null, errorClass: "E1", errorMessage: "c", metadata: null, createdAt: now },
+        { id: 4, sourceKind: "trpc.chat.send", sourceId: "trace-B", userId: null, errorClass: "E1", errorMessage: "d", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceKind = "trpc.chat.send";
+    state.active.sourceId = "trace-A";
+    state.active.errorClass = "E1";
+
+    const result = await listErrorEvents(
+      { sourceKind: "trpc.chat.send", sourceId: "trace-A", errorClass: "E1" },
+      { getDb: () => db as never },
+    );
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it("NULL-sourceId rows are excluded (SQL eq/IN semantics)", async () => {
+    const now = new Date();
+    const { db, state } = makeErrFakeDb({
+      rows: [
+        { id: 1, sourceKind: "k", sourceId: "trace-A", userId: null, errorClass: "E", errorMessage: "a", metadata: null, createdAt: now },
+        { id: 2, sourceKind: "k", sourceId: null, userId: null, errorClass: "E", errorMessage: "b", metadata: null, createdAt: now },
+      ],
+    });
+    state.selectQueue.push("list");
+    state.active.sourceId = "trace-A";
+
+    const result = await listErrorEvents(
+      { sourceId: "trace-A" },
       { getDb: () => db as never },
     );
     expect(result.map((r) => r.id)).toEqual([1]);

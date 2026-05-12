@@ -586,6 +586,12 @@ export const workspaceObservabilityRouter = router({
             ])
             .optional(),
           sourceKindLike: z.string().min(1).max(100).optional(),
+          sourceId: z
+            .union([
+              z.string().min(1).max(200),
+              z.array(z.string().min(1).max(200)).max(50),
+            ])
+            .optional(),
           errorClass: z
             .union([
               z.string().min(1).max(100),
