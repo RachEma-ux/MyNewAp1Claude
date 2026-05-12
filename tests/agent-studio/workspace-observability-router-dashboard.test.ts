@@ -350,4 +350,25 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards array-form recentErrorEventsUserId (#608)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ recentErrorEventsUserId: [7, 9, 11] });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      recentErrorEventsUserId: [7, 9, 11],
+    });
+  });
+
+  it("rejects oversized recentErrorEventsUserId array (>50) at the input layer (#608)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    const oversized = Array.from({ length: 51 }, (_, i) => i + 1);
+    await expect(
+      caller.getDashboard({ recentErrorEventsUserId: oversized }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

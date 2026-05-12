@@ -210,18 +210,18 @@ export interface ObservabilityDashboardInput {
    */
   readonly recentErrorEventsUserIdIsNull?: boolean;
   /**
-   * Optional specific userId filter forwarded to listErrorEvents
-   * (#540). Lets the dashboard scope the recent-errors slice to a
-   * specific user's errors — e.g. when a single user reports
-   * persistent failures and the operator wants to see their error
-   * trail without enumerating the full recent-errors stream.
+   * Optional specific userId filter (single `number` or array `IN`)
+   * forwarded to listErrorEvents (#540, #607). Lets the dashboard
+   * scope the recent-errors slice to one user (`number`) or an
+   * admin/beta-tester pool (`number[]`). Array form forwards as
+   * the listErrorEvents.userId `IN` clause (#607).
    *
    * Mutually exclusive with `recentErrorEventsUserIdIsNull` (the
    * specific-userId filter is narrower — matches the listErrorEvents
    * precedence convention from #593). Composes with all other
    * recent-errors filters (ANDed).
    */
-  readonly recentErrorEventsUserId?: number;
+  readonly recentErrorEventsUserId?: number | readonly number[];
   /**
    * Optional SQL LIKE-style prefix filter forwarded to
    * listErrorEvents (#514's sourceKindLike). Lets the dashboard
