@@ -1505,8 +1505,20 @@ export interface PruneOldBackgroundJobsInput {
    * Empty array short-circuits to `{deletedCount: 0}` (vacuous IN),
    * with no DB call so a no-op operator click doesn't fail when
    * ASDB is down.
+   *
+   * Mutually exclusive with `jobKindLike` (exact match wins —
+   * matches the listJobs precedence convention from #598).
    */
   readonly jobKind?: string | readonly string[];
+  /**
+   * SQL LIKE-style prefix filter on `jobKind`. Sister of
+   * `listJobs.jobKindLike` (#598) on the retention side. Lets
+   * cron sweeps prune by prefix — e.g. `projection.%` to clear
+   * all projection-family completed rows without enumerating each
+   * sub-kind. Composes with the other filters (ANDed). Mutually
+   * exclusive with `jobKind` (exact wins).
+   */
+  readonly jobKindLike?: string;
   /**
    * SQL LIKE-style filter on `lastError` (caller supplies the
    * wildcards). Sister of `listJobs.lastErrorLike` (#580) and
@@ -1565,6 +1577,8 @@ export async function pruneOldBackgroundJobs(
         eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
       );
     }
+  } else if (input.jobKindLike !== undefined) {
+    filters.push(like(agsWorkspaceBackgroundJobs.jobKind, input.jobKindLike));
   }
   if (input.lastErrorLike !== undefined) {
     filters.push(

@@ -146,6 +146,30 @@ describe("runRetentionSweep", () => {
     ]);
   });
 
+  it("passes backgroundJobsJobKindLike through to the jobs prune (#602)", async () => {
+    await runRetentionSweep(
+      { backgroundJobsJobKindLike: "projection.%" },
+      { now: new Date() },
+    );
+    expect(pruneJobsMock.mock.calls[0][0].jobKindLike).toBe("projection.%");
+  });
+
+  it("ANDs backgroundJobsJobKindLike with backgroundJobsLastErrorLike (#602)", async () => {
+    await runRetentionSweep(
+      {
+        backgroundJobsJobKindLike: "ingestion.%",
+        backgroundJobsLastErrorLike: "%timeout%",
+        backgroundJobsStatuses: ["failed"],
+      },
+      { now: new Date() },
+    );
+    expect(pruneJobsMock.mock.calls[0][0]).toMatchObject({
+      jobKindLike: "ingestion.%",
+      lastErrorLike: "%timeout%",
+      statuses: ["failed"],
+    });
+  });
+
   it("passes errorEventsErrorClass through to the errors prune (single, #550)", async () => {
     await runRetentionSweep(
       { errorEventsErrorClass: "ValidationError" },

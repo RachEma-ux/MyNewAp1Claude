@@ -1509,6 +1509,47 @@ describe("pruneOldBackgroundJobs — Phase 22 retention", () => {
     );
     expect(result.deletedCount).toBe(1);
   });
+
+  it("accepts jobKindLike (prefix LIKE) on retention prune (#602)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        statuses: ["completed"],
+        jobKindLike: "projection.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(2);
+    expect(db.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("jobKind takes precedence over jobKindLike on retention prune (#602)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }],
+        }),
+      })),
+    };
+    // Both set — exact jobKind wins; no error, both are accepted at the
+    // input layer but service-tier only applies the exact filter.
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        jobKind: "projection.rebuild",
+        jobKindLike: "projection.%",
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(1);
+  });
 });
 
 describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {
