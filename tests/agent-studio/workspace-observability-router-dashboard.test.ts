@@ -91,4 +91,37 @@ describe("workspaceObservabilityRouter.getDashboard", () => {
     ).rejects.toThrow();
     expect(dashboardMock).not.toHaveBeenCalled();
   });
+
+  it("forwards staleJobKind when supplied (#556)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({ staleJobKind: "projection.rebuild" });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      staleJobKind: "projection.rebuild",
+    });
+  });
+
+  it("forwards array-form staleJobKind (#556)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    await caller.getDashboard({
+      staleJobKind: ["projection.rebuild", "import.scan"],
+    });
+    expect(dashboardMock).toHaveBeenCalledWith({
+      staleJobKind: ["projection.rebuild", "import.scan"],
+    });
+  });
+
+  it("rejects oversized staleJobKind array (#556)", async () => {
+    const caller = workspaceObservabilityRouter.createCaller({
+      user: { id: 1, role: "user" },
+    } as never);
+    const oversized = Array.from({ length: 21 }, (_, i) => `k${i}`);
+    await expect(
+      caller.getDashboard({ staleJobKind: oversized }),
+    ).rejects.toThrow();
+    expect(dashboardMock).not.toHaveBeenCalled();
+  });
 });

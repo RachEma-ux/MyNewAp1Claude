@@ -31,6 +31,7 @@ export {
 export type {
   EnqueueJobInput,
   ListJobsInput,
+  ListStaleRunningJobsInput,
   BackgroundJobRow,
   JobStatus,
   RetryJobsResult,
