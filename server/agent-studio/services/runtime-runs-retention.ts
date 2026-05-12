@@ -16,15 +16,19 @@
  *    (`completed`, `failed`, `cancelled` — runtime runs can ALSO
  *    finish in `awaiting_approval` permanently if abandoned, but
  *    operators want those preserved for audit)
- *  - Cascade-deletes 6 sibling tables that key on `runtimeRunId`:
- *      agsRuntimeRunSteps       (per-step trace)
- *      agsRuntimeToolCalls      (tool dispatch trace)
- *      agsRuntimeMemoryEvents   (memory writes per run)
- *      agsRuntimePolicyEvents   (governance decisions per run)
- *      agsRuntimeHookExecutions (hook invocations per run)
- *      agsRuntimeGraphEvents    (Phase 14 Native Graph Workspace
- *                                projection events emitted by the
- *                                graph-agent per runtime trace)
+ *  - Cascade-deletes 8 sibling tables that key on `runtimeRunId`:
+ *      agsRuntimeRunSteps         (per-step trace)
+ *      agsRuntimeToolCalls        (tool dispatch trace)
+ *      agsRuntimeMemoryEvents     (memory writes per run)
+ *      agsRuntimePolicyEvents     (governance decisions per run)
+ *      agsRuntimeHookExecutions   (hook invocations per run)
+ *      agsRuntimeGraphEvents      (Phase 14 Native Graph Workspace
+ *                                  projection events emitted by the
+ *                                  graph-agent per runtime trace)
+ *      agsRuntimeNoteReferences   (Phase 14 §6: note references
+ *                                  used during a runtime trace)
+ *      agsCagBlockRuntimeUsages   (Phase 14 §6/§7: CAG capability
+ *                                  pack usage rows emitted per run)
  *    Deletion order: children first, then parent (no FK constraint,
  *    but orphans are visually confusing in the operator UI when a
  *    sub-table query returns rows for a non-existent run).
@@ -39,6 +43,16 @@
  *    initial cascade extension. The graph-agent writes one row per
  *    runtime trace + decision trace event; without this cascade,
  *    every sweep silently orphans graph-event rows.
+ *  - **#644 fix:** same shape as #637/#643 — Phase 14 §6/§7 added
+ *    two more per-runtime-trace usage tables on the graph-promotion
+ *    module side: `agsRuntimeNoteReferences` (notes used during a
+ *    runtime trace) and `agsCagBlockRuntimeUsages` (CAG capability
+ *    pack usage). Neither was in the graph-agent retention service
+ *    (`services/graph-agent/retention.ts`, which targets graph-agent
+ *    ledgers with a 90-day horizon — a deliberately longer policy
+ *    for the agent-scoped audit tables). These two are per-runtime-
+ *    trace forensic rows, so they belong in the runtime-runs cascade
+ *    alongside the other per-run side-tables.
  *  - Adds `environment` filter — runtime runs are partitioned across
  *    `draft` / `staging` / `production` and operators usually want
  *    distinct retention windows per environment (longer for prod)
@@ -61,6 +75,10 @@ import {
   agsRuntimeHookExecutions,
 } from "../../../drizzle/tables/agent-studio.js";
 import { agsRuntimeGraphEvents } from "../../../drizzle/tables/agent-studio-graph-projection.js";
+import {
+  agsRuntimeNoteReferences,
+  agsCagBlockRuntimeUsages,
+} from "../../../drizzle/tables/agent-studio-graph-promotion.js";
 
 export type RuntimeRunStatus =
   | "queued"
@@ -87,6 +105,8 @@ const ZERO_RESULT: PruneOldRuntimeRunsResult = {
   deletedPolicyEventsCount: 0,
   deletedHookExecutionsCount: 0,
   deletedGraphEventsCount: 0,
+  deletedNoteReferencesCount: 0,
+  deletedCagBlockUsagesCount: 0,
 };
 
 export interface PruneOldRuntimeRunsInput {
@@ -146,6 +166,12 @@ export interface PruneOldRuntimeRunsResult {
    * `>= 0`.
    */
   readonly deletedGraphEventsCount: number;
+  /**
+   * #644 cascade-delete sub-counts. Phase 14 §6/§7 per-runtime-trace
+   * usage tables on the graph-promotion module side. Always `>= 0`.
+   */
+  readonly deletedNoteReferencesCount: number;
+  readonly deletedCagBlockUsagesCount: number;
 }
 
 export interface PruneOldRuntimeRunsOptions {
@@ -219,8 +245,9 @@ export async function pruneOldRuntimeRuns(
   const runIds = candidates.map((r) => Number(r.id));
 
   // Cascade-delete children first so we don't leave orphans.
-  // Six sibling tables key on runtimeRunId (#637 extended to 5, #643
-  // added agsRuntimeGraphEvents). Issue them in parallel via
+  // Eight sibling tables key on runtimeRunId (#637 extended to 5,
+  // #643 added agsRuntimeGraphEvents, #644 added agsRuntimeNoteRefs
+  // + agsCagBlockRuntimeUsages). Issue them in parallel via
   // Promise.all since they're independent of each other.
   const [
     deletedSteps,
@@ -229,6 +256,8 @@ export async function pruneOldRuntimeRuns(
     deletedPolicyEvents,
     deletedHookExecutions,
     deletedGraphEvents,
+    deletedNoteReferences,
+    deletedCagBlockUsages,
   ] = await Promise.all([
     db
       .delete(agsRuntimeRunSteps)
@@ -254,6 +283,14 @@ export async function pruneOldRuntimeRuns(
       .delete(agsRuntimeGraphEvents)
       .where(inArray(agsRuntimeGraphEvents.runtimeRunId, runIds))
       .returning({ id: agsRuntimeGraphEvents.id }),
+    db
+      .delete(agsRuntimeNoteReferences)
+      .where(inArray(agsRuntimeNoteReferences.runtimeRunId, runIds))
+      .returning({ id: agsRuntimeNoteReferences.id }),
+    db
+      .delete(agsCagBlockRuntimeUsages)
+      .where(inArray(agsCagBlockRuntimeUsages.runtimeRunId, runIds))
+      .returning({ id: agsCagBlockRuntimeUsages.id }),
   ]);
 
   const deletedRuns = await db
@@ -269,5 +306,7 @@ export async function pruneOldRuntimeRuns(
     deletedPolicyEventsCount: deletedPolicyEvents.length,
     deletedHookExecutionsCount: deletedHookExecutions.length,
     deletedGraphEventsCount: deletedGraphEvents.length,
+    deletedNoteReferencesCount: deletedNoteReferences.length,
+    deletedCagBlockUsagesCount: deletedCagBlockUsages.length,
   };
 }
