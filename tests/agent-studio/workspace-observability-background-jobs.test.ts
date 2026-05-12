@@ -17,6 +17,7 @@ import {
   markJobCompleted,
   markJobsCompleted,
   markJobFailed,
+  markJobsFailed,
   markJobCancelled,
   bumpJobHeartbeat,
   bumpJobHeartbeats,
@@ -1986,5 +1987,137 @@ describe("markJobsCompleted — Phase 22 #564 bulk completion", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("not_running");
     expect(result.skipped[0].currentStatus).toBe("failed");
+  });
+});
+
+describe("markJobsFailed — Phase 22 #565 bulk failure", () => {
+  it("short-circuits empty input with no DB call", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await markJobsFailed([], { getDb });
+    expect(result.failed).toEqual([]);
+    expect(result.skipped).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("throws AsdbUnavailableError when ASDB is unavailable + non-empty input", async () => {
+    await expect(
+      markJobsFailed(
+        [{ jobId: 1, errorMessage: "boom" }],
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(AsdbUnavailableError);
+  });
+
+  it("partitions: fails running, skips not_found + non-running", async () => {
+    const now = new Date();
+    const rows: FakeRow[] = [
+      {
+        id: 7,
+        jobKind: "x",
+        payload: null,
+        status: "running",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 8,
+        jobKind: "x",
+        payload: null,
+        status: "completed",
+        attempts: 1,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    // Call sequence for [7, 8, 999]:
+    //   id 7 (running):   SELECT 7 → UPDATE 7 → SELECT 7
+    //                   + fire-and-forget INSERT to error_events (chain ignored)
+    //   id 8 (completed): SELECT 8 (skipped)
+    //   id 999 (missing): SELECT 999 (skipped)
+    const selectQueue: number[] = [7, 7, 8, 999];
+    const db = {
+      select: () => {
+        const chain: Record<string, unknown> = {
+          from: () => chain,
+          where: () => chain,
+          limit: async () => {
+            const id = selectQueue.shift();
+            const found = rows.find((r) => r.id === id);
+            return found ? [{ ...found }] : [];
+          },
+        };
+        return chain;
+      },
+      update: () => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            const target = rows.find((r) => r.id === 7);
+            if (!target) return;
+            if ("status" in vals) target.status = String(vals.status);
+            if ("lastError" in vals) {
+              target.lastError =
+                vals.lastError == null ? null : String(vals.lastError);
+            }
+            if ("updatedAt" in vals) target.updatedAt = vals.updatedAt as Date;
+          },
+        }),
+      }),
+      // recordErrorEvent uses .insert(...).values(...).returning() — return
+      // a no-op chain so the fire-and-forget doesn't reject loudly.
+      insert: () => ({
+        values: () => ({
+          returning: async () => [],
+        }),
+      }),
+    };
+
+    const result = await markJobsFailed(
+      [
+        { jobId: 7, errorMessage: "child-7 boom" },
+        { jobId: 8, errorMessage: "child-8 boom" },
+        { jobId: 999, errorMessage: "child-999 boom" },
+      ],
+      { getDb: () => db as never },
+    );
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].id).toBe(7);
+    expect(result.failed[0].status).toBe("failed");
+    expect(result.failed[0].lastError).toBe("child-7 boom");
+    expect(result.skipped).toHaveLength(2);
+    const reasons = result.skipped.map((s) => s.reason).sort();
+    expect(reasons).toEqual(["not_found", "not_running"]);
+    const skippedFor8 = result.skipped.find((s) => s.jobId === 8);
+    expect(skippedFor8?.currentStatus).toBe("completed");
+  });
+
+  it("returns empty failed when no rows are running", async () => {
+    const now = new Date();
+    const { db, state } = makeFakeDb({
+      rows: [
+        {
+          id: 7,
+          jobKind: "x",
+          payload: null,
+          status: "cancelled",
+          attempts: 1,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    state.selectQueue.push("byId");
+    state.active.jobId = 7;
+    const result = await markJobsFailed(
+      [{ jobId: 7, errorMessage: "boom" }],
+      { getDb: () => db as never },
+    );
+    expect(result.failed).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe("not_running");
+    expect(result.skipped[0].currentStatus).toBe("cancelled");
   });
 });
