@@ -338,6 +338,80 @@ export async function listStaleRunningJobs(
   return rows.map(rowToJob);
 }
 
+export interface ListOldestPendingJobsInput {
+  /**
+   * Cap on rows returned. Defaults to 10 — operators want a short
+   * "what's stuck waiting" list on the dashboard, not a full
+   * pending-queue dump.
+   */
+  readonly limit?: number;
+  /**
+   * Optional jobKind filter — single string (`eq`) or array (`IN`).
+   * Lets the dashboard scope the pending-backlog list to a specific
+   * worker subsystem when triaging starvation. Mirrors the same
+   * filter on listStaleRunningJobs (#556). Empty array → vacuous
+   * IN short-circuit (returns []).
+   */
+  readonly jobKind?: string | readonly string[];
+}
+
+/**
+ * "Oldest pending" selector for the operator dashboard. Sister of
+ * `listStaleRunningJobs` (#522/#556) but for `status='pending'` —
+ * orders by `createdAt` ASC so operators see the queue's
+ * longest-waiting rows. A worker subsystem that's stuck (not
+ * pulling jobs at all) shows up here as a backlog of pending rows
+ * concentrated on one jobKind, complementing the stale-running
+ * signal for workers that started but never completed.
+ */
+export async function listOldestPendingJobs(
+  input: ListOldestPendingJobsInput = {},
+  options: ServiceOptions = {},
+): Promise<BackgroundJobRow[]> {
+  const limit = input.limit ?? 10;
+
+  // Empty jobKind array → vacuous IN; short-circuit before the ASDB
+  // probe so a no-op operator filter doesn't fail when the DB is down.
+  if (Array.isArray(input.jobKind) && input.jobKind.length === 0) {
+    return [];
+  }
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+
+  const filters = [eq(agsWorkspaceBackgroundJobs.status, "pending")];
+  const jobKindInput = input.jobKind;
+  if (jobKindInput !== undefined) {
+    if (Array.isArray(jobKindInput)) {
+      filters.push(
+        inArray(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string[]),
+      );
+    } else {
+      filters.push(
+        eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
+      );
+    }
+  }
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceBackgroundJobs.id,
+      jobKind: agsWorkspaceBackgroundJobs.jobKind,
+      payload: agsWorkspaceBackgroundJobs.payload,
+      status: agsWorkspaceBackgroundJobs.status,
+      attempts: agsWorkspaceBackgroundJobs.attempts,
+      lastError: agsWorkspaceBackgroundJobs.lastError,
+      createdAt: agsWorkspaceBackgroundJobs.createdAt,
+      updatedAt: agsWorkspaceBackgroundJobs.updatedAt,
+    })
+    .from(agsWorkspaceBackgroundJobs)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .orderBy(agsWorkspaceBackgroundJobs.createdAt) // ASC = oldest-enqueued first
+    .limit(limit);
+  return rows.map(rowToJob);
+}
+
 export async function listJobs(
   input: ListJobsInput = {},
   options: ServiceOptions = {},
