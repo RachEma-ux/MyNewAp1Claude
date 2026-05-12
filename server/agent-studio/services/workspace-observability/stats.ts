@@ -25,6 +25,14 @@ export interface ErrorEventsTrendBucket {
   readonly count: number;
 }
 
+/**
+ * Generic day-bucket trend shape — same {date, count} contract as
+ * `ErrorEventsTrendBucket`, kept under a generic alias so multiple
+ * trend series (jobs, notifications, etc.) can declare their type
+ * without each pretending to be an "error events" bucket.
+ */
+export type DayTrendBucket = ErrorEventsTrendBucket;
+
 export interface WorkspaceObservabilityStats {
   readonly errorEventsBySourceKind: Record<string, number>;
   /**
@@ -47,6 +55,13 @@ export interface WorkspaceObservabilityStats {
    * (PR #503) — the same UI sparkline component renders both.
    */
   readonly errorEventsByDay: readonly ErrorEventsTrendBucket[];
+  /**
+   * Per-day count of background jobs created in the last 14 days
+   * (UTC), oldest-first, zero-filled. Sister of `errorEventsByDay` —
+   * the dashboard renders both with the same sparkline component so
+   * operators can spot throughput dips alongside error spikes.
+   */
+  readonly jobsCreatedByDay: readonly DayTrendBucket[];
   readonly jobsByStatus: Record<string, number>;
   readonly jobsByKind: Record<string, number>;
   readonly notificationsByKind: Record<string, number>;
@@ -69,6 +84,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   errorEventsByLane: {},
   errorEventsByErrorClass: {},
   errorEventsByDay: [],
+  jobsCreatedByDay: [],
   jobsByStatus: {},
   jobsByKind: {},
   notificationsByKind: {},
@@ -82,13 +98,17 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
  * shape as graph-quality's `zeroFillTrend` (PR #503) — kept in this
  * module for boundary clarity (workspace-observability shouldn't
  * import from graph-quality).
+ *
+ * Generic over which series — used for both error events and jobs.
+ * The original `zeroFillErrorEventsTrend` name is kept as an alias
+ * so existing imports/exports stay stable.
  */
-export function zeroFillErrorEventsTrend(
+export function zeroFillDayTrend(
   rawBuckets: Record<string, number>,
   windowDays: number,
   now: Date = new Date(),
-): ErrorEventsTrendBucket[] {
-  const filled: ErrorEventsTrendBucket[] = [];
+): DayTrendBucket[] {
+  const filled: DayTrendBucket[] = [];
   const utcMidnight = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
@@ -101,6 +121,9 @@ export function zeroFillErrorEventsTrend(
   }
   return filled;
 }
+
+/** @deprecated Use {@link zeroFillDayTrend}. Kept for back-compat. */
+export const zeroFillErrorEventsTrend = zeroFillDayTrend;
 
 /**
  * Roll up a per-sourceKind bucket map into a per-lane map by the first
@@ -153,6 +176,7 @@ export async function getWorkspaceObservabilityStats(
     notificationsByKindRows,
     notificationsByReadStateRows,
     errorEventsTrendRows,
+    jobsTrendRows,
   ] = await Promise.all([
     db
       .select({
@@ -206,6 +230,16 @@ export async function getWorkspaceObservabilityStats(
         sql`${agsWorkspaceErrorEvents.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
       )
       .groupBy(sql`date_trunc('day', ${agsWorkspaceErrorEvents.createdAt}) AT TIME ZONE 'UTC'`),
+    db
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceBackgroundJobs.createdAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceBackgroundJobs)
+      .where(
+        sql`${agsWorkspaceBackgroundJobs.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.createdAt}) AT TIME ZONE 'UTC'`),
   ]);
 
   const errorEventsBySourceKind = bucketize(
@@ -232,16 +266,17 @@ export async function getWorkspaceObservabilityStats(
   }
 
   const errorEventsTrendMap = bucketize(errorEventsTrendRows, "day");
-  const errorEventsByDay = zeroFillErrorEventsTrend(
-    errorEventsTrendMap,
-    TREND_DAYS,
-  );
+  const errorEventsByDay = zeroFillDayTrend(errorEventsTrendMap, TREND_DAYS);
+
+  const jobsTrendMap = bucketize(jobsTrendRows, "day");
+  const jobsCreatedByDay = zeroFillDayTrend(jobsTrendMap, TREND_DAYS);
 
   return {
     errorEventsBySourceKind,
     errorEventsByLane: rollupSourceKindsByLane(errorEventsBySourceKind),
     errorEventsByErrorClass,
     errorEventsByDay,
+    jobsCreatedByDay,
     jobsByStatus,
     jobsByKind,
     notificationsByKind,

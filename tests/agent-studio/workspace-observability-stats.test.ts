@@ -7,6 +7,7 @@ import {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
   zeroFillErrorEventsTrend,
+  zeroFillDayTrend,
 } from "../../server/agent-studio/services/workspace-observability/stats";
 
 interface SeededBuckets {
@@ -17,6 +18,7 @@ interface SeededBuckets {
   notificationsByKind?: { notificationKind: string; count: number }[];
   notificationsByReadState?: { read: boolean | null; count: number }[];
   errorEventsByDay?: { day: string; count: number }[];
+  jobsByDay?: { day: string; count: number }[];
 }
 
 function makeFakeDb(seeded: SeededBuckets = {}) {
@@ -34,7 +36,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     | "jobKind"
     | "notifKind"
     | "notifRead"
-    | "errorDay"
+    | "day"
     | null = null;
 
   const select = vi.fn((shape: Record<string, unknown>) => {
@@ -44,10 +46,11 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     else if ("jobKind" in shape) nextSelectKind = "jobKind";
     else if ("notificationKind" in shape) nextSelectKind = "notifKind";
     else if ("read" in shape) nextSelectKind = "notifRead";
-    else if ("day" in shape) nextSelectKind = "errorDay";
+    else if ("day" in shape) nextSelectKind = "day";
 
     return {
-      from: (_t: unknown) => {
+      from: (t: unknown) => {
+        const tn = tableName(t);
         const resolver = async () => {
           switch (nextSelectKind) {
             case "errorSource":
@@ -62,7 +65,10 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
               return seeded.notificationsByKind ?? [];
             case "notifRead":
               return seeded.notificationsByReadState ?? [];
-            case "errorDay":
+            case "day":
+              if (tn === "ags_workspace_background_jobs") {
+                return seeded.jobsByDay ?? [];
+              }
               return seeded.errorEventsByDay ?? [];
             default:
               return [];
@@ -280,5 +286,57 @@ describe("zeroFillErrorEventsTrend — pure helper", () => {
       { date: "2026-05-11", count: 7 },
       { date: "2026-05-12", count: 3 },
     ]);
+  });
+
+  it("zeroFillDayTrend is the canonical alias and yields the same output", () => {
+    const a = zeroFillErrorEventsTrend(
+      { "2026-05-12": 9 },
+      3,
+      now,
+    );
+    const b = zeroFillDayTrend({ "2026-05-12": 9 }, 3, now);
+    expect(a).toEqual(b);
+  });
+});
+
+describe("getWorkspaceObservabilityStats — jobsCreatedByDay trend", () => {
+  it("zero-fills the 14-day window when DB returns no rows", async () => {
+    const { db } = makeFakeDb({});
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.jobsCreatedByDay).toHaveLength(14);
+    expect(stats.jobsCreatedByDay.every((b) => b.count === 0)).toBe(true);
+    const dates = stats.jobsCreatedByDay.map((b) => b.date);
+    expect(dates).toEqual([...dates].sort());
+  });
+
+  it("merges DB day-bucket counts into the zero-filled jobs window", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      jobsByDay: [{ day: today, count: 9 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    const todayBucket = stats.jobsCreatedByDay.find((b) => b.date === today);
+    expect(todayBucket?.count).toBe(9);
+    const others = stats.jobsCreatedByDay.filter((b) => b.date !== today);
+    expect(others.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("error-events and jobs trends are independent (no cross-contamination)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { db } = makeFakeDb({
+      errorEventsByDay: [{ day: today, count: 4 }],
+      jobsByDay: [{ day: today, count: 11 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    const errToday = stats.errorEventsByDay.find((b) => b.date === today);
+    const jobToday = stats.jobsCreatedByDay.find((b) => b.date === today);
+    expect(errToday?.count).toBe(4);
+    expect(jobToday?.count).toBe(11);
   });
 });

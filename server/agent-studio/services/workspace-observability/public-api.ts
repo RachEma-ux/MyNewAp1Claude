@@ -77,6 +77,7 @@ export {
   getWorkspaceObservabilityStats,
   rollupSourceKindsByLane,
   zeroFillErrorEventsTrend,
+  zeroFillDayTrend,
 } from "./stats.js";
 
 export { runRetentionSweep } from "./retention-sweep.js";
@@ -89,4 +90,5 @@ export type {
   WorkspaceObservabilityStats,
   WorkspaceObservabilityStatsOptions,
   ErrorEventsTrendBucket,
+  DayTrendBucket,
 } from "./stats.js";
