@@ -19,6 +19,7 @@ import {
   markAllNotificationsRead,
   dismissNotifications,
   dismissAllNotifications,
+  dismissAllNotificationsByKind,
   markAllNotificationsReadByKind,
   pruneOldNotifications,
   AsdbUnavailableError as NotificationsAsdbUnavailableError,
@@ -546,6 +547,80 @@ describe("user-notifications — Phase 22", () => {
       { getDb: () => db as never },
     );
     expect(result.deletedCount).toBe(0);
+  });
+
+  it("dismissAllNotificationsByKind throws AsdbUnavailableError on null DB (#576)", async () => {
+    await expect(
+      dismissAllNotificationsByKind(
+        { userId: 1, notificationKind: "promotion.approved" },
+        { getDb: () => null as never },
+      ),
+    ).rejects.toBeInstanceOf(NotificationsAsdbUnavailableError);
+  });
+
+  it("dismissAllNotificationsByKind short-circuits empty kind array BEFORE the ASDB probe (#576)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await dismissAllNotificationsByKind(
+      { userId: 1, notificationKind: [] },
+      { getDb },
+    );
+    expect(result.deletedCount).toBe(0);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("dismissAllNotificationsByKind defaults readOnly=true (deletes only read rows) (#576)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 10 }, { id: 11 }],
+        }),
+      })),
+    };
+    const result = await dismissAllNotificationsByKind(
+      { userId: 7, notificationKind: "promotion.approved" },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(2);
+    expect(db.delete).toHaveBeenCalledOnce();
+  });
+
+  it("dismissAllNotificationsByKind with readOnly=false nukes all matching kind (#576)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [
+            { id: 10 },
+            { id: 11 },
+            { id: 12 },
+            { id: 13 },
+          ],
+        }),
+      })),
+    };
+    const result = await dismissAllNotificationsByKind(
+      { userId: 7, notificationKind: "promotion.approved", readOnly: false },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(4);
+  });
+
+  it("dismissAllNotificationsByKind accepts array-form notificationKind (#576)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      })),
+    };
+    const result = await dismissAllNotificationsByKind(
+      {
+        userId: 7,
+        notificationKind: ["promotion.approved", "broadcast"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(0);
+    expect(db.delete).toHaveBeenCalledOnce();
   });
 
   it("markNotificationsRead throws AsdbUnavailableError on null DB", async () => {
