@@ -15,7 +15,11 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import {
+  router,
+  protectedProcedure,
+  adminProcedure,
+} from "../../../_core/trpc.js";
 import {
   getJobById,
   listJobs,
@@ -31,6 +35,7 @@ import {
 import { listErrorEvents } from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
 import { getWorkspaceObservabilityStats } from "./stats.js";
+import { runRetentionSweep } from "./retention-sweep.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -225,6 +230,53 @@ export const workspaceObservabilityRouter = router({
       }));
     }
   }),
+
+  // ============================================================
+  // Retention sweep (operator-triggered, admin-only)
+  //
+  // Bundles the three Phase 22 retention prunes (#519/#520/#522)
+  // into a single admin-callable mutation so an operator can clear
+  // stale rows from the dashboard without dropping into the DB or
+  // wiring an out-of-band cron. Cron-style automation can call the
+  // service helper directly; this surface is for operator-on-demand.
+  // ============================================================
+
+  runRetentionSweep: adminProcedure
+    .input(
+      z
+        .object({
+          errorEventsRetentionDays: z.number().int().min(0).max(3650).optional(),
+          notificationsRetentionDays: z
+            .number()
+            .int()
+            .min(0)
+            .max(3650)
+            .optional(),
+          notificationsReadOnly: z.boolean().optional(),
+          backgroundJobsRetentionDays: z
+            .number()
+            .int()
+            .min(0)
+            .max(3650)
+            .optional(),
+          backgroundJobsStatuses: z
+            .array(JobStatusEnum)
+            .min(1)
+            .max(5)
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await runRetentionSweep(input ?? {});
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
 });
 
 export type WorkspaceObservabilityRouter = typeof workspaceObservabilityRouter;
