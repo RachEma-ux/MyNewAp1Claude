@@ -97,6 +97,45 @@ export async function recordErrorEvent(
   return rowToEvent(row);
 }
 
+/**
+ * Singleton getter — completes the per-table getById symmetry across
+ * the three Phase 22 tables. `getJobById` (#511-era) and
+ * `getNotificationById` (#557) already existed; this is the matching
+ * lookup for error_events.
+ *
+ * Returns `null` on ASDB-null (fail-soft, matches the rest of the
+ * surface) and on not-found. Used by drilldown UIs that deeplink to
+ * a specific captured error — typing the id into a URL or following
+ * a link from a related notification's metadata. Operator-facing,
+ * not user-scoped (errors don't have an owning userId in the
+ * dashboard-triage flow).
+ */
+export async function getErrorEventById(
+  errorEventId: number,
+  options: ServiceOptions = {},
+): Promise<ErrorEventRow | null> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({
+      id: agsWorkspaceErrorEvents.id,
+      sourceKind: agsWorkspaceErrorEvents.sourceKind,
+      sourceId: agsWorkspaceErrorEvents.sourceId,
+      userId: agsWorkspaceErrorEvents.userId,
+      errorClass: agsWorkspaceErrorEvents.errorClass,
+      errorMessage: agsWorkspaceErrorEvents.errorMessage,
+      metadata: agsWorkspaceErrorEvents.metadata,
+      createdAt: agsWorkspaceErrorEvents.createdAt,
+    })
+    .from(agsWorkspaceErrorEvents)
+    .where(eq(agsWorkspaceErrorEvents.id, errorEventId))
+    .limit(1);
+  if (rows.length === 0) return null;
+  return rowToEvent(rows[0]);
+}
+
 export interface ListErrorEventsInput {
   /**
    * Single sourceKind to filter by (exact `eq`), or an array (`IN`

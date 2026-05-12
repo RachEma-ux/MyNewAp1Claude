@@ -41,7 +41,7 @@ import {
   dismissNotifications,
   pushNotificationToUsers,
 } from "./user-notifications.js";
-import { listErrorEvents } from "./error-events.js";
+import { getErrorEventById, listErrorEvents } from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
 import { getWorkspaceObservabilityStats } from "./stats.js";
 import { runRetentionSweep } from "./retention-sweep.js";
@@ -452,6 +452,27 @@ export const workspaceObservabilityRouter = router({
       try {
         return await listErrorEvents(input ?? {});
       } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getErrorEventById: protectedProcedure
+    .input(z.object({ errorEventId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      try {
+        const row = await getErrorEventById(input.errorEventId);
+        if (!row) {
+          throwTrpcAndCapture(new TRPCError({
+            code: "NOT_FOUND",
+            message: `Error event ${input.errorEventId} not found`,
+          }));
+        }
+        return row;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),

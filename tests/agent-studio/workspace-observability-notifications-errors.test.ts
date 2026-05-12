@@ -22,6 +22,7 @@ import {
 } from "../../server/agent-studio/services/workspace-observability/user-notifications";
 import {
   recordErrorEvent,
+  getErrorEventById,
   listErrorEvents,
   pruneOldErrorEvents,
 } from "../../server/agent-studio/services/workspace-observability/error-events";
@@ -878,6 +879,60 @@ describe("listErrorEvents — sourceKind array filter (#553)", () => {
       { getDb: () => db as never },
     );
     expect(result.map((r) => r.id)).toEqual([1]);
+  });
+});
+
+describe("getErrorEventById — Phase 22 #558 singleton getter", () => {
+  it("returns null on ASDB-null (fail-soft)", async () => {
+    const result = await getErrorEventById(7, {
+      getDb: () => null as never,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns the row when found", async () => {
+    const now = new Date();
+    const row: ErrEventRow = {
+      id: 7,
+      sourceKind: "trpc.chat.send",
+      sourceId: null,
+      userId: null,
+      errorClass: "ValidationError",
+      errorMessage: "boom",
+      metadata: null,
+      createdAt: now,
+    };
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [row],
+          }),
+        }),
+      }),
+    };
+    const result = await getErrorEventById(7, {
+      getDb: () => db as never,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(7);
+    expect(result!.errorClass).toBe("ValidationError");
+  });
+
+  it("returns null when no row matches", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [],
+          }),
+        }),
+      }),
+    };
+    const result = await getErrorEventById(999, {
+      getDb: () => db as never,
+    });
+    expect(result).toBeNull();
   });
 });
 
