@@ -111,6 +111,15 @@ export interface WorkspaceObservabilityStats {
    *   broadcast → "broadcast" + 1 (no dot → key is itself)
    */
   readonly notificationsByLane: Record<string, number>;
+  /**
+   * Per-day count of notifications created in the last 14 days (UTC),
+   * oldest-first, zero-filled. Completes the daily-trend symmetry
+   * across all three Phase 22 tables (errorEventsByDay,
+   * jobsCreatedByDay, failedJobsByDay). Operators see notification
+   * volume spikes alongside error/jobs spikes — e.g. a stuck worker
+   * generating cascade failures shows up across all three trends.
+   */
+  readonly notificationsByDay: readonly DayTrendBucket[];
   readonly notificationsByReadState: { read: number; unread: number };
   readonly totals: {
     readonly errorEvents: number;
@@ -139,6 +148,7 @@ const EMPTY_STATS: WorkspaceObservabilityStats = {
   failedJobsByLane: {},
   notificationsByKind: {},
   notificationsByLane: {},
+  notificationsByDay: [],
   notificationsByReadState: { read: 0, unread: 0 },
   totals: { errorEvents: 0, jobs: 0, notifications: 0 },
 };
@@ -236,6 +246,7 @@ export async function getWorkspaceObservabilityStats(
     jobsTrendRows,
     failedJobsByKindRows,
     failedJobsTrendRows,
+    notificationsTrendRows,
   ] = await Promise.all([
     db
       .select({
@@ -317,6 +328,16 @@ export async function getWorkspaceObservabilityStats(
         sql`${agsWorkspaceBackgroundJobs.status} = 'failed' AND ${agsWorkspaceBackgroundJobs.updatedAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
       )
       .groupBy(sql`date_trunc('day', ${agsWorkspaceBackgroundJobs.updatedAt}) AT TIME ZONE 'UTC'`),
+    db
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${agsWorkspaceUserNotifications.createdAt}) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(agsWorkspaceUserNotifications)
+      .where(
+        sql`${agsWorkspaceUserNotifications.createdAt} > now() - interval '${sql.raw(String(TREND_DAYS))} days'`,
+      )
+      .groupBy(sql`date_trunc('day', ${agsWorkspaceUserNotifications.createdAt}) AT TIME ZONE 'UTC'`),
   ]);
 
   const errorEventsBySourceKind = bucketize(
@@ -351,6 +372,9 @@ export async function getWorkspaceObservabilityStats(
   const failedJobsTrendMap = bucketize(failedJobsTrendRows, "day");
   const failedJobsByDay = zeroFillDayTrend(failedJobsTrendMap, TREND_DAYS);
 
+  const notificationsTrendMap = bucketize(notificationsTrendRows, "day");
+  const notificationsByDay = zeroFillDayTrend(notificationsTrendMap, TREND_DAYS);
+
   const failedJobsByKind = bucketize(failedJobsByKindRows, "jobKind");
 
   return {
@@ -367,6 +391,7 @@ export async function getWorkspaceObservabilityStats(
     failedJobsByLane: rollupByLane(failedJobsByKind),
     notificationsByKind,
     notificationsByLane: rollupByLane(notificationsByKind),
+    notificationsByDay,
     notificationsByReadState: { read: readCount, unread: unreadCount },
     totals: {
       errorEvents: sumBuckets(errorEventsBySourceKind),
