@@ -522,6 +522,12 @@ export const workspaceObservabilityRouter = router({
             .min(1)
             .max(5)
             .optional(),
+          backgroundJobsJobKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
         })
         .optional(),
     )

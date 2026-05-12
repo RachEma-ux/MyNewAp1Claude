@@ -1022,6 +1022,49 @@ describe("pruneOldBackgroundJobs — Phase 22 retention", () => {
     );
     expect(result.deletedCount).toBe(1);
   });
+
+  it("short-circuits empty jobKind array with no DB call (#549)", async () => {
+    const getDb = vi.fn(() => null as never);
+    const result = await pruneOldBackgroundJobs(
+      { olderThan: new Date("2026-04-01"), jobKind: [] },
+      { getDb },
+    );
+    expect(result.deletedCount).toBe(0);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("forwards single-string jobKind to the DELETE predicate (#549)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 1 }, { id: 2 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      { olderThan: new Date("2026-04-01"), jobKind: "projection.rebuild" },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(2);
+  });
+
+  it("forwards array-form jobKind to the DELETE predicate (#549)", async () => {
+    const db = {
+      delete: vi.fn(() => ({
+        where: () => ({
+          returning: async () => [{ id: 5 }],
+        }),
+      })),
+    };
+    const result = await pruneOldBackgroundJobs(
+      {
+        olderThan: new Date("2026-04-01"),
+        jobKind: ["projection.rebuild", "import.scan"],
+      },
+      { getDb: () => db as never },
+    );
+    expect(result.deletedCount).toBe(1);
+  });
 });
 
 describe("listStaleRunningJobs — Phase 22 #545 dashboard helper", () => {

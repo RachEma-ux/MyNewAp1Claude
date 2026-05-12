@@ -48,6 +48,13 @@ export interface RunRetentionSweepInput {
    * ["completed", "failed", "cancelled"] for aggressive cleanup.
    */
   readonly backgroundJobsStatuses?: readonly JobStatus[];
+  /**
+   * Restrict background-job deletion to jobs of this kind (string)
+   * or kinds (array). Mirrors the jobKind filter on
+   * pruneOldBackgroundJobs (#549) — lets cron callers run
+   * per-worker retention policies without firing N sweeps.
+   */
+  readonly backgroundJobsJobKind?: string | readonly string[];
 }
 
 export interface RunRetentionSweepResult {
@@ -100,6 +107,7 @@ export async function runRetentionSweep(
       {
         olderThan: backgroundJobsCutoff,
         statuses: input.backgroundJobsStatuses,
+        jobKind: input.backgroundJobsJobKind,
       },
       { getDb: options.getDb },
     ),
