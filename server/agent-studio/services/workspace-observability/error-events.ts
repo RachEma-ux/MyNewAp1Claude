@@ -269,6 +269,15 @@ export interface ListErrorEventsInput {
    * last incident report" without computing the cutoff client-side.
    */
   readonly createdSince?: Date;
+  /**
+   * SQL LIKE-style search on `errorMessage` (caller supplies the
+   * wildcards — typically `%foo%` for substring). Operator gesture
+   * for grep-style incident search — "find all events whose
+   * message mentions 'connection refused'" without dragging the
+   * whole table client-side and filtering. Mutually compatible
+   * with the other filters; ANDed in the WHERE clause.
+   */
+  readonly errorMessageLike?: string;
 }
 
 export async function listErrorEvents(
@@ -321,6 +330,11 @@ export async function listErrorEvents(
   }
   if (input.createdSince !== undefined) {
     filters.push(gte(agsWorkspaceErrorEvents.createdAt, input.createdSince));
+  }
+  if (input.errorMessageLike !== undefined) {
+    filters.push(
+      like(agsWorkspaceErrorEvents.errorMessage, input.errorMessageLike),
+    );
   }
 
   const rows = await db
