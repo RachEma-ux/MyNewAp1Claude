@@ -242,8 +242,21 @@ export interface ListJobsInput {
    * `["projection.rebuild", "projection.repair"]` — without firing
    * two calls. Empty array short-circuits to no rows (vacuous IN).
    * Mirrors the array form on listErrorEvents.sourceKind (#553).
+   *
+   * Mutually exclusive with `jobKindLike` (this takes precedence
+   * when both are set — exact match is narrower).
    */
   readonly jobKind?: string | readonly string[];
+  /**
+   * SQL LIKE-style prefix match on `jobKind` (caller supplies the
+   * wildcards — typically `prefix%` for a worker family). Sister of
+   * `listErrorEvents.sourceKindLike` (#514): operators with kinds
+   * like `projection.rebuild` / `projection.repair` / `projection.snap`
+   * can group all `projection.%` rows in a single call. Mutually
+   * compatible with the other filters; ANDed in the WHERE clause.
+   * Mutually exclusive with `jobKind` (exact match wins — narrower).
+   */
+  readonly jobKindLike?: string;
   readonly limit?: number;
   /**
    * Restrict to jobs whose `createdAt` is at-or-after this timestamp.
@@ -501,6 +514,8 @@ export async function listJobs(
         eq(agsWorkspaceBackgroundJobs.jobKind, jobKindInput as string),
       );
     }
+  } else if (input.jobKindLike !== undefined) {
+    filters.push(like(agsWorkspaceBackgroundJobs.jobKind, input.jobKindLike));
   }
   if (input.createdSince !== undefined) {
     filters.push(gte(agsWorkspaceBackgroundJobs.createdAt, input.createdSince));

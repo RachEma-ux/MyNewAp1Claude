@@ -97,6 +97,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(100)).max(20),
             ])
             .optional(),
+          jobKindLike: z.string().min(1).max(100).optional(),
           limit: z.number().int().min(1).max(500).optional(),
           createdSince: z.coerce.date().optional(),
           updatedSince: z.coerce.date().optional(),
