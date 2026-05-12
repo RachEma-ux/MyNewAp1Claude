@@ -31,6 +31,7 @@ import {
   countUnreadNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  pushNotificationToUsers,
 } from "./user-notifications.js";
 import { listErrorEvents } from "./error-events.js";
 import { captureUnexpectedTrpcError } from "./trpc-error-capture.js";
@@ -230,6 +231,42 @@ export const workspaceObservabilityRouter = router({
       }));
     }
   }),
+
+  // ============================================================
+  // Operator broadcast (admin-only)
+  //
+  // Sister of `pushNotification` (singular, called from service code)
+  // — this surface is for operator-driven broadcasts: "graph
+  // projection rebuild complete — please review", "scheduled
+  // maintenance window starts 18:00 UTC", etc. Bulk INSERT to a
+  // caller-supplied user list.
+  // ============================================================
+
+  broadcastNotification: adminProcedure
+    .input(
+      z.object({
+        userIds: z
+          .array(z.number().int().positive())
+          .min(0)
+          .max(10_000),
+        notificationKind: z.string().min(1).max(100),
+        payload: z.record(z.string(), z.unknown()).nullish(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await pushNotificationToUsers({
+          userIds: input.userIds,
+          notificationKind: input.notificationKind,
+          payload: input.payload ?? null,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
 
   // ============================================================
   // Retention sweep (operator-triggered, admin-only)
