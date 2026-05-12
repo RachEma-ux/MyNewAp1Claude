@@ -20,6 +20,7 @@ interface SeededBuckets {
   pendingJobsByKind?: { jobKind: string; count: number }[];
   notificationsByKind?: { notificationKind: string; count: number }[];
   notificationsByReadState?: { read: boolean | null; count: number }[];
+  errorEventsByUserPresence?: { isSystem: boolean; count: number }[];
   errorEventsByDay?: { day: string; count: number }[];
   jobsByDay?: { day: string; count: number }[];
   failedJobsByDay?: { day: string; count: number }[];
@@ -42,6 +43,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
     | "jobKind"
     | "notifKind"
     | "notifRead"
+    | "errorUserPresence"
     | "day"
     | null = null;
   let jobsDayCallCount = 0;
@@ -50,6 +52,7 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
   const select = vi.fn((shape: Record<string, unknown>) => {
     if ("sourceKind" in shape) nextSelectKind = "errorSource";
     else if ("errorClass" in shape) nextSelectKind = "errorClass";
+    else if ("isSystem" in shape) nextSelectKind = "errorUserPresence";
     else if ("status" in shape) nextSelectKind = "jobStatus";
     else if ("jobKind" in shape) nextSelectKind = "jobKind";
     else if ("notificationKind" in shape) nextSelectKind = "notifKind";
@@ -83,6 +86,8 @@ function makeFakeDb(seeded: SeededBuckets = {}) {
               return seeded.notificationsByKind ?? [];
             case "notifRead":
               return seeded.notificationsByReadState ?? [];
+            case "errorUserPresence":
+              return seeded.errorEventsByUserPresence ?? [];
             case "day":
               if (tn === "ags_workspace_background_jobs") {
                 // Day-bucketed queries on the jobs table, in promise-order:
@@ -746,5 +751,56 @@ describe("getWorkspaceObservabilityStats — notificationsByDay trend (#552)", (
       getDb: () => null as never,
     });
     expect(stats.notificationsByDay).toEqual([]);
+  });
+});
+
+describe("getWorkspaceObservabilityStats — errorEventsByUserPresence (#594)", () => {
+  it("buckets by NULL-userId split (system vs user)", async () => {
+    const { db } = makeFakeDb({
+      errorEventsByUserPresence: [
+        { isSystem: true, count: 17 },
+        { isSystem: false, count: 5 },
+      ],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByUserPresence).toEqual({
+      system: 17,
+      user: 5,
+    });
+  });
+
+  it("system-only outage shows all-system rollup (#594)", async () => {
+    const { db } = makeFakeDb({
+      errorEventsByUserPresence: [{ isSystem: true, count: 42 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByUserPresence).toEqual({
+      system: 42,
+      user: 0,
+    });
+  });
+
+  it("user-only outage shows all-user rollup (#594)", async () => {
+    const { db } = makeFakeDb({
+      errorEventsByUserPresence: [{ isSystem: false, count: 8 }],
+    });
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => db as never,
+    });
+    expect(stats.errorEventsByUserPresence).toEqual({
+      system: 0,
+      user: 8,
+    });
+  });
+
+  it("returns {system:0, user:0} on ASDB-null (#594)", async () => {
+    const stats = await getWorkspaceObservabilityStats({
+      getDb: () => null as never,
+    });
+    expect(stats.errorEventsByUserPresence).toEqual({ system: 0, user: 0 });
   });
 });

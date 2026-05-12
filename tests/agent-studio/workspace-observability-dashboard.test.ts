@@ -56,6 +56,7 @@ const STATS_FIXTURE = {
   errorEventsBySourceKind: { "x.y": 1 },
   errorEventsByLane: { x: 1 },
   errorEventsByErrorClass: {},
+  errorEventsByUserPresence: { system: 0, user: 0 },
   errorEventsByDay: [],
   jobsCreatedByDay: [],
   failedJobsByDay: [],
