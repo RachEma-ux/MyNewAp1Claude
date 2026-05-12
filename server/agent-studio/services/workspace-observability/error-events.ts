@@ -381,6 +381,16 @@ export interface PruneOldErrorEventsInput {
    * with no DB call.
    */
   readonly errorClass?: string | readonly string[];
+  /**
+   * SQL LIKE-style filter on `errorMessage` (caller supplies the
+   * wildcards — typically `%foo%` for substring). Sister of
+   * `listErrorEvents.errorMessageLike` (#579) but for the retention
+   * sweep — operators can run "delete all old transient
+   * timeouts but keep auth failures" by setting
+   * `errorMessageLike="%timeout%"`. Composes with `errorClass`
+   * (ANDed). Rows whose `errorMessage` is empty match `""` only.
+   */
+  readonly errorMessageLike?: string;
 }
 
 export interface PruneOldErrorEventsResult {
@@ -423,6 +433,11 @@ export async function pruneOldErrorEvents(
         eq(agsWorkspaceErrorEvents.errorClass, errorClassInput as string),
       );
     }
+  }
+  if (input.errorMessageLike !== undefined) {
+    filters.push(
+      like(agsWorkspaceErrorEvents.errorMessage, input.errorMessageLike),
+    );
   }
 
   const deleted = await db

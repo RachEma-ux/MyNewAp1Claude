@@ -757,6 +757,7 @@ export const workspaceObservabilityRouter = router({
               z.array(z.string().min(1).max(200)).max(20),
             ])
             .optional(),
+          errorEventsErrorMessageLike: z.string().min(1).max(200).optional(),
           notificationsRetentionDays: z
             .number()
             .int()
