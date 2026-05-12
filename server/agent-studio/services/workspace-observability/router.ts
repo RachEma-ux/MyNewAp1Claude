@@ -729,7 +729,12 @@ export const workspaceObservabilityRouter = router({
           errorMessageLike: z.string().min(1).max(200).optional(),
           errorEventsCreatedSince: z.coerce.date().optional(),
           recentErrorEventsUserIdIsNull: z.boolean().optional(),
-          recentErrorEventsUserId: z.number().int().positive().optional(),
+          recentErrorEventsUserId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
           recentErrorEventsSourceId: z
             .union([
               z.string().min(1).max(200),

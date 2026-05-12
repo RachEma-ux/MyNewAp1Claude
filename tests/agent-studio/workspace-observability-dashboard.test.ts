@@ -545,6 +545,32 @@ describe("getObservabilityDashboard", () => {
     expect(args.userId).toBeUndefined();
   });
 
+  it("forwards array-form recentErrorEventsUserId to listErrorEvents (#608)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsUserId: [7, 9, 11],
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: [7, 9, 11] }),
+      expect.any(Object),
+    );
+  });
+
+  it("recentErrorEventsUserId array composes with errorClass + sourceKind (#608)", async () => {
+    await getObservabilityDashboard({
+      recentErrorEventsUserId: [42, 43],
+      errorClass: "BackgroundJobFailed",
+      sourceKind: "trpc.chat.send",
+    });
+    expect(listErrorsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: [42, 43],
+        errorClass: "BackgroundJobFailed",
+        sourceKind: "trpc.chat.send",
+      }),
+      expect.any(Object),
+    );
+  });
+
   it("forwards recentErrorEventsSourceKindLike to listErrorEvents (#601)", async () => {
     await getObservabilityDashboard({
       recentErrorEventsSourceKindLike: "trpc.chat.%",
