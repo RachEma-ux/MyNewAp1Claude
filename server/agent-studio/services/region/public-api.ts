@@ -29,3 +29,13 @@ export {
   resolveWorkspaceRegion,
   assertSameRegion,
 } from "./region-router.js";
+
+// V2 Phase MR-2 (2026-05-13): region-routed connection helper.
+export {
+  getDbForRegion,
+  getDbForWorkspace,
+  getNeo4jUriForRegion,
+  listWarmRegionPoolKeys,
+  type RegionConnectionOptions,
+  type GetDbForWorkspaceInput,
+} from "./connection-helper.js";
