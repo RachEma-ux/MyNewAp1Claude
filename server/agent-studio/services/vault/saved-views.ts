@@ -22,7 +22,7 @@
  * ADR: docs/architecture/agent-studio-markdown-profile.md
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsVaultSavedViews } from "../../../../drizzle/tables/agent-studio-vault.js";
 
@@ -54,6 +54,11 @@ export interface CreateSavedViewInput {
   readonly filters?: Record<string, unknown> | null;
   readonly sort?: Record<string, unknown> | null;
   readonly columns?: string[] | null;
+  /** V1+ Phase 16-α — sharing model. `"personal"` (default) or
+   *  `"workspace_shared"`. See `saved-views-visibility.ts`. */
+  readonly visibility?: "personal" | "workspace_shared";
+  /** When forking a shared view into a personal copy. */
+  readonly parentSavedViewId?: number | null;
 }
 
 export interface SavedViewRow {
@@ -65,6 +70,9 @@ export interface SavedViewRow {
   readonly filters: Record<string, unknown> | null;
   readonly sort: Record<string, unknown> | null;
   readonly columns: string[] | null;
+  readonly visibility: "personal" | "workspace_shared";
+  readonly version: number;
+  readonly parentSavedViewId: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -75,6 +83,8 @@ export interface UpdateSavedViewInput {
   readonly filters?: Record<string, unknown> | null;
   readonly sort?: Record<string, unknown> | null;
   readonly columns?: string[] | null;
+  /** V1+ Phase 16-α — operators can flip visibility. */
+  readonly visibility?: "personal" | "workspace_shared";
 }
 
 export interface ListSavedViewsInput {
@@ -89,6 +99,8 @@ export interface SavedViewServiceOptions {
 }
 
 function rowToSavedView(r: Record<string, unknown>): SavedViewRow {
+  const visibility =
+    r.visibility === "workspace_shared" ? "workspace_shared" : "personal";
   return {
     id: Number(r.id),
     vaultId: Number(r.vaultId),
@@ -99,6 +111,10 @@ function rowToSavedView(r: Record<string, unknown>): SavedViewRow {
       (r.filters as Record<string, unknown> | null | undefined) ?? null,
     sort: (r.sort as Record<string, unknown> | null | undefined) ?? null,
     columns: (r.columns as string[] | null | undefined) ?? null,
+    visibility,
+    version: r.version == null ? 1 : Number(r.version),
+    parentSavedViewId:
+      r.parentSavedViewId == null ? null : Number(r.parentSavedViewId),
     createdAt: r.createdAt as Date,
     updatedAt: r.updatedAt as Date,
   };
@@ -122,6 +138,9 @@ export async function createSavedView(
       filters: input.filters ?? null,
       sort: input.sort ?? null,
       columns: input.columns ?? null,
+      visibility: input.visibility ?? "personal",
+      version: 1,
+      parentSavedViewId: input.parentSavedViewId ?? null,
     })
     .returning({
       id: agsVaultSavedViews.id,
@@ -132,6 +151,9 @@ export async function createSavedView(
       filters: agsVaultSavedViews.filters,
       sort: agsVaultSavedViews.sort,
       columns: agsVaultSavedViews.columns,
+      visibility: agsVaultSavedViews.visibility,
+      version: agsVaultSavedViews.version,
+      parentSavedViewId: agsVaultSavedViews.parentSavedViewId,
       createdAt: agsVaultSavedViews.createdAt,
       updatedAt: agsVaultSavedViews.updatedAt,
     });
@@ -158,6 +180,9 @@ export async function getSavedViewById(
       filters: agsVaultSavedViews.filters,
       sort: agsVaultSavedViews.sort,
       columns: agsVaultSavedViews.columns,
+      visibility: agsVaultSavedViews.visibility,
+      version: agsVaultSavedViews.version,
+      parentSavedViewId: agsVaultSavedViews.parentSavedViewId,
       createdAt: agsVaultSavedViews.createdAt,
       updatedAt: agsVaultSavedViews.updatedAt,
     })
@@ -194,6 +219,9 @@ export async function listSavedViews(
       filters: agsVaultSavedViews.filters,
       sort: agsVaultSavedViews.sort,
       columns: agsVaultSavedViews.columns,
+      visibility: agsVaultSavedViews.visibility,
+      version: agsVaultSavedViews.version,
+      parentSavedViewId: agsVaultSavedViews.parentSavedViewId,
       createdAt: agsVaultSavedViews.createdAt,
       updatedAt: agsVaultSavedViews.updatedAt,
     })
@@ -213,11 +241,19 @@ export async function updateSavedView(
   const db = getDb();
   if (!db) throw new AsdbUnavailableError();
 
-  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  // V1+ Phase 16-α: bump `version` on every content edit so callers
+  // can detect drift against a snapshot they read earlier. Visibility
+  // flips also bump (the "shape" the row presents is part of the
+  // version contract for shared consumers).
+  const patch: Record<string, unknown> = {
+    updatedAt: new Date(),
+    version: sql`${agsVaultSavedViews.version} + 1`,
+  };
   if (input.name !== undefined) patch.name = input.name;
   if (input.filters !== undefined) patch.filters = input.filters;
   if (input.sort !== undefined) patch.sort = input.sort;
   if (input.columns !== undefined) patch.columns = input.columns;
+  if (input.visibility !== undefined) patch.visibility = input.visibility;
 
   await db
     .update(agsVaultSavedViews)
