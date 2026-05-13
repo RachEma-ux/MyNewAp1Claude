@@ -13,6 +13,10 @@ import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 // Mirrors the wfdb/prmdb/psmdb/codedb pattern.
 import { getAsDb } from "./db/connection";
 import {
+  buildApprovalStepStateUpdate,
+  buildPublishRequestStateUpdate,
+} from "./services/retention/lifecycle-transition";
+import {
   agsAgents,
   agsAgentDrafts,
   agsAgentVersions,
@@ -689,7 +693,14 @@ export async function getApprovalStepById(stepId: number) {
   return rows[0] ?? null;
 }
 
-/** Decide an approval step (approve or reject). Returns the updated row. */
+/**
+ * Decide an approval step (approve or reject). Returns the updated row.
+ *
+ * Routes the state transition through `buildApprovalStepStateUpdate` so
+ * `terminalAt` + `terminalReason` are set atomically with the state change.
+ * Retention age depends on `terminalAt`; if the helper is bypassed the row
+ * will never be retention-eligible.
+ */
 export async function decideApprovalStep(input: {
   stepId: number;
   state: "approved" | "rejected";
@@ -697,13 +708,19 @@ export async function decideApprovalStep(input: {
   decisionNote?: string;
 }) {
   const conn = db();
+  const terminal = buildApprovalStepStateUpdate({
+    state: input.state,
+    reason: input.decisionNote ?? `decided by user ${input.decidedBy}`,
+  });
   const [updated] = await conn
     .update(agsApprovalSteps)
     .set({
-      state: input.state,
+      state: terminal.state,
       decidedBy: input.decidedBy,
       decisionNote: input.decisionNote,
       decidedAt: new Date(),
+      terminalAt: terminal.terminalAt,
+      terminalReason: terminal.terminalReason,
     })
     .where(eq(agsApprovalSteps.id, input.stepId))
     .returning();
@@ -720,14 +737,42 @@ export async function getPublishRequestById(publishRequestId: number) {
   return rows[0] ?? null;
 }
 
-/** Update a publish request's state and decidedAt. */
+/**
+ * Update a publish request's state and decidedAt.
+ *
+ * Routes the state transition through `buildPublishRequestStateUpdate` so
+ * `terminalAt` + `terminalReason` are set atomically with the state change.
+ * Retention age depends on `terminalAt`; if the helper is bypassed the row
+ * will never be retention-eligible.
+ *
+ * The `state` union accepts the extended vocab (`cancelled`, `superseded`,
+ * `failed_terminal`) so callers in any future caller surface can transition
+ * to those terminal states without re-edit of this function signature.
+ */
 export async function updatePublishRequestState(input: {
   publishRequestId: number;
-  state: "pending" | "approved" | "rejected" | "withdrawn";
+  state:
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "withdrawn"
+    | "cancelled"
+    | "superseded"
+    | "failed_terminal";
+  reason?: string;
 }) {
+  const terminal = buildPublishRequestStateUpdate({
+    state: input.state,
+    reason: input.reason,
+  });
   await db()
     .update(agsPublishRequests)
-    .set({ state: input.state, decidedAt: new Date() })
+    .set({
+      state: terminal.state,
+      decidedAt: new Date(),
+      terminalAt: terminal.terminalAt,
+      terminalReason: terminal.terminalReason,
+    })
     .where(eq(agsPublishRequests.id, input.publishRequestId));
 }
 
