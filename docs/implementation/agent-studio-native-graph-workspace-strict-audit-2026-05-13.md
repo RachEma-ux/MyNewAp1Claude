@@ -40,7 +40,7 @@ audit closure mission.
 | 11 | Offline-first / local-first mode | "deferred ADR-only" | **NOT IMPLEMENTED** | ADR locks the deferral. No code. Out of scope for MVP 0-4. | n/a | n/a | n/a |
 | 12 | Neo4j Enterprise / Aura migration | "deferred; upgrade path documented" | **NOT IMPLEMENTED** | Phase 27 doc only. No code. Out of scope for MVP 0-4. | License + ops decision | n/a (V2 scope) | n/a |
 | 13 | Track J Runbook | "addressed" | **FULLY IMPLEMENTED** (runbook itself) | Note: a runbook is implementation of the runbook; the *flows it gates* (item 7) remain NOT IMPLEMENTED. | — | — | Runbook present at `docs/runbooks/` |
-| 14 | Phase 11b-3 panel coverage — 17 retention panels extracted | "first slice; 1/17" | **PARTIALLY IMPLEMENTED** (after PR-Y4) | 2 of 17 panels extracted as standalone components (`RuntimeRunsRetentionPanel` PR #729; `McpTransitionsRetentionPanel` PR #735). 15 panels remain inline in `RetrofitPage.tsx`. The remaining 15 still render correctly — extraction is a refactor for testability/maintainability, not a runtime fix. | — | "Retention panel extractions batch 3-N" (incremental) | Panel-coverage source-scan test green at 2/17 |
+| 14 | Phase 11b-3 panel coverage — 17 retention panels extracted | "first slice; 1/17" | **PARTIALLY IMPLEMENTED** (after PR-AT-4) | 5 of 17 panels extracted as standalone components (`RuntimeRunsRetentionPanel` PR #729; `McpTransitionsRetentionPanel` PR #735; `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel` PR-AT-4). 12 panels remain inline in `RetrofitPage.tsx`. The remaining 12 still render correctly — extraction is a refactor for testability/maintainability, not a runtime fix. | — | "Retention panel extractions batch 4-N" (incremental) | Panel-coverage + migration-lock source-scan tests green at 5/17 |
 | 15 | Multi-region graph deployment | "out of scope" | **NOT IMPLEMENTED** | Out of scope per CLAUDE.md. | n/a | n/a | n/a |
 | 16 | Full Canvas / Bases / plugin framework | "out of scope" | **NOT IMPLEMENTED** | Out of scope per CLAUDE.md. | n/a | n/a | n/a |
 | 17 | Hard-rule boundary scans (GraphRepository, OpenRouter, MCP, Postgres SoT) | "implemented" | **FULLY IMPLEMENTED** | None | — | — | Boundary tests green in CI |
@@ -185,15 +185,14 @@ populated directories is what *makes* item 1 FULLY IMPLEMENTED.
 
 ## 7. Next required PRs (in priority order)
 
-1. **Retention panel extractions batch 3** — 3-5 more panels per PR (closes item 14 partial).
+1. **Retention panel extractions batch 4-N** — 2-4 more panels per PR
+   to take item 14 from 5/17 to 17/17.
 2. **Layer 4 Playwright v0** — closes item 7.
 
 Closed this audit cycle: Phase 13.5 (item 4, `a8f5c634`); Golden
 Questions live adapter (item 2, PR-AT-1); Memgraph Bolt query path
-(item 6, PR-AT-2); Projection drift cron (item 9, PR-AT-3). The
-remaining open items at the top of the list are
-extractions/e2e-harness — none are blocked by the items the closed
-ones unblocked.
+(item 6, PR-AT-2); Projection drift cron (item 9, PR-AT-3); Retention
+panel batch 3 (item 14 progress, PR-AT-4 — 5/17 panels extracted).
 
 ---
 
@@ -211,7 +210,8 @@ PRs from the strict-audit mission:
 | #737 (Phase 13.5 PR #3) | `a8f5c634` | `createModelDrivenPlanner()` + 20 tests + ADR addendum — closes the LLM-emitted-plan slice of item 4 |
 | PR-AT-1 (Golden Questions live adapter) | `08cccdf9` | `live-evaluator.ts` + `live-engine-factory.ts` + scorer/orchestrator/report-formatter; CLI `--mode=live` branch; workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` env-var inputs; runbook §4.3 / §6 refresh; 37 new tests (17 evaluator + 20 factory) — closes item 2 |
 | PR-AT-2 (Memgraph Bolt query path) | `503ae0c8` | `bolt-driver-port.ts` + `default-bolt-driver-factory.ts` (lazy-loaded `neo4j-driver`); rewrote `memgraph-graph-repository.ts` with real Bolt round-trips for `health()` / `localGraph()` / `neighborhood()` / `shortestPath()` / `executeTemplate()`; `neo4j-driver` declared in `package.json`; workflow runs a live Bolt health check; 15 new behavioral tests + integrity refresh — closes item 6 |
-| PR-AT-3 (Projection drift cron) | this PR | `services/graph/projection/drift-cron.ts` wires `DriftDetector` to the shared `makeRetentionCron` factory (slot #19 in the daily-sweep ladder, default 04:30 UTC); persists drift events to `ags_graph_projection_drift_events`; new `services/graph/projection/router.ts` exposes `agentStudio.graphProjection.getDriftCronStatus`; boot.ts step 3.24 calls `ensureProjectionDriftCronStarted()`; 19 tests — closes item 9 |
+| PR-AT-3 (Projection drift cron) | `2ccf0841` | `services/graph/projection/drift-cron.ts` wires `DriftDetector` to the shared `makeRetentionCron` factory (slot #19 in the daily-sweep ladder, default 04:30 UTC); persists drift events to `ags_graph_projection_drift_events`; new `services/graph/projection/router.ts` exposes `agentStudio.graphProjection.getDriftCronStatus`; boot.ts step 3.24 calls `ensureProjectionDriftCronStarted()`; 19 tests — closes item 9 |
+| PR-AT-4 (Retention panel batch 3) | this PR | Three more panels extracted out of `RetrofitPage.tsx` into standalone components: `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel`. Each ships with a 10-11 test vitest suite covering both cards + mutation lifecycle. Migration-lock `EXTRACTED_PANEL_PATHS` updated; panel-coverage 2/17 → 5/17 |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The
