@@ -461,6 +461,26 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.20: Phase 22 follow-up #677 — graph-agent runtime-traces
+  // retention cron. Wraps the existing pruneRuntimeTraces (Phase 14 §3)
+  // in a scheduled cron — the service had no cron before #677. Default
+  // daily 17:00 UTC sweep — 15th slot in the daily-sweep ladder. 4-table
+  // children-first cascade (skillRuntimeUsages + queryTemplateRuns +
+  // graphAgentSteps + graphAgentRuns). 90-day default (matches the
+  // existing service's DEFAULT_HORIZON_MS — decision-trace ledgers have
+  // longer forensic value than per-tool-call traces). Env-flag-gated
+  // via AGS_GRAPH_AGENT_RUNTIME_TRACES_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureGraphAgentRuntimeTracesRetentionCronStarted } =
+      await import("./services/graph-agent/retention-cron");
+    ensureGraphAgentRuntimeTracesRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-agent-runtime-traces-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
