@@ -422,6 +422,25 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.18: Phase 22 follow-up #670 — ingestion-jobs retention cron.
+  // The ags_ingestion_jobs table (Universal Ingestion Phase 2-3
+  // lifecycle wrapper) had no retention before #669 + #670. Default
+  // daily 15:00 UTC sweep — 13th slot in the daily-sweep ladder.
+  // Single-table (agsIngestionArtifacts is a SIBLING not a child;
+  // compliance-adjacent and out of scope). Env-flag-gated via
+  // AGS_INGESTION_JOBS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureIngestionJobsRetentionCronStarted } = await import(
+      "./services/ingestion-jobs-retention-cron"
+    );
+    ensureIngestionJobsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-ingestion-jobs-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
