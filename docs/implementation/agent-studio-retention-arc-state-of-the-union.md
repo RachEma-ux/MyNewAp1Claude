@@ -121,39 +121,57 @@ The factory's `buildSweepInput` callback can adapt input shapes — used in
   scanKind, proposalKind, agentKey, sourceConnectorKey), confirm-and-sweep
   button, last-manual-run result card.
 
-## Deferred work — approval-lifecycle retention
+## Deferred work — approval-lifecycle retention (two explicit follow-up tracks)
 
-Per **user 2026-05-12 policy §§0-9**, the following 4 tables remain
-deferred. Implementation is blocked until the lifecycle-governance schema
-extension lands.
+Per **user 2026-05-12 policy §§0-9**, the four approval-lifecycle tables
+below remain deferred. The deferral is **resolved by splitting it into
+two independent follow-up tracks**, each with its own scope, policy
+shape, and acceptance criteria. Implementation of either track is
+blocked until its respective prerequisites land. **Track 2's exclusion
+is permanent — it does not unblock when Track 1 closes.**
 
-| Table                       | Reason                                                 |
-| --------------------------- | ------------------------------------------------------ |
-| `agsPublishRequests`        | Lifecycle vocabulary missing `cancelled` / `superseded` / `failed_terminal`; no `terminalAt` column; no hold model |
-| `agsApprovalSteps`          | Lifecycle vocabulary missing `skipped` / `expired` / `cancelled` / `superseded`; no parent-lifecycle-aware predicate |
-| `agsReleaseAuditRefs`       | **Permanent exclusion** from generic retention factory — compliance long-retention table (min 7y if finite). Only `archiveReleaseAuditRefsRetention` workflow allowed |
-| `agsNotePromotions`         | Approval-lifecycle table (Phase 10); shares same compliance-adjacency concerns. Added to deferral set 2026-05-13 |
+### Track 1 — Lifecycle-governance schema extension
 
-Required schema work (must complete in order before retention implementation):
+Full spec: [`approval-lifecycle-retention-track-1-lifecycle-governance-schema.md`](./approval-lifecycle-retention-track-1-lifecycle-governance-schema.md).
 
-1. Add lifecycle state vocabulary (extend the enums)
-2. Add `terminalAt` + `terminalReason` columns
-3. Add hold model (`legalHold` / `auditHold` / `governanceHold` columns, OR
-   shared `agsLifecycleHolds` reference table — preferred)
-4. Audit + standardize `agsAgentReleases.state` vocabulary
-5. Add active-release / active-deployment FK linkage
-6. Add governance-review + audit-investigation linkage
-7. Backfill existing rows conservatively (`terminalAt = decidedAt OR null`)
-8. Add `isRetentionEligible` derivation service
-9. Test eligibility derivation
-10. Implement retention service
-11. Cron only after retention tests prove safe behavior
+Three tables, all blocked on a single shared schema-extension sequence.
+Implementation is admissible only after the eleven-step prerequisite
+sequence ships (state vocabulary → `terminalAt` → hold model →
+release/deployment classification → governance/investigation linkage →
+backfill → `isRetentionEligible` derivation service → tests → retention
+service → cron).
 
-Full deferral detail: `~/.claude/projects/-root/memory/project_phase_22_approval_lifecycle_deferral.md`.
+| Table                  | Reason                                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `agsPublishRequests`   | Lifecycle vocabulary missing `cancelled` / `superseded` / `failed_terminal`; no `terminalAt` column; no hold model |
+| `agsApprovalSteps`     | Lifecycle vocabulary missing `skipped` / `expired` / `cancelled` / `superseded`; no parent-lifecycle-aware predicate |
+| `agsNotePromotions`    | Phase 10 approval-bearing lifecycle row (`approvedAt`/`rejectedAt`/`rolledBackAt`); shares the same schema gaps. Added to deferral set 2026-05-13 |
 
-**Standing principle (user §0)**: *"Do not weaken the retention predicate
-to fit the current schema. That would make the retention cron unsafe."*
-Schema first, retention second.
+Future allowed procedure names (only after Track 1 closes):
+`prunePublishRequestsRetention`, `pruneApprovalStepsRetention`,
+`pruneNotePromotionsRetention`.
+
+### Track 2 — Compliance archival workflow for `agsReleaseAuditRefs`
+
+Full spec: [`approval-lifecycle-retention-track-2-release-audit-refs-archival.md`](./approval-lifecycle-retention-track-2-release-audit-refs-archival.md).
+
+One table, **permanently excluded from the generic retention factory**.
+This is not a Track-1-style "blocked until schema lands" — it is a
+categorically different policy shape (audit/provenance long-retention,
+indefinite default, 7-year minimum if ever finite, deletion blocked by
+default).
+
+| Table                  | Reason                                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `agsReleaseAuditRefs`  | **Permanent exclusion** from generic retention factory. Compliance long-retention table; minimum 7-year window if finite. Only `archiveReleaseAuditRefsRetention` (separate compliance-approved workflow, NOT the generic factory) is admissible. `prune*Retention` procedure names are **forbidden** here. |
+
+### Standing principle (user §0)
+
+> Do not weaken the retention predicate to fit the current schema. That
+> would make the retention cron unsafe.
+
+Schema first, retention second. Any future implementation that bypasses
+either track's prerequisites is incorrect by construction.
 
 ## Cascade-orphan recurring pattern
 
