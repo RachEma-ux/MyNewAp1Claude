@@ -1,6 +1,37 @@
 # Runtime Hardening V3 — Phase 11b-3 (UI Surfaces) Deferral Note
 
-> **Status:** Deferred at Roadmap V3 closure (`c7d1d29`, 2026-05-10). This note exists so the deferral is visible alongside the Native Graph Workspace roadmap, which supersedes its scope.
+> **Status:** Substantively superseded by Native Graph Workspace MVP 0–4 closure (PR #723, 2026-05-13). The 5-surface scope is now covered by shipped Phase 14 + Phase 22 + Phase 24 work. One sliver — the inline chat diagnostics panel — is the only residual; see §"2026-05-13 re-evaluation" below for the disposition.
+
+## 2026-05-13 re-evaluation (PR-C of full closure mission)
+
+Re-audited each of the 5 original Phase 11b-3 surfaces against what shipped between 2026-05-10 and 2026-05-13:
+
+| Original 11b-3 surface | Shipped in | Status |
+|---|---|---|
+| Runtime Page UI (run list, run detail, SSE timeline) | Phase 14 runtime trace graph + Phase 22 retention surfaces in `RetrofitPage.tsx` | **Superseded** — operator runtime triage now happens through the workspace-observability bundle + per-cron status panels + the `RetrofitPage` retention dashboard |
+| RAC Page UI (RAC composer reads + governance reasons) | RAC retrieval-router + governance reasons already surface via the existing tRPC + `services/rac/` UI extensions | **Superseded** — Phase 22 graph-agent explain panel covers the governance-reason surface |
+| Governance Page UI (approval queue + decision history) | `services/promotion/` + approval-lifecycle retention surface (PRs #682–#703) | **Superseded** — approval queue + decision history have full operator UI today |
+| Trace detail surfaces (per-run drilldown) | `GraphAgentExplainPanel` (Phase 22) + decision-trace writer | **Superseded** |
+| Inline chat diagnostics panel (SSE first-token, idempotency conflicts, disconnect cause shown next to chat session) | No specific successor shipped | **Residual sliver** — not covered by Phase 14 or Phase 24 lenses |
+
+### Disposition
+
+- **4 of 5 surfaces:** Closed via supersession; no follow-up needed. Phase 11b-3 deferral is **closed** for these.
+- **1 surface (inline chat diagnostics panel):** Tracked as a tiny dedicated future PR (~1 small UI component reading `agsRuntimeRuns.sseFirstTokenMs` + `sseDurationMs` + `idempotencyConflicts` + `clientDisconnected` and rendering them next to the active chat session). Not blocking anything; not in MVP 0–4 scope; explicitly tracked in `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` as a V1+ candidate (Phase 11b-3-residual). No active workstream.
+
+### What this closes
+
+This deferral note used to be the only repo-side artifact tracking the carry-over. With the 2026-05-13 re-evaluation:
+
+- The 4 superseded surfaces are formally closed — operator does not need to wait for a Phase 11b-3 PR before relying on them.
+- The 1 residual surface has an explicit successor home (V1+ plan).
+- The note remains as the audit trail.
+
+The original deferral note follows for historical context.
+
+---
+
+## Original (2026-05-10) deferral context
 
 ## Context
 
