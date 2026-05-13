@@ -79,23 +79,48 @@ describe("retention-cron UI panel coverage", () => {
 
   for (const { cron, component } of EXPECTED_PANELS) {
     it(`RetrofitPage declares ${component} for the ${cron} retention cron`, () => {
-      const declRe = new RegExp(`\\bfunction\\s+${component}\\s*\\(`);
+      // A panel is "declared" if RetrofitPage either:
+      //   (a) defines it inline as `function <Component>(`, OR
+      //   (b) imports it from a sibling module (extraction pattern,
+      //       see PR #708 / #722) AND renders it as <Component … />.
+      // Both forms keep the operator-triage surface reachable.
+      const inlineRe = new RegExp(`\\bfunction\\s+${component}\\s*\\(`);
+      const importRe = new RegExp(
+        `import\\s*\\{[^}]*\\b${component}\\b[^}]*\\}\\s*from\\s*["'][^"']+["']`,
+      );
+      const renderRe = new RegExp(`<${component}\\b`);
+
+      const declared =
+        inlineRe.test(src) || (importRe.test(src) && renderRe.test(src));
+
       expect(
-        src,
+        declared,
         `RetrofitPage.tsx is missing the ${component} component for the ` +
-          `${cron} retention cron. If you added a new cron to the daily-sweep ` +
-          `ladder, also declare its operator UI panel in RetrofitPage so the ` +
-          `cron status is reachable from the operator dashboard.`,
-      ).toMatch(declRe);
+          `${cron} retention cron. Either declare it inline as ` +
+          `\`function ${component}(\`, or import it from a sibling module ` +
+          `AND render it as <${component} ... />. If you added a new cron ` +
+          `to the daily-sweep ladder, also declare its operator UI panel ` +
+          `in RetrofitPage so the cron status is reachable from the ` +
+          `operator dashboard.`,
+      ).toBe(true);
     });
   }
 
   for (const { shipped, component } of EXTRA_OPERATOR_SURFACES) {
     it(`RetrofitPage declares ${component} (${shipped})`, () => {
-      const declRe = new RegExp(`\\bfunction\\s+${component}\\s*\\(`);
-      expect(src, `RetrofitPage.tsx is missing the ${component} component`).toMatch(
-        declRe,
+      const inlineRe = new RegExp(`\\bfunction\\s+${component}\\s*\\(`);
+      const importRe = new RegExp(
+        `import\\s*\\{[^}]*\\b${component}\\b[^}]*\\}\\s*from\\s*["'][^"']+["']`,
       );
+      const renderRe = new RegExp(`<${component}\\b`);
+
+      const declared =
+        inlineRe.test(src) || (importRe.test(src) && renderRe.test(src));
+
+      expect(
+        declared,
+        `RetrofitPage.tsx is missing the ${component} component`,
+      ).toBe(true);
     });
   }
 });

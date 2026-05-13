@@ -53,17 +53,33 @@ const CRON_STATUS_BADGE_PATH = join(
 describe("CronStatusBadge migration — regression lock", () => {
   const src = readFileSync(RETROFIT_PAGE_PATH, "utf8");
 
+  // Panels extracted out of RetrofitPage (PR #708 / #722) still own
+  // their CronStatusBadge usages; count those alongside the inline
+  // usages so the 18-cron retention surface stays covered.
+  const EXTRACTED_PANEL_PATHS: ReadonlyArray<string> = [
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "CronStatusPanel.tsx"),
+  ];
+
+  function countBadgeUsages(): number {
+    const inline = (src.match(/<CronStatusBadge\b/g) ?? []).length;
+    const extracted = EXTRACTED_PANEL_PATHS.reduce((sum, p) => {
+      const panelSrc = readFileSync(p, "utf8");
+      return sum + (panelSrc.match(/<CronStatusBadge\b/g) ?? []).length;
+    }, 0);
+    return inline + extracted;
+  }
+
   it("RetrofitPage imports CronStatusBadge", () => {
     expect(src).toMatch(
       /import\s*\{\s*CronStatusBadge\s*\}\s*from\s*["']\.\.\/components\/CronStatusBadge["']/,
     );
   });
 
-  it("RetrofitPage uses CronStatusBadge at least 18 times (one per retention cron + archival surface where applicable)", () => {
-    const matches = src.match(/<CronStatusBadge\b/g) ?? [];
+  it("RetrofitPage + extracted panels use CronStatusBadge at least 18 times (one per retention cron + archival surface where applicable)", () => {
+    const total = countBadgeUsages();
     expect(
-      matches.length,
-      `Expected at least 18 <CronStatusBadge> usages in RetrofitPage (one per retention cron). Found ${matches.length}. If a panel was removed, update this assertion + the panel-coverage test.`,
+      total,
+      `Expected at least 18 <CronStatusBadge> usages across RetrofitPage + extracted panels (one per retention cron). Found ${total}. If a panel was removed, update this assertion + the panel-coverage test. If a panel was extracted into a new component file, add its path to EXTRACTED_PANEL_PATHS.`,
     ).toBeGreaterThanOrEqual(18);
   });
 

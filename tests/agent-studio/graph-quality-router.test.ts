@@ -61,6 +61,10 @@ describe("graphQualityRouter", () => {
       "getFindingAuditTrail",
       "getStats",
       "getOperatorDashboard",
+      "pruneScansRetention",
+      "getScansRetentionCronStatus",
+      "pruneAgentRunsRetention",
+      "getAgentRunsRetentionCronStatus",
     ]);
     for (const name of Object.keys(procedures)) {
       expect(known.has(name)).toBe(true);
