@@ -127,12 +127,30 @@ export function assertOfflineQueueable(kind: string): void {
 }
 
 /**
- * In-memory offline queue. Persistence (IndexedDB) is a separate
- * concern wired in Phase OL-2; this implementation keeps the
- * queue semantics testable without a browser environment.
+ * Optional persistence adapter for the offline queue. When set, the
+ * queue mirrors every enqueue/drain/clear into the store so the
+ * queue is durable across page reloads. Wired in Phase OL-2 (#762).
+ */
+export interface OfflineQueuePersistence {
+  put(entry: OfflineQueueEntry): Promise<void>;
+  delete(id: string): Promise<void>;
+  getAll(): Promise<OfflineQueueEntry[]>;
+  clear(): Promise<void>;
+}
+
+/**
+ * In-memory offline queue with optional persistence adapter (Phase
+ * OL-2 #762). Phase OL-1 shipped the in-memory contract; OL-2
+ * threads a `persistence` adapter so the queue survives page
+ * reloads. When constructed without an adapter, the behavior is
+ * identical to the OL-1 version — no breaking change.
  */
 export class OfflineQueue {
   private readonly entries: OfflineQueueEntry[] = [];
+
+  constructor(
+    private readonly persistence?: OfflineQueuePersistence,
+  ) {}
 
   size(): number {
     return this.entries.length;
@@ -140,6 +158,18 @@ export class OfflineQueue {
 
   list(): ReadonlyArray<OfflineQueueEntry> {
     return [...this.entries];
+  }
+
+  /**
+   * Load any persisted entries from the adapter into the in-memory
+   * working set. Call once at startup. No-op if no persistence
+   * adapter is configured.
+   */
+  async hydrate(): Promise<void> {
+    if (!this.persistence) return;
+    const persisted = await this.persistence.getAll();
+    this.entries.length = 0;
+    this.entries.push(...persisted);
   }
 
   enqueue(input: {
@@ -158,6 +188,13 @@ export class OfflineQueue {
       attempts: 0,
     };
     this.entries.push(entry);
+    // Fire-and-forget the persistence write. Errors surface via
+    // unhandled-rejection; the in-memory queue is the SoT until
+    // hydrate() is called next session, and a transient IDB failure
+    // shouldn't crash the enqueue path.
+    if (this.persistence) {
+      void this.persistence.put(entry);
+    }
     return entry;
   }
 
@@ -178,12 +215,19 @@ export class OfflineQueue {
       try {
         await drainOne(entry);
         drained += 1;
+        if (this.persistence) {
+          await this.persistence.delete(entry.id);
+        }
       } catch (err) {
-        remaining.push({
+        const updated: OfflineQueueEntry = {
           ...entry,
           attempts: entry.attempts + 1,
           lastError: err instanceof Error ? err.message : String(err),
-        });
+        };
+        remaining.push(updated);
+        if (this.persistence) {
+          await this.persistence.put(updated);
+        }
       }
     }
     this.entries.length = 0;
@@ -191,7 +235,10 @@ export class OfflineQueue {
     return drained;
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
     this.entries.length = 0;
+    if (this.persistence) {
+      await this.persistence.clear();
+    }
   }
 }
