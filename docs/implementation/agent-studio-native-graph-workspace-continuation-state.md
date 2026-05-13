@@ -25,7 +25,7 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-**None.** All MVP 0-4 runtime gaps closed. Remaining audit items are either intentional CLAUDE.md deferrals (10, 11, 12, 15, 16), operator-action (item 1), or V1+ plan narrative (item 8).
+**None.** All MVP 0-4 runtime gaps closed. V1+ successor plan first-slice burst (9 PRs) shipped 2026-05-13 — V1.0 + V1.5 + V2.0 first slices all FULLY IMPLEMENTED at data-model + service + boundary-test layer. Item 8 was the audit's "V1+ plan is plan-only narrative" placeholder; that no longer holds — the V1+ plan is in active execution. Remaining audit-level NOT IMPLEMENTED items are intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) which are now ACTIVELY contradicted by the V2.0 first-slice shipments (CRDT, multi-region, offline). The audit doc is the authoritative classifier; the V1+ plan ledger is the execution surface.
 
 **Just closed (2026-05-13):**
 - PR-AT-1 — Golden Questions live adapter (audit item 2). Merged at `08cccdf9`.
@@ -39,7 +39,21 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR-AT-9 — Layer 4 Playwright v0 (item 7 FULLY IMPLEMENTED): `playwright.config.ts` (chromium-only) + 3 specs + `.github/workflows/playwright-e2e.yml` (workflow_dispatch + label-gated `run-e2e`) + `@playwright/test ^1.49.0` devDep + 7-test source-scan integrity lock. Merged at `a0427c19`. Closes the only remaining MVP 0-4 runtime gap.
 - PR-AT-10 — Mission-close cleanup: reclassifies item 21 PARTIALLY → FULLY (the audit rewrite was the work; once complete, it's done); refreshes summary counts; adds §8.1 "Mission close" section to the strict-audit doc.
 
-**Next material work:** None inside MVP 0-4. Audit-mission COMPLETE. Remaining items are either intentional CLAUDE.md deferrals (10–12, 15, 16), operator-action (item 1 G3 benchmark execution), or V1+ plan narrative (item 8 — successor phases). If operator hands appear: trigger `graph-bench-neo4j-ce.yml` to close item 1's operator slice; otherwise the next direction is V1+ plan execution per `docs/implementation/agent-studio-native-graph-workspace-v1-v2-execution-plan.md`.
+**V1+ successor execution plan — first-slice burst (2026-05-13):**
+
+| PR | Phase | Merge SHA |
+|---|---|---|
+| #748 PR-V1-1 | J-1 (production hardening graph health-alerts) | `23e47643` |
+| #749 PR-V1-2 | 19-α (sync/publish target registry + ledger) | `892519b0` |
+| #750 PR-V1-3 | 15-α (vault template-instantiation ledger) | `71c6889d` |
+| #751 PR-V1-4 | 16-α (saved-views sharing + versioning + per-viewer filter) | `a6959a6d` |
+| #752 PR-V1-5 | 17-α (Canvas data model + service) | `9fc503de` |
+| #753 PR-V1-6 | 18-α (extension framework + capability-pinned dispatch) | `9f019393` |
+| #754 PR-V2-1 | MR-1 (region registry + pure router + failover runbook) | `1bf8e509` |
+| #755 PR-V2-2 | CRDT-α (presence service + 5-min idle TTL) | `0b36c820` |
+| #756 PR-V2-3 | OL-1 (offline queue + load-bearing deny-list) | `3e6bae92` |
+
+**Next material work:** Phase β/γ slices per each phase's "out of scope for the α slice" section. V1.0 priorities: Phase J-1 cron wiring (boot-step periodic health-alert scan); Phase 19-β (pusher registration for the three target types). V1.5 priorities: Phase 15-β attachment library; Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
 
 The historical (pre-strict-audit) recovery context follows.
 

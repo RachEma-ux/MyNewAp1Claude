@@ -96,11 +96,28 @@ successor phases) are operator/scoping work — the code paths exist.
 Phase 13.5 closed at `a8f5c634` (#737); items 2/6/9 closed via PR-AT-1
 through PR-AT-3 on 2026-05-13. Panel-extraction sub-arc closed at
 17/17 via PR-AT-8 (item 14 FULLY IMPLEMENTED). Layer 4 Playwright v0
-closed via PR-AT-9 (item 7 FULLY IMPLEMENTED). **All MVP 0-4 strict-
-audit runtime gaps are now closed.** The next material work is V1+
-plan execution (item 8) or operator-action follow-up on item 1 (G3
-benchmark trigger + evidence commit) — neither blocks MVP 0-4
-closure.
+closed via PR-AT-9 (item 7 FULLY IMPLEMENTED). All MVP 0-4 strict-
+audit runtime gaps are closed.
+
+**V1+ successor execution plan — 9-PR first-slice burst on 2026-05-13**
+(item 8 NOT IMPLEMENTED → first slice across all 9 phases shipped):
+
+| Phase | PR | Merge SHA |
+|---|---|---|
+| J-1   (V1.0 production hardening) | #748 | `23e47643` |
+| 19-α  (V1.0 sync/publish) | #749 | `892519b0` |
+| 15-α  (V1.5 templates) | #750 | `71c6889d` |
+| 16-α  (V1.5 saved views) | #751 | `a6959a6d` |
+| 17-α  (V1.5 canvas) | #752 | `9fc503de` |
+| 18-α  (V1.5 extensions) | #753 | `9f019393` |
+| MR-1  (V2.0 multi-region) | #754 | `1bf8e509` |
+| CRDT-α (V2.0 collab presence) | #755 | `0b36c820` |
+| OL-1  (V2.0 offline cache) | #756 | `3e6bae92` |
+
+V1.0 + V1.5 + V2.0 first slices are now FULLY IMPLEMENTED at the
+data-model + service + boundary-test layer. UI surfaces, lane-
+specific runtime hooks, and Phase β/γ extensions land in subsequent
+PRs per each phase's "out of scope for the α slice" section.
 
 ## 8. Why this tracker was rewritten
 
