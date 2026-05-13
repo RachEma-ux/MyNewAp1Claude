@@ -38,6 +38,7 @@ import {
   agsNotePromotionDecisions,
   agsNotePromotionAuditEvents,
 } from "../../../../drizzle/tables/agent-studio-graph-promotion.js";
+import { buildNotePromotionStatusUpdate } from "../retention/lifecycle-transition.js";
 import {
   agsVaultNotes,
   agsVaultNoteVersions,
@@ -206,13 +207,19 @@ export class AsdbPromotionAdapter implements PromotionAdapter {
       decidedByUserId,
     });
 
+    const approvedTransition = buildNotePromotionStatusUpdate({
+      status: "approved",
+      reason: `approved by user ${decidedByUserId}`,
+    });
     await this.db
       .update(agsNotePromotions)
       .set({
-        status: "approved",
+        status: approvedTransition.status,
         approvedByUserId: decidedByUserId,
         approvedAt: new Date(),
         updatedAt: new Date(),
+        terminalAt: approvedTransition.terminalAt,
+        terminalReason: approvedTransition.terminalReason,
       })
       .where(eq(agsNotePromotions.id, promotionId));
 
@@ -259,12 +266,18 @@ export class AsdbPromotionAdapter implements PromotionAdapter {
       decidedByUserId,
     });
 
+    const rollbackTransition = buildNotePromotionStatusUpdate({
+      status: "rolled_back",
+      reason: `rolled back by user ${decidedByUserId}`,
+    });
     await this.db
       .update(agsNotePromotions)
       .set({
-        status: "rolled_back",
+        status: rollbackTransition.status,
         rolledBackAt: new Date(),
         updatedAt: new Date(),
+        terminalAt: rollbackTransition.terminalAt,
+        terminalReason: rollbackTransition.terminalReason,
       })
       .where(eq(agsNotePromotions.id, promotionId));
 
