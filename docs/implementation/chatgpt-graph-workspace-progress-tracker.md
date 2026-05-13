@@ -70,10 +70,10 @@ Verdict: MVP 4 is formally closed in repo terms. Live execution of G3 benchmark 
 ## 8. Missing / Remaining Work
 | Priority | Item | Classification | Action |
 |---|---|---|---|
-| P0 | Neo4j CE live benchmark execution | Formalized; operator execution pending | run `docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md` and archive evidence |
-| P0 | Golden-questions live evaluation | Formalized; operator execution pending | run `docs/runbooks/agent-studio-native-graph-workspace-golden-questions-evaluation-runbook.md` and archive evidence |
-| P1 | Phase 11b-3 | Deferred by plan, not failed | leave deferred until successor planning |
-| P1 | V1 / V1.5 / V2 scope | Deferred by plan, not failed | handle in post-MVP planning cycle |
+| P0 | Neo4j CE live benchmark execution | Workflow-backed; operator triggers `Graph Backend Benchmark — Neo4j CE (G3)` workflow_dispatch | `gh workflow run "Graph Backend Benchmark — Neo4j CE (G3)"` — archive evidence under `docs/evidence/graph-backend/` per runbook §7 |
+| P0 | Golden-questions live evaluation | Workflow-backed; operator triggers `Golden Questions — Live Evaluation (G10)` workflow_dispatch | `gh workflow run "Golden Questions — Live Evaluation (G10)"` — adapter-composition is next operator-implementation PR per runbook §4.4 |
+| P1 | Phase 11b-3 | Substantively superseded (PR-C of closure mission #728) | 4 of 5 surfaces Superseded by Phase 14 + 22 + 24; 1 residual sliver (inline chat diagnostics panel) tracked in V1+ plan |
+| P1 | V1 / V1.5 / V2 scope | Successor-plan-ready (`agent-studio-native-graph-workspace-v1-v2-execution-plan.md`, PR-B #727) | 10-phase plan with first-PR identifiers; 5 ready-to-start V1.0 PRs |
 
 ## 9. Progress Summary for User
 - Current status: MVP 0-MVP 4 substantively delivered and formally closed in repo terms via PR #723.
@@ -83,9 +83,20 @@ Verdict: MVP 4 is formally closed in repo terms. Live execution of G3 benchmark 
 - Repo health: Strong, with remaining failures documented as environment-specific.
 
 ## 10. Next Prompt Recommendation
+
+Post-closure-mission (2026-05-13, PRs #726–#729), the recommended next prompt is:
+
 ```text
-Execute the two operator validation runbooks for formal MVP 4 closure evidence:
-1. Run docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md and archive results under docs/evidence/graph-backend/.
-2. Run docs/runbooks/agent-studio-native-graph-workspace-golden-questions-evaluation-runbook.md and archive results under docs/evidence/graph-agent-lite/.
-Then update the status doc from Formalized/operator-pending to Closed with live evidence links.
+Pick one V1.0 PR from docs/implementation/agent-studio-native-graph-workspace-v1-v2-execution-plan.md §6 and execute it against the named acceptance criteria. Recommended first: Phase 13.5 / PR #1 (Agentic GraphRAG planner contract + ADR + boundary tests), because it unblocks the most downstream phases.
 ```
+
+Alternative — operator-validation track (parallel to V1.0 development):
+
+```text
+Trigger the two operator validation workflows:
+1. gh workflow run "Graph Backend Benchmark — Neo4j CE (G3)" with fixture_scale=sanity
+2. gh workflow run "Golden Questions — Live Evaluation (G10)" with suite=all
+Download the artifacts and commit evidence directories per the linked runbooks §7 / §4.5.
+```
+
+The repo no longer has any deferred items requiring documentation work — every formerly-deferred item is now either Implemented, Workflow-backed, or Successor-plan-ready. See `agent-studio-native-graph-workspace-closure-mission-2026-05-13.md` for the full per-item ledger.
