@@ -61,3 +61,12 @@ export {
   type GetSourceRegionKeyFn,
   type GetTargetRegionKeyFn,
 } from "./cross-region-governance.js";
+
+// V1+ integration slice — agsApprovalSteps adapter for 19-γ gate.
+export {
+  decideGovernanceFromApprovalSteps,
+  createApprovalStepsGovernanceGate,
+  type ApprovalStepSnapshot,
+  type ResolvePublishRequestIdFn,
+  type CreateApprovalStepsGovernanceGateOptions,
+} from "./governance-gate-approval-steps.js";
