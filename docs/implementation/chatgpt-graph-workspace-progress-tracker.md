@@ -137,7 +137,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | 16-γ   (V1.5 saved-view immutable version history) | #769 | `200d4665` |
 | 16-β/γ wire-up (V1.5 vault-router 3 new procedures) | #770 | `3db12f93` |
 | 15-γ wire-up (V1.5 quota guard in createAttachment router) | #771 | `fdf7ba36` |
-| 19-γ   (V1.0 publish executor governance gate) | #772 | pending |
+| 19-γ   (V1.0 publish executor governance gate) | #772 | `123de148` |
+| OL-3   (V2.0 OfflineQueue client bootstrap) | #773 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
