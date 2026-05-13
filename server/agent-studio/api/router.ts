@@ -75,6 +75,7 @@ import { graphAgentRouter } from "../services/graph-agent/router";
 import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
 import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphQualityRouter } from "../services/graph-quality/router";
+import { promotionRouter } from "../services/promotion/router";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -2866,6 +2867,14 @@ export const agentStudioRouter = router({
   racSources: racSourcesRouter,
   // RAC Phase 3: Ingestion adapter contract (preview / register / validate)
   racIngestion: racIngestionRouter,
+  // Phase 11 promotion lifecycle (submit/approve/reject/rollback) +
+  // Phase 22 follow-up #694 retention surface (pruneRetention +
+  // getRetentionCronStatus for agsNotePromotions). The router was
+  // defined at PR #408 but the mount step was missed; the
+  // pruneRetention + getRetentionCronStatus procedures shipped at
+  // PR #694 / consumed by RetrofitPage at PR #695 only became
+  // operator-reachable when this mount landed.
+  promotion: promotionRouter,
   // Phase 22 follow-up #671: Universal Ingestion (Phase 2-3) lifecycle —
   // currently exposes only the ags_ingestion_jobs retention surface.
   ingestion: ingestionRouter,
