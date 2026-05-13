@@ -114,6 +114,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="graph-quality-scans-retention">Graph Quality Scans Retention</TabsTrigger>
           <TabsTrigger value="graph-correction-proposals-retention">Graph Correction Proposals Retention</TabsTrigger>
           <TabsTrigger value="graph-quality-agent-runs-retention">Graph Quality Agent Runs Retention</TabsTrigger>
+          <TabsTrigger value="ingestion-jobs-retention">Ingestion Jobs Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -178,6 +179,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="graph-quality-agent-runs-retention">
           <GraphQualityAgentRunsRetentionPanel />
+        </TabsContent>
+        <TabsContent value="ingestion-jobs-retention">
+          <IngestionJobsRetentionPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -3672,6 +3676,237 @@ function GraphQualityAgentRunsRetentionPanel() {
             <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
               <div className="text-zinc-400 uppercase">Last manual run</div>
               <div>agent runs deleted: {manualResult.deletedAgentRunsCount}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Ingestion Jobs Retention (Phase 22 follow-up #672) ────────────────
+//
+// Operator UI for the ingestion-jobs retention mini-arc
+// (#669 prune + #670 cron + #671 tRPC + #672 UI). 13th slot in the
+// daily-sweep ladder (15:00 UTC). Single-table — agsIngestionArtifacts
+// is a SIBLING (compliance-adjacent, out of scope) per the #669
+// doc-block.
+
+function IngestionJobsRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.ingestion.getJobsRetentionCronStatus.useQuery(
+      undefined,
+      { refetchInterval: 30_000 },
+    );
+  const [retentionDays, setRetentionDays] = useState("30");
+  const [includeSucceeded, setIncludeSucceeded] = useState(true);
+  const [includeFailed, setIncludeFailed] = useState(true);
+  const [includeUnsupported, setIncludeUnsupported] = useState(true);
+  const [workspaceIdInput, setWorkspaceIdInput] = useState("");
+  const [connectorKeyInput, setConnectorKeyInput] = useState("");
+  const [manualResult, setManualResult] = useState<{
+    deletedJobsCount: number;
+  } | null>(null);
+
+  const pruneMut = trpc.agentStudio.ingestion.pruneJobsRetention.useMutation({
+    onSuccess: (data) => {
+      setManualResult({ deletedJobsCount: data.deletedJobsCount });
+      toast.success(
+        `Ingestion jobs sweep complete — ${data.deletedJobsCount} job(s) deleted`,
+      );
+      void statusQuery.refetch();
+    },
+    onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+  });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 30);
+  const status = statusQuery.data;
+
+  const selectedStatuses: (
+    | "succeeded"
+    | "failed"
+    | "unsupported_type"
+  )[] = [];
+  if (includeSucceeded) selectedStatuses.push("succeeded");
+  if (includeFailed) selectedStatuses.push("failed");
+  if (includeUnsupported) selectedStatuses.push("unsupported_type");
+
+  function parseStringList(raw: string): string[] | undefined {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) return undefined;
+    const parts = trimmed
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    return parts.length > 0 ? parts : undefined;
+  }
+
+  function parseNumberList(raw: string): number[] | undefined {
+    const parts = parseStringList(raw);
+    if (!parts) return undefined;
+    const nums = parts
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    return nums.length > 0 ? nums : undefined;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Ingestion jobs retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 15:00 UTC (env:
+            AGS_INGESTION_JOBS_RETENTION_CRON_EXPR /
+            AGS_INGESTION_JOBS_RETENTION_DAYS). Sweeps
+            `ags_ingestion_jobs` — the Universal Ingestion lifecycle
+            wrapper. Single-table; `ags_ingestion_artifacts` is a
+            SIBLING (compliance-adjacent, out of scope). 13th slot
+            in the daily-sweep ladder.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">
+                jobs deleted
+              </div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult ? status.lastResult.deletedJobsCount : "—"}
+              </div>
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            `pending` + `running` jobs are never swept — those are
+            queued/in-flight. Optional `workspaceId` + `connectorKey`
+            CSVs scope the sweep.
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">retentionDays</Label>
+              <Input
+                type="number"
+                value={retentionDays}
+                onChange={(e) => setRetentionDays(e.target.value)}
+                min={1}
+                max={3650}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">statuses</Label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeSucceeded}
+                  onChange={(e) => setIncludeSucceeded(e.target.checked)}
+                />
+                succeeded
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeFailed}
+                  onChange={(e) => setIncludeFailed(e.target.checked)}
+                />
+                failed
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={includeUnsupported}
+                  onChange={(e) => setIncludeUnsupported(e.target.checked)}
+                />
+                unsupported_type
+              </label>
+            </div>
+            <div>
+              <Label className="text-xs">workspaceId (optional, CSV)</Label>
+              <Input
+                type="text"
+                value={workspaceIdInput}
+                onChange={(e) => setWorkspaceIdInput(e.target.value)}
+                placeholder="e.g. 11, 22"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">
+                sourceConnectorKey (optional, CSV)
+              </Label>
+              <Input
+                type="text"
+                value={connectorKeyInput}
+                onChange={(e) => setConnectorKeyInput(e.target.value)}
+                placeholder="e.g. s3, gdrive"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending || selectedStatuses.length === 0}
+            onClick={() => {
+              if (selectedStatuses.length === 0) return;
+              const ws = parseNumberList(workspaceIdInput);
+              const connectors = parseStringList(connectorKeyInput);
+              const statuses =
+                selectedStatuses.length === 3
+                  ? "all terminal statuses"
+                  : selectedStatuses.join(", ");
+              const scopeBits: string[] = [];
+              if (ws) scopeBits.push(`workspaceId=${ws.join(",")}`);
+              if (connectors)
+                scopeBits.push(`connectorKey=${connectors.join(",")}`);
+              const scopeMsg =
+                scopeBits.length > 0 ? `; ${scopeBits.join("; ")}` : "";
+              if (
+                window.confirm(
+                  `Delete ingestion jobs older than ${parsedDays} days (${statuses}${scopeMsg})?`,
+                )
+              ) {
+                pruneMut.mutate({
+                  retentionDays: parsedDays,
+                  statuses: selectedStatuses,
+                  workspaceId: ws && ws.length === 1 ? ws[0] : ws,
+                  sourceConnectorKey:
+                    connectors && connectors.length === 1
+                      ? connectors[0]
+                      : connectors,
+                });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>jobs deleted: {manualResult.deletedJobsCount}</div>
             </div>
           ) : null}
         </CardContent>
