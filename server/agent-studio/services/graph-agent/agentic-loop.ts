@@ -172,3 +172,50 @@ export const ALWAYS_STOP_PLANNER: AgenticPlanner = {
     return { kind: "stop", reason: "stub planner — PR #1 contract-only" };
   },
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 13.5 PR #2 — RoundRobinPlanner.
+//
+// Real, model-free planner. Cycles through a fixed sequence of
+// retrieval modes for `maxIterations` steps, then returns
+// `{ kind: "answer" }`. Useful as:
+//   - Operator-controlled deterministic mode (no LLM dependency).
+//   - Engine wiring test target (no OpenRouter call required).
+//   - V1.5 baseline before model-backed planners land.
+//
+// Boundary preservation is by interface — this planner only returns
+// closed-union actions, so it cannot dispatch tools, mutate the
+// graph, or call models directly.
+// ─────────────────────────────────────────────────────────────────────
+
+import type { RetrievalMode } from "../graph/retrieval/retrieval-router.js";
+
+export interface RoundRobinPlannerOptions {
+  /** Sequence of retrieval modes to cycle. */
+  readonly modes: ReadonlyArray<RetrievalMode>;
+}
+
+export function createRoundRobinPlanner(
+  options: RoundRobinPlannerOptions,
+): AgenticPlanner {
+  if (options.modes.length === 0) {
+    throw new Error("RoundRobinPlanner requires at least one retrieval mode");
+  }
+  return {
+    async plan(input) {
+      // After consuming `maxIterations` retrieve steps, return answer.
+      if (input.iterationIndex >= input.maxIterations) {
+        return {
+          kind: "answer",
+          reason: "round-robin budget exhausted",
+        };
+      }
+      const mode = options.modes[input.iterationIndex % options.modes.length];
+      return {
+        kind: "retrieve",
+        retrievalMode: mode,
+        reason: `round-robin step ${input.iterationIndex} of ${input.maxIterations}`,
+      };
+    },
+  };
+}
