@@ -179,6 +179,21 @@ If §6.1 returns the **Reopened** outcome:
 3. Status report G3 row stays `Formalized; operator execution pending` until a passing run lands.
 4. CLAUDE.md hard rules continue to apply — the `Neo4jCommunityGraphRepository` MAY remain wired but production deploys MUST NOT proceed without a passing benchmark.
 
+### 8.1 Memgraph fallback path
+
+If the Reopened outcome routes to Memgraph as the candidate fallback:
+
+1. Trigger `.github/workflows/graph-bench-memgraph-fallback.yml` via the Actions tab (`workflow_dispatch`) with `fixture_scale: sanity` first to verify the adapter wiring.
+2. The workflow today fails fast at the "Memgraph adapter readiness check" step (exit 78) because the `MemgraphGraphRepository` adapter is V1+ scope per `agent-studio-native-graph-workspace-v1-v2-execution-plan.md`. The failure is **intentional** — the workflow exists as the operator-readiness artifact named here, not as a runnable benchmark.
+3. To proceed with a real Memgraph benchmark, the operator-implementation PR must:
+   - Add a `MemgraphGraphRepository` class under `server/agent-studio/services/graph/repository/`
+   - Register `memgraph` as a backend key in `getGraphRepository()`
+   - Implement the same `GraphRepository` interface (boundary tested)
+   - Add Memgraph-specific Cypher dialect handling for parameterized templates
+4. Once that PR merges, re-run the Memgraph workflow at `fixture_scale: full` and compare evidence against the Neo4j CE results per §5.3.
+
+The Memgraph workflow + this §8.1 are the **fallback-readiness artifact** the Phase 1.5 ADR §3 requires. Memgraph is NOT made primary unless the Neo4j CE benchmark fails and the operator approves the migration in a rev-ADR.
+
 ## 9. CI / staging constraints
 
 - This runbook is **not** part of per-PR CI. It cannot run on Termux device (no Docker, no Neo4j CE deploy, no 10k-row fixture).

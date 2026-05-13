@@ -1,0 +1,164 @@
+# Native Graph Workspace MVP 0 — Phase 1.5 G3 fallback path.
+#
+# Operator-triggered Memgraph fallback benchmark. Runs only when
+# Neo4j CE has failed the §6.1 pass criteria in
+#   docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md
+# and the operator wants to evaluate the fallback candidate documented
+# in §1.5 of the Phase 1.5 backend decision ADR.
+#
+# This workflow is `workflow_dispatch` only and intentionally inert
+# in production. It mirrors the Neo4j CE workflow shape but targets
+# `memgraph/memgraph-platform` and emits its report under a distinct
+# `memgraph-` evidence subdirectory so both candidates can be compared
+# side-by-side.
+#
+# Hard-rule compliance:
+#   - Postgres remains source of truth — the Postgres baseline + the
+#     SOT-invariant assertion are kept identical to the CE workflow.
+#   - Memgraph is a projection target only. The GraphRepository
+#     backend abstraction is the same — when Memgraph is wired,
+#     `GRAPH_BACKEND=memgraph` selects the adapter.
+#
+# Status: workflow_dispatch skeleton. The Memgraph GraphRepository
+# adapter does NOT exist on main today; the workflow exists as the
+# fallback-readiness artifact named in the runbook §6.1. Wiring the
+# adapter is a separate operator-implementation PR (V1+ scope when
+# Memgraph adoption is actually triggered).
+
+name: Graph Backend Benchmark — Memgraph fallback (G3 fallback)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: 'Comma-separated scenario keys (or "all")'
+        required: false
+        default: 'all'
+      iterations:
+        description: 'Iterations per scenario'
+        required: false
+        default: '30'
+      fixture_scale:
+        description: 'Fixture size'
+        required: false
+        default: 'sanity'
+        type: choice
+        options:
+          - sanity
+          - full
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: asdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      memgraph:
+        image: memgraph/memgraph-platform:latest
+        ports:
+          - 7687:7687
+          - 3000:3000
+        options: >-
+          --health-cmd "echo 'RETURN 1' | mgconsole || exit 1"
+          --health-interval 15s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://testuser:testpass@localhost:5432/asdb
+      DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/asdb
+      MEMGRAPH_URI: bolt://localhost:7687
+      MEMGRAPH_USER: memgraph
+      MEMGRAPH_PASSWORD: ''
+      GRAPH_BACKEND: memgraph
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Apply ASDB schema
+        run: npx drizzle-kit push --force
+
+      - name: Memgraph adapter readiness check
+        run: |
+          # The Memgraph GraphRepository adapter is not on main today.
+          # This step fails loudly with a clear pointer so the operator
+          # knows the workflow exists but cannot run until the adapter
+          # is wired (V1+ scope per the V1/V1.5/V2 successor plan).
+          if ! grep -q "memgraph" server/agent-studio/services/graph/repository/index.ts 2>/dev/null; then
+            echo "::error::Memgraph GraphRepository adapter is not wired on main. This fallback workflow exists as a readiness artifact per docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md §6.1, but cannot execute until the adapter PR lands. See docs/architecture/agent-studio-active-graph-backend-decision.md §3 for the fallback path."
+            exit 78
+          fi
+          echo "[memgraph-adapter] OK"
+
+      - name: Compute run date
+        id: date
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve fixture scale
+        id: scale
+        run: |
+          if [ "${{ github.event.inputs.fixture_scale }}" = "full" ]; then
+            echo "label=full" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=sanity" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Memgraph benchmark
+        run: |
+          mkdir -p "docs/evidence/graph-backend/${{ steps.date.outputs.date }}-memgraph-${{ steps.scale.outputs.label }}"
+          npx tsx scripts/graph-bench/run-benchmark.ts \
+            --scenarios "${{ github.event.inputs.scenarios }}" \
+            --iterations "${{ github.event.inputs.iterations }}" \
+            --output "docs/evidence/graph-backend/${{ steps.date.outputs.date }}-memgraph-${{ steps.scale.outputs.label }}/report.md"
+
+      - name: Assert Postgres source-of-truth invariant
+        run: |
+          NOTES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_vault_notes" 2>/dev/null || echo 0)
+          NODES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_graph_nodes" 2>/dev/null || echo 0)
+          EDGES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_graph_edges" 2>/dev/null || echo 0)
+          echo "[postgres-sot] notes=${NOTES} nodes=${NODES} edges=${EDGES}"
+          if [ "${NOTES}" -eq 0 ] && [ "${NODES}" -eq 0 ] && [ "${EDGES}" -eq 0 ]; then
+            echo "::error::Postgres source-of-truth assertion failed."
+            exit 1
+          fi
+          echo "[postgres-sot] OK"
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graph-bench-memgraph-${{ steps.date.outputs.date }}-${{ steps.scale.outputs.label }}
+          path: docs/evidence/graph-backend/${{ steps.date.outputs.date }}-memgraph-${{ steps.scale.outputs.label }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Graph Backend Benchmark — Memgraph fallback — ${{ steps.date.outputs.date }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Scale: \`${{ steps.scale.outputs.label }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Adapter status: requires Memgraph GraphRepository PR (V1+ scope)" >> "$GITHUB_STEP_SUMMARY"
