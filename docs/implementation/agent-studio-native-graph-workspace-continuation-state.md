@@ -25,7 +25,7 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-1. Retention panel extractions 12-17 (item 14 partial — 6 remain)
+1. Retention panel extractions batch 7 (final) — item 14 partial; 3 panels remain (the approval-lifecycle trio)
 2. Layer 4 e2e harness (item 7)
 
 **Just closed (2026-05-13):**
@@ -34,9 +34,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR-AT-3 — Projection drift cron (audit item 9). Merged at `2ccf0841`.
 - PR-AT-4 — Retention panel batch 3 (item 14 progress, 2/17 → 5/17): `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel`. Merged at `90180205`.
 - PR-AT-5 — Retention panel batch 4 (item 14 progress, 5/17 → 8/17): `CagPackEventsRetentionPanel` + `SimulationRunsRetentionPanel` + `TestRunsRetentionPanel`. Merged at `0404b13b`.
-- PR-AT-6 — Retention panel batch 5 (item 14 progress, 8/17 → 11/17): `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`.
+- PR-AT-6 — Retention panel batch 5 (item 14 progress, 8/17 → 11/17): `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. Merged at `fdbac53d`.
+- PR-AT-7 — Retention panel batch 6 (item 14 progress, 11/17 → 14/17): `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`.
 
-**Next material work:** retention panel extractions batch 6 (item 14 partial). 6 panels remain inline: `IngestionJobsRetentionPanel`, `GraphChangeProposalsRetentionPanel`, `GraphAgentRuntimeTracesRetentionPanel`, `PublishRequestsRetentionPanel`, `ApprovalStepsRetentionPanel`, `NotePromotionsRetentionPanel`. Two batches of 3 should close item 14 entirely.
+**Next material work:** retention panel extractions batch 7 (final) — item 14 partial. 3 panels remain inline (the approval-lifecycle trio): `PublishRequestsRetentionPanel`, `ApprovalStepsRetentionPanel`, `NotePromotionsRetentionPanel`. One more batch closes item 14 entirely (14/17 → 17/17).
 
 The historical (pre-strict-audit) recovery context follows.
 

@@ -40,7 +40,7 @@ audit closure mission.
 | 11 | Offline-first / local-first mode | "deferred ADR-only" | **NOT IMPLEMENTED** | ADR locks the deferral. No code. Out of scope for MVP 0-4. | n/a | n/a | n/a |
 | 12 | Neo4j Enterprise / Aura migration | "deferred; upgrade path documented" | **NOT IMPLEMENTED** | Phase 27 doc only. No code. Out of scope for MVP 0-4. | License + ops decision | n/a (V2 scope) | n/a |
 | 13 | Track J Runbook | "addressed" | **FULLY IMPLEMENTED** (runbook itself) | Note: a runbook is implementation of the runbook; the *flows it gates* (item 7) remain NOT IMPLEMENTED. | — | — | Runbook present at `docs/runbooks/` |
-| 14 | Phase 11b-3 panel coverage — 17 retention panels extracted | "first slice; 1/17" | **PARTIALLY IMPLEMENTED** (after PR-AT-6) | 11 of 17 panels extracted as standalone components (Runtime/Mcp via #729/#735; Tool/Catalog/Rac via PR-AT-4; Cag/Simulation/Test via PR-AT-5; GraphQualityScans/GraphCorrectionProposals/GraphQualityAgentRuns via PR-AT-6). 6 panels remain inline in `RetrofitPage.tsx`. The remaining 6 still render correctly — extraction is a refactor for testability/maintainability, not a runtime fix. | — | "Retention panel extractions batch 6-N" (incremental) | Panel-coverage + migration-lock source-scan tests green at 11/17 |
+| 14 | Phase 11b-3 panel coverage — 17 retention panels extracted | "first slice; 1/17" | **PARTIALLY IMPLEMENTED** (after PR-AT-7) | 14 of 17 panels extracted as standalone components (Runtime/Mcp via #729/#735; Tool/Catalog/Rac via PR-AT-4; Cag/Simulation/Test via PR-AT-5; GraphQualityScans/GraphCorrectionProposals/GraphQualityAgentRuns via PR-AT-6; IngestionJobs/GraphChangeProposals/GraphAgentRuntimeTraces via PR-AT-7). 3 panels remain inline in `RetrofitPage.tsx` (the approval-lifecycle trio: PublishRequests, ApprovalSteps, NotePromotions). The remaining 3 still render correctly — extraction is a refactor for testability/maintainability, not a runtime fix. | — | "Retention panel extractions batch 7" (final batch, 3 panels) | Panel-coverage + migration-lock source-scan tests green at 14/17 |
 | 15 | Multi-region graph deployment | "out of scope" | **NOT IMPLEMENTED** | Out of scope per CLAUDE.md. | n/a | n/a | n/a |
 | 16 | Full Canvas / Bases / plugin framework | "out of scope" | **NOT IMPLEMENTED** | Out of scope per CLAUDE.md. | n/a | n/a | n/a |
 | 17 | Hard-rule boundary scans (GraphRepository, OpenRouter, MCP, Postgres SoT) | "implemented" | **FULLY IMPLEMENTED** | None | — | — | Boundary tests green in CI |
@@ -97,9 +97,9 @@ intentional, not gaps):
 
 1. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
    on PRs. The pyramid stops at the Layer 3 integration tests for now.
-2. **15 of 17 retention panels still inline** (item 14 — the partial
-   slice). Functional but not extracted/testable as standalone
-   components.
+2. **3 of 17 retention panels still inline** (item 14 — the partial
+   slice; the approval-lifecycle trio). Functional but not extracted/
+   testable as standalone components.
 
 Items closed in this audit cycle:
 - Item 2 (Golden Questions live adapter) — PR-AT-1.
@@ -185,14 +185,17 @@ populated directories is what *makes* item 1 FULLY IMPLEMENTED.
 
 ## 7. Next required PRs (in priority order)
 
-1. **Retention panel extractions batch 4-N** — 2-4 more panels per PR
-   to take item 14 from 5/17 to 17/17.
+1. **Retention panel extractions batch 7 (final)** — the approval-
+   lifecycle trio (PublishRequests + ApprovalSteps + NotePromotions),
+   taking item 14 from 14/17 to 17/17 and closing the panel-extraction
+   sub-arc.
 2. **Layer 4 Playwright v0** — closes item 7.
 
 Closed this audit cycle: Phase 13.5 (item 4, `a8f5c634`); Golden
 Questions live adapter (item 2, PR-AT-1); Memgraph Bolt query path
 (item 6, PR-AT-2); Projection drift cron (item 9, PR-AT-3); Retention
-panel batch 3 (item 14 progress, PR-AT-4 — 5/17 panels extracted).
+panel batches 3/4/5/6 (item 14 progress, PR-AT-4 through PR-AT-7 —
+14/17 panels extracted).
 
 ---
 
@@ -213,7 +216,8 @@ PRs from the strict-audit mission:
 | PR-AT-3 (Projection drift cron) | `2ccf0841` | `services/graph/projection/drift-cron.ts` wires `DriftDetector` to the shared `makeRetentionCron` factory (slot #19 in the daily-sweep ladder, default 04:30 UTC); persists drift events to `ags_graph_projection_drift_events`; new `services/graph/projection/router.ts` exposes `agentStudio.graphProjection.getDriftCronStatus`; boot.ts step 3.24 calls `ensureProjectionDriftCronStarted()`; 19 tests — closes item 9 |
 | PR-AT-4 (Retention panel batch 3) | `90180205` | Three panels extracted: `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel`. 31 vitest cases. 2/17 → 5/17 |
 | PR-AT-5 (Retention panel batch 4) | `0404b13b` | Three panels extracted: `CagPackEventsRetentionPanel` + `SimulationRunsRetentionPanel` + `TestRunsRetentionPanel`. 31 vitest cases. 5/17 → 8/17 |
-| PR-AT-6 (Retention panel batch 5) | this PR | Three more panels: `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. 28 vitest cases. 8/17 → 11/17 |
+| PR-AT-6 (Retention panel batch 5) | `fdbac53d` | Three more panels: `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. 28 vitest cases. 8/17 → 11/17 |
+| PR-AT-7 (Retention panel batch 6) | this PR | Three more panels: `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`. 29 vitest cases. 11/17 → 14/17 |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The
