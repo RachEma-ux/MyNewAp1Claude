@@ -11,7 +11,7 @@
 
 The earlier closure-mission addendum framed all 21 items as "Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked". The strict-audit pass (PRs #732–#737) re-classified each item under a binary scheme: **FULLY IMPLEMENTED / PARTIALLY IMPLEMENTED / NOT IMPLEMENTED**. The authoritative ledger is now `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`.
 
-**Honest counts:** 9 FULLY IMPLEMENTED · 5 PARTIALLY IMPLEMENTED · 7 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
+**Honest counts:** 10 FULLY IMPLEMENTED · 4 PARTIALLY IMPLEMENTED · 7 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
 
 **Phase 13.5 trio on main (audit item 4 — FULLY IMPLEMENTED):**
 - PR #731 — contract + closed-union types + boundary tests
@@ -25,15 +25,15 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-1. Memgraph Bolt query implementation (item 6 partial)
-2. Projection drift cron (item 9 partial)
-3. Retention panel extractions 3-17 (item 14 partial)
-4. Layer 4 e2e harness (item 7)
+1. Projection drift cron (item 9 partial)
+2. Retention panel extractions 3-17 (item 14 partial)
+3. Layer 4 e2e harness (item 7)
 
 **Just closed (2026-05-13):**
-- PR-AT-1 — Golden Questions live adapter (audit item 2). Live evaluator + engine factory + CLI `--mode=live` + workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` inputs + runbook §4.3 / §6 refresh. 47 tests green on main.
+- PR-AT-1 — Golden Questions live adapter (audit item 2). Live evaluator + engine factory + CLI `--mode=live` + workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` inputs. Merged at `08cccdf9`.
+- PR-AT-2 — Memgraph Bolt query path (audit item 6). `bolt-driver-port.ts` + lazy `default-bolt-driver-factory.ts` (dynamic-imports `neo4j-driver`) + real `health/localGraph/neighborhood/shortestPath/executeTemplate` in `MemgraphGraphRepository`. `neo4j-driver` declared in `package.json`. Workflow runs a live Bolt health round-trip.
 
-**Next material work:** Memgraph Bolt query path (item 6 partial). The skeleton + registration is on main from PR #733; the query implementation is what closes the partial.
+**Next material work:** projection drift cron (item 9 partial). Today drift detection runs on-demand via tRPC only; the cron slot is the 19th ladder addition.
 
 The historical (pre-strict-audit) recovery context follows.
 

@@ -32,7 +32,7 @@ audit closure mission.
 | 3 | Phase 13.5 / PR #1 — Agentic planner contract + ADR + boundary tests | "first slice" | **FULLY IMPLEMENTED** | None | — | — | PR #731 merged; 23 boundary tests green |
 | 4 | Phase 13.5 — agentic GraphRAG (contract + engine wiring + round-robin + model-driven planner) | "tracked in V1+ plan" / "first slice" | **FULLY IMPLEMENTED** (#731 + #732 `ffb4eba9` + #737 `a8f5c634`) | None for the V1.0 agentic slice. Multi-iteration permission-leak property test family is V1.5; model-output rewriting/retry layer is V1.5 (intentional — see ADR PR #3 addendum §"Failure path"). | — | — | 62/62 tests green on main (boundary 27 + model-planner 20 + engine-agentic 9 + engine 6) |
 | 5 | Phase 11b-3 — inline chat diagnostics panel | "residual sliver tracked in V1+" | **FULLY IMPLEMENTED** (after PR-Y3 #734) | None | — | — | PR #734; 11 panel tests green |
-| 6 | Phase 1.5 G3 fallback — Memgraph adapter | "readiness artifact, exit 78" | **PARTIALLY IMPLEMENTED** (after PR-Y2 #733) | `MemgraphGraphRepository` skeleton class exists + registered in `getGraphRepository()` switch; `MEMGRAPH_CAPABILITIES` published; integrity test green; benchmark workflow no longer exits 78. The actual Bolt query implementation (executeCypher, traversal, projection) is **NOT** wired — methods throw `GraphCapabilityUnsupportedError` placeholders. Activation requires the operator-implementation PR named in the V1+ plan. | Bolt query implementation; live Memgraph container | "Memgraph Bolt query implementation — V1+ PR" | PR #733; 6 integrity tests green; query-path runtime: missing |
+| 6 | Phase 1.5 G3 fallback — Memgraph adapter | "readiness artifact, exit 78" | **FULLY IMPLEMENTED** (PR-AT-2, 2026-05-13) | None for the read-only Bolt slice. Projection writes intentionally remain no-op because Postgres is source-of-truth and projection orchestration is a separate path; full GDS / MAGE algorithm wiring is out-of-MVP scope. | — | — | 26 tests green (15 behavioral with stub driver + 6 integrity + 5 boundary); `neo4j-driver` declared in package.json; workflow runs a real Bolt health round-trip |
 | 7 | Track J — Layer 4 e2e smoke harness | "ADR completed; first slice" | **NOT IMPLEMENTED** | ADR + scaffold exist; no real Playwright/Cypress e2e suite committed; CI does not run Layer 4 on PRs. | Playwright config + spec PRs | "Layer 4 e2e — Playwright suite v0" (V1.0 plan) | Layer 4 absent from CI matrix |
 | 8 | V1 / V1.5 / V2 successor plan | "successor-plan-ready" | **NOT IMPLEMENTED** (as runtime; the *plan document* exists) | The document is a plan, not code. Ten phases × ~5 PRs each are unstarted. | All listed in plan | Plan PR #1 per chosen phase | n/a (plan-only) |
 | 9 | Phase 14 — Neo4j projection for `agsRuntimeRuns` | "implemented in repo" | **PARTIALLY IMPLEMENTED** | Projection tables + projection writer exist; full bidirectional reconciliation + drift-detect cron is **NOT** running on a schedule. Drift detection is on-demand only via tRPC. | Cron slot + scheduler entry | "Phase 14 — projection drift cron" | Projection unit tests green; cron: absent |
@@ -51,8 +51,8 @@ audit closure mission.
 
 ### 1.1 Summary counts
 
-- **FULLY IMPLEMENTED:** 9 items (2, 3, 4, 5, 13, 17, 18, 19, 20)
-- **PARTIALLY IMPLEMENTED:** 5 items (1, 6, 9, 14, 21 — see below)
+- **FULLY IMPLEMENTED:** 10 items (2, 3, 4, 5, 6, 13, 17, 18, 19, 20)
+- **PARTIALLY IMPLEMENTED:** 4 items (1, 9, 14, 21 — see below)
 - **NOT IMPLEMENTED:** 7 items (7, 8, 10, 11, 12, 15, 16)
 
 Item 21 was reclassified from PARTIALLY → FULLY after the tracker was
@@ -95,22 +95,20 @@ The items below are **NOT IMPLEMENTED** in runtime and are inside MVP 0-4
 scope (the deferred-by-CLAUDE.md items above are excluded — they are
 intentional, not gaps):
 
-1. **Memgraph Bolt query implementation** (item 6 — the partial slice).
-   The skeleton + registration exists so the workflow + integrity test
-   can run; the actual Cypher/Bolt query path is unimplemented.
-2. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
+1. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
    on PRs. The pyramid stops at the Layer 3 integration tests for now.
-3. **Projection drift cron** (item 9 — the partial slice). Drift detect
+2. **Projection drift cron** (item 9 — the partial slice). Drift detect
    is on-demand only.
-4. **15 of 17 retention panels still inline** (item 14 — the partial
+3. **15 of 17 retention panels still inline** (item 14 — the partial
    slice). Functional but not extracted/testable as standalone
    components.
 
-Item 2 (Golden Questions live adapter) was closed by PR-AT-1 on
-2026-05-13 and moved from the gap list. Every other item is either
-FULLY IMPLEMENTED, intentionally out of MVP scope (10-12, 15-16), or
-operator-action (1 — G3 benchmark execution; 2 — workflow trigger +
-evidence commit).
+Item 2 (Golden Questions live adapter) closed by PR-AT-1 on 2026-05-13.
+Item 6 (Memgraph Bolt query path) closed by PR-AT-2 on 2026-05-13.
+Every other item is either FULLY IMPLEMENTED, intentionally out of
+MVP scope (10-12, 15-16), or operator-action (1 — G3 benchmark
+execution; 2 — workflow trigger + evidence commit; 6 — fallback
+adoption decision).
 
 ---
 
@@ -188,16 +186,13 @@ populated directories is what *makes* item 1 FULLY IMPLEMENTED.
 
 1. **Retention panel extractions batch 3** — 3-5 more panels per PR (closes item 14 partial).
 2. **Projection drift cron** — closes item 9 partial.
-3. **Memgraph Bolt query implementation** — closes item 6 partial.
-4. **Layer 4 Playwright v0** — closes item 7.
+3. **Layer 4 Playwright v0** — closes item 7.
 
-Phase 13.5 PR #3 merged at `a8f5c634` and is part of item 4's FULLY
-IMPLEMENTED footprint. The Golden Questions live adapter (item 2)
-merged via PR-AT-1 on 2026-05-13 and is also FULLY IMPLEMENTED — the
-remaining gap is operator action (run the workflow, commit the
-evidence directory), not code. Each remaining item is named in
-`agent-studio-native-graph-workspace-v1-v2-execution-plan.md` (audit
-item 8). The plan exists; execution is the work.
+Closed this audit cycle: Phase 13.5 (item 4, `a8f5c634`); Golden
+Questions live adapter (item 2, PR-AT-1); Memgraph Bolt query path
+(item 6, PR-AT-2). The remaining open items at the top of the list
+are extractions/cron-additions/e2e-harness — none are blocked by the
+items the closed ones unblocked.
 
 ---
 
@@ -213,7 +208,8 @@ PRs from the strict-audit mission:
 | #735 (PR-Y4) | `36d5844d` | `McpTransitionsRetentionPanel` extraction + 10 tests — raises panel-coverage 1/17 → 2/17 |
 | #736 (PR-Y5) | `b7ef35a7` | Strict-audit doc; local seed script; tracker rewrite to honest classifications |
 | #737 (Phase 13.5 PR #3) | `a8f5c634` | `createModelDrivenPlanner()` + 20 tests + ADR addendum — closes the LLM-emitted-plan slice of item 4 |
-| PR-AT-1 (Golden Questions live adapter) | this PR | `live-evaluator.ts` + `live-engine-factory.ts` + scorer/orchestrator/report-formatter; CLI `--mode=live` branch; workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` env-var inputs; runbook §4.3 / §6 refresh; 37 new tests (17 evaluator + 20 factory) — closes item 2 |
+| PR-AT-1 (Golden Questions live adapter) | `08cccdf9` | `live-evaluator.ts` + `live-engine-factory.ts` + scorer/orchestrator/report-formatter; CLI `--mode=live` branch; workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` env-var inputs; runbook §4.3 / §6 refresh; 37 new tests (17 evaluator + 20 factory) — closes item 2 |
+| PR-AT-2 (Memgraph Bolt query path) | this PR | `bolt-driver-port.ts` + `default-bolt-driver-factory.ts` (lazy-loaded `neo4j-driver`); rewrote `memgraph-graph-repository.ts` with real Bolt round-trips for `health()` / `localGraph()` / `neighborhood()` / `shortestPath()` / `executeTemplate()`; `neo4j-driver` declared in `package.json`; workflow runs a live Bolt health check; 15 new behavioral tests + integrity refresh — closes item 6 |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The
