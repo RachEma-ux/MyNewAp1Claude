@@ -108,17 +108,17 @@ export function getGraphRepository(): GraphRepository {
       break;
     case "memgraph":
       // Fallback path per `agent-studio-active-graph-backend-decision.md`
-      // §3. Adapter is currently a skeleton (same shape as Neo4j CE
-      // adapter pre-Phase-7.5); the fallback-promotion operator-
-      // implementation PR lands the real driver wiring. Triggering
-      // path: G3 benchmark fails Neo4j CE targets → operator approves
-      // fallback in rev-ADR → memgraph-fallback workflow runs against
-      // this backend.
+      // §3. Read-only Bolt query paths (health / localGraph /
+      // neighborhood / shortestPath / executeTemplate) implemented;
+      // the default driver factory dynamically imports `neo4j-driver`
+      // on first call so processes that do not select this backend
+      // pay zero cost. Projection writes stay no-op (Postgres = SoT).
       cachedRepository = new MemgraphGraphRepository({
         endpoint: process.env.MEMGRAPH_URI ?? "bolt://localhost:7687",
         username: process.env.MEMGRAPH_USER ?? "memgraph",
         password: process.env.MEMGRAPH_PASSWORD ?? "",
         database: process.env.MEMGRAPH_DATABASE ?? "memgraph",
+        // driverFactory omitted → default lazy loader resolves on first use.
       });
       break;
     case "postgres":

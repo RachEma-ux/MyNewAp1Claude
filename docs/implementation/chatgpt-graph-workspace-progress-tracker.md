@@ -20,7 +20,7 @@
 ## 2. Current overall verdict
 
 - **MVP 0–4 status:** the *plan* is fully covered in code; runtime
-  completeness varies per phase. 9 items FULLY IMPLEMENTED, 5 items
+  completeness varies per phase. 10 items FULLY IMPLEMENTED, 4 items
   PARTIALLY IMPLEMENTED, 7 items NOT IMPLEMENTED — see §4 below for
   the per-item breakdown.
 - **Honest completion estimate:** ~65–70% of the 21 originally-tracked
@@ -52,8 +52,8 @@ See the strict-audit doc for the full 21-item matrix. Summary:
 
 | Bucket | Count | Items |
 |---|---|---|
-| **FULLY IMPLEMENTED** | 9 | 2, 3, 4, 5, 13, 17, 18, 19, 20 |
-| **PARTIALLY IMPLEMENTED** | 5 | 1 (G3 benchmark — operator), 6 (Memgraph skeleton, no Bolt), 9 (projection on-demand only), 14 (2 of 17 panels extracted), 21 (this rewrite itself) |
+| **FULLY IMPLEMENTED** | 10 | 2, 3, 4, 5, 6, 13, 17, 18, 19, 20 |
+| **PARTIALLY IMPLEMENTED** | 4 | 1 (G3 benchmark — operator), 9 (projection on-demand only), 14 (2 of 17 panels extracted), 21 (this rewrite itself) |
 | **NOT IMPLEMENTED** | 7 | 7 (Layer 4 e2e), 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
 
 Intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) account for 5 of
@@ -74,26 +74,23 @@ the 7 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
 
 ## 6. Runtime gaps still open (priority order)
 
-1. **Memgraph Bolt query implementation** (item 6 partial) — activates
-   the fallback workflow_dispatch from skeleton to runtime.
-2. **Projection drift cron** (item 9 partial) — adds the 19th ladder slot.
-3. **Retention panel extractions batch 3+** (item 14 partial) — 15
+1. **Projection drift cron** (item 9 partial) — adds the 19th ladder slot.
+2. **Retention panel extractions batch 3+** (item 14 partial) — 15
    panels remain inline; each batch typically extracts 2-3 panels.
-4. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0.
+3. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0.
 
 Items 1 (G3 benchmark execution), 2 (Golden Q workflow trigger +
-evidence commit), and 8 (V1/V1.5/V2 successor phases) are
-operator/scoping work — the code paths exist.
+evidence commit), 6 (fallback adoption decision), and 8 (V1/V1.5/V2
+successor phases) are operator/scoping work — the code paths exist.
 
 ## 7. Next-prompt recommendation
 
-Phase 13.5 closed on main at `a8f5c634` (#737); item 2 (Golden
-Questions live adapter) closed via PR-AT-1 on 2026-05-13. The most-
-unblocking next PR is now either **Memgraph Bolt query implementation**
-(item 6 partial) or **retention panel extractions batch 3** (item 14
-partial). Operator action — triggering the Golden Questions workflow
-in `--mode=live` and committing the evidence directory — is also
-available without further code.
+Phase 13.5 closed on main at `a8f5c634` (#737); item 2 (Golden Q live
+adapter) closed via PR-AT-1 on 2026-05-13; item 6 (Memgraph Bolt
+query path) closed via PR-AT-2 on 2026-05-13. The most-unblocking
+next PR is now either **projection drift cron** (item 9 partial),
+**retention panel extractions batch 3** (item 14 partial), or
+**Layer 4 Playwright v0** (item 7).
 
 ## 8. Why this tracker was rewritten
 

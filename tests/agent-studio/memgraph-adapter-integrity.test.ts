@@ -9,13 +9,17 @@
 //   - boundary: no neo4j-driver import outside the repository directory
 //     (existing graph-repository-boundary test covers this, but we
 //     add a Memgraph-specific assertion here for explicitness)
+//   - health() returns "unavailable" with a clear error when no live
+//     Bolt endpoint is reachable (the integrity test runs without one;
+//     behavioral tests for the Bolt query path live in
+//     `memgraph-graph-repository.test.ts` with a stub driver factory).
 //
-// Honest classification: this test confirms the Memgraph adapter is
-// REGISTERED, not that it actually works against a live Memgraph
-// instance. Live wiring is the fallback-promotion operator-
-// implementation PR (per `agent-studio-active-graph-backend-decision.md`
-// §3 + `agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md`
-// §8.1).
+// Honest classification (post item #6 partial closure):
+//   The Memgraph adapter is REGISTERED + has REAL Bolt read paths
+//   (health / localGraph / neighborhood / shortestPath /
+//   executeTemplate). Projection writes remain no-op because Postgres
+//   is the source of truth and projection orchestration lives outside
+//   this repository.
 
 import { describe, it, expect, afterEach } from "vitest";
 import {
@@ -77,15 +81,20 @@ describe("MemgraphGraphRepository — adapter integrity", () => {
     expect(caps).toBe(MEMGRAPH_CAPABILITIES);
   });
 
-  it("health() returns degraded with a clear skeleton message until live wiring lands", async () => {
+  it("health() returns 'unavailable' with a clear error when no Bolt endpoint is reachable", async () => {
+    // No driverFactory injected → falls back to the default lazy
+    // loader. With no live Memgraph and (in this test env)
+    // possibly no `neo4j-driver` package installed, health()
+    // surfaces a structured error rather than throwing.
     const repo = new MemgraphGraphRepository({
-      endpoint: "bolt://localhost:7687",
+      endpoint: "bolt://127.0.0.1:1",
       username: "memgraph",
       password: "",
     });
     const health = await repo.health();
-    expect(health.status).toBe("degraded");
-    expect(health.errors?.[0]).toMatch(/memgraph driver not yet wired/i);
+    expect(health.status).toBe("unavailable");
+    expect(health.errors).toBeDefined();
+    expect(health.errors!.length).toBeGreaterThan(0);
   });
 
   it("BackendKey union includes memgraph + the other 4 canonical backends", () => {

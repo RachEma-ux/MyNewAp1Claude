@@ -19,11 +19,16 @@
 #     backend abstraction is the same — when Memgraph is wired,
 #     `GRAPH_BACKEND=memgraph` selects the adapter.
 #
-# Status: workflow_dispatch skeleton. The Memgraph GraphRepository
-# adapter does NOT exist on main today; the workflow exists as the
-# fallback-readiness artifact named in the runbook §6.1. Wiring the
-# adapter is a separate operator-implementation PR (V1+ scope when
-# Memgraph adoption is actually triggered).
+# Status (2026-05-13, post item #6 partial closure): The
+# MemgraphGraphRepository adapter is on main with real Bolt read paths
+# (health / localGraph / neighborhood / shortestPath /
+# executeTemplate). The default driver factory dynamically imports
+# `neo4j-driver`, which is now declared in package.json. This
+# workflow runs:
+#   1. Structural registration check
+#   2. Real Bolt health round-trip against the memgraph service container
+#   3. Benchmark scenarios
+#   4. Postgres source-of-truth invariant
 
 name: Graph Backend Benchmark — Memgraph fallback (G3 fallback)
 
@@ -104,14 +109,8 @@ jobs:
 
       - name: Memgraph adapter readiness check
         run: |
-          # The Memgraph adapter is registered as of the Memgraph-PR.
-          # This step structurally verifies registration; it no longer
-          # exits 78 because the registration is canonical on main.
-          # NOTE: today's adapter is a SKELETON — same shape as the
-          # Neo4j CE adapter pre-Phase-7.5. Real driver wiring is the
-          # fallback-promotion operator-implementation PR, triggered
-          # only after G3 benchmark fails Neo4j CE targets per the
-          # runbook §8.1.
+          # Structural assertion: the adapter class + the
+          # `getGraphRepository()` switch entry are present.
           if ! grep -q '"memgraph"' server/agent-studio/services/graph/repository/index.ts; then
             echo "::error::Memgraph backend key not registered in getGraphRepository() switch."
             exit 1
@@ -121,7 +120,30 @@ jobs:
             exit 1
           fi
           echo "[memgraph-adapter] backend key registered + class exists"
-          echo "[memgraph-adapter] adapter is SKELETON — empty results until fallback-promotion PR wires the driver"
+
+      - name: Memgraph driver round-trip (health check)
+        env:
+          GRAPH_BACKEND: memgraph
+          MEMGRAPH_URI: bolt://localhost:7687
+          MEMGRAPH_USER: memgraph
+          MEMGRAPH_PASSWORD: ''
+          MEMGRAPH_DATABASE: memgraph
+        run: |
+          # Real Bolt round-trip via the live Memgraph service container.
+          # If neo4j-driver is not installed, the adapter's default
+          # factory throws; this step fails the workflow loudly.
+          # If Memgraph is unreachable, the health() call returns
+          # status="unavailable" and the script exits non-zero.
+          npx tsx -e '
+            import { getGraphRepository } from "./server/agent-studio/services/graph/repository/index.js";
+            const repo = getGraphRepository();
+            const h = await repo.health();
+            console.log(JSON.stringify(h));
+            if (h.status !== "healthy") {
+              console.error("::error::Memgraph health check returned status=" + h.status);
+              process.exit(1);
+            }
+          '
 
       - name: Compute run date
         id: date
