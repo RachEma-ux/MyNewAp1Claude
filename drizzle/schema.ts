@@ -58,5 +58,6 @@ export * from './tables/agent-studio-graph-quality';
 export * from './tables/agent-studio-runtime-alerts';
 export * from './tables/agent-studio-publish-targets';
 export * from './tables/agent-studio-vault-template-instantiations';
+export * from './tables/agent-studio-canvas';
 export * from '../server/modules/kgia/schema';
 export * from '../server/openrouter/schema';
