@@ -481,6 +481,60 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.21–3.23: approval-lifecycle retention crons.
+  //
+  // Lifecycle-aware retention sweeps for the three approval-lifecycle
+  // tables (agsPublishRequests / agsApprovalSteps / agsNotePromotions).
+  // Unlike the age-only retention crons above, these re-validate per-row
+  // eligibility against the 12-blocker retention predicate (active
+  // release link / active version / holds / parent-lifecycle state /
+  // retention window) before deletion. Standing principle (user
+  // 2026-05-12 §0): "Do not weaken the retention predicate to fit the
+  // current schema."
+  //
+  // Default cron ladder slots: 18:00 / 19:00 / 20:00 UTC (16th-18th
+  // slots). 90-day retention default — longer than the 30-day default
+  // for operational tables because approval-lifecycle records carry
+  // compliance significance.
+  //
+  // Env-flag-gated via the per-table _CRON_DISABLED flag.
+
+  try {
+    const { ensurePublishRequestsRetentionCronStarted } = await import(
+      "./services/publish-requests-retention-cron"
+    );
+    ensurePublishRequestsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-publish-requests-retention-cron] start skipped — ${message}`,
+    );
+  }
+
+  try {
+    const { ensureApprovalStepsRetentionCronStarted } = await import(
+      "./services/approval-steps-retention-cron"
+    );
+    ensureApprovalStepsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-approval-steps-retention-cron] start skipped — ${message}`,
+    );
+  }
+
+  try {
+    const { ensureNotePromotionsRetentionCronStarted } = await import(
+      "./services/note-promotions-retention-cron"
+    );
+    ensureNotePromotionsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-note-promotions-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
