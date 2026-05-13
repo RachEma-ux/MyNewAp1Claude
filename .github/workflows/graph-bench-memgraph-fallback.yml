@@ -104,15 +104,24 @@ jobs:
 
       - name: Memgraph adapter readiness check
         run: |
-          # The Memgraph GraphRepository adapter is not on main today.
-          # This step fails loudly with a clear pointer so the operator
-          # knows the workflow exists but cannot run until the adapter
-          # is wired (V1+ scope per the V1/V1.5/V2 successor plan).
-          if ! grep -q "memgraph" server/agent-studio/services/graph/repository/index.ts 2>/dev/null; then
-            echo "::error::Memgraph GraphRepository adapter is not wired on main. This fallback workflow exists as a readiness artifact per docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md §6.1, but cannot execute until the adapter PR lands. See docs/architecture/agent-studio-active-graph-backend-decision.md §3 for the fallback path."
-            exit 78
+          # The Memgraph adapter is registered as of the Memgraph-PR.
+          # This step structurally verifies registration; it no longer
+          # exits 78 because the registration is canonical on main.
+          # NOTE: today's adapter is a SKELETON — same shape as the
+          # Neo4j CE adapter pre-Phase-7.5. Real driver wiring is the
+          # fallback-promotion operator-implementation PR, triggered
+          # only after G3 benchmark fails Neo4j CE targets per the
+          # runbook §8.1.
+          if ! grep -q '"memgraph"' server/agent-studio/services/graph/repository/index.ts; then
+            echo "::error::Memgraph backend key not registered in getGraphRepository() switch."
+            exit 1
           fi
-          echo "[memgraph-adapter] OK"
+          if ! grep -q "MemgraphGraphRepository" server/agent-studio/services/graph/repository/memgraph-graph-repository.ts; then
+            echo "::error::MemgraphGraphRepository class not found at the expected path."
+            exit 1
+          fi
+          echo "[memgraph-adapter] backend key registered + class exists"
+          echo "[memgraph-adapter] adapter is SKELETON — empty results until fallback-promotion PR wires the driver"
 
       - name: Compute run date
         id: date

@@ -70,10 +70,12 @@ export {
 export { TestGraphRepository } from "./test-graph-repository.js";
 export { PostgresGraphRepository } from "./postgres-graph-repository.js";
 export { Neo4jCommunityGraphRepository } from "./neo4j-community-graph-repository.js";
+export { MemgraphGraphRepository } from "./memgraph-graph-repository.js";
 
 import { TestGraphRepository } from "./test-graph-repository.js";
 import { PostgresGraphRepository } from "./postgres-graph-repository.js";
 import { Neo4jCommunityGraphRepository } from "./neo4j-community-graph-repository.js";
+import { MemgraphGraphRepository } from "./memgraph-graph-repository.js";
 import type { GraphRepository, BackendKey } from "./types.js";
 
 let cachedRepository: GraphRepository | null = null;
@@ -102,6 +104,21 @@ export function getGraphRepository(): GraphRepository {
         username: process.env.NEO4J_USER ?? "neo4j",
         password: process.env.NEO4J_PASSWORD ?? "neo4j",
         database: process.env.NEO4J_DATABASE ?? "neo4j",
+      });
+      break;
+    case "memgraph":
+      // Fallback path per `agent-studio-active-graph-backend-decision.md`
+      // §3. Adapter is currently a skeleton (same shape as Neo4j CE
+      // adapter pre-Phase-7.5); the fallback-promotion operator-
+      // implementation PR lands the real driver wiring. Triggering
+      // path: G3 benchmark fails Neo4j CE targets → operator approves
+      // fallback in rev-ADR → memgraph-fallback workflow runs against
+      // this backend.
+      cachedRepository = new MemgraphGraphRepository({
+        endpoint: process.env.MEMGRAPH_URI ?? "bolt://localhost:7687",
+        username: process.env.MEMGRAPH_USER ?? "memgraph",
+        password: process.env.MEMGRAPH_PASSWORD ?? "",
+        database: process.env.MEMGRAPH_DATABASE ?? "memgraph",
       });
       break;
     case "postgres":
