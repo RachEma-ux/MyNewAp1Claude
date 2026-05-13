@@ -138,6 +138,16 @@ export type {
   ComputeAttachmentQuotaOptions,
 } from "./attachment-library.js";
 
+// Phase 15-γ — attachment quota write-gate.
+export {
+  AttachmentQuotaExceededError,
+  assertWithinQuota,
+  resolveDefaultAttachmentBytesLimit,
+} from "./attachment-quota-guard.js";
+export type {
+  AssertWithinQuotaInput,
+} from "./attachment-quota-guard.js";
+
 export {
   createSavedView,
   getSavedViewById,
