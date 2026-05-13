@@ -51,3 +51,13 @@ export {
   type RegisterDefaultPublishPushersOptions,
   type CredentialFn,
 } from "./defaults.js";
+
+// V1+ integration slice — multi-region acceptance criterion #5.
+export {
+  requiresCrossRegionGovernance,
+  wrapWithCrossRegionGovernance,
+  type CrossRegionGovernanceInput,
+  type CrossRegionWrapOptions,
+  type GetSourceRegionKeyFn,
+  type GetTargetRegionKeyFn,
+} from "./cross-region-governance.js";
