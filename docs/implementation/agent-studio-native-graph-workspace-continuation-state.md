@@ -11,7 +11,7 @@
 
 The earlier closure-mission addendum framed all 21 items as "Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked". The strict-audit pass (PRs #732–#737) re-classified each item under a binary scheme: **FULLY IMPLEMENTED / PARTIALLY IMPLEMENTED / NOT IMPLEMENTED**. The authoritative ledger is now `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`.
 
-**Honest counts:** 11 FULLY IMPLEMENTED · 3 PARTIALLY IMPLEMENTED · 7 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
+**Honest counts (post-mission, 2026-05-13):** **14 FULLY IMPLEMENTED · 1 PARTIALLY IMPLEMENTED · 6 NOT IMPLEMENTED** (of which 5 are intentional CLAUDE.md MVP deferrals and 1 is V1+ plan narrative). The single PARTIALLY item (1 — G3 benchmark) is operator-action; the code path is complete.
 
 **Phase 13.5 trio on main (audit item 4 — FULLY IMPLEMENTED):**
 - PR #731 — contract + closed-union types + boundary tests
@@ -36,9 +36,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR-AT-6 — Retention panel batch 5 (item 14 progress, 8/17 → 11/17): `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. Merged at `fdbac53d`.
 - PR-AT-7 — Retention panel batch 6 (item 14 progress, 11/17 → 14/17): `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`. Merged at `7ea0ce4e`.
 - PR-AT-8 — Retention panel batch 7 (FINAL) (item 14 FULLY IMPLEMENTED, 14/17 → 17/17): `PublishRequestsRetentionPanel` + `ApprovalStepsRetentionPanel` + `NotePromotionsRetentionPanel` (the approval-lifecycle trio). Merged at `99f07ac1`. Closes the panel-extraction sub-arc.
-- PR-AT-9 — Layer 4 Playwright v0 (item 7 FULLY IMPLEMENTED): `playwright.config.ts` (chromium-only) + 3 specs + `.github/workflows/playwright-e2e.yml` (workflow_dispatch + label-gated `run-e2e`) + `@playwright/test ^1.49.0` devDep + 7-test source-scan integrity lock. Closes the only remaining MVP 0-4 runtime gap.
+- PR-AT-9 — Layer 4 Playwright v0 (item 7 FULLY IMPLEMENTED): `playwright.config.ts` (chromium-only) + 3 specs + `.github/workflows/playwright-e2e.yml` (workflow_dispatch + label-gated `run-e2e`) + `@playwright/test ^1.49.0` devDep + 7-test source-scan integrity lock. Merged at `a0427c19`. Closes the only remaining MVP 0-4 runtime gap.
+- PR-AT-10 — Mission-close cleanup: reclassifies item 21 PARTIALLY → FULLY (the audit rewrite was the work; once complete, it's done); refreshes summary counts; adds §8.1 "Mission close" section to the strict-audit doc.
 
-**Next material work:** None inside MVP 0-4. Audit-mission complete. Remaining items are either intentional CLAUDE.md deferrals, operator-action (item 1 G3 benchmark execution), or V1+ plan narrative (item 8).
+**Next material work:** None inside MVP 0-4. Audit-mission COMPLETE. Remaining items are either intentional CLAUDE.md deferrals (10–12, 15, 16), operator-action (item 1 G3 benchmark execution), or V1+ plan narrative (item 8 — successor phases). If operator hands appear: trigger `graph-bench-neo4j-ce.yml` to close item 1's operator slice; otherwise the next direction is V1+ plan execution per `docs/implementation/agent-studio-native-graph-workspace-v1-v2-execution-plan.md`.
 
 The historical (pre-strict-audit) recovery context follows.
 
