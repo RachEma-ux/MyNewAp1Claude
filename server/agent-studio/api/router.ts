@@ -1561,6 +1561,73 @@ const publishRouter = router({
         reason: input.reason,
       });
     }),
+
+  // ── Lifecycle-holds management ────────────────────────────────────────────
+  //
+  // agsLifecycleHolds carries (entityType, entityId, holdType) tuples
+  // that block retention sweeps. These adminProcedures let operators
+  // place + release + view holds without raw SQL. setBy / releasedBy
+  // are taken from ctx.user.id server-side; clients cannot spoof
+  // identity.
+
+  setLifecycleHold: adminProcedure
+    .input(
+      z.object({
+        entityType: z.string().min(1).max(64),
+        entityId: z.number().int().positive(),
+        holdType: z.string().min(1).max(64),
+        reason: z.string().min(1).max(1024),
+        holdUntil: z.string().datetime().optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { setLifecycleHold } = await import(
+        "../services/retention/lifecycle-holds-management"
+      );
+      return setLifecycleHold({
+        entityType: input.entityType,
+        entityId: input.entityId,
+        holdType: input.holdType,
+        reason: input.reason,
+        setBy: ctx.user.id,
+        holdUntil: input.holdUntil ? new Date(input.holdUntil) : null,
+        metadata: input.metadata,
+      });
+    }),
+  releaseLifecycleHold: adminProcedure
+    .input(
+      z.object({
+        holdId: z.number().int().positive(),
+        releaseNote: z.string().min(1).max(1024),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { releaseLifecycleHold } = await import(
+        "../services/retention/lifecycle-holds-management"
+      );
+      return releaseLifecycleHold({
+        holdId: input.holdId,
+        releasedBy: ctx.user.id,
+        releaseNote: input.releaseNote,
+      });
+    }),
+  listLifecycleHoldsForEntity: adminProcedure
+    .input(
+      z.object({
+        entityType: z.string().min(1).max(64),
+        entityId: z.number().int().positive(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { listLifecycleHoldsForEntity } = await import(
+        "../services/retention/lifecycle-holds-management"
+      );
+      return listLifecycleHoldsForEntity({
+        entityType: input.entityType,
+        entityId: input.entityId,
+      });
+    }),
 });
 
 // ── Phase 0b: openllm-agent2 native parity sub-routers ──────────────────────

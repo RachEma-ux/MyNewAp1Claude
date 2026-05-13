@@ -121,6 +121,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="approval-steps-retention">Approval Steps Retention</TabsTrigger>
           <TabsTrigger value="note-promotions-retention">Note Promotions Retention</TabsTrigger>
           <TabsTrigger value="release-audit-refs-archival">Release Audit Refs Archival</TabsTrigger>
+          <TabsTrigger value="lifecycle-holds-management">Lifecycle Holds</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -206,6 +207,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="release-audit-refs-archival">
           <ReleaseAuditRefsArchivalPanel />
+        </TabsContent>
+        <TabsContent value="lifecycle-holds-management">
+          <LifecycleHoldsManagementPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -5002,6 +5006,289 @@ function ReleaseAuditRefsArchivalPanel() {
                 Last archived: <span className="font-mono">#{lastArchivedId}</span>
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ── Lifecycle-holds management panel ───────────────────────────────────────
+//
+// Standalone panel: pick an entity (table + id), see its hold history,
+// place a new hold, or release an active one. This is the operator
+// surface for the agsLifecycleHolds table — the same table that the
+// retention predicate reads to block sweeps. Placing a hold here
+// prevents the corresponding retention sweep from deleting the row;
+// releasing it re-enables eligibility (after the retention window
+// elapses).
+
+function LifecycleHoldsManagementPanel() {
+  const [entityType, setEntityType] = useState("ags_publish_requests");
+  const [entityIdInput, setEntityIdInput] = useState("");
+  const [holdType, setHoldType] = useState("legal_hold");
+  const [reason, setReason] = useState("");
+  const [holdUntil, setHoldUntil] = useState("");
+  const [releaseNote, setReleaseNote] = useState("");
+  const [pendingReleaseHoldId, setPendingReleaseHoldId] = useState<number | null>(null);
+
+  const entityIdParsed = parseInt(entityIdInput, 10);
+  const entityIdValid = !Number.isNaN(entityIdParsed) && entityIdParsed > 0;
+
+  const holdsQuery = trpc.agentStudio.publish.listLifecycleHoldsForEntity.useQuery(
+    { entityType, entityId: entityIdValid ? entityIdParsed : 0 },
+    {
+      enabled: entityIdValid,
+      refetchInterval: 30_000,
+    },
+  );
+
+  const setMut = trpc.agentStudio.publish.setLifecycleHold.useMutation({
+    onSuccess: (data) => {
+      if (data?.set) {
+        toast.success(`Hold #${data.holdId} placed`);
+        setReason("");
+        setHoldUntil("");
+        void holdsQuery.refetch();
+      } else {
+        toast.error("setLifecycleHold returned set:false (ASDB unavailable?)");
+      }
+    },
+    onError: (err) => toast.error(`Failed to set hold: ${err.message ?? "unknown"}`),
+  });
+
+  const releaseMut = trpc.agentStudio.publish.releaseLifecycleHold.useMutation({
+    onSuccess: (data) => {
+      if (data?.released) {
+        toast.success(`Hold #${data.holdId} released`);
+        setReleaseNote("");
+        setPendingReleaseHoldId(null);
+        void holdsQuery.refetch();
+      } else {
+        toast.error(
+          "Release returned released:false (hold may not exist or already released)",
+        );
+      }
+    },
+    onError: (err) => toast.error(`Failed to release hold: ${err.message ?? "unknown"}`),
+  });
+
+  const holds = holdsQuery.data ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded border border-zinc-800 p-4 text-xs text-zinc-400">
+        <div className="font-semibold uppercase tracking-wide mb-1 text-zinc-300">
+          Lifecycle holds
+        </div>
+        <p>
+          Holds block the retention sweep from deleting a specific row.
+          Place a hold by entity (table + id); release it when the
+          underlying legal / audit / governance / investigation matter
+          resolves. Released holds stay in the table for audit
+          reconstruction.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Entity selector</SectionLabel>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div>
+              <Label className="text-xs">entityType</Label>
+              <select
+                value={entityType}
+                onChange={(e) => setEntityType(e.target.value)}
+                className="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm"
+              >
+                <option value="ags_publish_requests">ags_publish_requests</option>
+                <option value="ags_approval_steps">ags_approval_steps</option>
+                <option value="ags_note_promotions">ags_note_promotions</option>
+                <option value="ags_release_audit_refs">ags_release_audit_refs</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">entityId</Label>
+              <Input
+                type="number"
+                value={entityIdInput}
+                onChange={(e) => setEntityIdInput(e.target.value)}
+                placeholder="row id"
+                min={1}
+              />
+            </div>
+            <div className="flex items-end">
+              <Badge variant={entityIdValid ? "default" : "secondary"}>
+                {entityIdValid ? `${holds.length} hold(s)` : "enter an id"}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <SectionLabel>Place a hold</SectionLabel>
+            <div>
+              <Label className="text-xs">holdType</Label>
+              <select
+                value={holdType}
+                onChange={(e) => setHoldType(e.target.value)}
+                className="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm"
+              >
+                <option value="legal_hold">legal_hold</option>
+                <option value="audit_hold">audit_hold</option>
+                <option value="governance_hold">governance_hold</option>
+                <option value="governance_review">governance_review</option>
+                <option value="audit_investigation">audit_investigation</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">reason</Label>
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="audit-trail context"
+                maxLength={1024}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">holdUntil (optional ISO datetime)</Label>
+              <Input
+                value={holdUntil}
+                onChange={(e) => setHoldUntil(e.target.value)}
+                placeholder="2027-01-01T00:00:00Z (blank = indefinite)"
+              />
+            </div>
+            <Button
+              size="sm"
+              disabled={
+                setMut.isPending ||
+                !entityIdValid ||
+                reason.trim() === ""
+              }
+              onClick={() => {
+                if (!entityIdValid) return;
+                if (
+                  window.confirm(
+                    `Place ${holdType} on ${entityType} #${entityIdParsed}?`,
+                  )
+                ) {
+                  setMut.mutate({
+                    entityType,
+                    entityId: entityIdParsed,
+                    holdType,
+                    reason: reason.trim(),
+                    holdUntil: holdUntil.trim() || undefined,
+                  });
+                }
+              }}
+            >
+              {setMut.isPending ? "Placing…" : "Place hold"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <SectionLabel>Holds for this entity</SectionLabel>
+            {!entityIdValid ? (
+              <div className="text-xs text-zinc-500">
+                Enter a valid entityId to load holds.
+              </div>
+            ) : holdsQuery.isLoading ? (
+              <div className="text-xs text-zinc-500">Loading…</div>
+            ) : holds.length === 0 ? (
+              <div className="text-xs text-zinc-500">No holds on this entity.</div>
+            ) : (
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {holds.map((h) => {
+                  const active = h.releasedAt === null;
+                  return (
+                    <div
+                      key={h.id}
+                      className={`rounded border p-2 text-xs ${
+                        active
+                          ? "border-amber-800 bg-amber-950/20"
+                          : "border-zinc-800 bg-zinc-950/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono">
+                          #{h.id} · {h.holdType}
+                        </span>
+                        <Badge variant={active ? "default" : "secondary"}>
+                          {active ? "active" : "released"}
+                        </Badge>
+                      </div>
+                      {h.reason ? (
+                        <div className="text-zinc-500 mt-0.5 truncate">
+                          reason: {h.reason}
+                        </div>
+                      ) : null}
+                      {h.holdUntil ? (
+                        <div className="text-zinc-500">
+                          until: {String(h.holdUntil)}
+                        </div>
+                      ) : null}
+                      {!active && h.releaseNote ? (
+                        <div className="text-zinc-500">
+                          release: {h.releaseNote}
+                        </div>
+                      ) : null}
+                      {active ? (
+                        pendingReleaseHoldId === h.id ? (
+                          <div className="mt-1 space-y-1">
+                            <Input
+                              value={releaseNote}
+                              onChange={(e) => setReleaseNote(e.target.value)}
+                              placeholder="release reason"
+                              maxLength={1024}
+                            />
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                disabled={
+                                  releaseMut.isPending || releaseNote.trim() === ""
+                                }
+                                onClick={() => {
+                                  releaseMut.mutate({
+                                    holdId: h.id,
+                                    releaseNote: releaseNote.trim(),
+                                  });
+                                }}
+                              >
+                                Confirm release
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setPendingReleaseHoldId(null);
+                                  setReleaseNote("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="mt-1"
+                            onClick={() => setPendingReleaseHoldId(h.id)}
+                          >
+                            Release…
+                          </Button>
+                        )
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
