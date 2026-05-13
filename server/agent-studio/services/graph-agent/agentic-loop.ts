@@ -116,17 +116,22 @@ export async function runAgenticLoop(
 
     const validation = validateAgenticPlannerAction(rawAction);
     if (!validation.ok) {
+      // tsc with strictNullChecks=false (repo default) doesn't narrow
+      // the discriminated union after `!validation.ok`; pull the
+      // failure-variant payload explicitly so the access type-checks.
+      const failure = validation as Extract<typeof validation, { ok: false }>;
       return {
         steps,
         actions,
         plannerCallCount,
         terminationReason: "invalid_action",
-        invalidActionReason: validation.reason,
+        invalidActionReason: failure.reason,
       };
     }
-    actions.push(validation.action);
+    const success = validation as Extract<typeof validation, { ok: true }>;
+    actions.push(success.action);
 
-    if (validation.action.kind === "stop") {
+    if (success.action.kind === "stop") {
       return {
         steps,
         actions,
@@ -134,7 +139,7 @@ export async function runAgenticLoop(
         terminationReason: "planner_stop",
       };
     }
-    if (validation.action.kind === "answer") {
+    if (success.action.kind === "answer") {
       return {
         steps,
         actions,
@@ -147,7 +152,7 @@ export async function runAgenticLoop(
     // GraphRetrievalRouter.retrieve() here.
     steps.push({
       kind: "retrieve",
-      retrievalMode: validation.action.retrievalMode,
+      retrievalMode: success.action.retrievalMode,
       contextBlockCount: 0,
       citationCount: 0,
       durationMs: 0,
