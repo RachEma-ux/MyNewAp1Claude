@@ -20,9 +20,13 @@
 ## 2. Current overall verdict
 
 - **MVP 0–4 status:** the *plan* is fully covered in code; runtime
-  completeness varies per phase. 12 items FULLY IMPLEMENTED, 2 items
-  PARTIALLY IMPLEMENTED, 7 items NOT IMPLEMENTED — see §4 below for
-  the per-item breakdown.
+  completeness for all MVP 0-4 scope items is closed. 13 items FULLY
+  IMPLEMENTED, 2 items PARTIALLY IMPLEMENTED, 6 items NOT IMPLEMENTED
+  — see §4 below for the per-item breakdown. The remaining
+  PARTIALLY items are operator-action / audit-bookkeeping; the
+  remaining NOT IMPLEMENTED items are all intentionally out-of-MVP
+  scope per CLAUDE.md (CRDT / offline / Neo4j Enterprise / multi-
+  region / Canvas-Bases-plugins) or are plan-only V1+ narrative.
 - **Honest completion estimate:** ~65–70% of the 21 originally-tracked
   audit items are implemented in runtime. The remaining 30–35% splits
   into: 5 hard-blocker code gaps (items 2, 6-Bolt, 7, 9-cron, 14-15-panels)
@@ -52,13 +56,15 @@ See the strict-audit doc for the full 21-item matrix. Summary:
 
 | Bucket | Count | Items |
 |---|---|---|
-| **FULLY IMPLEMENTED** | 12 | 2, 3, 4, 5, 6, 9, 13, 14, 17, 18, 19, 20 |
+| **FULLY IMPLEMENTED** | 13 | 2, 3, 4, 5, 6, 7, 9, 13, 14, 17, 18, 19, 20 |
 | **PARTIALLY IMPLEMENTED** | 2 | 1 (G3 benchmark — operator), 21 (this rewrite itself) |
-| **NOT IMPLEMENTED** | 7 | 7 (Layer 4 e2e), 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
+| **NOT IMPLEMENTED** | 6 | 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
 
 Intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) account for 5 of
-the 7 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
-**items 7, 8** (NOT IMPLEMENTED) + the partial slices of **6, 9, 14**.
+the 6 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are
+**NONE** — items 2/6/7/9/14 all closed via the strict-audit closure
+mission (PR-AT-1 through PR-AT-9). Item 8 (V1/V1.5/V2 plan) is plan-
+only narrative for post-MVP work.
 
 ## 5. Test status
 
@@ -74,9 +80,9 @@ the 7 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
 
 ## 6. Runtime gaps still open (priority order)
 
-1. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0. Now the
-   only remaining runtime gap inside MVP 0-4 scope after item 14
-   closed at 17/17 via PR-AT-8.
+**None.** All MVP 0-4 runtime gaps are closed. Item 7 (Layer 4
+Playwright v0) closed via PR-AT-9; item 14 (panel-extraction sub-arc)
+closed at 17/17 via PR-AT-8.
 
 Items 1 (G3 benchmark execution), 2 (Golden Q workflow trigger +
 evidence commit), 6 (fallback adoption decision), and 8 (V1/V1.5/V2
@@ -85,10 +91,13 @@ successor phases) are operator/scoping work — the code paths exist.
 ## 7. Next-prompt recommendation
 
 Phase 13.5 closed at `a8f5c634` (#737); items 2/6/9 closed via PR-AT-1
-through PR-AT-3 on 2026-05-13. The panel-extraction sub-arc closed
-at 17/17 via PR-AT-8 (item 14 FULLY IMPLEMENTED). The next material
-work is **Layer 4 Playwright v0** (item 7) — the final remaining
-runtime gap inside MVP 0-4 scope; closes the test pyramid.
+through PR-AT-3 on 2026-05-13. Panel-extraction sub-arc closed at
+17/17 via PR-AT-8 (item 14 FULLY IMPLEMENTED). Layer 4 Playwright v0
+closed via PR-AT-9 (item 7 FULLY IMPLEMENTED). **All MVP 0-4 strict-
+audit runtime gaps are now closed.** The next material work is V1+
+plan execution (item 8) or operator-action follow-up on item 1 (G3
+benchmark trigger + evidence commit) — neither blocks MVP 0-4
+closure.
 
 ## 8. Why this tracker was rewritten
 

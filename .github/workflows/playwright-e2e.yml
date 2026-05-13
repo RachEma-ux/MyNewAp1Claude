@@ -1,0 +1,113 @@
+name: Playwright e2e (Layer 4)
+
+# Layer 4 e2e — V1.0 first slice. Closes strict-audit item #7.
+#
+# Trigger model is intentionally NOT push/PR-on-every-commit:
+#   - workflow_dispatch — operators can invoke from the Actions tab
+#   - label "run-e2e" on a PR — opt-in coverage for PRs that touch
+#     shell / routing / RetrofitPage / GraphWorkspace
+#
+# Rationale: the e2e harness installs chromium (~150 MB) and runs a
+# real dev server. Running on every commit would multiply CI minutes
+# and add a flake surface to PRs that don't touch the e2e
+# coverage area. The Layer 1-3 unit + integration job in run-tests.yml
+# remains the per-PR contract.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [labeled, synchronize]
+
+jobs:
+  playwright:
+    # Skip unless the PR carries the `run-e2e` label, or unless this
+    # is a workflow_dispatch run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+      NODE_ENV: development
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install --with-deps chromium
+
+      - name: Apply database schema
+        run: npx drizzle-kit push --force
+
+      - name: Start dev server
+        run: |
+          npm run dev > dev-server.log 2>&1 &
+          echo "DEV_SERVER_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for dev server
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/ >/dev/null 2>&1; then
+              echo "dev server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "dev server failed to start within 60s"
+          tail -200 dev-server.log
+          exit 1
+
+      - name: Run Playwright tests
+        run: npx playwright test --reporter=list,html,github
+
+      - name: Stop dev server
+        if: always()
+        run: |
+          if [ -n "${DEV_SERVER_PID:-}" ]; then
+            kill "${DEV_SERVER_PID}" || true
+          fi
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+      - name: Upload dev server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-server-log
+          path: dev-server.log
+          retention-days: 7
