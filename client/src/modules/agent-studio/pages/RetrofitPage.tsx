@@ -116,6 +116,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="graph-quality-agent-runs-retention">Graph Quality Agent Runs Retention</TabsTrigger>
           <TabsTrigger value="ingestion-jobs-retention">Ingestion Jobs Retention</TabsTrigger>
           <TabsTrigger value="graph-change-proposals-retention">Graph Change Proposals Retention</TabsTrigger>
+          <TabsTrigger value="graph-agent-runtime-traces-retention">Graph Agent Runtime Traces Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -186,6 +187,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="graph-change-proposals-retention">
           <GraphChangeProposalsRetentionPanel />
+        </TabsContent>
+        <TabsContent value="graph-agent-runtime-traces-retention">
+          <GraphAgentRuntimeTracesRetentionPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -4148,6 +4152,185 @@ function GraphChangeProposalsRetentionPanel() {
               <div>items deleted: {manualResult.deletedItemsCount}</div>
               <div>decisions deleted: {manualResult.deletedDecisionsCount}</div>
               <div>audit events deleted: {manualResult.deletedAuditEventsCount}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Graph Agent Runtime Traces Retention (Phase 22 follow-up #679) ────
+//
+// Operator UI for the graph-agent runtime-traces retention mini-arc
+// (#677 cron + #678 cron-status tRPC + #679 UI). 15th slot in the
+// daily-sweep ladder (17:00 UTC). 90-day default retention (matches
+// the existing pruneRuntimeTraces service's DEFAULT_HORIZON_MS).
+//
+// Different shape from prior panels: the prune mutation is the
+// EXISTING `graphAgent.pruneTraces` (Phase 14 §3) — takes
+// `olderThanMs` rather than `retentionDays`. The UI converts: user
+// enters retentionDays in the input, the mutation receives ms.
+// 4-table cascade: skillRuntimeUsages + queryTemplateRuns +
+// graphAgentSteps + graphAgentRuns.
+
+function GraphAgentRuntimeTracesRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.graphAgent.getRuntimeTracesRetentionCronStatus.useQuery(
+      undefined,
+      { refetchInterval: 30_000 },
+    );
+  const [retentionDays, setRetentionDays] = useState("90");
+  const [manualResult, setManualResult] = useState<{
+    graphSkillRuntimeUsages: number;
+    queryTemplateRuns: number;
+    graphAgentSteps: number;
+    graphAgentRuns: number;
+  } | null>(null);
+
+  const pruneMut = trpc.agentStudio.graphAgent.pruneTraces.useMutation({
+    onSuccess: (data) => {
+      if (data) {
+        setManualResult({
+          graphSkillRuntimeUsages: data.graphSkillRuntimeUsages,
+          queryTemplateRuns: data.queryTemplateRuns,
+          graphAgentSteps: data.graphAgentSteps,
+          graphAgentRuns: data.graphAgentRuns,
+        });
+        const total =
+          data.graphSkillRuntimeUsages +
+          data.queryTemplateRuns +
+          data.graphAgentSteps +
+          data.graphAgentRuns;
+        toast.success(
+          `Graph agent runtime traces sweep complete — ${total} row(s) deleted across 4 tables`,
+        );
+        void statusQuery.refetch();
+      }
+    },
+    onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+  });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 90);
+  const status = statusQuery.data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>
+              Graph agent runtime traces retention cron
+            </SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 17:00 UTC, 90-day window (env:
+            AGS_GRAPH_AGENT_RUNTIME_TRACES_RETENTION_CRON_EXPR /
+            AGS_GRAPH_AGENT_RUNTIME_TRACES_RETENTION_DAYS). Sweeps 4
+            trace-ledger tables (children-first):
+            `ags_graph_skill_runtime_usages`,
+            `ags_query_template_runs`, `ags_graph_agent_steps`,
+            `ags_graph_agent_runs`. 15th slot in the daily-sweep
+            ladder. Longer default than other retention crons
+            because decision-trace ledgers have longer forensic
+            value than per-tool-call traces.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">
+                rows deleted (last sweep)
+              </div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? status.lastResult.graphSkillRuntimeUsages +
+                    status.lastResult.queryTemplateRuns +
+                    status.lastResult.graphAgentSteps +
+                    status.lastResult.graphAgentRuns
+                  : "—"}
+              </div>
+              {status?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  usages {status.lastResult.graphSkillRuntimeUsages} ·
+                  queryRuns {status.lastResult.queryTemplateRuns} · steps{" "}
+                  {status.lastResult.graphAgentSteps} · runs{" "}
+                  {status.lastResult.graphAgentRuns}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Triggers the existing `graphAgent.pruneTraces` mutation
+            (Phase 14 §3) with a caller-supplied horizon. Sweeps
+            rows whose `createdAt` is older than `now -
+            retentionDays`. No status filter — the prune service
+            is timestamp-only (the 4 trace tables don't carry
+            lifecycle status columns).
+          </div>
+          <div>
+            <Label className="text-xs">retentionDays</Label>
+            <Input
+              type="number"
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(e.target.value)}
+              min={1}
+              max={365}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Delete graph agent runtime traces older than ${parsedDays} days?`,
+                )
+              ) {
+                pruneMut.mutate({
+                  olderThanMs: parsedDays * 86_400_000,
+                });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>
+                skill runtime usages deleted: {manualResult.graphSkillRuntimeUsages}
+              </div>
+              <div>
+                query template runs deleted: {manualResult.queryTemplateRuns}
+              </div>
+              <div>graph agent steps deleted: {manualResult.graphAgentSteps}</div>
+              <div>graph agent runs deleted: {manualResult.graphAgentRuns}</div>
             </div>
           ) : null}
         </CardContent>
