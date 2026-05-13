@@ -651,6 +651,50 @@ export const graphQualityRouter = router({
     );
     return getGraphQualityScansRetentionCronStatus();
   }),
+
+  // ── Retention (Phase 22 follow-up #665 + #666 + #667) ────────────
+  //
+  // Operator surface for `ags_graph_quality_agent_runs` retention.
+  // Sister of `pruneScansRetention` (#659) on the same sub-router —
+  // noun-qualified to disambiguate from the scans procedure.
+  // Single-table prune (no FK children); 12th slot in the
+  // daily-sweep ladder (14:00 UTC default).
+  pruneAgentRunsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          statuses: z
+            .array(z.enum(["running", "completed", "failed"]))
+            .max(3)
+            .optional(),
+          agentKey: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneOldGraphQualityAgentRuns } = await import(
+        "../graph-quality-agent-runs-retention.js"
+      );
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldGraphQualityAgentRuns({
+        olderThan,
+        statuses: input?.statuses,
+        agentKey: input?.agentKey,
+      });
+    }),
+  getAgentRunsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getGraphQualityAgentRunsRetentionCronStatus } = await import(
+      "../graph-quality-agent-runs-retention-cron.js"
+    );
+    return getGraphQualityAgentRunsRetentionCronStatus();
+  }),
 });
 
 export type GraphQualityRouter = typeof graphQualityRouter;
