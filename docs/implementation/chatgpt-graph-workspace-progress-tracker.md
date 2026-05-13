@@ -139,7 +139,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | 15-γ wire-up (V1.5 quota guard in createAttachment router) | #771 | `fdf7ba36` |
 | 19-γ   (V1.0 publish executor governance gate) | #772 | `123de148` |
 | OL-3   (V2.0 OfflineQueue client bootstrap) | #773 | `d5806bf8` |
-| CRDT-γ-2 (V2.0 realtime-doc WebSocket transport scaffold) | #774 | pending |
+| CRDT-γ-2 (V2.0 realtime-doc WebSocket transport scaffold) | #774 | `5c69ae7b` |
+| MR×19 integration (V2.0 cross-region publish governance) | #775 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
