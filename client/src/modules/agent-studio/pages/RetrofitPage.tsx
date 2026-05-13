@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { PageHeader, LoadingState, EmptyState, SectionLabel } from "../components/ui";
 import { EligibilityExplainer } from "../components/EligibilityExplainer";
+import { CronStatusBadge } from "../components/CronStatusBadge";
 
 /**
  * M1-c4 (cycle-4 audit `/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M1-c4)
@@ -4408,15 +4409,11 @@ function PublishRequestsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Publish requests retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 18:00 UTC, 90-day window (env:
@@ -4551,15 +4548,11 @@ function ApprovalStepsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Approval steps retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 19:00 UTC, 90-day window (env:
@@ -4696,15 +4689,11 @@ function NotePromotionsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Note promotions retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 20:00 UTC, 90-day window (env:
