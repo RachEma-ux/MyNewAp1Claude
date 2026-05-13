@@ -420,6 +420,20 @@ export const agsVaultSavedViews = pgTable(
     filters: json("filters").$type<Record<string, unknown>>(),
     sort: json("sort").$type<Record<string, unknown>>(),
     columns: json("columns").$type<string[]>(),
+    // V1+ Phase 16-α: sharing + versioning.
+    //   `visibility` — `"personal"` (default; legacy behavior, owner-only)
+    //     or `"workspace_shared"` (visible to all members of the
+    //     workspace's vault).
+    //   `version`   — immutable revision counter; bump on every
+    //     content edit. Mirrors `agsNoteVersions` shape.
+    //   `parentSavedViewId` — when a workspace_shared view is
+    //     forked into a personal copy, this links back to the
+    //     parent for lineage queries.
+    visibility: varchar("visibility", { length: 30 })
+      .notNull()
+      .default("personal"),
+    version: integer("version").notNull().default(1),
+    parentSavedViewId: integer("parent_saved_view_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
