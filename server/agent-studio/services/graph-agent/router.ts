@@ -15,7 +15,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, governedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, governedProcedure, adminProcedure } from "../../../_core/trpc.js";
 import { GraphAgentRunInput } from "./contracts.js";
 import { wireGraphAgentLite } from "./wiring.js";
 import { getExplanationForRun } from "./explain-reader.js";
@@ -270,6 +270,19 @@ export const graphAgentRouter = router({
         }));
       }
     }),
+
+  // ── Retention cron status (Phase 22 follow-up #677 + #678) ───────
+  //
+  // Surfaces the scheduled cron's last-run state to the UI panel
+  // (#679). The corresponding manual-sweep mutation is the
+  // existing `graphAgent.pruneTraces` above. adminProcedure
+  // because cron observability is a cross-tenant ops concern.
+  getRuntimeTracesRetentionCronStatus: adminProcedure.query(async () => {
+    const { getGraphAgentRuntimeTracesRetentionCronStatus } = await import(
+      "./retention-cron.js"
+    );
+    return getGraphAgentRuntimeTracesRetentionCronStatus();
+  }),
 });
 
 export type GraphAgentRouter = typeof graphAgentRouter;
