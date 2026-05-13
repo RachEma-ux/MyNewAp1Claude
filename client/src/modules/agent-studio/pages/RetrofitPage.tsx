@@ -120,6 +120,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="publish-requests-retention">Publish Requests Retention</TabsTrigger>
           <TabsTrigger value="approval-steps-retention">Approval Steps Retention</TabsTrigger>
           <TabsTrigger value="note-promotions-retention">Note Promotions Retention</TabsTrigger>
+          <TabsTrigger value="release-audit-refs-archival">Release Audit Refs Archival</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -202,6 +203,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="note-promotions-retention">
           <NotePromotionsRetentionPanel />
+        </TabsContent>
+        <TabsContent value="release-audit-refs-archival">
+          <ReleaseAuditRefsArchivalPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -4794,6 +4798,213 @@ function NotePromotionsRetentionPanel() {
           ) : null}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ── Track 2 — release-audit-refs compliance archival panel ─────────────────
+//
+// Different shape from the prior retention panels:
+//   - NO cron status (this is not a scheduled sweep — permanent
+//     factory exclusion).
+//   - NO age threshold input (the 7-year floor is enforced server-side
+//     and cannot be overridden).
+//   - Read pane lists archival candidates (rows that have aged past
+//     the floor + are not already archived + no holds + release is
+//     archived).
+//   - Action pane archives a single candidate at a time, requiring a
+//     non-empty complianceApprovalRef + reason.
+//   - Standing policy banner reminds operators that deletion is
+//     blocked — only `archive` is admissible.
+
+function ReleaseAuditRefsArchivalPanel() {
+  const candidatesQuery =
+    trpc.agentStudio.publish.listReleaseAuditRefsArchivalCandidates.useQuery(
+      { minRetentionYears: 7, limit: 50 },
+      { refetchInterval: 60_000 },
+    );
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [complianceApprovalRef, setComplianceApprovalRef] = useState("");
+  const [reason, setReason] = useState("");
+  const [lastArchivedId, setLastArchivedId] = useState<number | null>(null);
+
+  const archiveMut =
+    trpc.agentStudio.publish.archiveReleaseAuditRef.useMutation({
+      onSuccess: (data) => {
+        if (data?.archived) {
+          setLastArchivedId(data.id);
+          setComplianceApprovalRef("");
+          setReason("");
+          setSelectedId(null);
+          toast.success(`Archived release-audit-ref #${data.id}`);
+          void candidatesQuery.refetch();
+        } else {
+          toast.error(
+            `Archive returned archived:false — row may not exist or may already be archived`,
+          );
+        }
+      },
+      onError: (err) =>
+        toast.error(`Archive failed: ${err.message ?? "unknown"}`),
+    });
+
+  const candidates = candidatesQuery.data ?? [];
+  const selected = candidates.find((c) => c.id === selectedId) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded border border-amber-900 bg-amber-950/30 p-4 text-xs text-amber-200">
+        <div className="font-semibold uppercase tracking-wide mb-1">
+          Compliance long-retention table
+        </div>
+        <p>
+          `ags_release_audit_refs` is permanently excluded from the
+          generic retention factory. Default retention is indefinite;
+          7-year minimum if finite. <strong>Deletion is blocked by
+          policy</strong> — only the archive action is admissible, and
+          archives require a per-row compliance approval reference.
+          Standing principle (user 2026-05-12 §0): &ldquo;Do not weaken
+          the retention predicate to fit the current schema.&rdquo;
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <SectionLabel>
+                Archival candidates (≥7y old, release archived, no holds)
+              </SectionLabel>
+              {candidatesQuery.isLoading ? (
+                <Badge variant="secondary">loading</Badge>
+              ) : (
+                <Badge>{candidates.length} candidate{candidates.length === 1 ? "" : "s"}</Badge>
+              )}
+            </div>
+            <div className="text-xs text-zinc-400">
+              Each candidate has cleared the 7-year retention floor AND
+              its release is archived AND has no active hold. Click a
+              row to select it; the archive form on the right enables
+              once a row is selected.
+            </div>
+            {candidates.length === 0 ? (
+              <div className="rounded border border-zinc-800 p-3 text-xs text-zinc-500">
+                No candidates. This is the expected state on healthy
+                long-retention tables — most rows are not archival-eligible
+                yet, or are under active hold, or their release is still
+                live.
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedId(c.id)}
+                    className={`w-full text-left rounded border p-2 text-xs transition-colors ${
+                      selectedId === c.id
+                        ? "border-amber-700 bg-amber-950/30"
+                        : "border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono">
+                        #{c.id} · {c.auditSystem}
+                      </span>
+                      <span className="text-zinc-500">
+                        release #{c.releaseId}
+                      </span>
+                    </div>
+                    <div className="text-zinc-500 mt-0.5 truncate">
+                      ref: {c.externalRef}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <SectionLabel>Archive action</SectionLabel>
+            <div className="text-xs text-zinc-400">
+              Archives a single candidate. Does NOT delete the row —
+              `archivedAt` + `archivedBy` + `archiveReason` +
+              `complianceApprovalRef` are populated; the row remains for
+              audit reconstruction.
+            </div>
+            {selected ? (
+              <div className="rounded border border-zinc-800 p-2 text-xs">
+                <div>
+                  Selected: <span className="font-mono">#{selected.id}</span>
+                </div>
+                <div className="text-zinc-500">
+                  {selected.auditSystem} · release #{selected.releaseId}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded border border-dashed border-zinc-800 p-2 text-xs text-zinc-600">
+                No candidate selected
+              </div>
+            )}
+            <div>
+              <Label className="text-xs">complianceApprovalRef</Label>
+              <Input
+                value={complianceApprovalRef}
+                onChange={(e) => setComplianceApprovalRef(e.target.value)}
+                placeholder="e.g. COMPLIANCE-1234"
+                maxLength={128}
+              />
+              <div className="text-[10px] text-zinc-500 mt-1">
+                External ticket/jira ID authorizing the archive. Required.
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">reason</Label>
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="audit-trail context"
+                maxLength={1024}
+              />
+              <div className="text-[10px] text-zinc-500 mt-1">
+                Free-form audit-reconstruction context. Required.
+              </div>
+            </div>
+            <Button
+              size="sm"
+              disabled={
+                archiveMut.isPending ||
+                selectedId === null ||
+                complianceApprovalRef.trim() === "" ||
+                reason.trim() === ""
+              }
+              onClick={() => {
+                if (selectedId === null) return;
+                if (
+                  window.confirm(
+                    `Archive release-audit-ref #${selectedId} with approval ${complianceApprovalRef}?`,
+                  )
+                ) {
+                  archiveMut.mutate({
+                    id: selectedId,
+                    complianceApprovalRef: complianceApprovalRef.trim(),
+                    reason: reason.trim(),
+                  });
+                }
+              }}
+            >
+              {archiveMut.isPending ? "Archiving…" : "Archive row"}
+            </Button>
+            {lastArchivedId !== null ? (
+              <div className="rounded border border-zinc-800 p-2 text-xs text-zinc-500">
+                Last archived: <span className="font-mono">#{lastArchivedId}</span>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
