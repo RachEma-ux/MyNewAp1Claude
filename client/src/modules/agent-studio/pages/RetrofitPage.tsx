@@ -5123,6 +5123,12 @@ function LifecycleHoldsManagementPanel() {
               </Badge>
             </div>
           </div>
+          {entityIdValid && entityType !== "ags_release_audit_refs" ? (
+            <EligibilityExplainer
+              entityType={entityType as "ags_publish_requests" | "ags_approval_steps" | "ags_note_promotions"}
+              entityId={entityIdParsed}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -5292,6 +5298,87 @@ function LifecycleHoldsManagementPanel() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ── Eligibility explainer (used inline in the holds-management panel) ─────
+
+function EligibilityExplainer(props: {
+  entityType: "ags_publish_requests" | "ags_approval_steps" | "ags_note_promotions";
+  entityId: number;
+}) {
+  const query =
+    trpc.agentStudio.publish.explainRetentionEligibility.useQuery(
+      {
+        entityType: props.entityType,
+        entityId: props.entityId,
+        retentionDays: 90,
+      },
+      { retry: false },
+    );
+
+  if (query.isLoading) {
+    return (
+      <div className="text-xs text-zinc-500 mt-2">
+        Loading retention eligibility…
+      </div>
+    );
+  }
+  if (query.error) {
+    return (
+      <div className="text-xs text-amber-400 mt-2">
+        Eligibility lookup failed: {query.error.message}
+      </div>
+    );
+  }
+  const data = query.data;
+  if (!data) return null;
+
+  return (
+    <div
+      className={`rounded border p-2 text-xs mt-2 ${
+        data.retentionEligible
+          ? "border-emerald-900 bg-emerald-950/20"
+          : "border-amber-900 bg-amber-950/20"
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <SectionLabel>Retention eligibility (90-day window)</SectionLabel>
+        <Badge variant={data.retentionEligible ? "default" : "secondary"}>
+          {data.retentionEligible ? "eligible" : "preserved"}
+        </Badge>
+      </div>
+      <div className="mt-1 text-zinc-400">
+        state: <span className="font-mono">{data.state}</span> · terminalAt:{" "}
+        <span className="font-mono">
+          {data.terminalAt ? new Date(data.terminalAt).toISOString() : "—"}
+        </span>
+      </div>
+      <div className="mt-0.5 text-zinc-400">
+        retentionEligibleAt:{" "}
+        <span className="font-mono">
+          {data.retentionEligibleAt
+            ? new Date(data.retentionEligibleAt).toISOString()
+            : "—"}
+        </span>
+      </div>
+      {data.retentionBlockers.length > 0 ? (
+        <div className="mt-1">
+          <div className="text-zinc-500 uppercase tracking-wide">blockers</div>
+          <ul className="list-disc list-inside text-zinc-400">
+            {data.retentionBlockers.map((code: string) => (
+              <li key={code} className="font-mono">
+                {code}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="mt-1 text-emerald-400">
+          No active blockers — the next sweep will delete this row.
+        </div>
+      )}
     </div>
   );
 }

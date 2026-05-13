@@ -1628,6 +1628,130 @@ const publishRouter = router({
         entityId: input.entityId,
       });
     }),
+
+  // ── Eligibility explainer ─────────────────────────────────────────────────
+  //
+  // Operator-investigation surface for "why isn't this row being swept?"
+  // Loads the same eligibility derivation the cron uses and returns the
+  // full blocker code list (plus retentionEligibleAt for time-based
+  // questions). Supports the 3 retention-eligible tables. Track 2's
+  // agsReleaseAuditRefs is intentionally not supported here — its
+  // policy is qualitatively different (archive, not retention).
+
+  explainRetentionEligibility: adminProcedure
+    .input(
+      z.object({
+        entityType: z.enum([
+          "ags_publish_requests",
+          "ags_approval_steps",
+          "ags_note_promotions",
+        ]),
+        entityId: z.number().int().positive(),
+        retentionDays: z.number().int().min(1).max(3650).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const days = input.retentionDays ?? 90;
+      const retentionWindowMs = days * 86_400_000;
+
+      if (input.entityType === "ags_publish_requests") {
+        const { loadPublishRequestEligibility } = await import(
+          "../services/retention/lifecycle-eligibility"
+        );
+        const row = await repo.getPublishRequestById(input.entityId);
+        if (!row) {
+          throwTrpcAndCapture(
+            new TRPCError({ code: "NOT_FOUND", message: "Publish request not found" }),
+          );
+        }
+        return {
+          entityType: input.entityType,
+          entityId: input.entityId,
+          state: row.state,
+          terminalAt: row.terminalAt ?? null,
+          ...(await loadPublishRequestEligibility(
+            { id: row.id, state: row.state, terminalAt: row.terminalAt ?? null },
+            { retentionWindowMs },
+          )),
+        };
+      }
+      if (input.entityType === "ags_approval_steps") {
+        const { loadApprovalStepEligibility } = await import(
+          "../services/retention/lifecycle-eligibility"
+        );
+        const step = await repo.getApprovalStepById(input.entityId);
+        if (!step) {
+          throwTrpcAndCapture(
+            new TRPCError({ code: "NOT_FOUND", message: "Approval step not found" }),
+          );
+        }
+        const parent = await repo.getPublishRequestById(step.publishRequestId);
+        if (!parent) {
+          throwTrpcAndCapture(
+            new TRPCError({
+              code: "NOT_FOUND",
+              message: `Parent publish request ${step.publishRequestId} not found`,
+            }),
+          );
+        }
+        return {
+          entityType: input.entityType,
+          entityId: input.entityId,
+          state: step.state,
+          terminalAt: step.terminalAt ?? null,
+          ...(await loadApprovalStepEligibility(
+            {
+              id: step.id,
+              state: step.state,
+              terminalAt: step.terminalAt ?? null,
+              publishRequestId: step.publishRequestId,
+            },
+            { state: parent.state, terminalAt: parent.terminalAt ?? null },
+            { retentionWindowMs },
+          )),
+        };
+      }
+      // ags_note_promotions — fetch directly (no repository helper today)
+      const { loadNotePromotionEligibility } = await import(
+        "../services/retention/lifecycle-eligibility"
+      );
+      const { getAsDb } = await import("../db/connection");
+      const { agsNotePromotions } = await import(
+        "../../../drizzle/tables/agent-studio-graph-promotion"
+      );
+      const { eq } = await import("drizzle-orm");
+      const db = getAsDb();
+      if (!db) {
+        throwTrpcAndCapture(
+          new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ASDB unavailable" }),
+        );
+      }
+      const promoRows = await db
+        .select({
+          id: agsNotePromotions.id,
+          status: agsNotePromotions.status,
+          terminalAt: agsNotePromotions.terminalAt,
+        })
+        .from(agsNotePromotions)
+        .where(eq(agsNotePromotions.id, input.entityId))
+        .limit(1);
+      if (promoRows.length === 0) {
+        throwTrpcAndCapture(
+          new TRPCError({ code: "NOT_FOUND", message: "Note promotion not found" }),
+        );
+      }
+      const promo = promoRows[0];
+      return {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        state: promo.status,
+        terminalAt: promo.terminalAt ?? null,
+        ...(await loadNotePromotionEligibility(
+          { id: promo.id, status: promo.status, terminalAt: promo.terminalAt ?? null },
+          { retentionWindowMs },
+        )),
+      };
+    }),
 });
 
 // ── Phase 0b: openllm-agent2 native parity sub-routers ──────────────────────
