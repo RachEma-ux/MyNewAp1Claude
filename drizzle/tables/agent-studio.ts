@@ -626,6 +626,56 @@ export const agsReleaseAuditRefs = pgTable(
   })
 );
 
+// ── Approval-lifecycle retention — shared lifecycle holds ───────────────────
+//
+// A retention sweep MUST NOT delete a row that is currently under hold.
+// Holds attach to (entityType, entityId) tuples and are open-set on
+// holdType so we can use the same table for legal / audit / governance
+// holds AND for governance-review / audit-investigation linkage without
+// adding parallel tables for each.
+//
+// Active hold = `releasedAt IS NULL AND (holdUntil IS NULL OR holdUntil > now())`.
+// Holds are never hard-deleted — set `releasedAt` to revoke them; the
+// historical row remains for audit reconstruction.
+export const agsLifecycleHolds = pgTable(
+  "ags_lifecycle_holds",
+  {
+    id: serial("id").primaryKey(),
+    /** Source-of-truth table the hold attaches to (e.g. "ags_publish_requests"). */
+    entityType: varchar("entity_type", { length: 64 }).notNull(),
+    /** Row PK in the source table. */
+    entityId: integer("entity_id").notNull(),
+    /**
+     * Hold category. Open-set varchar (not enum) so future hold types can
+     * land without a migration. Established values:
+     *   - legal_hold
+     *   - audit_hold
+     *   - governance_hold
+     *   - governance_review     (open governance review against the entity)
+     *   - audit_investigation   (unresolved audit investigation)
+     */
+    holdType: varchar("hold_type", { length: 64 }).notNull(),
+    reason: text("reason"),
+    setBy: integer("set_by"),
+    setAt: timestamp("set_at").defaultNow().notNull(),
+    /** Optional auto-expiry. Null = indefinite until released. */
+    holdUntil: timestamp("hold_until"),
+    /** Null while the hold is active; set when the hold is released. */
+    releasedAt: timestamp("released_at"),
+    releasedBy: integer("released_by"),
+    releaseNote: text("release_note"),
+    /** Free-form bag for system-specific metadata (e.g. legal case ID). */
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    entityIdx: index("idx_ags_lifecycle_holds_entity").on(t.entityType, t.entityId),
+    activeIdx: index("idx_ags_lifecycle_holds_active").on(t.entityType, t.entityId, t.releasedAt),
+    typeIdx: index("idx_ags_lifecycle_holds_type").on(t.holdType),
+  })
+);
+
 // ── Phase 0a: openllm-agent2 native parity tables ───────────────────────────
 //
 // 6 new tables that bring Studio to representational parity with
