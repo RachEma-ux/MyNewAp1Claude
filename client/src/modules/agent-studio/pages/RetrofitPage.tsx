@@ -274,13 +274,11 @@ function CronStatusPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Retention sweep</SectionLabel>
-            {retention?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : retention?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={false}
+              lastError={retention?.lastError}
+              lastRunAt={retention?.lastRunAt}
+            />
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 03:00 UTC (env: AGS_RETENTION_CRON_EXPR).
@@ -327,13 +325,11 @@ function CronStatusPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Stale-running sweep</SectionLabel>
-            {staleRunning?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : staleRunning?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={false}
+              lastError={staleRunning?.lastError}
+              lastRunAt={staleRunning?.lastRunAt}
+            />
           </div>
           <div className="text-xs text-zinc-400">
             Default: every 10 min, 30-min staleness threshold (env:
