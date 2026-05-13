@@ -50,8 +50,8 @@ audit closure mission.
 
 ### 1.1 Summary counts
 
-- **FULLY IMPLEMENTED:** 13 items (2, 3, 4, 5, 6, 7, 9, 13, 14, 17, 18, 19, 20)
-- **PARTIALLY IMPLEMENTED:** 2 items (1, 21 — see below)
+- **FULLY IMPLEMENTED:** 14 items (2, 3, 4, 5, 6, 7, 9, 13, 14, 17, 18, 19, 20, 21)
+- **PARTIALLY IMPLEMENTED:** 1 item (1 — operator-action only; code path complete)
 - **NOT IMPLEMENTED:** 6 items (8, 10, 11, 12, 15, 16)
 
 Item 21 was reclassified from PARTIALLY → FULLY after the tracker was
@@ -223,13 +223,47 @@ PRs from the strict-audit mission:
 | PR-AT-6 (Retention panel batch 5) | `fdbac53d` | Three more panels: `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. 28 vitest cases. 8/17 → 11/17 |
 | PR-AT-7 (Retention panel batch 6) | `7ea0ce4e` | Three more panels: `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`. 29 vitest cases. 11/17 → 14/17 |
 | PR-AT-8 (Retention panel batch 7 — FINAL) | `99f07ac1` | Final three panels (the approval-lifecycle trio): `PublishRequestsRetentionPanel` + `ApprovalStepsRetentionPanel` + `NotePromotionsRetentionPanel`. 30 vitest cases. 14/17 → **17/17**. Closes item #14 and the panel-extraction sub-arc. |
-| PR-AT-9 (Layer 4 Playwright v0) | this PR | `playwright.config.ts` (chromium-only) + 3 specs (`01-app-boot.spec.ts`, `02-agent-studio-shell.spec.ts`, `03-retrofit-page.spec.ts`) + `.github/workflows/playwright-e2e.yml` (workflow_dispatch + label-gated `run-e2e`) + `@playwright/test ^1.49.0` devDep + 7 source-scan integrity tests. Closes item #7 — Layer 4 e2e harness FULLY IMPLEMENTED. |
+| PR-AT-9 (Layer 4 Playwright v0) | `a0427c19` | `playwright.config.ts` (chromium-only) + 3 specs (`01-app-boot.spec.ts`, `02-agent-studio-shell.spec.ts`, `03-retrofit-page.spec.ts`) + `.github/workflows/playwright-e2e.yml` (workflow_dispatch + label-gated `run-e2e`) + `@playwright/test ^1.49.0` devDep + 7 source-scan integrity tests. Closes item #7 — Layer 4 e2e harness FULLY IMPLEMENTED. |
+| PR-AT-10 (Mission-close cleanup) | this PR | Reclassifies item 21 PARTIALLY → FULLY (the rewrite was the work; once complete, it's done); updates summary counts to **14 FULLY / 1 PARTIALLY / 6 NOT IMPLEMENTED**; documents the mission-close state. |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The
-counter-fact: 4 items moved from PARTIALLY/NOT IMPLEMENTED to FULLY
-IMPLEMENTED (items 3, 4, 5, 13) because the strict-audit mission shipped
-real code, not narrative.
+counter-fact: **9 items** moved from PARTIALLY/NOT IMPLEMENTED to
+FULLY IMPLEMENTED during the strict-audit closure mission (items 2,
+3, 4, 5, 6, 7, 9, 13, 14) because the mission shipped real code, not
+narrative.
+
+---
+
+## 8.1 Mission close (2026-05-13)
+
+The strict-audit closure mission is COMPLETE. All MVP 0-4 runtime
+gaps are closed:
+
+| Item | Closure | Merge SHA |
+|---|---|---|
+| 2 — Golden Questions live adapter | PR-AT-1 | `08cccdf9` |
+| 6 — Memgraph Bolt query path | PR-AT-2 | `503ae0c8` |
+| 9 — Projection drift cron | PR-AT-3 | `2ccf0841` |
+| 14 — Panel extraction sub-arc (17/17) | PR-AT-4..PR-AT-8 | `90180205`, `0404b13b`, `fdbac53d`, `7ea0ce4e`, `99f07ac1` |
+| 7 — Layer 4 Playwright v0 | PR-AT-9 | `a0427c19` |
+
+Remaining items are NOT MVP 0-4 runtime gaps:
+- **Item 1** — operator-action only (G3 benchmark trigger + evidence
+  commit; code path complete). Stays PARTIALLY until an operator
+  runs the workflow and commits evidence under
+  `docs/evidence/graph-backend/`. No code PR can close this.
+- **Item 8** — V1/V1.5/V2 plan-only narrative; out of MVP 0-4 scope
+  by construction.
+- **Items 10, 11, 12, 15, 16** — intentional CLAUDE.md deferrals;
+  out of MVP 0-4 scope (CRDT, offline, Neo4j Enterprise, multi-
+  region, Canvas/Bases/plugins).
+
+**Next material work direction (post-mission):**
+- If operator hands appear: trigger `graph-bench-neo4j-ce.yml` and
+  commit benchmark evidence to close item 1's operator slice.
+- Otherwise: V1+ plan execution (item 8 → real code) per
+  `docs/implementation/agent-studio-native-graph-workspace-v1-v2-execution-plan.md`.
 
 ---
 

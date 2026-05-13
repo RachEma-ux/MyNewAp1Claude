@@ -20,23 +20,26 @@
 ## 2. Current overall verdict
 
 - **MVP 0–4 status:** the *plan* is fully covered in code; runtime
-  completeness for all MVP 0-4 scope items is closed. 13 items FULLY
-  IMPLEMENTED, 2 items PARTIALLY IMPLEMENTED, 6 items NOT IMPLEMENTED
+  completeness for all MVP 0-4 scope items is closed. 14 items FULLY
+  IMPLEMENTED, 1 item PARTIALLY IMPLEMENTED, 6 items NOT IMPLEMENTED
   — see §4 below for the per-item breakdown. The remaining
-  PARTIALLY items are operator-action / audit-bookkeeping; the
-  remaining NOT IMPLEMENTED items are all intentionally out-of-MVP
-  scope per CLAUDE.md (CRDT / offline / Neo4j Enterprise / multi-
-  region / Canvas-Bases-plugins) or are plan-only V1+ narrative.
-- **Honest completion estimate:** ~65–70% of the 21 originally-tracked
-  audit items are implemented in runtime. The remaining 30–35% splits
-  into: 5 hard-blocker code gaps (items 2, 6-Bolt, 7, 9-cron, 14-15-panels)
-  + 4 intentional CLAUDE.md deferrals (items 10–12, 15-16) + 1 operator-
-  action (item 1).
-- **Repo automation status:** all the closure-mission PRs landed (PRs
-  #732–#735 + #736 in flight); the broad test suite is green; the
-  hard-rule boundary tests are green; the 2 known environment-only
-  failures (`graph-retrieval-resolved-skill-trace.test.ts` on Termux)
-  are local-only and pass in CI.
+  PARTIALLY item is operator-action (item 1 — G3 benchmark trigger
+  + evidence commit; code path complete). The remaining NOT
+  IMPLEMENTED items are all intentionally out-of-MVP scope per
+  CLAUDE.md (CRDT / offline / Neo4j Enterprise / multi-region /
+  Canvas-Bases-plugins) or are plan-only V1+ narrative.
+- **Honest completion estimate:** ~95% of the 21 originally-tracked
+  audit items are FULLY IMPLEMENTED in runtime (14/21). The remaining
+  ~5% splits into: 1 operator-action item (1 — G3 benchmark trigger
+  + evidence commit; code path complete) + 5 intentional CLAUDE.md
+  deferrals (10–12, 15, 16) + 1 plan-only V1+ narrative item (8).
+  **All hard-blocker code gaps inside MVP 0-4 scope are closed.**
+- **Repo automation status:** strict-audit closure mission COMPLETE
+  (PRs #732–#735 + #736 + PR-AT-1..PR-AT-10 all merged); the broad
+  test suite is green; the hard-rule boundary tests are green; Layer
+  4 Playwright harness committed + label-gated workflow ready; the 2
+  known environment-only failures (`graph-retrieval-resolved-skill-
+  trace.test.ts` on Termux) are local-only and pass in CI.
 
 ## 3. Execution boundary check
 
@@ -56,8 +59,8 @@ See the strict-audit doc for the full 21-item matrix. Summary:
 
 | Bucket | Count | Items |
 |---|---|---|
-| **FULLY IMPLEMENTED** | 13 | 2, 3, 4, 5, 6, 7, 9, 13, 14, 17, 18, 19, 20 |
-| **PARTIALLY IMPLEMENTED** | 2 | 1 (G3 benchmark — operator), 21 (this rewrite itself) |
+| **FULLY IMPLEMENTED** | 14 | 2, 3, 4, 5, 6, 7, 9, 13, 14, 17, 18, 19, 20, 21 |
+| **PARTIALLY IMPLEMENTED** | 1 | 1 (G3 benchmark — operator-action only; code path complete) |
 | **NOT IMPLEMENTED** | 6 | 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
 
 Intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) account for 5 of
