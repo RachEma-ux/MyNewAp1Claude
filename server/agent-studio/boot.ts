@@ -441,6 +441,26 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.19: Phase 22 follow-up #674 — graph-change-proposals retention
+  // cron. The Phase 11.5 structural-change proposal scaffolding
+  // (ags_graph_change_proposals + items + decisions + audit_events)
+  // had no retention before #673 + #674. Default daily 16:00 UTC
+  // sweep — 14th slot in the daily-sweep ladder. 4-table cascade:
+  // 3 children in parallel (all NO ACTION FK) then proposals.
+  // Env-flag-gated via
+  // AGS_GRAPH_CHANGE_PROPOSALS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureGraphChangeProposalsRetentionCronStarted } = await import(
+      "./services/graph-change-proposals-retention-cron"
+    );
+    ensureGraphChangeProposalsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-change-proposals-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
