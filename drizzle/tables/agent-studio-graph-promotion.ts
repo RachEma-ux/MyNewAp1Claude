@@ -41,11 +41,18 @@ export const agsNotePromotions = pgTable(
     rolledBackAt: timestamp("rolled_back_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    // Approval-lifecycle retention Track 1 (PR-A1): canonical terminal-transition
+    // timestamp. Set exactly once when the row reaches a terminal state.
+    // Retention age MUST be computed from this column, never from createdAt,
+    // approvedAt, rejectedAt, or rolledBackAt. Null on non-terminal rows.
+    terminalAt: timestamp("terminal_at"),
+    terminalReason: text("terminal_reason"),
   },
   (t) => ({
     noteIdx: index("idx_ags_note_promotions_note").on(t.noteId),
     statusIdx: index("idx_ags_note_promotions_status").on(t.status),
     kindIdx: index("idx_ags_note_promotions_kind").on(t.promotionKind),
+    terminalAtIdx: index("idx_ags_note_promotions_terminal_at").on(t.terminalAt),
   }),
 );
 
