@@ -35,8 +35,14 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
-import { SCENARIOS, getScenarios } from "../../../scripts/graph-bench/lib/scenarios.js";
+import {
+  SCENARIOS,
+  getScenarios,
+  validateScenarioKeys,
+} from "../../../scripts/graph-bench/lib/scenarios.js";
 import { DEFAULT_FIXTURE } from "../../../scripts/graph-bench/lib/fixtures.js";
+import { runBenchmark } from "../../../scripts/graph-bench/lib/runner.js";
+import type { GraphRepository } from "../../../server/agent-studio/services/graph/repository/index.js";
 
 const REPO_ROOT = join(__dirname, "..", "..", "..");
 const RUN_BENCHMARK_PATH = join(REPO_ROOT, "scripts", "graph-bench", "run-benchmark.ts");
@@ -155,13 +161,16 @@ describe("graph-bench harness — static integrity", () => {
       expect(existsSync(RUN_BENCHMARK_PATH)).toBe(true);
     });
 
-    it("imports getGraphRepository + scenarios + fixtures + runner + reporter", () => {
+    it("imports getGraphRepository + scenario validation + fixtures + runner + reporter", () => {
       // The CLI orchestrates all 5 surfaces. A future refactor that
       // drops one of these imports breaks the harness silently
       // (a degraded report still writes; operator may not notice).
+      // `validateScenarioKeys` replaced the permissive `getScenarios`
+      // import in PR-A to enforce loud-failure on unknown / empty
+      // scenario inputs.
       const src = readFileSync(RUN_BENCHMARK_PATH, "utf8");
       expect(src).toMatch(/getGraphRepository/);
-      expect(src).toMatch(/getScenarios/);
+      expect(src).toMatch(/validateScenarioKeys/);
       expect(src).toMatch(/generateFixture/);
       expect(src).toMatch(/runBenchmark/);
       expect(src).toMatch(/formatReport/);
@@ -174,6 +183,71 @@ describe("graph-bench harness — static integrity", () => {
       // produce a "passing" closure PR.
       const src = readFileSync(RUN_BENCHMARK_PATH, "utf8");
       expect(src).toMatch(/process\.exit\(\s*report\.overallPassed\s*\?\s*0\s*:\s*1\s*\)/);
+    });
+
+    it("validates scenario keys before touching the repository", () => {
+      // Closure-mission acceptance: unknown scenario keys must fail
+      // loudly + empty scenario selection must not silently pass.
+      // The CLI checks validation BEFORE `getGraphRepository()`.
+      const src = readFileSync(RUN_BENCHMARK_PATH, "utf8");
+      expect(src).toMatch(/validateScenarioKeys\(/);
+      const validateIdx = src.indexOf("validateScenarioKeys(");
+      const getRepoIdx = src.indexOf("getGraphRepository(");
+      expect(validateIdx).toBeGreaterThan(-1);
+      expect(getRepoIdx).toBeGreaterThan(-1);
+      expect(validateIdx).toBeLessThan(getRepoIdx);
+    });
+  });
+
+  describe("validateScenarioKeys — loud-failure guard", () => {
+    it("returns full canonical set for ['all']", () => {
+      const v = validateScenarioKeys(["all"]);
+      expect(v.unknown).toEqual([]);
+      expect(v.resolved).toHaveLength(SCENARIOS.length);
+    });
+
+    it("returns full canonical set for []", () => {
+      const v = validateScenarioKeys([]);
+      expect(v.unknown).toEqual([]);
+      expect(v.resolved).toHaveLength(SCENARIOS.length);
+    });
+
+    it("splits valid + unknown for mixed input", () => {
+      const v = validateScenarioKeys(["note_open", "does_not_exist", "search_10k_notes"]);
+      expect(v.valid).toEqual(["note_open", "search_10k_notes"]);
+      expect(v.unknown).toEqual(["does_not_exist"]);
+      expect(v.resolved.map((s) => s.key)).toEqual(["note_open", "search_10k_notes"]);
+    });
+
+    it("reports every key unknown when none match", () => {
+      const v = validateScenarioKeys(["nope_a", "nope_b"]);
+      expect(v.valid).toEqual([]);
+      expect(v.unknown).toEqual(["nope_a", "nope_b"]);
+      expect(v.resolved).toEqual([]);
+    });
+  });
+
+  describe("runner — silent-success defense", () => {
+    // Pre-PR-A bug: `results.every(...)` on an empty array returns
+    // true by spec, so an empty scenario list silently produced a
+    // "passing" report. The runner now requires results.length > 0.
+    // This test is the regression lock.
+    function makeStubRepo(): GraphRepository {
+      // Minimal duck-typed stub — runBenchmark only calls
+      // scenario.run(repo). With 0 scenarios, the repo is never
+      // touched, so the stub never needs to implement anything.
+      return { backendKey: "test" } as unknown as GraphRepository;
+    }
+
+    it("overallPassed is false when no scenarios ran", async () => {
+      const report = await runBenchmark({
+        repository: makeStubRepo(),
+        scenarios: [],
+        iterations: 1,
+        fixtureSize: DEFAULT_FIXTURE,
+      });
+      expect(report.results).toHaveLength(0);
+      expect(report.overallPassed).toBe(false);
     });
   });
 });

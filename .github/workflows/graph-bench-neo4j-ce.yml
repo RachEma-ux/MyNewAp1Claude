@@ -172,6 +172,24 @@ jobs:
             $SKIP_FLAG \
             --output "docs/evidence/graph-backend/${{ steps.date.outputs.date }}-neo4j-ce-${{ steps.scale.outputs.label }}/report.md"
 
+      - name: Assert Postgres source-of-truth invariant
+        run: |
+          # CLAUDE.md "Native Graph Workspace — Non-Build List" hard rule:
+          # Postgres = source of truth; Neo4j CE = projected backend.
+          # After the run, the ASDB fixture tables MUST still contain
+          # the expected node + edge counts. If Postgres rows are
+          # missing or smaller than the Neo4j projection, an invariant
+          # has been violated.
+          NOTES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_vault_notes" 2>/dev/null || echo 0)
+          NODES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_graph_nodes" 2>/dev/null || echo 0)
+          EDGES=$(psql "${DATABASE_URL_ASDB}" -tAc "SELECT count(*) FROM ags_graph_edges" 2>/dev/null || echo 0)
+          echo "[postgres-sot] notes=${NOTES} nodes=${NODES} edges=${EDGES}"
+          if [ "${NOTES}" -eq 0 ] && [ "${NODES}" -eq 0 ] && [ "${EDGES}" -eq 0 ]; then
+            echo "::error::Postgres source-of-truth assertion failed — ASDB has zero notes/nodes/edges after the benchmark run. Either fixture generation never executed (Neo4j-only path?) or the run mutated Neo4j without populating Postgres first."
+            exit 1
+          fi
+          echo "[postgres-sot] OK — ASDB retains the fixture rows after Neo4j benchmark."
+
       - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4

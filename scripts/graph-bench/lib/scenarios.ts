@@ -100,3 +100,42 @@ export function getScenarios(keys?: string[]): BenchmarkScenario[] {
   if (!keys || keys.length === 0 || keys.includes("all")) return SCENARIOS;
   return SCENARIOS.filter((s) => keys.includes(s.key));
 }
+
+export interface ScenarioKeyValidation {
+  readonly valid: string[];
+  readonly unknown: string[];
+  readonly resolved: BenchmarkScenario[];
+}
+
+/**
+ * Strict-mode key validation for CLI / workflow callers.
+ *
+ * `getScenarios()` silently returns an empty array for unknown keys —
+ * useful for permissive library callers, dangerous for the CLI
+ * because it pairs with the runner's "0 scenarios = silent pass"
+ * historical bug. This function is the loud-failure variant: it
+ * splits the requested keys into `valid` + `unknown` so the CLI can
+ * reject the run before scenarios execute.
+ *
+ * `["all"]` is treated as "all canonical scenarios" — no unknowns
+ * reported. `[]` is treated the same way (matches `getScenarios`
+ * permissive semantics). Anything else must match a scenario key
+ * exactly or be reported as unknown.
+ *
+ * Acceptance: G3 benchmark runbook §6 + closure mission acceptance
+ * criteria — "unknown scenario keys must fail loudly".
+ */
+export function validateScenarioKeys(keys: string[]): ScenarioKeyValidation {
+  if (keys.length === 0 || keys.includes("all")) {
+    return { valid: SCENARIOS.map((s) => s.key), unknown: [], resolved: SCENARIOS };
+  }
+  const known = new Set(SCENARIOS.map((s) => s.key));
+  const valid: string[] = [];
+  const unknown: string[] = [];
+  for (const k of keys) {
+    if (known.has(k)) valid.push(k);
+    else unknown.push(k);
+  }
+  const resolved = SCENARIOS.filter((s) => valid.includes(s.key));
+  return { valid, unknown, resolved };
+}
