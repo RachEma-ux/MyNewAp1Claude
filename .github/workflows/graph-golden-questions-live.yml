@@ -52,11 +52,13 @@ jobs:
     env:
       DATABASE_URL: postgres://testuser:testpass@localhost:5432/asdb
       DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/asdb
-      # OPENROUTER_API_KEY is consumed only by the live-wiring path
-      # (runbook §4.4). The run script tolerates its absence and
-      # emits an inventory-only report with `liveWired: false`. To
-      # exercise the live path, set the `OPENROUTER_API_KEY` repo
-      # secret before triggering this workflow.
+      # The secret plumbing is intentionally pre-wired for the
+      # eventual live-wiring PR (runbook §4.4). The day-1 run
+      # script does NOT read this directly — per Plan v3 D1,
+      # provider credentials flow through `withProviderCredential`,
+      # not raw `process.env` reads. When the live-wiring PR lands,
+      # the model-access adapter will resolve credentials via the
+      # provider-connections seed path, not this env var.
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
     steps:

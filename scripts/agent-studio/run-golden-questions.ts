@@ -11,10 +11,8 @@
  *   - Reads the seeded suites from ASDB.
  *   - Writes a structured markdown report at --output with the
  *     question inventory + expected paths + minimum citation counts.
- *   - Returns exit 0 with a "needs-live-wiring" status when the
- *     OPENROUTER_API_KEY env var or full engine adapters are
- *     unavailable (this is the day-1 shape; the runbook §4.3
- *     describes the live-wiring path).
+ *   - Returns exit 0 with a `liveWired: false` status — the day-1
+ *     shape; runbook §4.3 describes the live-wiring path.
  *   - Returns exit 1 only on infrastructure failure (ASDB
  *     unreachable, seed missing, IO failure).
  *
@@ -23,7 +21,10 @@
  * GraphRepository + GraphRetrievalRouter + ModelAccessAdapter +
  * McpDispatchAdapter + RuntimeTraceAdapter for a live single-shot
  * eval requires per-deployment configuration and a workspace
- * smoke vault that this CLI cannot make assumptions about.
+ * smoke vault that this CLI cannot make assumptions about. When
+ * that wiring lands, provider credentials MUST flow through
+ * `withProviderCredential` per Plan v3 Decision D1 — never via
+ * `process.env` in script bodies.
  *
  * Usage:
  *   DATABASE_URL_ASDB=postgres://... pnpm tsx scripts/agent-studio/run-golden-questions.ts \
@@ -188,16 +189,17 @@ async function main() {
     questionsBySuite.set(s.id, qs);
   }
 
-  // Liveness check — live wiring requires OPENROUTER_API_KEY for the
-  // ModelAccessAdapter path. Without it we emit the inventory-only
-  // report so the operator gets actionable feedback.
-  const hasOpenRouter =
-    typeof process.env.OPENROUTER_API_KEY === "string" &&
-    process.env.OPENROUTER_API_KEY.length > 0;
+  // Day-1 shape: adapter composition for GraphAgentEngine
+  // (repository + retrievalRouter + modelAccess + mcpDispatcher +
+  // runtimeTrace + decisionTrace) is operator-implementation
+  // territory per runbook §4.4. Provider credentials for the
+  // eventual modelAccess adapter MUST flow through
+  // `withProviderCredential` (Plan v3 D1) — never via direct
+  // `process.env` reads in script bodies. The inventory-only
+  // report below is the day-1 closure-evidence shape.
   const liveWired = false;
-  const reason = hasOpenRouter
-    ? "Adapter composition not yet implemented in this CLI (runbook §4.4)."
-    : "OPENROUTER_API_KEY not set, and adapter composition not yet implemented in this CLI (runbook §4.4).";
+  const reason =
+    "Adapter composition not yet implemented in this CLI (runbook §4.4). When wired, model-access credentials must flow through withProviderCredential per Plan v3 D1.";
 
   const markdown = formatReport(date, liveWired, reason, allSuites, questionsBySuite);
 
