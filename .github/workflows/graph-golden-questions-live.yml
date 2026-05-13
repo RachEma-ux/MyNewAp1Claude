@@ -1,0 +1,110 @@
+# Native Graph Workspace MVP 4 — Phase 22 / 23 (G10 evaluation surface).
+#
+# Operator-triggered execution of the Golden Question evaluation
+# runbook at
+#   docs/runbooks/agent-studio-native-graph-workspace-golden-questions-evaluation-runbook.md
+#
+# This workflow is `workflow_dispatch` only — the operator triggers
+# it from the Actions tab or via `gh workflow run`.
+#
+# Outputs:
+#   - GitHub Actions artifact: golden-questions-report-${run_id}.zip
+#     containing the markdown inventory + (when live wiring lands)
+#     per-question results.
+#
+# Live-wiring status:
+#   The run script is a structured inventory-report generator today;
+#   full adapter-composed live evaluation is operator-implementation
+#   territory per runbook §4.4. The workflow still runs end-to-end:
+#   ASDB seed + run, with the report archived as evidence even before
+#   live wiring lands.
+
+name: Golden Questions — Live Evaluation (G10)
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Suite key to run (or "all")'
+        required: false
+        default: 'all'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: asdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://testuser:testpass@localhost:5432/asdb
+      DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/asdb
+      # The secret plumbing is intentionally pre-wired for the
+      # eventual live-wiring PR (runbook §4.4). The day-1 run
+      # script does NOT read this directly — per Plan v3 D1,
+      # provider credentials flow through `withProviderCredential`,
+      # not raw `process.env` reads. When the live-wiring PR lands,
+      # the model-access adapter will resolve credentials via the
+      # provider-connections seed path, not this env var.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Apply ASDB schema
+        run: npx drizzle-kit push --force
+
+      - name: Seed Golden Question suites
+        run: npx tsx scripts/agent-studio/seed-golden-questions.ts
+
+      - name: Compute run date
+        id: date
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Run Golden Questions evaluation
+        run: |
+          mkdir -p "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions"
+          npx tsx scripts/agent-studio/run-golden-questions.ts \
+            --suite "${{ github.event.inputs.suite }}" \
+            --output "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/report.md"
+
+      - name: Upload evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-questions-${{ steps.date.outputs.date }}
+          path: docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Golden Questions Evaluation — ${{ steps.date.outputs.date }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Suite filter: \`${{ github.event.inputs.suite }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "OPENROUTER_API_KEY secret present: ${{ secrets.OPENROUTER_API_KEY != '' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Inventory report archived as artifact. On live wiring, the runbook §4.4 / §4.5 prescribes evidence commit + status-doc flip." >> "$GITHUB_STEP_SUMMARY"
