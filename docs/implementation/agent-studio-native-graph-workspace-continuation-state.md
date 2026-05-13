@@ -2,16 +2,31 @@
 
 **Status:** Recovery artifact. **NOT a stopping boundary.** Resume autonomous execution from here when a new session starts.
 
-**Last updated:** 2026-05-10 (single-session execution from §15 of the multi-session execution prompt)
-**Last commit on `feat/native-graph-workspace-mvp0-mvp4`:** `68e9534` (architecture docs) — additional code commits follow this artifact
+**Last updated:** 2026-05-13 (post-closure-mission addendum)
+**MVP 0–4 closure landed on main:** PR #723 (`a70a27a5`), #724 (`01a1dd0f`), #725 (`9fd0e5f8`)
+**Full-closure mission PRs in flight:** #726 (Bundle A), #727 (Bundle B), #728 (Bundle C), #729 (Bundle D), this PR (Bundle E)
+**Original branch:** `feat/native-graph-workspace-mvp0-mvp4` at `68e9534` (pre-MVP-4-closure ADRs) — superseded; all closure work landed on `main`
+
+## 2026-05-13 post-closure-mission addendum (top-of-doc summary)
+
+All 21 closure-mission items resolved into Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked. See `agent-studio-native-graph-workspace-closure-mission-2026-05-13.md` for the per-item ledger.
+
+**Next material work:** V1.0 phase queue per `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` §6 — 5 ready-to-start PRs. Recommended first: Phase 13.5 / PR #1 (Agentic GraphRAG planner contract + ADR + boundary tests).
+
+The historical (pre-closure) recovery context follows.
 
 ---
 
 ## Current MVP
 
-**MVP 0 — substantively complete.** Architecture, ADRs, GraphRepository skeleton + capability registry, Drizzle table schemas (vault + typed graph + projection sync + migration), source-scan boundary tests, backend decision (provisional, gated on operator-side benchmark), benchmark harness skeleton, CLAUDE.md non-build list update.
+**MVP 0 through MVP 4 — substantively complete + formally closed (2026-05-13).** Per the closure-mission ledger:
+- G1, G2, G4–G9: Implemented
+- G3: Workflow-backed (`graph-bench-neo4j-ce.yml` workflow_dispatch + CI Layer 9 harness-integrity static guard)
+- G10: Workflow-backed (`graph-golden-questions-live.yml` + CI Layer 9 seed-integrity static guard) — adapter composition for full live eval = next V1.0 operator-implementation PR
 
-**MVP 1 — not yet started.** Vault service, Markdown editor, properties / frontmatter UI, search, command palette, wikilink/backlink engine remain.
+**MVP 1 — implemented** (vault service, editor, properties, wikilinks, search shipped pre-MVP-4 closure).
+
+The text below this point reflects the original 2026-05-10 recovery state and is kept for historical reference. The closure-mission addendum above is the authoritative current state.
 
 **MVP 2 — not yet started.** Active Neo4j CE wiring (real `neo4j-driver`), projection sync layer, drift detection, graph view UI.
 
