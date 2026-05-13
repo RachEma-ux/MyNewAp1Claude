@@ -117,6 +117,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="ingestion-jobs-retention">Ingestion Jobs Retention</TabsTrigger>
           <TabsTrigger value="graph-change-proposals-retention">Graph Change Proposals Retention</TabsTrigger>
           <TabsTrigger value="graph-agent-runtime-traces-retention">Graph Agent Runtime Traces Retention</TabsTrigger>
+          <TabsTrigger value="publish-requests-retention">Publish Requests Retention</TabsTrigger>
+          <TabsTrigger value="approval-steps-retention">Approval Steps Retention</TabsTrigger>
+          <TabsTrigger value="note-promotions-retention">Note Promotions Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -190,6 +193,15 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="graph-agent-runtime-traces-retention">
           <GraphAgentRuntimeTracesRetentionPanel />
+        </TabsContent>
+        <TabsContent value="publish-requests-retention">
+          <PublishRequestsRetentionPanel />
+        </TabsContent>
+        <TabsContent value="approval-steps-retention">
+          <ApprovalStepsRetentionPanel />
+        </TabsContent>
+        <TabsContent value="note-promotions-retention">
+          <NotePromotionsRetentionPanel />
         </TabsContent>
       </Tabs>
     </div>
@@ -4331,6 +4343,453 @@ function GraphAgentRuntimeTracesRetentionPanel() {
               </div>
               <div>graph agent steps deleted: {manualResult.graphAgentSteps}</div>
               <div>graph agent runs deleted: {manualResult.graphAgentRuns}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Approval-lifecycle retention panels ────────────────────────────────────
+//
+// Three sister panels for the approval-lifecycle retention surface
+// (publish-requests / approval-steps / note-promotions). Unlike the
+// age-only retention panels above, the manual-sweep result includes
+// preservedCount + blockerCounts so operators see WHY rows weren't
+// deleted ("oh — 12 are under legal hold").
+
+function PublishRequestsRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.publish.getPublishRequestsRetentionCronStatus.useQuery(
+      undefined,
+      { refetchInterval: 30_000 },
+    );
+  const [retentionDays, setRetentionDays] = useState("90");
+  const [manualResult, setManualResult] = useState<{
+    deletedCount: number;
+    preservedCount: number;
+    blockerCounts: Record<string, number>;
+  } | null>(null);
+
+  const pruneMut =
+    trpc.agentStudio.publish.prunePublishRequestsRetention.useMutation({
+      onSuccess: (data) => {
+        if (data) {
+          setManualResult({
+            deletedCount: data.deletedCount,
+            preservedCount: data.preservedCount,
+            blockerCounts: data.blockerCounts as Record<string, number>,
+          });
+          toast.success(
+            `Publish requests sweep complete — ${data.deletedCount} deleted, ${data.preservedCount} preserved`,
+          );
+          void statusQuery.refetch();
+        }
+      },
+      onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 90);
+  const status = statusQuery.data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Publish requests retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 18:00 UTC, 90-day window (env:
+            AGS_PUBLISH_REQUESTS_RETENTION_CRON_EXPR /
+            AGS_PUBLISH_REQUESTS_RETENTION_DAYS). Lifecycle-aware sweep —
+            deletes only rows where every retention blocker (active
+            release link, holds, etc.) is cleared. 90-day default
+            covers two quarterly audit cycles.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last sweep</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? `${status.lastResult.deletedCount} deleted`
+                  : "—"}
+              </div>
+              {status?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  preserved {status.lastResult.preservedCount}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Lifecycle-aware sweep against `ags_publish_requests`. Only
+            rows in terminal state with non-null `terminal_at`, no
+            active release link, no holds, and past the retention
+            window are deleted.
+          </div>
+          <div>
+            <Label className="text-xs">retentionDays</Label>
+            <Input
+              type="number"
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(e.target.value)}
+              min={1}
+              max={3650}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Sweep publish-requests older than ${parsedDays} days (lifecycle-aware)?`,
+                )
+              ) {
+                pruneMut.mutate({ retentionDays: parsedDays });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>deleted: {manualResult.deletedCount}</div>
+              <div>preserved: {manualResult.preservedCount}</div>
+              {Object.entries(manualResult.blockerCounts).length > 0 ? (
+                <div className="text-zinc-500">
+                  blockers:{" "}
+                  {Object.entries(manualResult.blockerCounts)
+                    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+                    .join(", ")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ApprovalStepsRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.publish.getApprovalStepsRetentionCronStatus.useQuery(
+      undefined,
+      { refetchInterval: 30_000 },
+    );
+  const [retentionDays, setRetentionDays] = useState("90");
+  const [manualResult, setManualResult] = useState<{
+    deletedCount: number;
+    preservedCount: number;
+    blockerCounts: Record<string, number>;
+  } | null>(null);
+
+  const pruneMut =
+    trpc.agentStudio.publish.pruneApprovalStepsRetention.useMutation({
+      onSuccess: (data) => {
+        if (data) {
+          setManualResult({
+            deletedCount: data.deletedCount,
+            preservedCount: data.preservedCount,
+            blockerCounts: data.blockerCounts as Record<string, number>,
+          });
+          toast.success(
+            `Approval steps sweep complete — ${data.deletedCount} deleted, ${data.preservedCount} preserved`,
+          );
+          void statusQuery.refetch();
+        }
+      },
+      onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+    });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 90);
+  const status = statusQuery.data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Approval steps retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 19:00 UTC, 90-day window (env:
+            AGS_APPROVAL_STEPS_RETENTION_CRON_EXPR /
+            AGS_APPROVAL_STEPS_RETENTION_DAYS). Parent-lifecycle-aware
+            — a step can't be retention-eligible independently of its
+            parent publish-request.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last sweep</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? `${status.lastResult.deletedCount} deleted`
+                  : "—"}
+              </div>
+              {status?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  preserved {status.lastResult.preservedCount}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Lifecycle-aware sweep against `ags_approval_steps`. Step's
+            effective terminal moment is MAX(step.terminal_at,
+            parent.terminal_at).
+          </div>
+          <div>
+            <Label className="text-xs">retentionDays</Label>
+            <Input
+              type="number"
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(e.target.value)}
+              min={1}
+              max={3650}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Sweep approval-steps older than ${parsedDays} days (lifecycle-aware)?`,
+                )
+              ) {
+                pruneMut.mutate({ retentionDays: parsedDays });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>deleted: {manualResult.deletedCount}</div>
+              <div>preserved: {manualResult.preservedCount}</div>
+              {Object.entries(manualResult.blockerCounts).length > 0 ? (
+                <div className="text-zinc-500">
+                  blockers:{" "}
+                  {Object.entries(manualResult.blockerCounts)
+                    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+                    .join(", ")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function NotePromotionsRetentionPanel() {
+  const statusQuery =
+    trpc.agentStudio.promotion.getRetentionCronStatus.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
+  const [retentionDays, setRetentionDays] = useState("90");
+  const [manualResult, setManualResult] = useState<{
+    deletedCount: number;
+    preservedCount: number;
+    blockerCounts: Record<string, number>;
+    cascadeDeletedCounts: {
+      versions: number;
+      decisions: number;
+      auditEvents: number;
+    };
+  } | null>(null);
+
+  const pruneMut = trpc.agentStudio.promotion.pruneRetention.useMutation({
+    onSuccess: (data) => {
+      if (data) {
+        setManualResult({
+          deletedCount: data.deletedCount,
+          preservedCount: data.preservedCount,
+          blockerCounts: data.blockerCounts as Record<string, number>,
+          cascadeDeletedCounts: data.cascadeDeletedCounts,
+        });
+        toast.success(
+          `Note promotions sweep complete — ${data.deletedCount} deleted, ${data.preservedCount} preserved`,
+        );
+        void statusQuery.refetch();
+      }
+    },
+    onError: (err) => toast.error(`Sweep failed: ${err.message ?? "unknown"}`),
+  });
+
+  const parsedDays = Math.max(1, parseInt(retentionDays, 10) || 90);
+  const status = statusQuery.data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Note promotions retention cron</SectionLabel>
+            {statusQuery.isLoading ? (
+              <Badge variant="secondary">loading</Badge>
+            ) : status?.lastError ? (
+              <Badge variant="destructive">error</Badge>
+            ) : status?.lastRunAt ? (
+              <Badge>healthy</Badge>
+            ) : (
+              <Badge variant="secondary">never run</Badge>
+            )}
+          </div>
+          <div className="text-xs text-zinc-400">
+            Default: daily 20:00 UTC, 90-day window (env:
+            AGS_NOTE_PROMOTIONS_RETENTION_CRON_EXPR /
+            AGS_NOTE_PROMOTIONS_RETENTION_DAYS). Cascades child tables
+            (versions / decisions / audit_events) children-first. Active
+            version (`agsNotePromotionVersions.active=true`) is a
+            retention blocker.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last run</div>
+              <div className="text-lg font-semibold">
+                {formatRelative(status?.lastRunAt)}
+              </div>
+            </div>
+            <div className="rounded border border-zinc-800 p-3">
+              <div className="text-xs text-zinc-400 uppercase">last sweep</div>
+              <div className="text-lg font-semibold">
+                {status?.lastResult
+                  ? `${status.lastResult.deletedCount} deleted`
+                  : "—"}
+              </div>
+              {status?.lastResult ? (
+                <div className="text-xs text-zinc-500 mt-1">
+                  preserved {status.lastResult.preservedCount} · cascade v
+                  {status.lastResult.cascadeDeletedCounts.versions}/d
+                  {status.lastResult.cascadeDeletedCounts.decisions}/a
+                  {status.lastResult.cascadeDeletedCounts.auditEvents}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {status?.lastError ? (
+            <div className="rounded border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+              <div className="uppercase tracking-wide mb-1">last error</div>
+              {status.lastError}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <SectionLabel>Manual sweep</SectionLabel>
+          <div className="text-xs text-zinc-400">
+            Lifecycle-aware sweep against `ags_note_promotions`. Rolled-
+            back promotions are terminal but preserved if a governance-
+            review hold exists.
+          </div>
+          <div>
+            <Label className="text-xs">retentionDays</Label>
+            <Input
+              type="number"
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(e.target.value)}
+              min={1}
+              max={3650}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={pruneMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Sweep note-promotions older than ${parsedDays} days (lifecycle-aware, cascades children)?`,
+                )
+              ) {
+                pruneMut.mutate({ retentionDays: parsedDays });
+              }
+            }}
+          >
+            {pruneMut.isPending ? "Sweeping…" : "Run sweep now"}
+          </Button>
+          {manualResult ? (
+            <div className="rounded border border-zinc-800 p-3 text-xs space-y-1">
+              <div className="text-zinc-400 uppercase">Last manual run</div>
+              <div>deleted: {manualResult.deletedCount}</div>
+              <div>preserved: {manualResult.preservedCount}</div>
+              <div className="text-zinc-500">
+                cascade — versions:{" "}
+                {manualResult.cascadeDeletedCounts.versions}, decisions:{" "}
+                {manualResult.cascadeDeletedCounts.decisions}, audit-events:{" "}
+                {manualResult.cascadeDeletedCounts.auditEvents}
+              </div>
+              {Object.entries(manualResult.blockerCounts).length > 0 ? (
+                <div className="text-zinc-500">
+                  blockers:{" "}
+                  {Object.entries(manualResult.blockerCounts)
+                    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+                    .join(", ")}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardContent>
