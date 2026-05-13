@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { PageHeader, LoadingState, EmptyState, SectionLabel } from "../components/ui";
 import { EligibilityExplainer } from "../components/EligibilityExplainer";
 import { CronStatusBadge } from "../components/CronStatusBadge";
+import { formatRelative } from "../components/format-relative";
 
 /**
  * M1-c4 (cycle-4 audit `/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M1-c4)
@@ -231,20 +232,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
 // refresh. Renders an unambiguous "never" state for fresh boots
 // where no sweep has fired yet.
 
-function formatRelative(date: Date | null | undefined): string {
-  if (!date) return "never";
-  const d = new Date(date);
-  const ms = Date.now() - d.getTime();
-  if (ms < 0) return d.toISOString();
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
-}
+// formatRelative extracted to ../components/format-relative.ts (PR #719).
 
 function CronStatusPanel() {
   const q = trpc.agentStudio.workspaceObservability.getCronStatus.useQuery(
