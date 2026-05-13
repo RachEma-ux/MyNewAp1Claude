@@ -4,12 +4,10 @@
  * Composes:
  *   1. Target lookup (by id or targetKey)
  *   2. Pusher resolution from the registry (by targetType)
- *   3. Plan v3 D1 credential boundary (`withProviderCredential` if
- *      `providerConnectionId` is bound; otherwise null is passed)
- *   4. Ledger row insert (`ags_publish_target_executions`)
- *   5. Pusher invocation inside the credential closure
- *   6. Ledger row finalization (success / failure)
- *   7. Returns a structured result
+ *   3. Ledger row insert (`ags_publish_target_executions`)
+ *   4. Pusher invocation (pusher acquires its own credentials)
+ *   5. Ledger row finalization (success / failure)
+ *   6. Returns a structured result
  *
  * Idempotency: the `(target_id, source_promotion_id, attempt)`
  * unique tuple is enforced at the DB level. The executor computes
@@ -17,12 +15,19 @@
  * + 1`. Callers retry by re-invoking; the second call inserts
  * `attempt=2`.
  *
- * Hard-rule compliance:
- *   - No `process.env.*_API_KEY` reads here or in the pushers. The
- *     credential ALWAYS flows through `withProviderCredential`. A
- *     source-scan test pins this property.
- *   - No graph mutation. This module reads promotion ids but does
- *     not write graph state.
+ * Hard-rule compliance (Plan v3 D2 + CLAUDE.md):
+ *   - This module does NOT import the internal credential resolver
+ *     (`server/provider-connections/internal/credential-resolver`).
+ *     Per D2, that import is restricted to
+ *     `server/openrouter/model-access/**`. Source-scan tested.
+ *   - This module does NOT read `process.env.*_API_KEY`. Source-
+ *     scan tested.
+ *   - The pusher is responsible for acquiring its own credentials
+ *     (e.g. via a closure captured at registration time, or via
+ *     Model Access for AI-bound targets). The `target.providerConnectionId`
+ *     is an opaque reference the pusher can use to look up its
+ *     scoped credential surface.
+ *   - No graph mutation. This module reads promotion ids only.
  */
 
 import { eq, sql, and } from "drizzle-orm";
@@ -32,7 +37,6 @@ import {
   agsPublishTargets,
   agsPublishTargetExecutions,
 } from "../../../../drizzle/tables/agent-studio-publish-targets.js";
-import { withProviderCredential } from "../../../provider-connections/internal/credential-resolver.js";
 import { getPublishPusher } from "./registry.js";
 import {
   isPublishTargetType,
@@ -77,9 +81,6 @@ export interface ExecutePublishInput {
   readonly pusherLookup?: (
     targetType: PublishTargetType,
   ) => PublishPusher | undefined;
-  /** Test seam — bypass `withProviderCredential`. Useful in unit
-   *  tests where the secrets subsystem is not available. */
-  readonly skipCredentialResolution?: boolean;
 }
 
 export interface ExecutePublishResult {
@@ -152,9 +153,9 @@ async function nextAttempt(
 
 /**
  * Execute one push attempt against the named target. Inserts a
- * ledger row, runs the pusher inside the credential closure (if
- * any), finalizes the ledger row with the outcome, returns the
- * structured result.
+ * ledger row, runs the pusher, finalizes the ledger row with the
+ * outcome, returns the structured result. The pusher is responsible
+ * for its own credential acquisition (Plan v3 D2).
  */
 export async function executePublish(
   input: ExecutePublishInput,
@@ -172,12 +173,8 @@ export async function executePublish(
   const db = getAsDb();
   if (!db) {
     // Test-mode fall-through: still call the pusher so unit tests
-    // exercising the wire-up shape work. Skip credential resolution.
-    const outcome = await pusher({
-      target,
-      payload: input.payload,
-      credential: null,
-    });
+    // exercising the wire-up shape work.
+    const outcome = await pusher({ target, payload: input.payload });
     return { executionId: 0, attempt, outcome };
   }
 
@@ -197,22 +194,7 @@ export async function executePublish(
 
   let outcome: PublishExecutionOutcome;
   try {
-    if (
-      target.providerConnectionId !== null &&
-      !input.skipCredentialResolution
-    ) {
-      outcome = await withProviderCredential(
-        target.providerConnectionId,
-        async (credential) =>
-          pusher({ target, payload: input.payload, credential }),
-      );
-    } else {
-      outcome = await pusher({
-        target,
-        payload: input.payload,
-        credential: null,
-      });
-    }
+    outcome = await pusher({ target, payload: input.payload });
   } catch (err) {
     outcome = {
       status: "failed",

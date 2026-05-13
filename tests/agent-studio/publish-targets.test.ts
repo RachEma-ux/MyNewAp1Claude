@@ -155,7 +155,33 @@ describe("executePublish (composition)", () => {
   });
 });
 
-describe("executePublish — production-path discipline (Plan v3 D1)", () => {
+describe("executePublish — production-path discipline (Plan v3 D2)", () => {
+  it("publish-targets module MUST NOT import the internal credential resolver (D2)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const repoRoot = path.join(__dirname, "..", "..");
+    const files = [
+      "server/agent-studio/services/publish-targets/executor.ts",
+      "server/agent-studio/services/publish-targets/registry.ts",
+      "server/agent-studio/services/publish-targets/types.ts",
+      "server/agent-studio/services/publish-targets/index.ts",
+    ];
+    for (const rel of files) {
+      const src = readFileSync(path.join(repoRoot, rel), "utf8");
+      const code = src
+        .split("\n")
+        .filter((l) => !/^\s*\*?\s*\/\//.test(l) && !/^\s*\*/.test(l))
+        .join("\n");
+      const forbidden = code.match(
+        /from\s+["'][^"']*credential-resolver[^"']*["']/,
+      );
+      expect(
+        forbidden,
+        `${rel} imports the internal credential resolver, violating Plan v3 D2. The resolver is restricted to server/openrouter/model-access/**. Pusher implementations must acquire credentials via their own scoped surface (e.g. via Model Access for AI-bound targets).`,
+      ).toBeNull();
+    }
+  });
+
   it("the executor body MUST NOT reference process.env.*_API_KEY directly", async () => {
     // Source-scan rather than dynamic — we want this to fail if a
     // future contributor inlines a raw env read (e.g.
@@ -186,7 +212,11 @@ describe("executePublish — production-path discipline (Plan v3 D1)", () => {
     }
   });
 
-  it("the executor body MUST import `withProviderCredential` (Plan v3 D1 anchor)", async () => {
+  it("the executor body MUST declare its D2 contract in a docblock", async () => {
+    // Refactor anchor — if a future contributor reintroduces a
+    // credential-resolver import, this docblock would be the second
+    // thing to change. Locking it in the test makes the change
+    // explicit.
     const { readFileSync } = await import("node:fs");
     const path = await import("node:path");
     const src = readFileSync(
@@ -198,8 +228,7 @@ describe("executePublish — production-path discipline (Plan v3 D1)", () => {
       ),
       "utf8",
     );
-    expect(src).toMatch(
-      /import\s*\{[^}]*withProviderCredential[^}]*\}\s*from\s*["'][^"']*credential-resolver/,
-    );
+    expect(src).toMatch(/Plan v3 D2/);
+    expect(src).toMatch(/credential-resolver/); // referenced in the comment
   });
 });

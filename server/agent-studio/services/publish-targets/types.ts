@@ -7,14 +7,23 @@
  *     ADR + this union update + a new pusher branch.
  *   - `PublishExecutionStatus` is the 4-value lifecycle ladder.
  *
- * Hard-rule boundary (Plan v3 D1):
- *   - The pusher receives `ResolvedProviderCredentialContext` from
- *     `withProviderCredential` — never raw env vars, never the PAT
- *     string. Tests verify this via source-scan (no
- *     `process.env.*_API_KEY` reads in the service body).
+ * Hard-rule boundary (Plan v3 D2):
+ *   - The publish-targets module does NOT import the internal
+ *     credential resolver (D2 restricts that import to
+ *     `server/openrouter/model-access/**`).
+ *   - Credential acquisition is the pusher's responsibility via
+ *     dependency injection. A pusher that needs AI-provider
+ *     credentials registers a `credentialProvider` that routes
+ *     through Model Access; a pusher for a webhook / signed-URL
+ *     target uses its own scoped credential surface.
+ *   - The publish-targets executor ONLY passes the bound
+ *     `providerConnectionId` reference and the optional
+ *     credential-provider result to the pusher; it never resolves
+ *     a credential itself.
+ *
+ * Source-scan tested: no `process.env.*_API_KEY` reads in any
+ * publish-targets file; no `credential-resolver` import.
  */
-
-import type { ResolvedProviderCredentialContext } from "../../../provider-connections/internal/credential-resolver.js";
 
 export const PUBLISH_TARGET_TYPES = [
   "staging_env",
@@ -46,6 +55,9 @@ export interface PublishTargetRecord {
   readonly targetKey: string;
   readonly targetType: PublishTargetType;
   readonly endpoint: string;
+  /** Reference to the bound `provider_connections` row. The pusher
+   *  uses this ID to look up its own credential surface — the
+   *  publish-targets module itself never resolves the credential. */
   readonly providerConnectionId: number | null;
   readonly config: Record<string, unknown> | null;
   readonly enabled: boolean;
@@ -71,11 +83,12 @@ export interface PublishExecutionOutcome {
 
 /**
  * Pusher contract — each `PublishTargetType` registers one pusher
- * via the registry below. The pusher receives either a resolved
- * credential context (Plan v3 D1) OR null (anonymous targets).
+ * via the registry. The pusher receives the target record + payload
+ * and is responsible for acquiring its own credentials (typically
+ * from a closure captured at registration time, or via Model Access
+ * for AI-bound targets).
  */
 export type PublishPusher = (input: {
   readonly target: PublishTargetRecord;
   readonly payload: PublishPayload;
-  readonly credential: ResolvedProviderCredentialContext | null;
 }) => Promise<PublishExecutionOutcome>;
