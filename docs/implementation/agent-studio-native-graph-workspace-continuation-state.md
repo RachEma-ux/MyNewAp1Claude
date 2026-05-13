@@ -7,13 +7,29 @@
 **Full-closure mission PRs in flight:** #726 (Bundle A), #727 (Bundle B), #728 (Bundle C), #729 (Bundle D), this PR (Bundle E)
 **Original branch:** `feat/native-graph-workspace-mvp0-mvp4` at `68e9534` (pre-MVP-4-closure ADRs) — superseded; all closure work landed on `main`
 
-## 2026-05-13 post-closure-mission addendum (top-of-doc summary)
+## 2026-05-13 strict-audit addendum (top-of-doc summary, supersedes earlier closure-mission addendum)
 
-All 21 closure-mission items resolved into Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked. See `agent-studio-native-graph-workspace-closure-mission-2026-05-13.md` for the per-item ledger.
+The earlier closure-mission addendum framed all 21 items as "Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked". The strict-audit pass (PRs #732–#736) re-classified each item under a binary scheme: **FULLY IMPLEMENTED / PARTIALLY IMPLEMENTED / NOT IMPLEMENTED**. The authoritative ledger is now `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`.
 
-**Next material work:** V1.0 phase queue per `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` §6 — 5 ready-to-start PRs. Recommended first: Phase 13.5 / PR #1 (Agentic GraphRAG planner contract + ADR + boundary tests).
+**Honest counts:** 8 FULLY IMPLEMENTED · 5 PARTIALLY IMPLEMENTED · 8 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
 
-The historical (pre-closure) recovery context follows.
+**Strict-audit PRs:**
+- PR #732 (PR-Y1) — Phase 13.5 PR #2: engine wiring + runAgentic() loop + round-robin planner — closes audit items 4
+- PR #733 (PR-Y2) — Memgraph adapter skeleton + getGraphRepository() registration + workflow no-longer-78 — partially closes item 6 (skeleton only; Bolt query path not wired)
+- PR #734 (PR-Y3) — ChatDiagnosticsPanel + 11 tests — closes item 5 (Phase 11b-3 residual sliver)
+- PR #735 (PR-Y4) — McpTransitionsRetentionPanel extraction + 10 tests — 1/17 → 2/17 on item 14
+- PR #736 (PR-Y5) — this addendum + strict-audit doc + local seed script + tracker rewrite
+
+**Runtime code gaps still open** (priority order — see strict-audit doc §2):
+1. Golden Questions live adapter (item 2)
+2. Memgraph Bolt query implementation (item 6 partial)
+3. Projection drift cron (item 9 partial)
+4. Retention panel extractions 3-17 (item 14 partial)
+5. Layer 4 e2e harness (item 7)
+
+**Next material work:** Phase 13.5 PR #3 (model-driven planner) is the most-unblocking next step — it builds directly on PR-Y1's engine wiring and unblocks the live Golden-Questions adapter (item 2).
+
+The historical (pre-strict-audit) recovery context follows.
 
 ---
 
