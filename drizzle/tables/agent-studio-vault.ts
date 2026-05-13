@@ -148,6 +148,46 @@ export const agsVaultNoteConflicts = pgTable(
 );
 
 // ============================================================================
+// Presence (V2 Phase CRDT-α — ephemeral; 5-min idle TTL)
+// ============================================================================
+//
+// Tracks "who is currently in this note" for the collaborative
+// editing surface. Session-scoped — entries are NOT preserved
+// beyond the operator session. The presence service eagerly
+// removes stale rows on every list call (TTL = 5 min idle).
+//
+// Separate from `agsVaultNoteEditSessions` below: that table
+// tracks long-horizon editing intent for soft-lock semantics.
+// Presence is the real-time "I'm here, my cursor is at X" surface
+// for the future Phase CRDT-β Yjs document layer.
+
+export const agsVaultNotePresence = pgTable(
+  "ags_vault_note_presence",
+  {
+    id: serial("id").primaryKey(),
+    noteId: integer("note_id").notNull().references(() => agsVaultNotes.id),
+    userId: integer("user_id").notNull(),
+    sessionToken: varchar("session_token", { length: 120 }).notNull(),
+    /** Cursor position payload — opaque to the service; UI decodes
+     *  it (Yjs awareness state, line/col, etc.). */
+    cursorState: json("cursor_state"),
+    enteredAt: timestamp("entered_at").defaultNow().notNull(),
+    lastActiveAt: timestamp("last_active_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    noteIdx: index("idx_ags_vault_note_presence_note").on(t.noteId),
+    sessionIdx: uniqueIndex("uniq_ags_vault_note_presence_session").on(
+      t.noteId,
+      t.userId,
+      t.sessionToken,
+    ),
+    lastActiveIdx: index("idx_ags_vault_note_presence_active").on(
+      t.lastActiveAt,
+    ),
+  }),
+);
+
+// ============================================================================
 // Edit sessions + soft locks
 // ============================================================================
 
