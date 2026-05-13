@@ -279,3 +279,60 @@ export async function deleteSavedView(
 
   return { deleted: true };
 }
+
+// ============================================================================
+// Viewer-scoped listing (V1+ Phase 16-β)
+//
+// The base `listSavedViews()` is the operator/admin path: it returns
+// every row matching the (vaultId, ownerUserId, viewKind) filter
+// without consulting visibility. Phase 16-α (#751) shipped the
+// visibility helper (`saved-views-visibility.ts`) but the list path
+// was never wired to it.
+//
+// This β slice composes listSavedViews + filterVisibleSavedViews so
+// the caller can get a viewer-safe list in one call. Existing
+// callers of listSavedViews keep their operator-scoped semantics.
+// ============================================================================
+
+import { filterVisibleSavedViews } from "./saved-views-visibility.js";
+
+export interface ListVisibleSavedViewsForUserInput
+  extends ListSavedViewsInput {
+  readonly viewerUserId: number | null;
+}
+
+export interface ListVisibleSavedViewsForUserOptions
+  extends SavedViewServiceOptions {
+  /** Test seam — substitute the underlying list implementation. */
+  readonly listImpl?: (
+    input: ListSavedViewsInput,
+    options: SavedViewServiceOptions,
+  ) => Promise<SavedViewRow[]>;
+}
+
+/**
+ * Returns the subset of saved views in `vaultId` that the supplied
+ * viewer is allowed to see. Composes `listSavedViews` + the pure
+ * `filterVisibleSavedViews` predicate from `saved-views-visibility.ts`.
+ *
+ * Visibility semantics (from CRDT-α / 16-α):
+ *   - `workspace_shared` views are visible to any viewer.
+ *   - `personal` views are visible only to their owner. A null
+ *     ownerUserId on a `personal` row is treated as "owned by no
+ *     one" — not visible to anyone (defensive against legacy NULLs).
+ *
+ * The intrinsic vaultId/ownerUserId/viewKind filters from
+ * `ListSavedViewsInput` still apply (they bound the result *before*
+ * the visibility filter).
+ */
+export async function listVisibleSavedViewsForUser(
+  input: ListVisibleSavedViewsForUserInput,
+  options: ListVisibleSavedViewsForUserOptions = {},
+): Promise<SavedViewRow[]> {
+  const list = options.listImpl ?? listSavedViews;
+  const all = await list(input, options);
+  return filterVisibleSavedViews({
+    views: all,
+    viewerUserId: input.viewerUserId,
+  });
+}

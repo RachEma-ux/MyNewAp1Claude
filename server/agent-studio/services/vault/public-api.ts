@@ -152,6 +152,7 @@ export {
   createSavedView,
   getSavedViewById,
   listSavedViews,
+  listVisibleSavedViewsForUser,
   updateSavedView,
   deleteSavedView,
   AsdbUnavailableError as VaultSavedViewsAsdbUnavailableError,
@@ -161,6 +162,8 @@ export type {
   CreateSavedViewInput,
   UpdateSavedViewInput,
   ListSavedViewsInput,
+  ListVisibleSavedViewsForUserInput,
+  ListVisibleSavedViewsForUserOptions,
   SavedViewRow,
   SavedViewServiceOptions,
 } from "./saved-views.js";

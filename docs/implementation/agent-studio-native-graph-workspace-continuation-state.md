@@ -65,9 +65,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #763 PR-V1-12 | MR-2 (V2.0) | Region-routed connection helper: `getDbForRegion` (per-region pool cache) + `getDbForWorkspace` (composes pure router) + `getNeo4jUriForRegion` + `listWarmRegionPoolKeys` operator inspection | `af8b1667` |
 | #764 PR-V1-13 | CRDT-β (V2.0) | Realtime document layer: `RealtimeDocBackend` interface + `InMemoryRealtimeDocBackend` reference impl + `RealtimeDocSession` + registry + `getCanonicalContentForSave` save-boundary helper. Yjs adapter + WebSocket transport deferred to CRDT-γ. | `183f0909` |
 | #765 PR-V1-14 | CRDT-γ (V2.0) | Yjs adapter (`realtime-doc-backend-yjs.ts`) implementing the CRDT-β contract; type-only `YjsNamespace` DI seam so tests run without yjs install; `yjs` declared in package.json | `2a534c51` |
-| #766 PR-V1-15 | 15-γ (V1.5) | Attachment quota write-gate (`attachment-quota-guard.ts`): `assertWithinQuota` pure function + `AttachmentQuotaExceededError` + env-default resolver. Caller integration deferred. | pending |
+| #766 PR-V1-15 | 15-γ (V1.5) | Attachment quota write-gate (`attachment-quota-guard.ts`): `assertWithinQuota` pure function + `AttachmentQuotaExceededError` + env-default resolver. Caller integration deferred. | `61e0c600` |
+| #767 PR-V1-16 | 16-β (V1.5) | `listVisibleSavedViewsForUser` composes `listSavedViews` + `filterVisibleSavedViews` per-viewer. listImpl DI seam for testability. | pending |
 
-**Next material work:** WebSocket transport (CRDT-γ-2), browser IDB persistence (y-indexeddb), MR-2 caller-migration sub-arc, attachment-quota call-site integration. V1.5+V2.0 α+β+γ scaffolding all landed at contract+pure-helper level.
+**Next material work:** WebSocket transport (CRDT-γ-2), browser IDB persistence (y-indexeddb), MR-2 caller-migration sub-arc, attachment-quota call-site integration, saved-views-router viewer-scoped query path. V1.5+V2.0 α+β+γ scaffolding all landed at contract+pure-helper level.
 
 The historical (pre-strict-audit) recovery context follows.
 
