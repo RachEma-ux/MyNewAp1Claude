@@ -69,9 +69,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #767 PR-V1-16 | 16-β (V1.5) | `listVisibleSavedViewsForUser` composes `listSavedViews` + `filterVisibleSavedViews` per-viewer. listImpl DI seam for testability. | `0c04a3a5` |
 | #768 PR-V1-17 | 18-β (V1.5) | Extension lane hook registry (`extensions/lane-hooks.ts`): `registerLaneHook`/`getLaneHook`/`listRegisteredLaneHookLanes` + `LaneHookFn` + `LaneHookOutcome`. `invokeFromExtension` calls registered hook for non-tool lanes; tool lane invariant (no hook registerable) preserved. | `09c67999` |
 | #769 PR-V1-18 | 16-γ (V1.5) | New `ags_vault_saved_view_versions` table + `updateSavedView` snapshots prior row state BEFORE applying patch + `listSavedViewVersions`/`getSavedViewVersionById` helpers + `UpdateSavedViewOptions.capturedByUserId`. | `200d4665` |
-| #770 PR-V1-19 | 16-β/γ (V1.5) | Wire vault router: 3 new tRPC procedures — `listVisibleSavedViews` (uses 16-β `listVisibleSavedViewsForUser`) + `listSavedViewVersions` + `getSavedViewVersion` (use 16-γ helpers) + 11-test source-scan procedure-mount integrity suite. | pending |
+| #770 PR-V1-19 | 16-β/γ (V1.5) | Wire vault router: 3 new tRPC procedures — `listVisibleSavedViews` (uses 16-β `listVisibleSavedViewsForUser`) + `listSavedViewVersions` + `getSavedViewVersion` (use 16-γ helpers) + 11-test source-scan procedure-mount integrity suite. | `3db12f93` |
+| #771 PR-V1-20 | 15-γ wire-up (V1.5) | `createAttachment` router mutation now calls `assertWithinQuota` BEFORE the insert; `AttachmentQuotaExceededError` maps to `FORBIDDEN` TRPCError; bytes limit threaded via `resolveDefaultAttachmentBytesLimit()`; 8-test source-scan order-of-operations suite | pending |
 
-**Next material work:** WebSocket transport (CRDT-γ-2), browser IDB persistence (y-indexeddb), MR-2 caller-migration sub-arc, attachment-quota call-site integration, concrete lane hooks (retrieve/assemble/compose). V1.5+V2.0 α+β+γ scaffolding all landed; saved-views router fully wired through 16-α/β/γ surfaces.
+**Next material work:** WebSocket transport (CRDT-γ-2), browser IDB persistence (y-indexeddb), MR-2 caller-migration sub-arc, concrete lane hooks (retrieve/assemble/compose). V1.5+V2.0 α+β+γ scaffolding all landed; saved-views + attachment-quota routers fully wired through their α/β/γ surfaces.
 
 The historical (pre-strict-audit) recovery context follows.
 
