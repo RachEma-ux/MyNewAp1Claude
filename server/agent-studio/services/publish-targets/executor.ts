@@ -40,6 +40,7 @@ import {
 import { getPublishPusher } from "./registry.js";
 import {
   isPublishTargetType,
+  type GovernanceGateFn,
   type PublishExecutionOutcome,
   type PublishPayload,
   type PublishPusher,
@@ -81,6 +82,14 @@ export interface ExecutePublishInput {
   readonly pusherLookup?: (
     targetType: PublishTargetType,
   ) => PublishPusher | undefined;
+  /** V1+ Phase 19-γ — optional governance gate. When omitted, the
+   *  executor proceeds as if the gate returned `"approved"`. */
+  readonly governanceGate?: GovernanceGateFn;
+  /** Test seam — supply a stubbed target loader and bypass the
+   *  DB lookup. Default uses the internal `loadTarget` helper. */
+  readonly targetLoader?: (
+    input: { targetId?: number; targetKey?: string },
+  ) => Promise<PublishTargetRecord>;
 }
 
 export interface ExecutePublishResult {
@@ -160,7 +169,11 @@ async function nextAttempt(
 export async function executePublish(
   input: ExecutePublishInput,
 ): Promise<ExecutePublishResult> {
-  const target = await loadTarget(input);
+  const loader = input.targetLoader ?? loadTarget;
+  const target = await loader({
+    targetId: input.targetId,
+    targetKey: input.targetKey,
+  });
   const pusherLookup = input.pusherLookup ?? getPublishPusher;
   const pusher = pusherLookup(target.targetType);
   if (!pusher) {
@@ -170,6 +183,49 @@ export async function executePublish(
     target.id,
     input.payload.sourcePromotionId,
   );
+  // V1+ Phase 19-γ — governance gate. When supplied, branch BEFORE
+  // staging the ledger row. The gate result drives the row's status:
+  //   approved → continue (pusher runs, in_flight → succeeded/failed)
+  //   pending  → stage a `pending` ledger row; pusher NEVER runs;
+  //              caller re-invokes after governance sign-off.
+  //   rejected → stage a `failed` ledger row with errorMessage
+  //              "governance_rejected"; pusher NEVER runs.
+  const governanceGate = input.governanceGate;
+  let governanceDecision: "approved" | "pending" | "rejected" = "approved";
+  if (governanceGate) {
+    governanceDecision = await governanceGate({
+      target,
+      payload: input.payload,
+    });
+  }
+  if (governanceDecision !== "approved") {
+    const stagedStatus = governanceDecision === "pending" ? "pending" : "failed";
+    const stagedError =
+      governanceDecision === "rejected" ? "governance_rejected" : undefined;
+    const outcome: PublishExecutionOutcome = {
+      status: stagedStatus,
+      errorMessage: stagedError,
+      details: { governanceDecision },
+    };
+    const db = getAsDb();
+    if (!db) return { executionId: 0, attempt, outcome };
+    const [staged] = await db
+      .insert(agsPublishTargetExecutions)
+      .values({
+        targetId: target.id,
+        sourcePromotionId: input.payload.sourcePromotionId,
+        sourceVersionId: input.payload.sourceVersionId ?? null,
+        attempt,
+        status: stagedStatus,
+        startedAt: new Date(),
+        completedAt: stagedStatus === "failed" ? new Date() : null,
+        errorMessage: stagedError ?? null,
+        details: { governanceDecision },
+      })
+      .returning({ id: agsPublishTargetExecutions.id });
+    return { executionId: staged?.id ?? 0, attempt, outcome };
+  }
+
   const db = getAsDb();
   if (!db) {
     // Test-mode fall-through: still call the pusher so unit tests

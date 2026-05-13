@@ -13,12 +13,16 @@ export type {
   PublishPayload,
   PublishExecutionOutcome,
   PublishPusher,
+  GovernanceDecision,
+  GovernanceGateFn,
 } from "./types.js";
 
 export {
   PUBLISH_TARGET_TYPES,
   PUBLISH_EXECUTION_STATUSES,
+  GOVERNANCE_DECISIONS,
   isPublishTargetType,
+  isGovernanceDecision,
 } from "./types.js";
 
 export {
