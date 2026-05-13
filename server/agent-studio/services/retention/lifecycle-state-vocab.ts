@@ -115,16 +115,50 @@ export function isNotePromotionTerminal(state: string): state is NotePromotionSt
 //
 // Release-state classification is consumed by the retention eligibility
 // predicate to answer: is a publish-request linked to an ACTIVE release?
-// "Active" = retention-blocker. See follow-up audit PR for the inventory.
+// "Active" = retention-blocker.
+//
+// Audit (2026-05-13, repository.ts + boot.ts):
+//   - Column default: `state = "pending"`.
+//   - Only state value written in code today: `"published"` (publishRelease,
+//     repository.ts:812).
+//   - The retire signal is `archivedAt IS NOT NULL`, NOT a state value.
+//     There is no `retired` / `superseded` / `failed` state in production
+//     use.
+//   - Future state values (e.g. `draft`, `rolled_back`) may be introduced
+//     — the predicate below treats unknown states as retention-blockers
+//     (fail-closed) so an unknown future state never accidentally allows
+//     a sweep of a still-live release link.
+//
+// Primary retention-blocker signal: `archivedAt IS NULL`. The state-set
+// below is a secondary fallback for state values that should block
+// retention even when `archivedAt` is set (none today, but the slot
+// exists for future contracts).
 
-export const RELEASE_STATE_RETENTION_BLOCKERS: ReadonlySet<string> = new Set([
-  "draft",
-  "pending",
-  "active",
-  "published",
-  "rolled_back_under_review",
-]);
+/**
+ * State values that block retention regardless of `archivedAt`.
+ *
+ * Today this set is empty — `archivedAt IS NULL` is the sole signal. The
+ * set exists so future contracts (e.g. `rolled_back_under_review`) can
+ * extend it without restructuring callers.
+ */
+export const RELEASE_STATE_HARD_RETENTION_BLOCKERS: ReadonlySet<string> = new Set([]);
 
-export function isReleaseStateRetentionBlocker(state: string): boolean {
-  return RELEASE_STATE_RETENTION_BLOCKERS.has(state);
+export interface ReleaseRetentionShape {
+  readonly state: string;
+  readonly archivedAt: Date | null;
+}
+
+/**
+ * Returns true if a publish-request linked to this release should be
+ * retention-blocked.
+ *
+ * Decision tree:
+ *   - `archivedAt IS NULL` → true (release is still live).
+ *   - State is in `RELEASE_STATE_HARD_RETENTION_BLOCKERS` → true.
+ *   - Otherwise → false (release is archived AND state doesn't hard-block).
+ */
+export function isReleaseRetentionBlocker(release: ReleaseRetentionShape): boolean {
+  if (release.archivedAt === null) return true;
+  if (RELEASE_STATE_HARD_RETENTION_BLOCKERS.has(release.state)) return true;
+  return false;
 }
