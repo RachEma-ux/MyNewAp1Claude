@@ -535,6 +535,25 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.24 — strict-audit item #9 partial closure (2026-05-13):
+  // projection drift cron. The DriftDetector existed pre-2026-05-13
+  // but ran on-demand only via tRPC. This cron schedules it daily at
+  // 04:30 UTC (slot #19 in the daily-sweep ladder; offset 30m from
+  // runtime-runs at 04:00). Persists drift events to
+  // ags_graph_projection_drift_events for operator follow-up.
+  // Env-flag-gated via AGS_PROJECTION_DRIFT_CRON_DISABLED.
+  try {
+    const { ensureProjectionDriftCronStarted } = await import(
+      "./services/graph/projection/drift-cron"
+    );
+    ensureProjectionDriftCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-projection-drift-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the

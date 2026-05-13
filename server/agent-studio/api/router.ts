@@ -74,6 +74,7 @@ import { graphSkillRouter } from "./graph-skill-router";
 import { graphAgentRouter } from "../services/graph-agent/router";
 import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
 import { graphCorrectionRouter } from "../services/graph-correction/router";
+import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
 import {
@@ -2903,6 +2904,11 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 23: graph correction proposal lifecycle
   // (submit / approve / reject / list / audit)
   graphCorrection: graphCorrectionRouter,
+  // Strict-audit item #9 partial closure (2026-05-13): projection
+  // drift cron status surface. Operator UI reads
+  // `agentStudio.graphProjection.getDriftCronStatus` to display the
+  // last drift scan's outcome alongside the 18 retention crons.
+  graphProjection: graphProjectionRouter,
   // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
   // findings + finding→proposal conversion surface for operator UI.
   graphQuality: graphQualityRouter,
