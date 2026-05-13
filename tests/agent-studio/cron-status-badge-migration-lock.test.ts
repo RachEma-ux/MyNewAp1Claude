@@ -58,6 +58,7 @@ describe("CronStatusBadge migration — regression lock", () => {
   // usages so the 18-cron retention surface stays covered.
   const EXTRACTED_PANEL_PATHS: ReadonlyArray<string> = [
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "CronStatusPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "McpTransitionsRetentionPanel.tsx"),
   ];
 
   function countBadgeUsages(): number {
