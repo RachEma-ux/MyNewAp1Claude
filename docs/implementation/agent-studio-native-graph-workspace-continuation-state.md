@@ -61,9 +61,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #759 PR-V1-8 | 19-β (V1.0) | Shared HTTP pusher factory + 3 default pusher registrations (staging_env / remote_vault / external_kb); boot Step 3.26 | `525c5f8b` |
 | #760 PR-V1-9 | 15-β (V1.5) | Attachment library service: browseAttachmentLibrary + findUnusedAttachments + computeAttachmentQuota + closed mime-class taxonomy (6 values) | `ad7f9829` |
 | #761 PR-V1-10 | 17-β (V1.5) | Canvas → Note projection edge: buildCanvasReferenceProjection (Canvas + CanvasNode + CONTAINS_CANVAS_NODE + CANVAS_REFERENCES_NOTE bundled) + sync-worker event kinds `canvas.note_reference_changed` / `_removed` | `e608cffe` |
-| #762 PR-V1-11 | OL-2 (V2.0) | OfflineQueue IndexedDB persistence: `OfflineQueueStore` contract + `InMemoryOfflineQueueStore` + `IndexedDbOfflineQueueStore` + `createOfflineQueueStore()` factory; OfflineQueue gains optional persistence adapter + `hydrate()` | pending |
+| #762 PR-V1-11 | OL-2 (V2.0) | OfflineQueue IndexedDB persistence: `OfflineQueueStore` contract + `InMemoryOfflineQueueStore` + `IndexedDbOfflineQueueStore` + `createOfflineQueueStore()` factory; OfflineQueue gains optional persistence adapter + `hydrate()` | `c67fab23` |
+| #763 PR-V1-12 | MR-2 (V2.0) | Region-routed connection helper: `getDbForRegion` (per-region pool cache) + `getDbForWorkspace` (composes pure router) + `getNeo4jUriForRegion` + `listWarmRegionPoolKeys` operator inspection | pending |
 
-**Next material work:** Continue Phase β/γ slices. V2.0 remaining: Phase CRDT-β Yjs document layer + WebSocket transport; Phase MR-2 connection-helper integration.
+**Next material work:** Continue Phase β/γ slices. V2.0 remaining: Phase CRDT-β Yjs document layer + WebSocket transport. Caller-migration to the region-routed helper is a separate sub-arc.
 
 The historical (pre-strict-audit) recovery context follows.
 
