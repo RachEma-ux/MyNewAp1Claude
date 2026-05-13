@@ -129,7 +129,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | 17-β   (V1.5 CANVAS_REFERENCES_NOTE projection edge) | #761 | `e608cffe` |
 | OL-2   (V2.0 OfflineQueue IndexedDB persistence) | #762 | `c67fab23` |
 | MR-2   (V2.0 region-routed connection helper) | #763 | `af8b1667` |
-| CRDT-β (V2.0 realtime document layer + backend interface) | #764 | pending |
+| CRDT-β (V2.0 realtime document layer + backend interface) | #764 | `183f0909` |
+| CRDT-γ (V2.0 Yjs adapter — DI-seam, lockfile-divergence pattern) | #765 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
