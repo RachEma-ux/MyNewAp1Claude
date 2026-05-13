@@ -62,9 +62,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #760 PR-V1-9 | 15-β (V1.5) | Attachment library service: browseAttachmentLibrary + findUnusedAttachments + computeAttachmentQuota + closed mime-class taxonomy (6 values) | `ad7f9829` |
 | #761 PR-V1-10 | 17-β (V1.5) | Canvas → Note projection edge: buildCanvasReferenceProjection (Canvas + CanvasNode + CONTAINS_CANVAS_NODE + CANVAS_REFERENCES_NOTE bundled) + sync-worker event kinds `canvas.note_reference_changed` / `_removed` | `e608cffe` |
 | #762 PR-V1-11 | OL-2 (V2.0) | OfflineQueue IndexedDB persistence: `OfflineQueueStore` contract + `InMemoryOfflineQueueStore` + `IndexedDbOfflineQueueStore` + `createOfflineQueueStore()` factory; OfflineQueue gains optional persistence adapter + `hydrate()` | `c67fab23` |
-| #763 PR-V1-12 | MR-2 (V2.0) | Region-routed connection helper: `getDbForRegion` (per-region pool cache) + `getDbForWorkspace` (composes pure router) + `getNeo4jUriForRegion` + `listWarmRegionPoolKeys` operator inspection | pending |
+| #763 PR-V1-12 | MR-2 (V2.0) | Region-routed connection helper: `getDbForRegion` (per-region pool cache) + `getDbForWorkspace` (composes pure router) + `getNeo4jUriForRegion` + `listWarmRegionPoolKeys` operator inspection | `af8b1667` |
+| #764 PR-V1-13 | CRDT-β (V2.0) | Realtime document layer: `RealtimeDocBackend` interface + `InMemoryRealtimeDocBackend` reference impl + `RealtimeDocSession` + registry + `getCanonicalContentForSave` save-boundary helper. Yjs adapter + WebSocket transport deferred to CRDT-γ. | pending |
 
-**Next material work:** Continue Phase β/γ slices. V2.0 remaining: Phase CRDT-β Yjs document layer + WebSocket transport. Caller-migration to the region-routed helper is a separate sub-arc.
+**Next material work:** V2.0 sub-arcs complete at the contract+reference-impl layer. Remaining γ work: CRDT-γ (Yjs adapter + WebSocket transport + browser IDB persistence) and connection-helper caller migration sub-arc. V1.5+V2.0 first slices + β slices all landed.
 
 The historical (pre-strict-audit) recovery context follows.
 
