@@ -32,3 +32,15 @@ export {
   getCanvasSnapshot,
   listNoteReferencesForCanvas,
 } from "./canvas-service.js";
+
+// V1+ Phase 17-β: projection helpers (CANVAS_REFERENCES_NOTE edge).
+export {
+  buildCanvasReferenceProjection,
+  buildCanvasReferenceRemoval,
+  buildAllCanvasReferenceProjections,
+} from "./projection.js";
+export type {
+  CanvasReferenceInput,
+  CanvasReferenceRemovalInput,
+  BuildAllCanvasReferencesInput,
+} from "./projection.js";
