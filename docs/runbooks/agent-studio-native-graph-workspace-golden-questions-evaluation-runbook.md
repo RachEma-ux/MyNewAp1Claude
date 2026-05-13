@@ -1,8 +1,8 @@
 # Golden-Questions Evaluation — Native Graph Workspace Operator Runbook
 
 **Plan:** Agent Studio Native Graph Workspace MVP 4 — Phases 13, 22, 23 (Graph Agent Lite, retention/feedback, graph quality)
-**Status:** Formalized; CI-safe static integrity tests in repo; live evaluation operator-driven
-**Owner:** Operator on staging infrastructure (Graph Agent Lite live invocation requires Neo4j CE + ASDB + RAGDB + OpenRouter model access)
+**Status:** FULLY IMPLEMENTED (2026-05-13). CI-safe static integrity tests in repo; live-mode adapter composition shipped in `server/agent-studio/services/graph-skill/golden-questions/`; workflow_dispatch supports both `dry-run` and `live` modes.
+**Owner:** Operator on staging infrastructure (live mode requires Neo4j CE + ASDB + RAGDB + a configured OpenRouter provider connection row)
 **Seed:** `server/agent-studio/services/graph-skill/seed-golden-questions.ts`
 **Static integrity tests:** `tests/agent-studio/graph-skill/golden-questions/`
 **Last refreshed:** 2026-05-13
@@ -91,18 +91,43 @@ Any non-empty `errors` array blocks the run — investigate before proceeding.
 
 ### 4.3 Run the evaluation
 
+**Dry-run (default)** — emits an inventory-only markdown report; exits 0 unless ASDB is unreachable or the seed is missing:
+
 ```bash
 DATE=$(date -u +%Y-%m-%d)
 pnpm tsx scripts/agent-studio/run-golden-questions.ts \
   --suite all \
+  --mode dry-run \
   --output docs/evidence/graph-agent-lite/${DATE}-golden-questions/report.md
 ```
 
-Per question, the evaluator MUST:
+**Live mode** — composes the engine + scores every question. Exits non-zero if any question fails:
 
-1. Invoke Graph Agent Lite with the question text under the operator's smoke vault.
-2. Capture: chosen skill pack, chosen Cypher template, retrieval mode, citation count, raw answer.
-3. Compare against `expectedPaths` and `minimumCitationCount`.
+```bash
+DATE=$(date -u +%Y-%m-%d)
+GOLDEN_Q_LIVE=true \
+GOLDEN_Q_LIVE_PROVIDER_CONNECTION_ID=<int> \
+GOLDEN_Q_LIVE_MODEL_REF="anthropic/claude-3-5-sonnet" \
+GOLDEN_Q_LIVE_WORKSPACE_ID=<int> \
+GOLDEN_Q_LIVE_ACTOR_ID=<int> \
+pnpm tsx scripts/agent-studio/run-golden-questions.ts \
+  --suite all \
+  --mode live \
+  --output docs/evidence/graph-agent-lite/${DATE}-golden-questions/report.md \
+  --json-output docs/evidence/graph-agent-lite/${DATE}-golden-questions/report.json
+```
+
+The live adapter composition lives in:
+
+- `server/agent-studio/services/graph-skill/golden-questions/live-evaluator.ts` — pure scorer + report formatter + orchestrator (deterministic; same inputs → same outputs).
+- `server/agent-studio/services/graph-skill/golden-questions/live-engine-factory.ts` — composes `GraphAgentEngine` with `getGraphRepository()` + `GraphRetrievalRouter` + a `ModelAccessAdapter` that delegates to `execute()` (Plan v3 D1 — `withProviderCredential` resolves provider creds inside `execute()`; this file never reads raw provider-key env vars) + an `McpDispatchAdapter` that delegates to `dispatchMcpToolCall()`.
+
+Per question, the evaluator:
+
+1. Invokes Graph Agent Lite with the question text under the operator's smoke vault.
+2. Captures: chosen skill pack, chosen Cypher template, retrieval mode, citation count, raw answer, duration.
+3. Compares against `expectedPaths` and `minimumCitationCount` (and optional `expectedAnswerPattern` regex when set).
+4. Emits both the markdown report and a JSON sidecar suitable for CI artifact upload.
 
 ### 4.4 Pass / fail criteria per question
 
@@ -132,7 +157,7 @@ A suite passes iff every question passes. An overall pass requires every suite t
 ## 6. CI / staging constraints
 
 - The static integrity test (§3) runs in CI on every PR — it is fast (< 1 s), uses no infra, and protects the seed-to-registry contract.
-- A **`workflow_dispatch`-gated** GitHub Actions workflow lives at `.github/workflows/graph-golden-questions-live.yml`. The operator triggers it from the Actions tab or via `gh workflow run "Golden Questions — Live Evaluation (G10)"`. The workflow brings up a Postgres service container, seeds the suites (`scripts/agent-studio/seed-golden-questions.ts`), runs the evaluation CLI (`scripts/agent-studio/run-golden-questions.ts`), and archives the report under `docs/evidence/graph-agent-lite/<date>-golden-questions/` as a workflow artifact. The day-1 run script emits an inventory-only report (`liveWired: false`); the live-wiring PR (operator territory per §4.4) will compose the engine adapters and resolve provider credentials through `withProviderCredential` per Plan v3 D1 — never via direct `process.env` reads.
+- A **`workflow_dispatch`-gated** GitHub Actions workflow lives at `.github/workflows/graph-golden-questions-live.yml`. The operator triggers it from the Actions tab or via `gh workflow run "Golden Questions — Live Evaluation (G10)"` and selects `mode = dry-run | live`. The workflow brings up a Postgres service container, seeds the suites, runs the evaluation CLI, and archives both the markdown and JSON reports under `docs/evidence/graph-agent-lite/<date>-golden-questions/` as a workflow artifact. The live mode (added 2026-05-13) requires the four `GOLDEN_Q_LIVE_*` workflow inputs to be supplied; missing inputs surface a structured `exit 2` config error. Plan v3 D1 compliance is enforced by the boundary tests in `tests/agent-studio/graph-skill/golden-questions/live-engine-factory.test.ts` — the script and factory never read raw provider-key env vars.
 - The live evaluation (§4) MUST NOT run on per-PR CI. Any future workflow that wraps it MUST be `workflow_dispatch` only.
 - The seed file is the single source of truth. Do not duplicate the question text into the runbook or evidence directories.
 

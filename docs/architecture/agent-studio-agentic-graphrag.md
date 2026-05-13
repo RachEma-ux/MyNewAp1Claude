@@ -1,6 +1,6 @@
 # Agent Studio — Agentic GraphRAG ADR (Phase 13.5)
 
-**Status:** Draft (2026-05-13). V1.0 Phase 13.5 / PR #1 — contract-only.
+**Status:** ACTIVE (2026-05-13). V1.0 Phase 13.5 complete on `main` — PR #731 (contract) + PR #732 `ffb4eba9` (engine wiring + RoundRobinPlanner) + PR #737 `a8f5c634` (model-driven planner).
 **Decision owner:** Planner agent + Governance review before promoting to "Accepted".
 **V1+ execution plan reference:** `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` Phase 13.5
 **Predecessor:** Graph Agent Lite (`services/graph-agent/engine.ts`) — fixed plan → retrieve → reason → answer pipeline (G9 closure).

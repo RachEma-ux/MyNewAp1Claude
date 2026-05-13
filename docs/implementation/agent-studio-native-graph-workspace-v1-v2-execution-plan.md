@@ -54,14 +54,16 @@ The path **does not** require linear execution — V1 phases can ship in paralle
 
 ## 2. Phase-by-phase plan
 
-### Phase 13.5 — Agentic GraphRAG (V1.0)
+### Phase 13.5 — Agentic GraphRAG (V1.0) — **FULLY IMPLEMENTED on main** (2026-05-13)
 
 **MVP 0–4 deferral rationale:** plan §9 — "deferred to V1. Phase 13 is 'Graph Agent Lite' intentionally — overbuilding adaptive planning in MVP risks the G9 boundary verification."
 
-**Status today:**
-- Graph Agent Lite (`server/agent-studio/services/graph-agent/`) implements a fixed plan → retrieve → reason → answer pipeline.
-- The MCP dispatcher boundary + OpenRouter Model Access + no-mutation property are all source-scan tested.
-- No adaptive replan loop exists.
+**Status (post-merge):**
+- Graph Agent Lite (`server/agent-studio/services/graph-agent/`) ships both a fixed plan→retrieve→reason→answer pipeline AND a bounded adaptive loop via `runAgentic()`.
+- Phase 13.5 trio merged: PR #731 (contract) + PR #732 `ffb4eba9` (engine wiring + `RoundRobinPlanner`) + PR #737 `a8f5c634` (`createModelDrivenPlanner` for LLM-emitted plans).
+- 62/62 tests green on main (boundary 27 + model-planner 20 + engine-agentic 9 + engine 6).
+- MCP dispatcher boundary + OpenRouter Model Access boundary + no-mutation property all source-scan tested under the agentic surface.
+- See ADR `docs/architecture/agent-studio-agentic-graphrag.md` (Status: ACTIVE) for the truth-claim table.
 
 **Acceptance criteria:**
 1. Planner contract — explicit ADR + TS interface for `AgenticPlanner`:

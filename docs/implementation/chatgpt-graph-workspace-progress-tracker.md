@@ -10,18 +10,18 @@
 
 ## 1. Tracker metadata
 
-- Last updated: 2026-05-13
+- Last updated: 2026-05-13 (post Phase 13.5 closure on main)
 - Repository: `RachEma-ux/MyNewAp1Claude`
 - Branch: `main`
-- Latest merged audit PR: `#735` (`McpTransitionsRetentionPanel` extraction)
-- In-flight: PR-Y5 (this document + strict-audit doc + local seed script)
+- Latest merged audit PR: `#737` (Phase 13.5 PR #3 — model-driven planner) at `a8f5c634`
+- Phase 13.5 trio on main: `#731` (contract) + `#732` `ffb4eba9` (engine wiring + RoundRobinPlanner) + `#737` `a8f5c634` (model-driven planner)
 - Authoritative classification: see `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`
 
 ## 2. Current overall verdict
 
 - **MVP 0–4 status:** the *plan* is fully covered in code; runtime
-  completeness varies per phase. 8 items FULLY IMPLEMENTED, 5 items
-  PARTIALLY IMPLEMENTED, 8 items NOT IMPLEMENTED — see §4 below for
+  completeness varies per phase. 9 items FULLY IMPLEMENTED, 5 items
+  PARTIALLY IMPLEMENTED, 7 items NOT IMPLEMENTED — see §4 below for
   the per-item breakdown.
 - **Honest completion estimate:** ~65–70% of the 21 originally-tracked
   audit items are implemented in runtime. The remaining 30–35% splits
@@ -52,20 +52,20 @@ See the strict-audit doc for the full 21-item matrix. Summary:
 
 | Bucket | Count | Items |
 |---|---|---|
-| **FULLY IMPLEMENTED** | 8 | 3, 4, 5, 13, 17, 18, 19, 20 |
+| **FULLY IMPLEMENTED** | 9 | 2, 3, 4, 5, 13, 17, 18, 19, 20 |
 | **PARTIALLY IMPLEMENTED** | 5 | 1 (G3 benchmark — operator), 6 (Memgraph skeleton, no Bolt), 9 (projection on-demand only), 14 (2 of 17 panels extracted), 21 (this rewrite itself) |
-| **NOT IMPLEMENTED** | 8 | 2 (Golden Q live adapter), 7 (Layer 4 e2e), 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
+| **NOT IMPLEMENTED** | 7 | 7 (Layer 4 e2e), 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
 
 Intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) account for 5 of
-the 8 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
-**items 2, 7, 8** (NOT IMPLEMENTED) + the partial slices of **6, 9, 14**.
+the 7 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
+**items 7, 8** (NOT IMPLEMENTED) + the partial slices of **6, 9, 14**.
 
 ## 5. Test status
 
 | Suite | Status |
 |---|---|
 | Broad unit + integration (Layer 1-3) | 3,393 / 3,395 green (2 Termux-only env failures, CI-green) |
-| Graph-agent engine + agentic | 38/38 green (PR #732) |
+| Phase 13.5 (boundary + engine + engine-agentic + model-planner) | 62/62 green on main `a8f5c634` |
 | Memgraph adapter integrity | 6/6 green (PR #733) |
 | ChatDiagnosticsPanel | 11/11 green (PR #734) |
 | McpTransitionsRetentionPanel | 10/10 green (PR #735) |
@@ -74,27 +74,26 @@ the 8 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
 
 ## 6. Runtime gaps still open (priority order)
 
-1. **Golden Questions live adapter** (item 2) — closes G10 live.
-2. **Memgraph Bolt query implementation** (item 6 partial) — activates
+1. **Memgraph Bolt query implementation** (item 6 partial) — activates
    the fallback workflow_dispatch from skeleton to runtime.
-3. **Projection drift cron** (item 9 partial) — adds the 19th ladder slot.
-4. **Retention panel extractions batch 3+** (item 14 partial) — 15
+2. **Projection drift cron** (item 9 partial) — adds the 19th ladder slot.
+3. **Retention panel extractions batch 3+** (item 14 partial) — 15
    panels remain inline; each batch typically extracts 2-3 panels.
-5. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0.
+4. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0.
 
-Items 1 (G3 benchmark execution) and 8 (V1/V1.5/V2 successor phases)
-are operator/scoping work, not code gaps.
+Items 1 (G3 benchmark execution), 2 (Golden Q workflow trigger +
+evidence commit), and 8 (V1/V1.5/V2 successor phases) are
+operator/scoping work — the code paths exist.
 
 ## 7. Next-prompt recommendation
 
-After PR-Y5 (#736) lands, the most-unblocking next PR is **Phase 13.5
-PR #3 — model-driven agentic planner** (drives an LLM-emitted plan
-through `runAgentic()` instead of the round-robin baseline added in
-PR-Y1). It builds directly on the engine wiring from #732 and unblocks
-the live Golden-Questions adapter (item 2).
-
-Alternative parallel track — close item 14 partial by extracting more
-retention panels (each PR adds 2-3 panels + tests; trivially mergeable).
+Phase 13.5 closed on main at `a8f5c634` (#737); item 2 (Golden
+Questions live adapter) closed via PR-AT-1 on 2026-05-13. The most-
+unblocking next PR is now either **Memgraph Bolt query implementation**
+(item 6 partial) or **retention panel extractions batch 3** (item 14
+partial). Operator action — triggering the Golden Questions workflow
+in `--mode=live` and committing the evidence directory — is also
+available without further code.
 
 ## 8. Why this tracker was rewritten
 
