@@ -105,6 +105,18 @@ export type {
   RealtimeDocBackendFactory,
 } from "./realtime-doc.js";
 
+// V2 Phase CRDT-γ-2 (2026-05-13): WebSocket transport scaffold.
+export {
+  RealtimeDocTransport,
+  getRealtimeDocTransport,
+} from "./realtime-doc-transport.js";
+export type {
+  RealtimeDocConnection,
+  RealtimeDocMessageHandler,
+  RealtimeDocCloseHandler,
+  AttachConnectionOptions,
+} from "./realtime-doc-transport.js";
+
 // V2 Phase CRDT-γ (2026-05-13): Yjs adapter (DI-friendly; tests run
 // without the yjs install — production passes `Y` from `import * as
 // Y from "yjs"`).
