@@ -1512,6 +1512,55 @@ const publishRouter = router({
     );
     return getApprovalStepsRetentionCronStatus();
   }),
+
+  // ── Track 2 — release-audit-refs compliance archival ──────────────────────
+  //
+  // agsReleaseAuditRefs is the compliance long-retention table. NEVER on
+  // the generic factory; minimum 7-year retention if finite; deletion
+  // blocked by default. Operator surface exposes the read-side
+  // (candidates list) + the archive action. Deletion has NO operator
+  // surface — operators wanting deletion must work through the
+  // compliance team's external workflow.
+
+  listReleaseAuditRefsArchivalCandidates: adminProcedure
+    .input(
+      z
+        .object({
+          minRetentionYears: z.number().int().min(7).max(100).optional(),
+          limit: z.number().int().min(1).max(1000).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const { listReleaseAuditRefsArchivalCandidates } = await import(
+        "../services/release-audit-refs-archival"
+      );
+      const years = input?.minRetentionYears ?? 7;
+      const minRetentionMs = years * 365 * 24 * 60 * 60 * 1000;
+      return listReleaseAuditRefsArchivalCandidates({
+        minRetentionMs,
+        limit: input?.limit,
+      });
+    }),
+  archiveReleaseAuditRef: adminProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        complianceApprovalRef: z.string().min(1).max(128),
+        reason: z.string().min(1).max(1024),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { archiveReleaseAuditRef } = await import(
+        "../services/release-audit-refs-archival"
+      );
+      return archiveReleaseAuditRef({
+        id: input.id,
+        complianceApprovalRef: input.complianceApprovalRef,
+        archivedBy: ctx.user.id,
+        reason: input.reason,
+      });
+    }),
 });
 
 // ── Phase 0b: openllm-agent2 native parity sub-routers ──────────────────────
