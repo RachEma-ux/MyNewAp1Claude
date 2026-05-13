@@ -182,7 +182,7 @@ If §6.1 returns the **Reopened** outcome:
 ## 9. CI / staging constraints
 
 - This runbook is **not** part of CI. It cannot run on Termux device (no Docker, no Neo4j CE deploy, no 10k-row fixture).
-- A **static integrity test** for the harness shape (scenario library compiles, targets non-null, default fixture sizes match the spec) lives at `tests/agent-studio/graph-bench/harness-integrity.test.ts` if added in a future closure PR. It is not a substitute for execution; it only prevents harness drift.
+- A **static integrity test** for the harness shape (scenario library compiles, 10 canonical scenario keys, p50 < p95, default fixture sizes match the spec, CLI imports + exit-code wiring intact) lives at `tests/agent-studio/graph-bench/harness-integrity.test.ts`. It runs in CI on every PR. It is not a substitute for execution; it only prevents harness drift between operator runs.
 - CI must not attempt to run `pnpm tsx scripts/graph-bench/run-benchmark.ts`. Any future job under `.github/workflows/` that touches the harness MUST be gated on `if: github.event_name == 'workflow_dispatch'`.
 
 ## 10. Hard-rule compliance reminder
