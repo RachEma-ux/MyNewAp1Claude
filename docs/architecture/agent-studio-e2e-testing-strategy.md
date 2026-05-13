@@ -71,15 +71,37 @@ For PR-C (this closure bundle):
 - [x] CI Layer 4 stays green
 - [x] No new dependencies
 
-For the future V1.0 Playwright PR (out of scope for this closure mission):
+For the V1.0 Playwright PR (PR-AT-9 — strict-audit item #7 closure):
 
-- [ ] Playwright installed; chromium-only
-- [ ] At least 3 user-journey tests
-- [ ] CI Layer 4 includes Playwright job (workflow_dispatch + label-gated)
-- [ ] Staging-target tests, not local
+- [x] `@playwright/test` declared in devDependencies (`^1.49.0`)
+- [x] Chromium-only `playwright.config.ts` at repo root
+- [x] At least 3 specs under `tests/playwright/specs/`:
+      `01-app-boot.spec.ts`, `02-agent-studio-shell.spec.ts`,
+      `03-retrofit-page.spec.ts`
+- [x] CI Layer 4 includes Playwright job —
+      `.github/workflows/playwright-e2e.yml` is workflow_dispatch +
+      label-gated (`run-e2e` label)
+- [x] Demo-mode tests (no OAuth env vars in CI); runs against the
+      dev server started in the workflow
+- [x] Source-scan integrity test
+      (`tests/agent-studio/playwright-harness-integrity.test.ts`)
+      prevents silent demotion back to ADR-only state
+
+Out of scope for PR-AT-9 (tracked for future iterations):
+
+- [ ] Staging-target tests (currently runs against in-workflow dev
+      server; staging target is V1.1+)
+- [ ] User-journey breadth — Phase 11.5 proposal flow, OAuth flow,
+      multi-workspace flows (the v0 covers shell + retention
+      dashboard; deeper user journeys are incremental)
+- [ ] Per-PR auto-trigger — currently opt-in via label to keep CI
+      minutes bounded; auto-trigger on `client/**` changes is
+      V1.1+
 
 ## Reference
 
 - V1+ plan: `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` §1
 - Predecessor: `agent-studio-native-graph-workspace-execution-plan.md` §11
-- First smoke test: `tests/e2e/agent-studio-shell-smoke.test.tsx`
+- First smoke test (Layer-4 first slice, no-Playwright): `tests/e2e/agent-studio-shell-smoke.test.ts`
+- Playwright v0 harness (Layer-4 V1.0): `playwright.config.ts`, `tests/playwright/specs/`, `.github/workflows/playwright-e2e.yml`
+- Integrity lock: `tests/agent-studio/playwright-harness-integrity.test.ts`
