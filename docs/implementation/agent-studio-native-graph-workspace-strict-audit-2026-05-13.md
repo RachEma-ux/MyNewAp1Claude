@@ -28,9 +28,9 @@ audit closure mission.
 | # | Item | Prior claim | Actual status | Missing runtime work | Blockers | Next PR | CI/test evidence |
 |---|---|---|---|---|---|---|---|
 | 1 | G3 Neo4j CE live benchmark | "workflow-backed; operator territory" | **PARTIALLY IMPLEMENTED** | Workflow + runbook exist (`graph-bench-neo4j-ce.yml`); no committed evidence under `docs/evidence/graph-backend/`. Operator must trigger `workflow_dispatch` and commit report. | Live Neo4j CE container; operator hands | None — operator action | Workflow file present; report path uncommitted |
-| 2 | G10 Golden Questions live evaluation | "workflow-backed; operator territory" | **NOT IMPLEMENTED** | Workflow shape exists (`graph-golden-questions-live.yml`); the question-runner adapter for the live OpenRouter retrieval composition is not committed. Workflow currently exercises static integrity only. | Adapter PR named in runbook §4.4 | "Golden questions live adapter — PR #1" per V1.0 plan | Static integrity test green; live adapter absent |
+| 2 | G10 Golden Questions live evaluation | "workflow-backed; operator territory" | **FULLY IMPLEMENTED** (PR-AT-1, 2026-05-13) | None for the scoring/runner slice. Operator must still trigger the workflow with a configured `providerConnectionId` to produce committed evidence; that is operator action, not code. | — | — | 17/17 evaluator tests + 20/20 factory + 10/10 seed-integrity = 47 green; tsc clean |
 | 3 | Phase 13.5 / PR #1 — Agentic planner contract + ADR + boundary tests | "first slice" | **FULLY IMPLEMENTED** | None | — | — | PR #731 merged; 23 boundary tests green |
-| 4 | Phase 13.5 / PR #2 — Engine wiring + runAgentic loop | "tracked in V1+ plan" | **FULLY IMPLEMENTED** (after PR-Y1 #732) | None for fixed-mode round-robin planner. Real model-driven planner (LLM-emitted plans) is deliberately out of scope for the V1.0 slice. | — | "Phase 13.5 PR #3 — model-driven planner" (V1.0 plan) | PR #732; 9 new engine-agentic tests green |
+| 4 | Phase 13.5 — agentic GraphRAG (contract + engine wiring + round-robin + model-driven planner) | "tracked in V1+ plan" / "first slice" | **FULLY IMPLEMENTED** (#731 + #732 `ffb4eba9` + #737 `a8f5c634`) | None for the V1.0 agentic slice. Multi-iteration permission-leak property test family is V1.5; model-output rewriting/retry layer is V1.5 (intentional — see ADR PR #3 addendum §"Failure path"). | — | — | 62/62 tests green on main (boundary 27 + model-planner 20 + engine-agentic 9 + engine 6) |
 | 5 | Phase 11b-3 — inline chat diagnostics panel | "residual sliver tracked in V1+" | **FULLY IMPLEMENTED** (after PR-Y3 #734) | None | — | — | PR #734; 11 panel tests green |
 | 6 | Phase 1.5 G3 fallback — Memgraph adapter | "readiness artifact, exit 78" | **PARTIALLY IMPLEMENTED** (after PR-Y2 #733) | `MemgraphGraphRepository` skeleton class exists + registered in `getGraphRepository()` switch; `MEMGRAPH_CAPABILITIES` published; integrity test green; benchmark workflow no longer exits 78. The actual Bolt query implementation (executeCypher, traversal, projection) is **NOT** wired — methods throw `GraphCapabilityUnsupportedError` placeholders. Activation requires the operator-implementation PR named in the V1+ plan. | Bolt query implementation; live Memgraph container | "Memgraph Bolt query implementation — V1+ PR" | PR #733; 6 integrity tests green; query-path runtime: missing |
 | 7 | Track J — Layer 4 e2e smoke harness | "ADR completed; first slice" | **NOT IMPLEMENTED** | ADR + scaffold exist; no real Playwright/Cypress e2e suite committed; CI does not run Layer 4 on PRs. | Playwright config + spec PRs | "Layer 4 e2e — Playwright suite v0" (V1.0 plan) | Layer 4 absent from CI matrix |
@@ -51,12 +51,41 @@ audit closure mission.
 
 ### 1.1 Summary counts
 
-- **FULLY IMPLEMENTED:** 8 items (3, 4, 5, 13, 17, 18, 19, 20)
+- **FULLY IMPLEMENTED:** 9 items (2, 3, 4, 5, 13, 17, 18, 19, 20)
 - **PARTIALLY IMPLEMENTED:** 5 items (1, 6, 9, 14, 21 — see below)
-- **NOT IMPLEMENTED:** 8 items (2, 7, 8, 10, 11, 12, 15, 16)
+- **NOT IMPLEMENTED:** 7 items (7, 8, 10, 11, 12, 15, 16)
 
 Item 21 was reclassified from PARTIALLY → FULLY after the tracker was
 rewritten in this PR; it is fully implemented as a document.
+
+### 1.2 Phase 13.5 (item 4) reclassification (2026-05-13 post-merge)
+
+Item 4 now spans **the complete Phase 13.5 trio** on main rather than
+just PR #2's engine wiring:
+
+| Phase 13.5 sub-PR | Merge SHA | Shipped |
+|---|---|---|
+| PR #1 — contract + closed-union types + boundary tests | (PR #731) | `agentic-planner-contract.ts` (closed `AgenticPlannerAction` union of 3 variants + `validateAgenticPlannerAction` validator + `AgenticLoopBudget`); `agentic-planner-boundary.test.ts` |
+| PR #2 — engine wiring + RoundRobinPlanner | `ffb4eba9` | `engine.ts` `runAgentic()` branch consumes `agenticPlanner?: AgenticPlanner`; `agentic-loop.ts` `runAgenticLoop` + `createRoundRobinPlanner`; `graph-agent-engine-agentic.test.ts` |
+| PR #3 — model-driven planner | `a8f5c634` | `agentic-model-planner.ts` `createModelDrivenPlanner({ modelCall, systemPromptOverride? })`; `agentic-model-planner.test.ts` |
+
+Truth-claims that justify FULLY IMPLEMENTED (each verified on main
+`a8f5c634` immediately before this reclassification):
+
+- **Closed-union contract exists** — `AGENTIC_PLANNER_ACTION_KINDS = ["retrieve","answer","stop"]` at `agentic-planner-contract.ts:95`; `validateAgenticPlannerAction` rejects any kind outside the set.
+- **Boundary tests exist** — `tests/agent-studio/agentic-planner-boundary.test.ts` (27 tests; source-scans every `agentic-*.ts` file for `neo4j-driver` / `dispatchMcpToolCall` references).
+- **Engine branch exists** — `engine.ts:130` branches on `this.options.agenticPlanner` and dispatches to `runAgentic()` at `engine.ts:321`, which calls `runAgenticLoop` at `engine.ts:372`.
+- **Baseline planner exists** — `createRoundRobinPlanner({ modes })` at `agentic-loop.ts:203` (deterministic, model-free).
+- **Model-driven planner exists** — `createModelDrivenPlanner({ modelCall, systemPromptOverride? })` at `agentic-model-planner.ts`.
+- **Malformed JSON fails safely** — `parseModelResponse` returns a placeholder whose `kind` is outside the closed set; `validateAgenticPlannerAction` returns `{ ok: false }`; the loop terminates with `terminationReason: "invalid_action"` and an `invalidActionReason` string suitable for the why-this-answer panel. End-to-end test at `agentic-model-planner.test.ts` ("planner emits garbage → loop terminates with invalid_action").
+- **No direct graph mutation path** — source-scan of `agentic-*.ts` finds no `GraphRepository` write call sites, no `insertNode`/`insertEdge`/`upsert` references. Mutations route through Phase 11.5 graph change proposals.
+- **No direct tool execution path** — source-scan finds no `dispatchMcpToolCall(...)` call sites in `agentic-*.ts` (only docstring mentions documenting the rule). Closed action union forbids `kind: "dispatch_tool"` by construction.
+- **Model-call seam preserves OpenRouter boundary** — `AgenticPlannerModelCall` is a narrow `(systemPrompt, userPrompt) → text` callable; the planner imports nothing from `server/openrouter/model-access` or any provider SDK. Production composition translates this into a `ModelAccessExecuteInput` at the runtime path, keeping operator-controlled `providerConnectionId / modelRef / intent / workspaceId / actorId` outside the planner.
+- **Tests green on main** — 62/62 (`agentic-planner-boundary` 27 + `agentic-model-planner` 20 + `graph-agent-engine-agentic` 9 + `graph-agent-engine` 6) at `a8f5c634`.
+
+Counts after this reclassification are unchanged (item 4 was already
+counted as FULLY IMPLEMENTED in §1.1; this section documents the
+expanded scope and verification trail).
 
 ---
 
@@ -66,23 +95,22 @@ The items below are **NOT IMPLEMENTED** in runtime and are inside MVP 0-4
 scope (the deferred-by-CLAUDE.md items above are excluded — they are
 intentional, not gaps):
 
-1. **G10 Golden Questions live adapter** (item 2). The static integrity
-   test is green; the live-execution adapter (the thing that actually
-   runs each question against the deployed retrieval composition and
-   scores it) is missing.
-2. **Memgraph Bolt query implementation** (item 6 — the partial slice).
+1. **Memgraph Bolt query implementation** (item 6 — the partial slice).
    The skeleton + registration exists so the workflow + integrity test
    can run; the actual Cypher/Bolt query path is unimplemented.
-3. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
+2. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
    on PRs. The pyramid stops at the Layer 3 integration tests for now.
-4. **Projection drift cron** (item 9 — the partial slice). Drift detect
+3. **Projection drift cron** (item 9 — the partial slice). Drift detect
    is on-demand only.
-5. **15 of 17 retention panels still inline** (item 14 — the partial
+4. **15 of 17 retention panels still inline** (item 14 — the partial
    slice). Functional but not extracted/testable as standalone
    components.
 
-Every other item is either FULLY IMPLEMENTED, intentionally out of MVP
-scope (10-12, 15-16), or operator-action (1 — G3 benchmark execution).
+Item 2 (Golden Questions live adapter) was closed by PR-AT-1 on
+2026-05-13 and moved from the gap list. Every other item is either
+FULLY IMPLEMENTED, intentionally out of MVP scope (10-12, 15-16), or
+operator-action (1 — G3 benchmark execution; 2 — workflow trigger +
+evidence commit).
 
 ---
 
@@ -158,15 +186,18 @@ populated directories is what *makes* item 1 FULLY IMPLEMENTED.
 
 ## 7. Next required PRs (in priority order)
 
-1. **Phase 13.5 PR #3** — model-driven agentic planner (LLM-emitted
-   plans). Round-robin planner from PR-Y1 is the baseline.
-2. **Golden Questions live adapter** — closes item 2.
-3. **Retention panel extractions batch 3** — 3-5 more panels per PR.
-4. **Projection drift cron** — closes item 9 partial.
-5. **Layer 4 Playwright v0** — closes item 7.
+1. **Retention panel extractions batch 3** — 3-5 more panels per PR (closes item 14 partial).
+2. **Projection drift cron** — closes item 9 partial.
+3. **Memgraph Bolt query implementation** — closes item 6 partial.
+4. **Layer 4 Playwright v0** — closes item 7.
 
-Each is named in `agent-studio-native-graph-workspace-v1-v2-execution-plan.md`
-(item 8). The plan exists; execution is the work.
+Phase 13.5 PR #3 merged at `a8f5c634` and is part of item 4's FULLY
+IMPLEMENTED footprint. The Golden Questions live adapter (item 2)
+merged via PR-AT-1 on 2026-05-13 and is also FULLY IMPLEMENTED — the
+remaining gap is operator action (run the workflow, commit the
+evidence directory), not code. Each remaining item is named in
+`agent-studio-native-graph-workspace-v1-v2-execution-plan.md` (audit
+item 8). The plan exists; execution is the work.
 
 ---
 
@@ -176,11 +207,13 @@ PRs from the strict-audit mission:
 
 | PR | Lands | What it actually shipped |
 |---|---|---|
-| #732 (PR-Y1) | `1f93077..` | Engine wiring for Phase 13.5 — `runAgentic()` + round-robin planner + 9 tests |
-| #733 (PR-Y2) | (in flight) | `MemgraphGraphRepository` skeleton + `getGraphRepository()` registration + workflow no-longer-78 + 6 integrity tests |
-| #734 (PR-Y3) | (in flight) | `ChatDiagnosticsPanel` + 11 tests — closes Phase 11b-3 residual sliver |
-| #735 (PR-Y4) | (in flight) | `McpTransitionsRetentionPanel` extraction + 10 tests — raises panel-coverage 1/17 → 2/17 |
-| #736 (PR-Y5, this PR) | this commit | Strict audit doc; local seed script; tracker rewrite to honest classifications |
+| #732 (PR-Y1) | `ffb4eba9` | Engine wiring for Phase 13.5 — `runAgentic()` + RoundRobinPlanner + 9 engine-agentic tests + `strictNullChecks=false` narrowing fix |
+| #733 (PR-Y2) | `327bca0b` | `MemgraphGraphRepository` skeleton + `getGraphRepository()` registration + workflow no-longer-78 + 6 integrity tests |
+| #734 (PR-Y3) | `6bea4bf4` | `ChatDiagnosticsPanel` + 11 tests — closes Phase 11b-3 residual sliver |
+| #735 (PR-Y4) | `36d5844d` | `McpTransitionsRetentionPanel` extraction + 10 tests — raises panel-coverage 1/17 → 2/17 |
+| #736 (PR-Y5) | `b7ef35a7` | Strict-audit doc; local seed script; tracker rewrite to honest classifications |
+| #737 (Phase 13.5 PR #3) | `a8f5c634` | `createModelDrivenPlanner()` + 20 tests + ADR addendum — closes the LLM-emitted-plan slice of item 4 |
+| PR-AT-1 (Golden Questions live adapter) | this PR | `live-evaluator.ts` + `live-engine-factory.ts` + scorer/orchestrator/report-formatter; CLI `--mode=live` branch; workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` env-var inputs; runbook §4.3 / §6 refresh; 37 new tests (17 evaluator + 20 factory) — closes item 2 |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The

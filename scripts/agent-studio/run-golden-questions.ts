@@ -1,34 +1,41 @@
 /**
- * Native Graph Workspace MVP 4 — Phase 22 / 23.
+ * Native Graph Workspace V1.0 — Golden Question evaluation CLI.
  *
- * Operator entry point: run the Golden Question evaluation suite
- * against the live Graph Agent Lite engine. Mirrors the shape
- * referenced by the evaluation runbook at
+ * Two modes:
+ *
+ *   --mode=dry-run (default)
+ *     Reads the seeded suites from ASDB and emits a structured
+ *     inventory markdown report. Exit 0 unless ASDB unreachable or
+ *     seed missing.
+ *
+ *   --mode=live
+ *     Composes the Graph Agent Lite engine with real adapter wiring
+ *     (GraphRepository + GraphRetrievalRouter + ModelAccessAdapter +
+ *     McpDispatchAdapter), runs each seeded question, scores against
+ *     `expectedPaths` + `minimumCitationCount` + optional regex
+ *     pattern, emits a markdown PASS/FAIL report PLUS a machine-
+ *     readable JSON sidecar. Exit non-zero if any question fails.
+ *
+ *     Live mode requires the documented env vars (see
+ *     `server/agent-studio/services/graph-skill/golden-questions/
+ *     live-engine-factory.ts`):
+ *       GOLDEN_Q_LIVE=true
+ *       GOLDEN_Q_LIVE_PROVIDER_CONNECTION_ID
+ *       GOLDEN_Q_LIVE_MODEL_REF
+ *       GOLDEN_Q_LIVE_WORKSPACE_ID
+ *       GOLDEN_Q_LIVE_ACTOR_ID
+ *     Missing any of these in --mode=live → exit 2 (config error).
+ *
+ *     Plan v3 D1: model-access `execute()` resolves credentials via
+ *     `withProviderCredential` internally — this script never reads
+ *     raw provider-key env vars directly.
+ *
+ * Backwards-compatible flags:
+ *   --require-live   Equivalent to --mode=live; preserved so the
+ *                    existing workflow_dispatch input still works.
+ *
+ * Runbook:
  *   docs/runbooks/agent-studio-native-graph-workspace-golden-questions-evaluation-runbook.md
- * (§4.3).
- *
- * What this CLI does today (pre-operator-wiring):
- *   - Reads the seeded suites from ASDB.
- *   - Writes a structured markdown report at --output with the
- *     question inventory + expected paths + minimum citation counts.
- *   - Returns exit 0 with a `liveWired: false` status — the day-1
- *     shape; runbook §4.3 describes the live-wiring path.
- *   - Returns exit 1 only on infrastructure failure (ASDB
- *     unreachable, seed missing, IO failure).
- *
- * Live evaluation wiring (operator territory per runbook §4.4) is
- * intentionally NOT performed here yet — composing
- * GraphRepository + GraphRetrievalRouter + ModelAccessAdapter +
- * McpDispatchAdapter + RuntimeTraceAdapter for a live single-shot
- * eval requires per-deployment configuration and a workspace
- * smoke vault that this CLI cannot make assumptions about. When
- * that wiring lands, provider credentials MUST flow through
- * `withProviderCredential` per Plan v3 Decision D1 — never via
- * `process.env` in script bodies.
- *
- * Usage:
- *   DATABASE_URL_ASDB=postgres://... pnpm tsx scripts/agent-studio/run-golden-questions.ts \
- *     --suite all --output docs/evidence/graph-agent-lite/2026-MM-DD/report.md
  */
 
 import { writeFileSync, mkdirSync } from "fs";
@@ -40,20 +47,45 @@ import {
   agsGoldenQuestionSuites,
   agsGoldenQuestions,
 } from "../../drizzle/tables/agent-studio-graph-quality.js";
+import {
+  runLiveEvaluation,
+  formatLiveReport,
+  formatLiveReportJson,
+  type GoldenQuestion,
+  type GoldenQuestionSuite,
+} from "../../server/agent-studio/services/graph-skill/golden-questions/live-evaluator.js";
+import {
+  buildLiveEngine,
+  parseLiveEnv,
+} from "../../server/agent-studio/services/graph-skill/golden-questions/live-engine-factory.js";
+
+type Mode = "dry-run" | "live";
 
 interface CliArgs {
   suite: string;
   output: string | null;
-  requireLive: boolean;
+  jsonOutput: string | null;
+  mode: Mode;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { suite: "all", output: null, requireLive: false };
+  const args: CliArgs = {
+    suite: "all",
+    output: null,
+    jsonOutput: null,
+    mode: "dry-run",
+  };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--suite") args.suite = argv[++i] ?? "all";
     else if (a === "--output") args.output = argv[++i] ?? null;
-    else if (a === "--require-live") args.requireLive = true;
+    else if (a === "--json-output") args.jsonOutput = argv[++i] ?? null;
+    else if (a === "--require-live") args.mode = "live";
+    else if (a === "--mode") {
+      const v = argv[++i];
+      if (v === "live" || v === "dry-run") args.mode = v;
+      else throw new Error(`--mode must be 'dry-run' or 'live', got '${v}'`);
+    }
   }
   return args;
 }
@@ -74,30 +106,24 @@ interface QuestionRow {
   minimumCitationCount: number;
 }
 
-function formatReport(
+function formatDryRunReport(
   date: string,
-  liveWired: boolean,
-  reason: string,
   suites: SuiteRow[],
   questionsBySuite: Map<number, QuestionRow[]>,
 ): string {
   const lines: string[] = [];
-  lines.push(`# Golden Question Evaluation Report — ${date}`);
+  lines.push(`# Golden Question Evaluation Report (dry-run inventory) — ${date}`);
   lines.push("");
-  lines.push("**Generator:** `scripts/agent-studio/run-golden-questions.ts`");
+  lines.push("**Generator:** `scripts/agent-studio/run-golden-questions.ts --mode=dry-run`");
   lines.push(
     "**Runbook:** `docs/runbooks/agent-studio-native-graph-workspace-golden-questions-evaluation-runbook.md`",
   );
-  lines.push(`**Live-wired:** ${liveWired ? "yes" : "no"}`);
-  if (!liveWired) {
-    lines.push(`**Reason:** ${reason}`);
-  }
   lines.push("");
-  lines.push("## Inventory");
+  lines.push("Inventory only — no engine invocation. To run live, re-invoke with `--mode=live` and the documented env vars.");
   lines.push("");
   for (const suite of suites) {
     const qs = questionsBySuite.get(suite.id) ?? [];
-    lines.push(`### ${suite.name} (\`${suite.suiteKey}\`)`);
+    lines.push(`## ${suite.name} (\`${suite.suiteKey}\`)`);
     if (suite.description) lines.push(suite.description);
     lines.push("");
     lines.push("| Question | Expected skill pack | Expected template | Min citations |");
@@ -118,19 +144,26 @@ function formatReport(
     }
     lines.push("");
   }
-  lines.push("## Next steps (operator)");
-  lines.push("");
-  if (liveWired) {
-    lines.push(
-      "Live results are present above. Per the runbook §4.4 / §4.5, archive this report under `docs/evidence/graph-agent-lite/<date>/` and update the status doc.",
-    );
-  } else {
-    lines.push(
-      "Live evaluation is not wired in this CLI today. The runbook §4.4 describes the adapter composition needed (GraphRepository + GraphRetrievalRouter + ModelAccessAdapter + McpDispatchAdapter + RuntimeTraceAdapter). To proceed live, supply those adapters in a follow-up implementation PR and re-run.",
-    );
-  }
-  lines.push("");
   return lines.join("\n");
+}
+
+function rowsToSuites(
+  suites: SuiteRow[],
+  byId: Map<number, QuestionRow[]>,
+): GoldenQuestionSuite[] {
+  return suites.map((s) => ({
+    suiteKey: s.suiteKey,
+    name: s.name,
+    description: s.description,
+    questions: (byId.get(s.id) ?? []).map((q): GoldenQuestion => ({
+      suiteKey: s.suiteKey,
+      questionKey: q.questionKey,
+      question: q.question,
+      expectedAnswerPattern: q.expectedAnswerPattern,
+      expectedPaths: q.expectedPaths as { templateKey?: string; skillPackKey?: string } | null,
+      minimumCitationCount: q.minimumCitationCount,
+    })),
+  }));
 }
 
 async function main() {
@@ -191,59 +224,81 @@ async function main() {
     questionsBySuite.set(s.id, qs);
   }
 
-  // Day-1 shape: adapter composition for GraphAgentEngine
-  // (repository + retrievalRouter + modelAccess + mcpDispatcher +
-  // runtimeTrace + decisionTrace) is operator-implementation
-  // territory per runbook §4.4. Provider credentials for the
-  // eventual modelAccess adapter MUST flow through
-  // `withProviderCredential` (Plan v3 D1) — never via direct
-  // `process.env` reads in script bodies. The inventory-only
-  // report below is the day-1 closure-evidence shape.
-  const liveWired = false;
-  const reason =
-    "Adapter composition not yet implemented in this CLI (runbook §4.4). When wired, model-access credentials must flow through withProviderCredential per Plan v3 D1.";
+  if (args.mode === "dry-run") {
+    const markdown = formatDryRunReport(date, allSuites, questionsBySuite);
+    emit(args, markdown, null, {
+      ok: true,
+      mode: "dry-run",
+      suiteCount: allSuites.length,
+      questionCount: Array.from(questionsBySuite.values()).reduce((a, b) => a + b.length, 0),
+    });
+    process.exit(0);
+  }
 
-  const markdown = formatReport(date, liveWired, reason, allSuites, questionsBySuite);
+  // ── live mode ────────────────────────────────────────────────────
+  const env = parseLiveEnv();
+  if (!env.ok) {
+    console.error(
+      JSON.stringify({
+        ok: false,
+        mode: "live",
+        error: `live-mode config error: ${env.reason}`,
+      }),
+    );
+    process.exit(2);
+  }
 
-  // Exit-code contract:
-  //   - Default (no --require-live): exit 0 even when liveWired=false.
-  //     Inventory report is valuable closure-evidence pre-live-wiring.
-  //   - --require-live: exit 1 when liveWired=false. This is the flag
-  //     the operator-implementation PR for adapter composition will
-  //     use to gate the workflow on real live wiring being present.
-  //   - When live wiring DOES land, this function additionally exits
-  //     non-zero if any suite has a failed question (per runbook §4.4
-  //     pass/fail criteria).
-  const requireLiveFailed = args.requireLive && !liveWired;
-  const exitCode = requireLiveFailed ? 1 : 0;
+  const engine = buildLiveEngine(env.config);
+  const suites = rowsToSuites(allSuites, questionsBySuite);
 
+  const summary = await runLiveEvaluation(suites, (input) => engine.run(input), {
+    workspaceId: env.config.workspaceId,
+    userId: env.config.actorId,
+  });
+
+  const markdown = formatLiveReport(date, summary);
+  const json = formatLiveReportJson(date, summary);
+  emit(args, markdown, json, {
+    ok: summary.overallPassed,
+    mode: "live",
+    summary: {
+      overallPassed: summary.overallPassed,
+      suitesPassed: summary.suitesPassed,
+      suitesTotal: summary.suitesTotal,
+      questionsPassed: summary.questionsPassed,
+      questionsTotal: summary.questionsTotal,
+      questionsErrored: summary.questionsErrored,
+    },
+  });
+  process.exit(summary.overallPassed ? 0 : 1);
+}
+
+function emit(
+  args: CliArgs,
+  markdown: string,
+  json: string | null,
+  consoleLog: object,
+): void {
   if (args.output) {
     const path = isAbsolute(args.output) ? args.output : resolve(process.cwd(), args.output);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, markdown, "utf8");
-    console.log(
-      JSON.stringify({
-        ok: !requireLiveFailed,
-        liveWired,
-        reason,
-        requireLive: args.requireLive,
-        suiteCount: allSuites.length,
-        questionCount: Array.from(questionsBySuite.values()).reduce((a, b) => a + b.length, 0),
-        output: path,
-        exitCode,
-      }),
-    );
+    if (json !== null && args.jsonOutput) {
+      const jsonPath = isAbsolute(args.jsonOutput)
+        ? args.jsonOutput
+        : resolve(process.cwd(), args.jsonOutput);
+      mkdirSync(dirname(jsonPath), { recursive: true });
+      writeFileSync(jsonPath, json, "utf8");
+    } else if (json !== null) {
+      // Sidecar JSON next to the markdown when --json-output is omitted.
+      const sidecarPath = path.replace(/\.md$/i, "") + ".json";
+      writeFileSync(sidecarPath, json, "utf8");
+    }
+    console.log(JSON.stringify({ ...consoleLog, output: path }));
   } else {
     process.stdout.write(markdown + "\n");
+    if (json !== null) process.stdout.write("\n" + json + "\n");
   }
-
-  if (requireLiveFailed) {
-    console.error(
-      "[golden-questions] --require-live set but live wiring is not present. " +
-        "See runbook §4.4 for the adapter-composition implementation PR.",
-    );
-  }
-  process.exit(exitCode);
 }
 
 main().catch((e) => {

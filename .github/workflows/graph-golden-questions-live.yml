@@ -12,12 +12,16 @@
 #     containing the markdown inventory + (when live wiring lands)
 #     per-question results.
 #
-# Live-wiring status:
-#   The run script is a structured inventory-report generator today;
-#   full adapter-composed live evaluation is operator-implementation
-#   territory per runbook §4.4. The workflow still runs end-to-end:
-#   ASDB seed + run, with the report archived as evidence even before
-#   live wiring lands.
+# Live-wiring status (2026-05-13):
+#   Live evaluation IS wired. The script's --mode=live branch composes
+#   the Graph Agent Lite engine + GraphRepository + GraphRetrievalRouter
+#   + OpenRouter Model Access (`execute()` via `withProviderCredential`)
+#   + MCP dispatcher, then scores each seeded question against
+#   `expectedPaths` + `minimumCitationCount` + optional regex pattern.
+#   Pass requires every suite to pass. Failure exits non-zero.
+#
+#   Dry-run mode (default) emits the inventory-only report and exits 0
+#   for repo-state validation.
 
 name: Golden Questions — Live Evaluation (G10)
 
@@ -28,14 +32,30 @@ on:
         description: 'Suite key to run (or "all")'
         required: false
         default: 'all'
-      require_live:
-        description: 'Fail the run if the script is still in inventory-only mode (no live wiring). Gate-the-workflow flag for post-adapter-composition operator runs.'
+      mode:
+        description: 'Evaluation mode. "dry-run" emits an inventory report; "live" composes the engine and scores answers (requires the live-mode secrets to be configured).'
         required: false
-        default: 'false'
+        default: 'dry-run'
         type: choice
         options:
-          - 'false'
-          - 'true'
+          - 'dry-run'
+          - 'live'
+      provider_connection_id:
+        description: 'Provider connection row id for the model-access binding. Required in live mode.'
+        required: false
+        default: ''
+      model_ref:
+        description: 'Model ref (e.g. "anthropic/claude-3-5-sonnet"). Required in live mode.'
+        required: false
+        default: ''
+      workspace_id:
+        description: 'Workspace id (smoke vault). Required in live mode.'
+        required: false
+        default: ''
+      actor_id:
+        description: 'Actor / user id for the engine run. Required in live mode.'
+        required: false
+        default: ''
 
 jobs:
   evaluate:
@@ -60,14 +80,18 @@ jobs:
     env:
       DATABASE_URL: postgres://testuser:testpass@localhost:5432/asdb
       DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/asdb
-      # The secret plumbing is intentionally pre-wired for the
-      # eventual live-wiring PR (runbook §4.4). The day-1 run
-      # script does NOT read this directly — per Plan v3 D1,
-      # provider credentials flow through `withProviderCredential`,
-      # not raw `process.env` reads. When the live-wiring PR lands,
-      # the model-access adapter will resolve credentials via the
-      # provider-connections seed path, not this env var.
+      # Provider credential resolution happens inside
+      # `withProviderCredential` (Plan v3 D1) — neither the script
+      # body nor this workflow reads raw key env vars directly. The
+      # secret is staged here so the provider-connections seed step
+      # (when present) can register the connection row that the
+      # live-mode adapter will resolve by id.
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GOLDEN_Q_LIVE: ${{ github.event.inputs.mode == 'live' && 'true' || 'false' }}
+      GOLDEN_Q_LIVE_PROVIDER_CONNECTION_ID: ${{ github.event.inputs.provider_connection_id }}
+      GOLDEN_Q_LIVE_MODEL_REF: ${{ github.event.inputs.model_ref }}
+      GOLDEN_Q_LIVE_WORKSPACE_ID: ${{ github.event.inputs.workspace_id }}
+      GOLDEN_Q_LIVE_ACTOR_ID: ${{ github.event.inputs.actor_id }}
 
     steps:
       - name: Checkout
@@ -95,14 +119,11 @@ jobs:
       - name: Run Golden Questions evaluation
         run: |
           mkdir -p "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions"
-          REQUIRE_LIVE_FLAG=""
-          if [ "${{ github.event.inputs.require_live }}" = "true" ]; then
-            REQUIRE_LIVE_FLAG="--require-live"
-          fi
           npx tsx scripts/agent-studio/run-golden-questions.ts \
             --suite "${{ github.event.inputs.suite }}" \
-            $REQUIRE_LIVE_FLAG \
-            --output "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/report.md"
+            --mode "${{ github.event.inputs.mode }}" \
+            --output "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/report.md" \
+            --json-output "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/report.json"
 
       - name: Upload evaluation evidence
         if: always()
@@ -118,6 +139,11 @@ jobs:
         run: |
           echo "## Golden Questions Evaluation — ${{ steps.date.outputs.date }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Suite filter: \`${{ github.event.inputs.suite }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Mode: \`${{ github.event.inputs.mode }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "OPENROUTER_API_KEY secret present: ${{ secrets.OPENROUTER_API_KEY != '' }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Inventory report archived as artifact. On live wiring, the runbook §4.4 / §4.5 prescribes evidence commit + status-doc flip." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.event.inputs.mode }}" = "live" ]; then
+            echo "Live mode: scored report archived as artifact. Pass requires every suite to pass; failure exited non-zero. Per runbook §4.5, on PASS commit the report under docs/evidence/graph-agent-lite/<date>-golden-questions/ and flip the relevant status doc row." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Dry-run mode: inventory-only report archived. Re-run with mode=live + the four GOLDEN_Q_LIVE_* inputs to score against the seeded suites." >> "$GITHUB_STEP_SUMMARY"
+          fi

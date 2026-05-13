@@ -51,7 +51,7 @@ No item remains silently deferred. No item is blocked without a documented hard-
 | # | Item | PR | Closure shape |
 |---|---|---|---|
 | 4 | Phase 11b-3 runtime UI surfaces | **#728** | Re-audit closes 4 of 5 surfaces as Superseded; 1 residual sliver tracked in V1+ plan |
-| 5 | Phase 13.5 Agentic GraphRAG | **#727** | V1.0 phase in successor plan; first-PR: planner-contract ADR + boundary tests |
+| 5 | Phase 13.5 Agentic GraphRAG | **#727 → #731 → #732 → #737** | FULLY IMPLEMENTED on main 2026-05-13: PR #731 contract + PR #732 `ffb4eba9` engine wiring + RoundRobinPlanner + PR #737 `a8f5c634` model-driven planner; 62/62 tests green |
 | 6 | V1 / V1.5 / V2 successor plan | **#727** | `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` — comprehensive 10-phase plan |
 | 7 | Layer 4 e2e | **#728** | ADR + first slice (RTL smoke, 4 tests green, no new dep); full Playwright = V1.0 PR |
 | 8 | Phase 15 templates/attachments standalone | **#727** | V1.5 phase in successor plan |
