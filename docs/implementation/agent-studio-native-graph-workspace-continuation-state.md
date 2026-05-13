@@ -25,15 +25,16 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-1. Retention panel extractions 3-17 (item 14 partial)
+1. Retention panel extractions 6-17 (item 14 partial — 12 remain)
 2. Layer 4 e2e harness (item 7)
 
 **Just closed (2026-05-13):**
-- PR-AT-1 — Golden Questions live adapter (audit item 2). Live evaluator + engine factory + CLI `--mode=live` + workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` inputs. Merged at `08cccdf9`.
-- PR-AT-2 — Memgraph Bolt query path (audit item 6). `bolt-driver-port.ts` + lazy `default-bolt-driver-factory.ts` (dynamic-imports `neo4j-driver`) + real `health/localGraph/neighborhood/shortestPath/executeTemplate` in `MemgraphGraphRepository`. Merged at `503ae0c8`.
-- PR-AT-3 — Projection drift cron (audit item 9). New `services/graph/projection/drift-cron.ts` wires `DriftDetector` to `makeRetentionCron`; ladder slot #19 (04:30 UTC); `agentStudio.graphProjection.getDriftCronStatus` tRPC surface; boot.ts step 3.24.
+- PR-AT-1 — Golden Questions live adapter (audit item 2). Merged at `08cccdf9`.
+- PR-AT-2 — Memgraph Bolt query path (audit item 6). Merged at `503ae0c8`.
+- PR-AT-3 — Projection drift cron (audit item 9). Merged at `2ccf0841`.
+- PR-AT-4 — Retention panel batch 3 (item 14 progress, 2/17 → 5/17): `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel` extracted with 31 vitest cases. Migration-lock `EXTRACTED_PANEL_PATHS` updated.
 
-**Next material work:** retention panel extractions batch 3 (item 14 partial). 15 of 17 panels remain inline in `RetrofitPage.tsx`. Each batch typically extracts 2-3 panels + tests + EXTRACTED_PANEL_PATHS update — trivially mergeable.
+**Next material work:** retention panel extractions batch 4 (item 14 partial). 12 panels remain inline in `RetrofitPage.tsx` — next candidates by size are `CagPackEventsRetentionPanel`, `SimulationRunsRetentionPanel`, `TestRunsRetentionPanel`.
 
 The historical (pre-strict-audit) recovery context follows.
 

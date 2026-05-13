@@ -59,6 +59,9 @@ describe("CronStatusBadge migration — regression lock", () => {
   const EXTRACTED_PANEL_PATHS: ReadonlyArray<string> = [
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "CronStatusPanel.tsx"),
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "McpTransitionsRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "ToolCallTracesRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "CatalogSyncLogRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "RacRuntimeTracesRetentionPanel.tsx"),
   ];
 
   function countBadgeUsages(): number {
