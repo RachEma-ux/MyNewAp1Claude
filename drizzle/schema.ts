@@ -55,5 +55,6 @@ export * from './tables/agent-studio-graph-skill';
 export * from './tables/agent-studio-graph-agent';
 export * from './tables/agent-studio-graph-rag';
 export * from './tables/agent-studio-graph-quality';
+export * from './tables/agent-studio-runtime-alerts';
 export * from '../server/modules/kgia/schema';
 export * from '../server/openrouter/schema';
