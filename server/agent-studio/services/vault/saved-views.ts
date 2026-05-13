@@ -24,7 +24,10 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
-import { agsVaultSavedViews } from "../../../../drizzle/tables/agent-studio-vault.js";
+import {
+  agsVaultSavedViews,
+  agsVaultSavedViewVersions,
+} from "../../../../drizzle/tables/agent-studio-vault.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -233,13 +236,37 @@ export async function listSavedViews(
   return rows.map(rowToSavedView);
 }
 
+export interface UpdateSavedViewOptions extends SavedViewServiceOptions {
+  /** V1+ Phase 16-γ — operator user id captured on the version
+   *  snapshot row so `listSavedViewVersions` can render audit trail. */
+  readonly capturedByUserId?: number;
+}
+
 export async function updateSavedView(
   input: UpdateSavedViewInput,
-  options: SavedViewServiceOptions = {},
+  options: UpdateSavedViewOptions = {},
 ): Promise<SavedViewRow> {
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) throw new AsdbUnavailableError();
+
+  // V1+ Phase 16-γ — snapshot the prior row state to
+  // `ags_vault_saved_view_versions` BEFORE applying the update.
+  // The snapshot carries the row at its current `version` number;
+  // the post-update row carries the bumped counter.
+  const prior = await getSavedViewById(input.id, options);
+  if (!prior) throw new SavedViewNotFoundError(input.id);
+  await db.insert(agsVaultSavedViewVersions).values({
+    savedViewId: prior.id,
+    version: prior.version,
+    name: prior.name,
+    viewKind: prior.viewKind,
+    filters: (prior.filters as Record<string, unknown> | null) ?? null,
+    sort: (prior.sort as Record<string, unknown> | null) ?? null,
+    columns: (prior.columns as string[] | null) ?? null,
+    visibility: prior.visibility,
+    capturedByUserId: options.capturedByUserId ?? null,
+  });
 
   // V1+ Phase 16-α: bump `version` on every content edit so callers
   // can detect drift against a snapshot they read earlier. Visibility
@@ -299,6 +326,104 @@ import { filterVisibleSavedViews } from "./saved-views-visibility.js";
 export interface ListVisibleSavedViewsForUserInput
   extends ListSavedViewsInput {
   readonly viewerUserId: number | null;
+}
+
+// ============================================================================
+// V1+ Phase 16-γ — immutable version history
+// ============================================================================
+
+export interface SavedViewVersionRow {
+  readonly id: number;
+  readonly savedViewId: number;
+  readonly version: number;
+  readonly name: string;
+  readonly viewKind: string;
+  readonly filters: Record<string, unknown> | null;
+  readonly sort: Record<string, unknown> | null;
+  readonly columns: string[] | null;
+  readonly visibility: string;
+  readonly capturedByUserId: number | null;
+  readonly capturedAt: Date;
+}
+
+function rowToSavedViewVersion(r: Record<string, unknown>): SavedViewVersionRow {
+  return {
+    id: Number(r.id),
+    savedViewId: Number(r.savedViewId),
+    version: Number(r.version),
+    name: String(r.name),
+    viewKind: String(r.viewKind),
+    filters: (r.filters as Record<string, unknown> | null) ?? null,
+    sort: (r.sort as Record<string, unknown> | null) ?? null,
+    columns: (r.columns as string[] | null) ?? null,
+    visibility: String(r.visibility),
+    capturedByUserId: (r.capturedByUserId as number | null) ?? null,
+    capturedAt: r.capturedAt as Date,
+  };
+}
+
+/**
+ * Return all immutable version snapshots for a saved view in
+ * version-desc order. Empty array when no versions exist yet (no
+ * updates since creation).
+ */
+export async function listSavedViewVersions(
+  savedViewId: number,
+  options: SavedViewServiceOptions = {},
+): Promise<SavedViewVersionRow[]> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: agsVaultSavedViewVersions.id,
+      savedViewId: agsVaultSavedViewVersions.savedViewId,
+      version: agsVaultSavedViewVersions.version,
+      name: agsVaultSavedViewVersions.name,
+      viewKind: agsVaultSavedViewVersions.viewKind,
+      filters: agsVaultSavedViewVersions.filters,
+      sort: agsVaultSavedViewVersions.sort,
+      columns: agsVaultSavedViewVersions.columns,
+      visibility: agsVaultSavedViewVersions.visibility,
+      capturedByUserId: agsVaultSavedViewVersions.capturedByUserId,
+      capturedAt: agsVaultSavedViewVersions.capturedAt,
+    })
+    .from(agsVaultSavedViewVersions)
+    .where(eq(agsVaultSavedViewVersions.savedViewId, savedViewId))
+    .orderBy(desc(agsVaultSavedViewVersions.version));
+  return rows.map((r) => rowToSavedViewVersion(r as Record<string, unknown>));
+}
+
+/**
+ * Look up one immutable version snapshot by id. Returns null when
+ * the row is absent.
+ */
+export async function getSavedViewVersionById(
+  versionId: number,
+  options: SavedViewServiceOptions = {},
+): Promise<SavedViewVersionRow | null> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: agsVaultSavedViewVersions.id,
+      savedViewId: agsVaultSavedViewVersions.savedViewId,
+      version: agsVaultSavedViewVersions.version,
+      name: agsVaultSavedViewVersions.name,
+      viewKind: agsVaultSavedViewVersions.viewKind,
+      filters: agsVaultSavedViewVersions.filters,
+      sort: agsVaultSavedViewVersions.sort,
+      columns: agsVaultSavedViewVersions.columns,
+      visibility: agsVaultSavedViewVersions.visibility,
+      capturedByUserId: agsVaultSavedViewVersions.capturedByUserId,
+      capturedAt: agsVaultSavedViewVersions.capturedAt,
+    })
+    .from(agsVaultSavedViewVersions)
+    .where(eq(agsVaultSavedViewVersions.id, versionId))
+    .limit(1);
+  if (rows.length === 0) return null;
+  return rowToSavedViewVersion(rows[0] as Record<string, unknown>);
 }
 
 export interface ListVisibleSavedViewsForUserOptions
