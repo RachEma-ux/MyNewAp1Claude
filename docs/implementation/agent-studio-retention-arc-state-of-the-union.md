@@ -1,9 +1,19 @@
-# Agent Studio Retention Arc — State of the Union (CLOSED 2026-05-13)
+# Agent Studio Retention Arc — State of the Union (CLOSED 2026-05-13, deferral resolved 2026-05-13)
 
 **Phase 22 follow-up cohort closure memo.** This document captures the final
 state of the retention arc that ran across 2026-05-12 and 2026-05-13. The
 arc is closed at PR #680. Future retention work should treat this memo as
 the authoritative starting reference.
+
+> **Post-closure addendum (2026-05-13)** — the approval-lifecycle deferral
+> that this memo describes in §"Deferred work" was fully resolved
+> immediately after closure via a 22-PR follow-up arc (PRs #682–#703).
+> Both Track 1 (lifecycle-governance schema + 3 retention services) and
+> Track 2 (`agsReleaseAuditRefs` compliance archival) shipped, together
+> with a holds-management write-side surface and a parent-hold-inheritance
+> bugfix. The daily-sweep ladder grew from 15 slots (03–17 UTC) to 18
+> slots (03–20 UTC). See [§Post-closure addendum](#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13)
+> below for the deferral-resolution detail.
 
 ---
 
@@ -23,9 +33,12 @@ the authoritative starting reference.
 - **1 DRY factory refactor** (#642 — `makeRetentionCron({...})` consolidated
   ~6 cron scaffolds into a single shared factory).
 
-## Daily-sweep ladder (final state)
+## Daily-sweep ladder (final state, deferral-resolution addendum 2026-05-13)
 
-15 slots, 03:00–17:00 UTC, offset 1h each to spread ASDB write load:
+**18 slots, 03:00–20:00 UTC**, offset 1h each to spread ASDB write load.
+Slots 16–18 were added by the approval-lifecycle deferral-resolution
+addendum (PRs #682–#703) — see [§Post-closure addendum](#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13).
+The 15-slot baseline (03–17 UTC) is the original arc closure at #680.
 
 | UTC | Mini-arc # | PR  | Table / Cascade                                                                                          | Default |
 | --- | ---------- | --- | -------------------------------------------------------------------------------------------------------- | ------- |
@@ -44,6 +57,9 @@ the authoritative starting reference.
 | 15  | 13         | #670 | `agsIngestionJobs` (single-table; artifacts is sibling not child)                                        | 30 d    |
 | 16  | 14         | #674 | `agsGraphChangeProposals` + `agsGraphChangeProposalItems` + `agsGraphChangeDecisions` + `agsGraphChangeAuditEvents` | 30 d  |
 | 17  | 15         | #677 | `agsGraphSkillRuntimeUsages` + `agsQueryTemplateRuns` + `agsGraphAgentSteps` + `agsGraphAgentRuns`        | 90 d    |
+| 18  | A1 (#693)  | #693 | `agsPublishRequests` (lifecycle-aware; 12-blocker predicate; parent-hold inheritance via #701)            | 90 d    |
+| 19  | A2 (#693)  | #693 | `agsApprovalSteps` (lifecycle-aware; parent-publish-request hold inheritance)                            | 90 d    |
+| 20  | A3 (#693)  | #693 | `agsNotePromotions` + 3-table cascade (`agsNotePromotionAuditEvents`, `agsNotePromotionDecisions`, `agsNotePromotionVersions`) | 90 d |
 
 Plus one high-frequency cron:
 - Every 10 min — `agsWorkspaceBackgroundJobs` stale-running sweep (#613)
@@ -121,25 +137,39 @@ The factory's `buildSweepInput` callback can adapt input shapes — used in
   scanKind, proposalKind, agentKey, sourceConnectorKey), confirm-and-sweep
   button, last-manual-run result card.
 
-## Deferred work — approval-lifecycle retention (two explicit follow-up tracks)
+## Deferred work — approval-lifecycle retention (DEFERRAL RESOLVED 2026-05-13)
+
+> **Status update (2026-05-13).** The two-track plan recorded below
+> shipped end-to-end in a 22-PR follow-up arc (PRs #682–#703). The
+> sub-section status badges (`SHIPPED ✓`) below replace the original
+> "deferred" framing; the surrounding rationale is preserved as
+> historical context because future contributors who hit a similar
+> "schema-extension first" shape benefit from seeing how the deferral
+> was framed *before* it shipped. See
+> [§Post-closure addendum](#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13)
+> for the canonical ledger of what shipped where.
 
 Per **user 2026-05-12 policy §§0-9**, the four approval-lifecycle tables
-below remain deferred. The deferral is **resolved by splitting it into
+below were deferred. The deferral was **resolved by splitting it into
 two independent follow-up tracks**, each with its own scope, policy
-shape, and acceptance criteria. Implementation of either track is
-blocked until its respective prerequisites land. **Track 2's exclusion
-is permanent — it does not unblock when Track 1 closes.**
+shape, and acceptance criteria. Implementation of each track was
+blocked until its respective prerequisites landed. **Track 2's
+exclusion from the generic retention factory remained permanent even
+after Track 2 shipped — the archival workflow is a categorically
+distinct compliance shape, not a stack-on-top-of-generic-factory shape.**
 
-### Track 1 — Lifecycle-governance schema extension
+### Track 1 — Lifecycle-governance schema extension — SHIPPED ✓ (PRs #682–#695, #699–#702)
 
 Full spec: [`approval-lifecycle-retention-track-1-lifecycle-governance-schema.md`](./approval-lifecycle-retention-track-1-lifecycle-governance-schema.md).
 
 Three tables, all blocked on a single shared schema-extension sequence.
-Implementation is admissible only after the eleven-step prerequisite
-sequence ships (state vocabulary → `terminalAt` → hold model →
-release/deployment classification → governance/investigation linkage →
-backfill → `isRetentionEligible` derivation service → tests → retention
-service → cron).
+The eleven-step prerequisite sequence shipped in order (state vocabulary
+→ `terminalAt` → hold model → release/deployment classification →
+governance/investigation linkage → backfill → `isRetentionEligible`
+derivation service → tests → retention service → cron → operator
+surfaces). All three retention services are live on the daily-sweep
+ladder at slots 18–20 UTC (90-day default per compliance-significance
+rationale).
 
 | Table                  | Reason                                                                                                            |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -147,11 +177,11 @@ service → cron).
 | `agsApprovalSteps`     | Lifecycle vocabulary missing `skipped` / `expired` / `cancelled` / `superseded`; no parent-lifecycle-aware predicate |
 | `agsNotePromotions`    | Phase 10 approval-bearing lifecycle row (`approvedAt`/`rejectedAt`/`rolledBackAt`); shares the same schema gaps. Added to deferral set 2026-05-13 |
 
-Future allowed procedure names (only after Track 1 closes):
+Procedure names now live (shipped at #694 / #690-#692):
 `prunePublishRequestsRetention`, `pruneApprovalStepsRetention`,
 `pruneNotePromotionsRetention`.
 
-### Track 2 — Compliance archival workflow for `agsReleaseAuditRefs`
+### Track 2 — Compliance archival workflow for `agsReleaseAuditRefs` — SHIPPED ✓ (PRs #696–#698)
 
 Full spec: [`approval-lifecycle-retention-track-2-release-audit-refs-archival.md`](./approval-lifecycle-retention-track-2-release-audit-refs-archival.md).
 
@@ -159,7 +189,9 @@ One table, **permanently excluded from the generic retention factory**.
 This is not a Track-1-style "blocked until schema lands" — it is a
 categorically different policy shape (audit/provenance long-retention,
 indefinite default, 7-year minimum if ever finite, deletion blocked by
-default).
+default). The exclusion remains permanent: Track 2 ships as a separate
+archival workflow (`archiveReleaseAuditRef` + `listReleaseAuditRefs­ArchivalCandidates`)
+with `deleteReleaseAuditRef` always throwing.
 
 | Table                  | Reason                                                                                                            |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -275,8 +307,11 @@ sibling tables.
 As of #679, the remaining unmanaged ASDB tables fall cleanly into three
 buckets:
 
-- **Approval-lifecycle / compliance-tier** — correctly deferred per user
-  policy. Implementation blocked on schema-extension prerequisites.
+- **Approval-lifecycle / compliance-tier** — ~~correctly deferred per user
+  policy. Implementation blocked on schema-extension prerequisites.~~
+  **Resolved 2026-05-13 via PRs #682–#703** (22-PR follow-up arc). Both
+  tracks shipped; the daily-sweep ladder grew from 15 slots to 18 slots.
+  See [§Post-closure addendum](#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13).
 - **Content / CRUD-managed** — agent definitions, catalog tools, KB
   units, vault notes, chat messages, etc. Retention is user-driven via
   application workflows, not a cron concern.
@@ -306,3 +341,191 @@ Future retention work should:
 If a new sub-feature lands that adds a `*runtime_run_id`-referencing
 table, audit and extend the runtime-runs cascade (see
 [Cascade-orphan](#cascade-orphan-recurring-pattern)).
+
+If a new approval-lifecycle table lands (analogous to
+`agsPublishRequests` / `agsApprovalSteps` / `agsNotePromotions`):
+
+1. Confirm the schema has `state` + `terminalAt` + `terminalReason`
+   columns (or add them via a `*-terminal-at` migration).
+2. Wire its mutation sites through `lifecycle-transition.ts` helpers.
+3. Add it to `lifecycle-active-link.ts` if it links to releases /
+   active versions / running deployments.
+4. Add an entry to the 12-blocker eligibility predicate if the row
+   has a domain-specific blocker shape that isn't covered.
+5. Add a `prune<Table>Retention` service + `*-cron.ts` factory
+   instance + `*-retention.test.ts`.
+6. Slot at UTC 21+ (the post-#693 ladder extends past 20:00 UTC).
+7. Update this memo and `project_approval_lifecycle_retention_complete.md`.
+
+---
+
+## Post-closure addendum — approval-lifecycle deferral resolution (2026-05-13)
+
+The two-track deferral recorded above shipped end-to-end in a 22-PR
+follow-up arc on **2026-05-13**, the same day this memo was originally
+closed. Main moved from `33dd1155` (closure commit for #680) to
+`b83de91e` (live-ASDB integration tests at #703).
+
+### Ledger — 22 PRs (#682–#703)
+
+| PR  | Sub-arc | Scope                                                                                                                            |
+| --- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| #682 | A1      | Add `terminalAt` + `terminalReason` columns + indexes on the 3 approval-lifecycle tables                                          |
+| #683 | A2      | Create `agsLifecycleHolds` shared reference table (open-set `holdType`)                                                            |
+| #684 | B1      | State vocabularies + zod schemas + terminal-transition helpers (pure functions, 15 tests)                                          |
+| #685 | B2      | Wire `decideApprovalStep` + `updatePublishRequestState` + promotion adapter approve/rollback through the helpers                   |
+| #686 | C1      | Audit-driven release-state classifier (`isReleaseRetentionBlocker(release)` using `archivedAt` as primary signal)                   |
+| #687 | C2      | Active-link query helpers (publish→release / approval→release-via-parent / note-promotion→active-version), fail-soft to `true`     |
+| #688 | D1      | Operator-applied SQL backfill for pre-existing terminal rows (`scripts/migrations/manual/approval-lifecycle-terminal-at-backfill.sql`) |
+| #689 | E1      | `isRetentionEligible` derivation service — pure derivers + loaders + 25 tests; 12 blocker codes                                   |
+| #690 | F1      | `prunePublishRequestsRetention` service + 4 tests                                                                                  |
+| #691 | F2      | `pruneApprovalStepsRetention` service (batched parent fetch via Map) + 3 tests                                                     |
+| #692 | F3      | `pruneNotePromotionsRetention` service (children-first cascade across 3 tables) + 4 tests                                          |
+| #693 | G1      | 3 daily-sweep crons (18 / 19 / 20 UTC, 90-day default) + boot wire-up                                                              |
+| #694 | G2      | tRPC procedures — publishRouter (publishRequests + approvalSteps prefix-qualified) + promotionRouter (`pruneRetention` simple)      |
+| #695 | G3      | RetrofitPage UI panels for the 3 Track-1 services (preserved/blocker counts surfaced)                                              |
+| #696 | H1      | Track 2 — `release-audit-refs-archival.ts` with 7-year floor + archive preconditions + deletion-always-throws                       |
+| #697 | H2      | Track 2 — tRPC procedures (`listReleaseAuditRefsArchivalCandidates`, `archiveReleaseAuditRef`) on publishRouter                     |
+| #698 | H3      | Track 2 — RetrofitPage archival panel (candidate list + archive action + standing-policy banner)                                   |
+| #699 | J1      | Holds-management write-side service (`setLifecycleHold` / `releaseLifecycleHold` / `listLifecycleHoldsForEntity`) + 12 tests        |
+| #700 | J2      | Holds-management tRPC procedures + RetrofitPage "Lifecycle Holds" panel (entity selector + place + release UI)                     |
+| #701 | K1      | Bugfix: approval-step inherits parent publish-request holds (closes silent audit-trail-deletion vulnerability)                      |
+| #702 | L1      | Operator-investigation surface — `explainRetentionEligibility` adminProcedure + inline EligibilityExplainer UI                      |
+| #703 | M1      | Live-ASDB integration tests (20 cases) at `tests/integration/agent-studio/approval-lifecycle-retention.integration.test.ts`        |
+
+### Architectural pieces shipped
+
+- **Schema** (#682, #683, #696): 6 new columns on 3 Track-1 tables
+  (`terminalAt` + `terminalReason` × 3), 4 new columns on
+  `agsReleaseAuditRefs` (`archivedAt` + `archivedBy` + `archiveReason` +
+  `complianceApprovalRef`), `agsLifecycleHolds` reference table, 5
+  new indexes.
+- **Service layer** (#684–#692, #696, #699):
+  `server/agent-studio/services/retention/lifecycle-*.ts` (state vocab,
+  transition helpers, active-link helpers, holds query, eligibility
+  derivation, holds management), 3 prune services
+  (`publish-requests-retention.ts`, `approval-steps-retention.ts`,
+  `note-promotions-retention.ts`), and `release-audit-refs-archival.ts`
+  (Track 2; permanent factory exclusion).
+- **Wire-up** (#685, #693, #694, #695, #697, #698, #700):
+  `repository.ts` mutation routing, `services/promotion/adapter-asdb.ts`,
+  `boot.ts` (3 new `ensure*Started` calls at steps 3.21–3.23),
+  `api/router.ts` (publishRouter adminProcedures), promotionRouter,
+  `RetrofitPage.tsx` (5 new tabs/panels).
+
+### The 12-blocker retention predicate
+
+Every approval-lifecycle prune service evaluates these in order:
+
+1. `NON_TERMINAL_STATE` — state not in terminal set
+2. `NO_TERMINAL_TIMESTAMP` — `terminalAt` is null (backfill not applied)
+3. `MINIMUM_RETENTION_WINDOW_NOT_ELAPSED` — `now < terminalAt + window`
+4. `ACTIVE_RELEASE_LINK` — linked release where `archivedAt IS NULL`
+5. `ACTIVE_DEPLOYMENT` — reserved alias of `ACTIVE_RELEASE_LINK`
+   (while deployment is fused into the release row)
+6. `ACTIVE_PROMOTION_VERSION` — note-promotion specific; any version
+   has `active=true`
+7. `PENDING_APPROVAL_CHAIN` — approval-step specific; parent
+   publish-request non-terminal
+8. `LEGAL_HOLD`
+9. `AUDIT_HOLD`
+10. `GOVERNANCE_HOLD`
+11. `OPEN_GOVERNANCE_REVIEW`
+12. `UNRESOLVED_AUDIT_INVESTIGATION`
+
+Unknown hold types surface as `GOVERNANCE_HOLD` (fail-closed). The
+predicate strengthened, never weakened — per user §0 standing principle.
+
+### Track 2 — `agsReleaseAuditRefs` archival policy
+
+Permanent generic-factory exclusion preserved. Three functions + tRPC
++ UI:
+
+- `listReleaseAuditRefsArchivalCandidates({ minRetentionMs, limit? })`
+  — 7-year floor via `RELEASE_AUDIT_REFS_MIN_RETENTION_MS` constant;
+  below-floor calls throw.
+- `archiveReleaseAuditRef({ id, complianceApprovalRef, archivedBy, reason })`
+  — `complianceApprovalRef` + `reason` both required service-layer; no
+  anonymous archives.
+- `deleteReleaseAuditRef(...)` — **always throws.** Operators use the
+  compliance team's external workflow.
+
+No cron. No tRPC deletion entry-point (intentional).
+
+### Daily-sweep ladder — final extended state
+
+15 slots → **18 slots**, 03:00–20:00 UTC. Approval-lifecycle slots
+(18 / 19 / 20 UTC) carry a 90-day default vs the operational 30-day
+default because approval-lifecycle records cover two quarterly audit
+cycles before sweeping.
+
+### Test coverage delta — 97 new tests
+
+- 76 unit tests across `lifecycle-*` helpers + 3 prune services +
+  Track 2 archival + holds management.
+- 20 live-ASDB integration tests in `tests/integration/agent-studio/approval-lifecycle-retention.integration.test.ts`
+  (`pnpm run test:integration:staging`).
+- 1 explainRetentionEligibility unit test (#702).
+
+### Five carry-forward lessons from the addendum arc
+
+These supplement the 15 carry-forward lessons recorded in the original
+SOU body — they are specific to the addendum's lifecycle-aware shape
+and should be applied to future approval-lifecycle table additions
+(see [§Re-opening the arc](#re-opening-the-arc) for the procedural
+hook).
+
+1. **Lifecycle-aware retention has higher per-row cost but materially
+   different semantics.** A candidate query reduces volume to "rows
+   that have at least cleared the age threshold"; per-row eligibility
+   re-validation against the 12 blocker codes is the predicate's
+   actual work. Fine for low-volume tables (approval-lifecycle); for
+   high-volume tables (runtime traces), the age-only pattern remains
+   appropriate.
+
+2. **Returning `preservedCount` + `blockerCounts` is operator gold.**
+   When a sweep deletes 4 rows but preserves 12, operators need to see
+   *why*. The 12 blocker codes feed directly into the UI's
+   "blockers: legal_hold=4, active_release_link=8" line. Future
+   retention services with compliance dimensions should follow this
+   pattern.
+
+3. **State-machine helpers belong at the service layer, not as DB
+   CHECK constraints.** The 3 tables had varchar state columns with
+   pre-existing values from before the vocabulary extension. CHECK
+   constraints would have required a backfill migration first.
+   Service-layer enforcement (zod at the API boundary + helpers at
+   mutation sites) was the right call.
+
+4. **`MAX(own.terminalAt, parent.terminalAt)` for child-table
+   eligibility is non-obvious but correct.** An approval-step cannot
+   outlive its parent publish-request's lifecycle from a retention
+   standpoint. The deriver's `latestTerminalAt` computation captures
+   this; future child-table retention services should adopt the same.
+
+5. **Permanent-exclusion tables benefit from explicit "always throw"
+   markers.** `deleteReleaseAuditRef` exists as a function that always
+   throws with a message naming the compliance team's external
+   workflow. A future contributor who searches for "delete this row"
+   finds the marker + the policy rationale, instead of looking for a
+   missing function and implementing one ad hoc.
+
+### Cross-references
+
+- Approval-lifecycle complete memory: `~/.claude/projects/-root/memory/project_approval_lifecycle_retention_complete.md`
+- Track 1 spec: [`approval-lifecycle-retention-track-1-lifecycle-governance-schema.md`](./approval-lifecycle-retention-track-1-lifecycle-governance-schema.md)
+- Track 2 spec: [`approval-lifecycle-retention-track-2-release-audit-refs-archival.md`](./approval-lifecycle-retention-track-2-release-audit-refs-archival.md)
+- Live-ASDB integration test: `tests/integration/agent-studio/approval-lifecycle-retention.integration.test.ts`
+  (run via `pnpm run test:integration:staging`)
+
+### Deferred operator-validation step
+
+Local Postgres seed pass against the live-ASDB integration suite was
+attempted in the prior session and **deferred** as a non-blocking
+operator action — the on-device Postgres cluster used a non-default
+role identifier (`u0_a296`) and the seed script aborted with a
+non-fatal SIGKILL. The integration test code is shipped at #703 and
+runs against any properly-provisioned ASDB role; the on-device seed
+shortcut is operator-environment-specific. Cross-references:
+`~/.claude/projects/-root/memory/reference_termux_dev_env_recovery.md`,
+`~/.claude/projects/-root/memory/feedback_dev_env_respects_port_registry.md`.
