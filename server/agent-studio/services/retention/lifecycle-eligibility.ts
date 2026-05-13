@@ -273,13 +273,23 @@ export async function loadApprovalStepEligibility(
   options: EligibilityLoaderOptions,
 ): Promise<RetentionEligibilityResult> {
   const now = options.now ?? new Date();
-  const [parentHasActiveReleaseLink, activeHolds] = await Promise.all([
+  // Approval-steps inherit holds from their parent publish-request. A legal
+  // hold placed on a publish-request must protect its approval-steps too —
+  // otherwise the audit trail (which step approved/rejected) could be swept
+  // while the parent decision row is still held. Concat own-holds + parent-
+  // holds and let the deriver classify them all.
+  const [parentHasActiveReleaseLink, ownHolds, parentHolds] = await Promise.all([
     isPublishRequestLinkedToActiveRelease({ publishRequestId: row.publishRequestId }, options),
     listActiveHolds(
       { entityType: "ags_approval_steps", entityId: row.id },
       { ...options, now },
     ),
+    listActiveHolds(
+      { entityType: "ags_publish_requests", entityId: row.publishRequestId },
+      { ...options, now },
+    ),
   ]);
+  const activeHolds = [...ownHolds, ...parentHolds];
   return deriveApprovalStepEligibility({
     state: row.state,
     terminalAt: row.terminalAt,
