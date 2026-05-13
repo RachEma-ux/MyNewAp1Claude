@@ -27,6 +27,10 @@ import {
   renderTemplate,
 } from "./templates.js";
 import {
+  computeTemplateDigest,
+  recordTemplateInstantiation,
+} from "./template-instantiations.js";
+import {
   exportNoteAsMarkdown,
   parseMarkdownBlob,
 } from "./markdown-import-export.js";
@@ -615,6 +619,20 @@ export const vaultRouter = router({
         },
         userId,
       );
+      // Phase 15-α — record the instantiation in the ledger so
+      // future refactors can find every note created from this
+      // template version. ASDB-unavailable paths no-op.
+      await recordTemplateInstantiation({
+        templateId: input.templateId,
+        noteId: note.id,
+        noteVersionId: note.versionId,
+        templateVersionDigest: computeTemplateDigest(template.contentMd),
+        instantiatedByUserId: userId,
+        context: {
+          variables: input.variables ?? null,
+          frontmatterOverrides: input.frontmatterOverrides ?? null,
+        },
+      });
       return {
         noteId: note.id,
         versionId: note.versionId,
