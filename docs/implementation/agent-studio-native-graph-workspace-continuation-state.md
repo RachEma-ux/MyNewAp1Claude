@@ -59,9 +59,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 |---|---|---|---|
 | #758 PR-V1-7 | J-1-β (V1.0) | Health-alert cron + tRPC status (`*/5 * * * *`; boot Step 3.25) | `660303f6` |
 | #759 PR-V1-8 | 19-β (V1.0) | Shared HTTP pusher factory + 3 default pusher registrations (staging_env / remote_vault / external_kb); boot Step 3.26 | `525c5f8b` |
-| #760 PR-V1-9 | 15-β (V1.5) | Attachment library service: browseAttachmentLibrary + findUnusedAttachments + computeAttachmentQuota + closed mime-class taxonomy (6 values) | pending |
+| #760 PR-V1-9 | 15-β (V1.5) | Attachment library service: browseAttachmentLibrary + findUnusedAttachments + computeAttachmentQuota + closed mime-class taxonomy (6 values) | `ad7f9829` |
+| #761 PR-V1-10 | 17-β (V1.5) | Canvas → Note projection edge: buildCanvasReferenceProjection (Canvas + CanvasNode + CONTAINS_CANVAS_NODE + CANVAS_REFERENCES_NOTE bundled) + sync-worker event kinds `canvas.note_reference_changed` / `_removed` | pending |
 
-**Next material work:** Continue Phase β/γ slices. V1.5 remaining: Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
+**Next material work:** Continue Phase β/γ slices. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
 
 The historical (pre-strict-audit) recovery context follows.
 

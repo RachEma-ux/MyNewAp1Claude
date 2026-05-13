@@ -15,6 +15,10 @@ import type {
   ProjectionWrite,
   ProvenanceFields,
 } from "../repository/index.js";
+import {
+  buildCanvasReferenceProjection,
+  buildCanvasReferenceRemoval,
+} from "../../canvas/projection.js";
 
 export type ProjectionEvent =
   | { kind: "note.created"; payload: { noteId: number; vaultId: number; slug: string; title: string; versionId: number } }
@@ -33,7 +37,13 @@ export type ProjectionEvent =
   | { kind: "tool_schema.changed"; payload: { toolId: string; version: string } }
   | { kind: "graph_correction.approved"; payload: { proposalId: number } }
   | { kind: "semantic_enrichment.approved"; payload: { proposalId: number } }
-  | { kind: "kgra.build_completed"; payload: { buildId: string } };
+  | { kind: "kgra.build_completed"; payload: { buildId: string } }
+  // V1+ Phase 17-β (2026-05-13): canvas → note projection edge.
+  // PR-V1-5 (#752) shipped canvas data model + listNoteReferencesForCanvas
+  // (source-side); this event drives the projection side via
+  // buildCanvasReferenceProjection().
+  | { kind: "canvas.note_reference_changed"; payload: { canvasId: number; canvasNodeId: number; referencedNoteId: number } }
+  | { kind: "canvas.note_reference_removed"; payload: { canvasNodeId: number } };
 
 export interface ProjectionJobResult {
   readonly eventKind: ProjectionEvent["kind"];
@@ -132,6 +142,18 @@ export class ProjectionSyncWorker {
             provenance: provenance("runtime_run", String(runtimeRunId), "derived"),
           },
         }];
+      }
+      case "canvas.note_reference_changed": {
+        const { canvasId, canvasNodeId, referencedNoteId } = event.payload;
+        return buildCanvasReferenceProjection({
+          canvasId,
+          canvasNodeId,
+          referencedNoteId,
+        });
+      }
+      case "canvas.note_reference_removed": {
+        const { canvasNodeId } = event.payload;
+        return buildCanvasReferenceRemoval({ canvasNodeId });
       }
       case "promotion.approved": {
         const { noteId, noteVersionId, targetAssetId, promotionKind } = event.payload;

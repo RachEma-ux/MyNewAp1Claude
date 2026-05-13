@@ -125,7 +125,8 @@ PRs per each phase's "out of scope for the α slice" section.
 |---|---|---|
 | J-1-β  (V1.0 health-alert cron + tRPC status) | #758 | `660303f6` |
 | 19-β   (V1.0 publish-target default pushers) | #759 | `525c5f8b` |
-| 15-β   (V1.5 attachment library service) | #760 | pending |
+| 15-β   (V1.5 attachment library service) | #760 | `ad7f9829` |
+| 17-β   (V1.5 CANVAS_REFERENCES_NOTE projection edge) | #761 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
