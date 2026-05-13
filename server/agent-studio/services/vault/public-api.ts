@@ -105,6 +105,19 @@ export type {
   RealtimeDocBackendFactory,
 } from "./realtime-doc.js";
 
+// V2 Phase CRDT-γ (2026-05-13): Yjs adapter (DI-friendly; tests run
+// without the yjs install — production passes `Y` from `import * as
+// Y from "yjs"`).
+export {
+  YjsRealtimeDocBackend,
+  createYjsRealtimeDocBackend,
+} from "./realtime-doc-backend-yjs.js";
+export type {
+  YText,
+  YDoc,
+  YjsNamespace,
+} from "./realtime-doc-backend-yjs.js";
+
 // Phase 15-β attachment library surfaces (V1+, 2026-05-13).
 export {
   ATTACHMENT_MIME_CLASSES,
