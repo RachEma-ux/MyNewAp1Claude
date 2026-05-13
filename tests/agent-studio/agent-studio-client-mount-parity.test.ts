@@ -94,10 +94,16 @@ function collectClientReferences(): Map<string, string[]> {
 
 function collectMountedSubrouters(): Set<string> {
   const src = readFileSync(ROUTER_PATH, "utf8");
-  // The agentStudioRouter is the last `router({...})` block in the
-  // file. Find it via brace-balanced walk and scan only its body.
-  const composeStart = src.lastIndexOf("router({");
-  expect(composeStart).toBeGreaterThanOrEqual(0);
+  // Find the agentStudioRouter declaration explicitly — using "the last
+  // `router({...})` block" is fragile when the composition contains
+  // inline `<key>: router({...})` nested routers (their `router({` can
+  // appear later in the file than the outer `agentStudioRouter = router({`).
+  // Audit at PR #712 found this exact shape elsewhere in the repo (prm
+  // has an inline `catalogImports: router({...})`).
+  const declRe = /export\s+const\s+agentStudioRouter\s*=\s*router\s*\(\s*\{/;
+  const declMatch = declRe.exec(src);
+  expect(declMatch, "agentStudioRouter declaration not found").not.toBeNull();
+  const composeStart = declMatch!.index;
   const openBraceIdx = src.indexOf("{", composeStart);
   let depth = 0;
   let composeEnd = -1;
@@ -113,14 +119,41 @@ function collectMountedSubrouters(): Set<string> {
     }
   }
   expect(composeEnd).toBeGreaterThan(composeStart);
-  const composeBody = src.slice(composeStart, composeEnd + 1);
+  const composeBody = src.slice(openBraceIdx, composeEnd + 1);
   const out = new Set<string>();
-  // Capture `<key>: <Identifier>Router` lines inside the composition.
-  // Matches "  foo: fooRouter," and "  foo: fooRouter\n".
-  const mountRe = /^\s*([a-zA-Z][a-zA-Z0-9]*)\s*:\s*[a-zA-Z][a-zA-Z0-9]*Router\b/gm;
-  let m: RegExpExecArray | null;
-  while ((m = mountRe.exec(composeBody)) !== null) {
-    out.add(m[1]);
+
+  // The client AppRouter type reflects ANY key declared at the top
+  // level of the composition body, regardless of value type. Three
+  // shapes are legitimate:
+  //
+  //   1. Sub-router mount:    `<key>: <X>Router`           (most common)
+  //   2. Inline router:       `<key>: router({...})`       (catalogImports-style)
+  //   3. Direct procedure:    `<key>: protectedProcedure`  (root-level surface)
+  //
+  // All three should be accepted, otherwise a future contributor who
+  // legitimately adds a direct procedure on agentStudioRouter trips
+  // a false-positive failure.
+  //
+  // We collect via depth-aware top-level-key scanning so that keys
+  // declared INSIDE a nested inline router (e.g. catalogImports'
+  // children) are NOT pulled up as parity targets.
+  const lines = composeBody.split("\n");
+  let depth2 = 0;
+  for (const line of lines) {
+    // Only top-level lines (depth === 1, i.e. inside the outer
+    // composition braces but not inside a nested block) are mounts on
+    // agentStudioRouter itself.
+    const trimmed = line.trim();
+    if (depth2 === 1) {
+      const m = trimmed.match(
+        /^([a-zA-Z][a-zA-Z0-9]*)\s*:\s*(?:[a-zA-Z][a-zA-Z0-9]*Router\b|router\s*\(|(?:public|protected|admin|governed)Procedure\b)/,
+      );
+      if (m) out.add(m[1]);
+    }
+    for (const ch of line) {
+      if (ch === "{") depth2++;
+      else if (ch === "}") depth2--;
+    }
   }
   return out;
 }
