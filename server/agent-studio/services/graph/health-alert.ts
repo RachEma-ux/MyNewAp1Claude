@@ -108,6 +108,11 @@ export interface EvaluateHealthInput {
   readonly health: BackendHealth;
   readonly thresholds?: HealthThresholds;
   readonly scope?: string;
+  /** Backend identifier — lives on the repository, not on
+   * BackendHealth. Threaded through here as metadata so the operator
+   * dashboard can render "which backend raised this". Optional so
+   * the pure evaluator stays callable without a live repo. */
+  readonly backendKey?: string;
 }
 
 /**
@@ -119,8 +124,11 @@ export function evaluateHealth({
   health,
   thresholds = DEFAULT_HEALTH_THRESHOLDS,
   scope = "default",
+  backendKey,
 }: EvaluateHealthInput): AlertDecision[] {
   const decisions: AlertDecision[] = [];
+  const detailsBase: Record<string, unknown> = {};
+  if (typeof backendKey === "string") detailsBase.backend = backendKey;
 
   if (health.status === "unavailable") {
     decisions.push({
@@ -132,7 +140,7 @@ export function evaluateHealth({
         errors: health.errors ?? [],
       },
       threshold: { expectedStatus: "healthy" },
-      details: { backend: health.capabilities.backendKey },
+      details: { ...detailsBase },
     });
     // When unavailable, latency is irrelevant — skip the latency
     // evaluation below. The runbook says: address availability
@@ -150,7 +158,7 @@ export function evaluateHealth({
         errors: health.errors ?? [],
       },
       threshold: { expectedStatus: "healthy" },
-      details: { backend: health.capabilities.backendKey },
+      details: { ...detailsBase },
     });
   }
 
@@ -168,7 +176,7 @@ export function evaluateHealth({
           latencyWarnMs: thresholds.latencyWarnMs,
           latencyCriticalMs: thresholds.latencyCriticalMs,
         },
-        details: { backend: health.capabilities.backendKey },
+        details: { ...detailsBase },
       });
     } else if (health.latencyMs >= thresholds.latencyWarnMs) {
       decisions.push({
@@ -180,7 +188,7 @@ export function evaluateHealth({
           latencyWarnMs: thresholds.latencyWarnMs,
           latencyCriticalMs: thresholds.latencyCriticalMs,
         },
-        details: { backend: health.capabilities.backendKey },
+        details: { ...detailsBase },
       });
     }
   }
@@ -300,7 +308,12 @@ export async function runHealthAlertScan(
   const persist = input.persist ?? persistHealthAlertDecisions;
 
   const health = await repository.health();
-  const decisions = evaluateHealth({ health, thresholds, scope });
+  const decisions = evaluateHealth({
+    health,
+    thresholds,
+    scope,
+    backendKey: repository.backendKey,
+  });
   const persisted = await persist(decisions, scope);
 
   return {
