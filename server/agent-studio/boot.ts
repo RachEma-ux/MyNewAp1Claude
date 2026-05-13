@@ -404,6 +404,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.17: Phase 22 follow-up #666 — graph-quality-agent-runs retention cron.
+  // The ags_graph_quality_agent_runs table had no retention before
+  // #665 + #666. Default daily 14:00 UTC sweep — 12th slot in the
+  // daily-sweep ladder. Single-table (no FK children — graph-correction
+  // proposals own their own retention via #661-#664). Env-flag-gated
+  // via AGS_GRAPH_QUALITY_AGENT_RUNS_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureGraphQualityAgentRunsRetentionCronStarted } = await import(
+      "./services/graph-quality-agent-runs-retention-cron"
+    );
+    ensureGraphQualityAgentRunsRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-quality-agent-runs-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
