@@ -11,7 +11,7 @@
 
 The earlier closure-mission addendum framed all 21 items as "Implemented / Workflow-backed / Successor-plan-ready / Repo-tracked". The strict-audit pass (PRs #732–#737) re-classified each item under a binary scheme: **FULLY IMPLEMENTED / PARTIALLY IMPLEMENTED / NOT IMPLEMENTED**. The authoritative ledger is now `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`.
 
-**Honest counts:** 10 FULLY IMPLEMENTED · 4 PARTIALLY IMPLEMENTED · 7 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
+**Honest counts:** 11 FULLY IMPLEMENTED · 3 PARTIALLY IMPLEMENTED · 7 NOT IMPLEMENTED (of which 5 are intentional CLAUDE.md MVP deferrals).
 
 **Phase 13.5 trio on main (audit item 4 — FULLY IMPLEMENTED):**
 - PR #731 — contract + closed-union types + boundary tests
@@ -25,15 +25,15 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-1. Projection drift cron (item 9 partial)
-2. Retention panel extractions 3-17 (item 14 partial)
-3. Layer 4 e2e harness (item 7)
+1. Retention panel extractions 3-17 (item 14 partial)
+2. Layer 4 e2e harness (item 7)
 
 **Just closed (2026-05-13):**
 - PR-AT-1 — Golden Questions live adapter (audit item 2). Live evaluator + engine factory + CLI `--mode=live` + workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` inputs. Merged at `08cccdf9`.
-- PR-AT-2 — Memgraph Bolt query path (audit item 6). `bolt-driver-port.ts` + lazy `default-bolt-driver-factory.ts` (dynamic-imports `neo4j-driver`) + real `health/localGraph/neighborhood/shortestPath/executeTemplate` in `MemgraphGraphRepository`. `neo4j-driver` declared in `package.json`. Workflow runs a live Bolt health round-trip.
+- PR-AT-2 — Memgraph Bolt query path (audit item 6). `bolt-driver-port.ts` + lazy `default-bolt-driver-factory.ts` (dynamic-imports `neo4j-driver`) + real `health/localGraph/neighborhood/shortestPath/executeTemplate` in `MemgraphGraphRepository`. Merged at `503ae0c8`.
+- PR-AT-3 — Projection drift cron (audit item 9). New `services/graph/projection/drift-cron.ts` wires `DriftDetector` to `makeRetentionCron`; ladder slot #19 (04:30 UTC); `agentStudio.graphProjection.getDriftCronStatus` tRPC surface; boot.ts step 3.24.
 
-**Next material work:** projection drift cron (item 9 partial). Today drift detection runs on-demand via tRPC only; the cron slot is the 19th ladder addition.
+**Next material work:** retention panel extractions batch 3 (item 14 partial). 15 of 17 panels remain inline in `RetrofitPage.tsx`. Each batch typically extracts 2-3 panels + tests + EXTRACTED_PANEL_PATHS update — trivially mergeable.
 
 The historical (pre-strict-audit) recovery context follows.
 

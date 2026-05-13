@@ -35,7 +35,7 @@ audit closure mission.
 | 6 | Phase 1.5 G3 fallback — Memgraph adapter | "readiness artifact, exit 78" | **FULLY IMPLEMENTED** (PR-AT-2, 2026-05-13) | None for the read-only Bolt slice. Projection writes intentionally remain no-op because Postgres is source-of-truth and projection orchestration is a separate path; full GDS / MAGE algorithm wiring is out-of-MVP scope. | — | — | 26 tests green (15 behavioral with stub driver + 6 integrity + 5 boundary); `neo4j-driver` declared in package.json; workflow runs a real Bolt health round-trip |
 | 7 | Track J — Layer 4 e2e smoke harness | "ADR completed; first slice" | **NOT IMPLEMENTED** | ADR + scaffold exist; no real Playwright/Cypress e2e suite committed; CI does not run Layer 4 on PRs. | Playwright config + spec PRs | "Layer 4 e2e — Playwright suite v0" (V1.0 plan) | Layer 4 absent from CI matrix |
 | 8 | V1 / V1.5 / V2 successor plan | "successor-plan-ready" | **NOT IMPLEMENTED** (as runtime; the *plan document* exists) | The document is a plan, not code. Ten phases × ~5 PRs each are unstarted. | All listed in plan | Plan PR #1 per chosen phase | n/a (plan-only) |
-| 9 | Phase 14 — Neo4j projection for `agsRuntimeRuns` | "implemented in repo" | **PARTIALLY IMPLEMENTED** | Projection tables + projection writer exist; full bidirectional reconciliation + drift-detect cron is **NOT** running on a schedule. Drift detection is on-demand only via tRPC. | Cron slot + scheduler entry | "Phase 14 — projection drift cron" | Projection unit tests green; cron: absent |
+| 9 | Phase 14 — Neo4j projection for `agsRuntimeRuns` | "implemented in repo" | **FULLY IMPLEMENTED** (PR-AT-3, 2026-05-13) | None for the drift-cron slice. Bidirectional reconciliation worker (the active resolver that auto-fixes detected drifts) remains V1.5 — drift detection persists events for operator review; the cron does NOT auto-resolve. | — | — | 19 tests green (11 cron + 8 mount integrity); ladder slot #19 wired |
 | 10 | CRDT / real-time collaboration | "deferred ADR-only" | **NOT IMPLEMENTED** | ADR locks the deferral. No code. Out of scope for MVP 0-4 per CLAUDE.md. | n/a (intentional) | n/a | n/a |
 | 11 | Offline-first / local-first mode | "deferred ADR-only" | **NOT IMPLEMENTED** | ADR locks the deferral. No code. Out of scope for MVP 0-4. | n/a | n/a | n/a |
 | 12 | Neo4j Enterprise / Aura migration | "deferred; upgrade path documented" | **NOT IMPLEMENTED** | Phase 27 doc only. No code. Out of scope for MVP 0-4. | License + ops decision | n/a (V2 scope) | n/a |
@@ -51,8 +51,8 @@ audit closure mission.
 
 ### 1.1 Summary counts
 
-- **FULLY IMPLEMENTED:** 10 items (2, 3, 4, 5, 6, 13, 17, 18, 19, 20)
-- **PARTIALLY IMPLEMENTED:** 4 items (1, 9, 14, 21 — see below)
+- **FULLY IMPLEMENTED:** 11 items (2, 3, 4, 5, 6, 9, 13, 17, 18, 19, 20)
+- **PARTIALLY IMPLEMENTED:** 3 items (1, 14, 21 — see below)
 - **NOT IMPLEMENTED:** 7 items (7, 8, 10, 11, 12, 15, 16)
 
 Item 21 was reclassified from PARTIALLY → FULLY after the tracker was
@@ -97,14 +97,15 @@ intentional, not gaps):
 
 1. **Layer 4 e2e harness** (item 7). No Playwright/Cypress suite runs
    on PRs. The pyramid stops at the Layer 3 integration tests for now.
-2. **Projection drift cron** (item 9 — the partial slice). Drift detect
-   is on-demand only.
-3. **15 of 17 retention panels still inline** (item 14 — the partial
+2. **15 of 17 retention panels still inline** (item 14 — the partial
    slice). Functional but not extracted/testable as standalone
    components.
 
-Item 2 (Golden Questions live adapter) closed by PR-AT-1 on 2026-05-13.
-Item 6 (Memgraph Bolt query path) closed by PR-AT-2 on 2026-05-13.
+Items closed in this audit cycle:
+- Item 2 (Golden Questions live adapter) — PR-AT-1.
+- Item 6 (Memgraph Bolt query path) — PR-AT-2.
+- Item 9 (Projection drift cron) — PR-AT-3.
+
 Every other item is either FULLY IMPLEMENTED, intentionally out of
 MVP scope (10-12, 15-16), or operator-action (1 — G3 benchmark
 execution; 2 — workflow trigger + evidence commit; 6 — fallback
@@ -185,14 +186,14 @@ populated directories is what *makes* item 1 FULLY IMPLEMENTED.
 ## 7. Next required PRs (in priority order)
 
 1. **Retention panel extractions batch 3** — 3-5 more panels per PR (closes item 14 partial).
-2. **Projection drift cron** — closes item 9 partial.
-3. **Layer 4 Playwright v0** — closes item 7.
+2. **Layer 4 Playwright v0** — closes item 7.
 
 Closed this audit cycle: Phase 13.5 (item 4, `a8f5c634`); Golden
 Questions live adapter (item 2, PR-AT-1); Memgraph Bolt query path
-(item 6, PR-AT-2). The remaining open items at the top of the list
-are extractions/cron-additions/e2e-harness — none are blocked by the
-items the closed ones unblocked.
+(item 6, PR-AT-2); Projection drift cron (item 9, PR-AT-3). The
+remaining open items at the top of the list are
+extractions/e2e-harness — none are blocked by the items the closed
+ones unblocked.
 
 ---
 
@@ -209,7 +210,8 @@ PRs from the strict-audit mission:
 | #736 (PR-Y5) | `b7ef35a7` | Strict-audit doc; local seed script; tracker rewrite to honest classifications |
 | #737 (Phase 13.5 PR #3) | `a8f5c634` | `createModelDrivenPlanner()` + 20 tests + ADR addendum — closes the LLM-emitted-plan slice of item 4 |
 | PR-AT-1 (Golden Questions live adapter) | `08cccdf9` | `live-evaluator.ts` + `live-engine-factory.ts` + scorer/orchestrator/report-formatter; CLI `--mode=live` branch; workflow_dispatch `mode` input + four `GOLDEN_Q_LIVE_*` env-var inputs; runbook §4.3 / §6 refresh; 37 new tests (17 evaluator + 20 factory) — closes item 2 |
-| PR-AT-2 (Memgraph Bolt query path) | this PR | `bolt-driver-port.ts` + `default-bolt-driver-factory.ts` (lazy-loaded `neo4j-driver`); rewrote `memgraph-graph-repository.ts` with real Bolt round-trips for `health()` / `localGraph()` / `neighborhood()` / `shortestPath()` / `executeTemplate()`; `neo4j-driver` declared in `package.json`; workflow runs a live Bolt health check; 15 new behavioral tests + integrity refresh — closes item 6 |
+| PR-AT-2 (Memgraph Bolt query path) | `503ae0c8` | `bolt-driver-port.ts` + `default-bolt-driver-factory.ts` (lazy-loaded `neo4j-driver`); rewrote `memgraph-graph-repository.ts` with real Bolt round-trips for `health()` / `localGraph()` / `neighborhood()` / `shortestPath()` / `executeTemplate()`; `neo4j-driver` declared in `package.json`; workflow runs a live Bolt health check; 15 new behavioral tests + integrity refresh — closes item 6 |
+| PR-AT-3 (Projection drift cron) | this PR | `services/graph/projection/drift-cron.ts` wires `DriftDetector` to the shared `makeRetentionCron` factory (slot #19 in the daily-sweep ladder, default 04:30 UTC); persists drift events to `ags_graph_projection_drift_events`; new `services/graph/projection/router.ts` exposes `agentStudio.graphProjection.getDriftCronStatus`; boot.ts step 3.24 calls `ensureProjectionDriftCronStarted()`; 19 tests — closes item 9 |
 
 The audit dropped 13 items from prior "addressed/closure-narrative"
 status to **NOT IMPLEMENTED** or **PARTIALLY IMPLEMENTED**. The
