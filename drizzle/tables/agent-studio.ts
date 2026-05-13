@@ -574,10 +574,17 @@ export const agsPublishRequests = pgTable(
     preflight: jsonb("preflight").$type<Record<string, unknown>>().default({}),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     decidedAt: timestamp("decided_at"),
+    // Approval-lifecycle retention Track 1 (PR-A1): canonical terminal-transition
+    // timestamp. Set exactly once when the row reaches a terminal state.
+    // Retention age MUST be computed from this column, never from createdAt
+    // or decidedAt. Null on non-terminal rows.
+    terminalAt: timestamp("terminal_at"),
+    terminalReason: text("terminal_reason"),
   },
   (t) => ({
     agentIdx: index("idx_ags_publish_agent").on(t.agentId),
     stateIdx: index("idx_ags_publish_state").on(t.state),
+    terminalAtIdx: index("idx_ags_publish_terminal_at").on(t.terminalAt),
   })
 );
 
@@ -593,9 +600,14 @@ export const agsApprovalSteps = pgTable(
     decisionNote: text("decision_note"),
     decidedAt: timestamp("decided_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // Approval-lifecycle retention Track 1 (PR-A1): canonical terminal-transition
+    // timestamp. See agsPublishRequests.terminalAt for semantics.
+    terminalAt: timestamp("terminal_at"),
+    terminalReason: text("terminal_reason"),
   },
   (t) => ({
     requestIdx: index("idx_ags_approvals_request").on(t.publishRequestId),
+    terminalAtIdx: index("idx_ags_approvals_terminal_at").on(t.terminalAt),
   })
 );
 
