@@ -339,17 +339,27 @@ Layer 4 — e2e browser tests — also lands in V1.0 (covered separately in PR-C
 
 ---
 
-## 6. First V1.0 PRs (ready to start)
+## 6. First-slice PR ledger (2026-05-13)
 
-| PR | Phase | Scope |
-|---|---|---|
-| 1 | Phase J-1 | Operator runbook for CE → Aura migration |
-| 2 | Phase 13.5 | Planner contract + ADR + boundary tests (no engine wiring yet) |
-| 3 | Phase 19-α | `agsPublishTargets` table + binding shape + boundary test |
-| 4 | Phase CRDT | ADR stub + presence service skeleton |
-| 5 | Phase OL-1 | ADR stub + offline cache type contract |
+| PR | Phase | Scope | Merge SHA |
+|---|---|---|---|
+| #748 (PR-V1-1) | Phase J-1 | Graph health-alert evaluator + scanner + `ags_runtime_alerts` table; threshold-breach taxonomy for the Neo4j CE → Aura migration trigger conditions | `23e47643` |
+| #749 (PR-V1-2) | Phase 19-α | `ags_publish_targets` + `ags_publish_target_executions` ledger + `services/publish-targets/` (Plan v3 D2-clean — pusher owns credential acquisition) | `892519b0` |
+| #750 (PR-V1-3) | Phase 15-α | `ags_vault_template_instantiations` ledger + `services/vault/template-instantiations.ts` (sha256 digest + record/list helpers) + router wiring | `71c6889d` |
+| #751 (PR-V1-4) | Phase 16-α | Saved views: `visibility` + `version` + `parentSavedViewId` columns + `saved-views-visibility.ts` (per-viewer materialization filter; load-bearing #4 acceptance) | `a6959a6d` |
+| #752 (PR-V1-5) | Phase 17-α | Canvas data model (3 tables) + `services/canvas/` (CRUD + snapshot loader + note-reference projection helper) | `9fc503de` |
+| #753 (PR-V1-6) | Phase 18-α | Extension framework: `ags_extensions` + `ags_extension_invocations` + `evaluateCapability` (pure) + `invokeFromExtension()` (only path to MCP dispatcher) | `9f019393` |
+| #754 (PR-V2-1) | Phase MR-1 | `ags_regions` + `services/region/` (pure router with cross-region deny) + multi-region failover runbook | `1bf8e509` |
+| #755 (PR-V2-2) | Phase CRDT-α | `ags_vault_note_presence` (5-min idle TTL) + `services/vault/presence.ts` (enter / heartbeat / leave / list with eager eviction) | `0b36c820` |
+| #756 (PR-V2-3) | Phase OL-1 | `client/src/modules/agent-studio/services/offline-cache.ts` — `OfflineQueue` + load-bearing deny-list for graph + agent + provider operations | `3e6bae92` |
 
-All five can run in parallel; none gate the others. The Builder agent should pick whichever it has freshest context for.
+All 9 first-slice PRs landed on main on 2026-05-13. Each carries:
+- Closed-taxonomy type unions where applicable
+- Source-scan boundary tests preserving CLAUDE.md / Plan v3 D2 invariants
+- ASDB-unavailable test fall-through patterns
+- No raw `process.env.*_API_KEY` reads, no `credential-resolver` imports outside model-access, no `dispatchMcpToolCall` imports outside the MCP chokepoint / `services/extensions/runtime.ts` wrapper
+
+**Status:** V1.0 + V1.5 + V2.0 first slices are now **FULLY IMPLEMENTED** at the data-model + service + boundary-test layer. UI surfaces and lane-specific runtime hooks land in subsequent β/γ slices per each phase's "out of scope for the α slice" section.
 
 ---
 
