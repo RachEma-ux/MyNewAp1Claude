@@ -65,6 +65,9 @@ describe("CronStatusBadge migration — regression lock", () => {
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "CagPackEventsRetentionPanel.tsx"),
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "SimulationRunsRetentionPanel.tsx"),
     join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "TestRunsRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "GraphQualityScansRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "GraphCorrectionProposalsRetentionPanel.tsx"),
+    join(REPO_ROOT, "client", "src", "modules", "agent-studio", "components", "GraphQualityAgentRunsRetentionPanel.tsx"),
   ];
 
   function countBadgeUsages(): number {

@@ -53,7 +53,7 @@ See the strict-audit doc for the full 21-item matrix. Summary:
 | Bucket | Count | Items |
 |---|---|---|
 | **FULLY IMPLEMENTED** | 11 | 2, 3, 4, 5, 6, 9, 13, 17, 18, 19, 20 |
-| **PARTIALLY IMPLEMENTED** | 3 | 1 (G3 benchmark — operator), 14 (8 of 17 panels extracted), 21 (this rewrite itself) |
+| **PARTIALLY IMPLEMENTED** | 3 | 1 (G3 benchmark — operator), 14 (11 of 17 panels extracted), 21 (this rewrite itself) |
 | **NOT IMPLEMENTED** | 7 | 7 (Layer 4 e2e), 8 (V1/V1.5/V2 plan is plan-only), 10 (CRDT — intentional), 11 (offline — intentional), 12 (Neo4j Enterprise — intentional), 15 (multi-region — intentional), 16 (Canvas/Bases/plugins — intentional) |
 
 Intentional CLAUDE.md deferrals (10, 11, 12, 15, 16) account for 5 of
@@ -74,7 +74,7 @@ the 7 NOT IMPLEMENTED items. Real code gaps inside MVP 0-4 scope are:
 
 ## 6. Runtime gaps still open (priority order)
 
-1. **Retention panel extractions batch 5+** (item 14 partial) — 9
+1. **Retention panel extractions batch 6+** (item 14 partial) — 6
    panels remain inline; each batch typically extracts 2-3 panels.
 2. **Layer 4 e2e harness** (item 7) — Playwright/Cypress v0.
 
