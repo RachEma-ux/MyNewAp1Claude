@@ -35,3 +35,15 @@ export {
   type ExecutePublishInput,
   type ExecutePublishResult,
 } from "./executor.js";
+
+export {
+  makeHttpPusher,
+  type MakeHttpPusherOptions,
+  type HttpMethod,
+} from "./http-pusher.js";
+
+export {
+  registerDefaultPublishPushers,
+  type RegisterDefaultPublishPushersOptions,
+  type CredentialFn,
+} from "./defaults.js";
