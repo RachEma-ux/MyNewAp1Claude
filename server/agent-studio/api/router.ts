@@ -63,6 +63,7 @@ import { cagRouter } from "./cag-router";
 import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
 import { ingestionRouter } from "./ingestion-router";
+import { graphChangeRouter } from "./graph-change-router";
 import { racTraceRouter } from "./rac-trace-router";
 import { racEvaluationRouter } from "./rac-evaluation-router";
 import { kbRouter } from "./kb-router";
@@ -2557,6 +2558,9 @@ export const agentStudioRouter = router({
   // Phase 22 follow-up #671: Universal Ingestion (Phase 2-3) lifecycle —
   // currently exposes only the ags_ingestion_jobs retention surface.
   ingestion: ingestionRouter,
+  // Phase 22 follow-up #675: Graph Change Proposals (Phase 11.5
+  // structural mutations) — currently exposes only the retention surface.
+  graphChange: graphChangeRouter,
   // RAC Phase 7: Trace + feedback (getTrace / submitFeedback)
   racTrace: racTraceRouter,
   // RAC Phase 8: Evaluation (evaluate / previewRetrieval / runGroundednessCheck)
