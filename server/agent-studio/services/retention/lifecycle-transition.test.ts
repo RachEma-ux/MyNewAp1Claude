@@ -9,7 +9,7 @@ import {
   isApprovalStepTerminal,
   isNotePromotionTerminal,
   isPublishRequestTerminal,
-  isReleaseStateRetentionBlocker,
+  isReleaseRetentionBlocker,
 } from "./lifecycle-state-vocab";
 
 const FROZEN_NOW = new Date("2026-05-13T00:00:00.000Z");
@@ -103,25 +103,29 @@ describe("note-promotion status transitions", () => {
   });
 });
 
-describe("release-state retention-blocker classification", () => {
-  it("blocks retention for active / pending / draft states", () => {
-    expect(isReleaseStateRetentionBlocker("draft")).toBe(true);
-    expect(isReleaseStateRetentionBlocker("pending")).toBe(true);
-    expect(isReleaseStateRetentionBlocker("active")).toBe(true);
-    expect(isReleaseStateRetentionBlocker("published")).toBe(true);
-    expect(isReleaseStateRetentionBlocker("rolled_back_under_review")).toBe(true);
+describe("release retention-blocker classification", () => {
+  it("blocks retention when the release has not been archived", () => {
+    expect(isReleaseRetentionBlocker({ state: "published", archivedAt: null })).toBe(true);
+    expect(isReleaseRetentionBlocker({ state: "pending", archivedAt: null })).toBe(true);
+    // Even an unknown future state blocks retention when archivedAt is null
+    expect(isReleaseRetentionBlocker({ state: "totally_unknown", archivedAt: null })).toBe(true);
   });
 
-  it("does not block retention for retired / superseded / failed terminal states", () => {
-    expect(isReleaseStateRetentionBlocker("retired")).toBe(false);
-    expect(isReleaseStateRetentionBlocker("superseded")).toBe(false);
-    expect(isReleaseStateRetentionBlocker("failed")).toBe(false);
+  it("allows retention when the release has been archived", () => {
+    expect(
+      isReleaseRetentionBlocker({ state: "published", archivedAt: new Date("2026-01-01") }),
+    ).toBe(false);
+    expect(
+      isReleaseRetentionBlocker({ state: "pending", archivedAt: new Date("2026-01-01") }),
+    ).toBe(false);
   });
 
-  it("does not block retention for unknown / future states (conservative on unknowns: caller decides)", () => {
-    // The classifier returns false for unknown states by design — callers
-    // that want to fail-closed on unknowns should layer their own check.
-    expect(isReleaseStateRetentionBlocker("totally_unknown_state")).toBe(false);
+  it("primary signal is archivedAt, not state", () => {
+    // Same state, different archivedAt → different outcome
+    expect(isReleaseRetentionBlocker({ state: "published", archivedAt: null })).toBe(true);
+    expect(
+      isReleaseRetentionBlocker({ state: "published", archivedAt: new Date("2025-12-31") }),
+    ).toBe(false);
   });
 });
 
