@@ -25,8 +25,7 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR #736 (PR-Y5) `b7ef35a7` — strict-audit doc + local seed script + tracker rewrite
 
 **Runtime code gaps still open** (priority order — see strict-audit doc §2):
-1. Retention panel extractions batch 7 (final) — item 14 partial; 3 panels remain (the approval-lifecycle trio)
-2. Layer 4 e2e harness (item 7)
+1. Layer 4 e2e harness (item 7) — the only remaining runtime gap inside MVP 0-4 scope after item 14 closed at 17/17 via PR-AT-8
 
 **Just closed (2026-05-13):**
 - PR-AT-1 — Golden Questions live adapter (audit item 2). Merged at `08cccdf9`.
@@ -35,9 +34,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 - PR-AT-4 — Retention panel batch 3 (item 14 progress, 2/17 → 5/17): `ToolCallTracesRetentionPanel` + `CatalogSyncLogRetentionPanel` + `RacRuntimeTracesRetentionPanel`. Merged at `90180205`.
 - PR-AT-5 — Retention panel batch 4 (item 14 progress, 5/17 → 8/17): `CagPackEventsRetentionPanel` + `SimulationRunsRetentionPanel` + `TestRunsRetentionPanel`. Merged at `0404b13b`.
 - PR-AT-6 — Retention panel batch 5 (item 14 progress, 8/17 → 11/17): `GraphQualityScansRetentionPanel` + `GraphCorrectionProposalsRetentionPanel` + `GraphQualityAgentRunsRetentionPanel`. Merged at `fdbac53d`.
-- PR-AT-7 — Retention panel batch 6 (item 14 progress, 11/17 → 14/17): `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`.
+- PR-AT-7 — Retention panel batch 6 (item 14 progress, 11/17 → 14/17): `IngestionJobsRetentionPanel` + `GraphChangeProposalsRetentionPanel` + `GraphAgentRuntimeTracesRetentionPanel`. Merged at `7ea0ce4e`.
+- PR-AT-8 — Retention panel batch 7 (FINAL) (item 14 FULLY IMPLEMENTED, 14/17 → 17/17): `PublishRequestsRetentionPanel` + `ApprovalStepsRetentionPanel` + `NotePromotionsRetentionPanel` (the approval-lifecycle trio). Closes the panel-extraction sub-arc.
 
-**Next material work:** retention panel extractions batch 7 (final) — item 14 partial. 3 panels remain inline (the approval-lifecycle trio): `PublishRequestsRetentionPanel`, `ApprovalStepsRetentionPanel`, `NotePromotionsRetentionPanel`. One more batch closes item 14 entirely (14/17 → 17/17).
+**Next material work:** Layer 4 Playwright v0 (item 7). The only remaining runtime gap inside MVP 0-4 scope after item 14 closed at 17/17.
 
 The historical (pre-strict-audit) recovery context follows.
 
