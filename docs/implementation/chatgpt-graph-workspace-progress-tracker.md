@@ -123,12 +123,21 @@ PRs per each phase's "out of scope for the α slice" section.
 
 | Phase | PR | Merge SHA |
 |---|---|---|
-| J-1-β  (V1.0 health-alert cron + tRPC status) | #758 | pending |
+| J-1-β  (V1.0 health-alert cron + tRPC status) | #758 | `660303f6` |
+| 19-β   (V1.0 publish-target default pushers) | #759 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
 adds boot Step 3.25 + admin tRPC `agentStudio.graphHealth.*`. No new
 data model.
+
+Phase 19-β registers the three default `PublishPusher` implementations
+for `staging_env` / `remote_vault` / `external_kb` (PR-V1-2 shipped
+the executor + registry + ledger but left the registry empty). All
+three use a shared `makeHttpPusher` factory configured per
+`targetType` (HTTP method + path suffix + credential header).
+Credential acquisition flows through a registrant-supplied
+`credentialFn` closure — Plan v3 D2 clean.
 
 ## 8. Why this tracker was rewritten
 

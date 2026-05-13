@@ -57,9 +57,10 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 
 | PR | Phase | Scope | Merge SHA |
 |---|---|---|---|
-| #758 PR-V1-7 | J-1-β (V1.0) | Health-alert cron + tRPC status (`*/5 * * * *`; boot Step 3.25) | pending |
+| #758 PR-V1-7 | J-1-β (V1.0) | Health-alert cron + tRPC status (`*/5 * * * *`; boot Step 3.25) | `660303f6` |
+| #759 PR-V1-8 | 19-β (V1.0) | Shared HTTP pusher factory + 3 default pusher registrations (staging_env / remote_vault / external_kb); boot Step 3.26 | pending |
 
-**Next material work:** Continue Phase β/γ slices. V1.0 remaining: Phase 19-β (pusher registration for `staging_env` / `remote_vault` / `external_kb`). V1.5 priorities: Phase 15-β attachment library; Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
+**Next material work:** Continue Phase β/γ slices. V1.5 priorities: Phase 15-β attachment library; Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
 
 The historical (pre-strict-audit) recovery context follows.
 

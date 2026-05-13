@@ -554,6 +554,34 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.26 — V1+ Phase 19-β (2026-05-13): register default publish
+  // pushers for the three target types defined in PR-V1-2 (#749):
+  // staging_env, remote_vault, external_kb. PR-V1-2 shipped the
+  // executor + registry + ledger but the registry was empty, so
+  // executePublish() always threw PublishPusherNotRegisteredError.
+  // This wire-up gives operators a usable default; pusher-specific
+  // credentialFn closures can be injected here or per-target via the
+  // registration overrides shape.
+  try {
+    const { registerDefaultPublishPushers } = await import(
+      "./services/publish-targets/defaults"
+    );
+    // Default credentialFn is a no-op: returns null so the request
+    // is sent without auth. Operator overrides via env or via a
+    // future Phase 19-γ secret-binding surface. The publish target
+    // record's `providerConnectionId` reference is the hook point
+    // for that wiring.
+    const registered = registerDefaultPublishPushers();
+    console.log(
+      `[ags-publish-targets] default pushers registered — ${registered.join(", ")}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-publish-targets] default pusher registration skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
