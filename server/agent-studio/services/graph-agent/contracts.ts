@@ -53,6 +53,18 @@ export const GraphAgentAnswer = z.object({
     graphBackendKey: z.string(),
     projectionSnapshotId: z.string().optional(),
     truncationReason: z.string().optional(),
+    // Phase 13.5 PR #2 — populated when the engine ran in agentic
+    // mode (an AgenticPlanner was supplied via engine options).
+    // Backwards-compatible: undefined for non-agentic runs.
+    agenticIterations: z.number().int().min(0).optional(),
+    agenticTerminationReason: z.enum([
+      "planner_stop",
+      "planner_answer",
+      "max_iterations",
+      "wall_clock_budget",
+      "invalid_action",
+    ]).optional(),
+    agenticRetrievalModes: z.array(z.string()).optional(),
   }),
 });
 export type GraphAgentAnswer = z.infer<typeof GraphAgentAnswer>;
