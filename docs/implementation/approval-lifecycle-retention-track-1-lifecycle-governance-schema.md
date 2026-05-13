@@ -1,13 +1,25 @@
 # Approval-Lifecycle Retention — Track 1: Lifecycle-governance schema extension
 
-**Status:** Open. Prerequisite for any retention sweep of approval-lifecycle
-tables. **Implementation blocked** until the schema work below ships.
+**Status:** **SHIPPED ✓** (2026-05-13). Closed end-to-end via 17 PRs
+(#682–#695, #699–#702). The eleven-step prerequisite sequence enumerated
+below shipped in order; the three retention services are live on the
+daily-sweep ladder at slots 18–20 UTC (90-day default per compliance-
+significance rationale). The body of this document is preserved as
+the **historical specification** for the work — future contributors who
+hit a similar "schema-extension first" shape benefit from reading how
+the deferral was framed *before* it shipped.
 
-**Owner:** TBD.
+**Implementation reference:**
+- 22-PR ledger and architectural summary: [Retention arc state-of-the-union §"Post-closure addendum"](./agent-studio-retention-arc-state-of-the-union.md#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13).
+- Auto-memory record: `~/.claude/projects/-root/memory/project_approval_lifecycle_retention_complete.md`.
+- Live-ASDB integration tests: `tests/integration/agent-studio/approval-lifecycle-retention.integration.test.ts` (20 cases, run via `pnpm run test:integration:staging`).
+
+**Owner:** Shipped under the autonomous-execution authority recorded in
+`feedback_autonomous_pmb_execution.md`.
 **Source policy:** user 2026-05-12 §§0-9 (standing principle below) +
 schema-gap audit 2026-05-12, with `agsNotePromotions` folded in 2026-05-13.
 **Companion track:** [Track 2 — compliance archival workflow for
-`agsReleaseAuditRefs`](./approval-lifecycle-retention-track-2-release-audit-refs-archival.md).
+`agsReleaseAuditRefs`](./approval-lifecycle-retention-track-2-release-audit-refs-archival.md) **(SHIPPED at PRs #696–#698)**.
 **Closure context:** [Retention arc state-of-the-union](./agent-studio-retention-arc-state-of-the-union.md).
 
 ## Standing principle (user §0)

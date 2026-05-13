@@ -1,11 +1,26 @@
 # Approval-Lifecycle Retention — Track 2: Compliance archival workflow for `agsReleaseAuditRefs`
 
-**Status:** Open. **Not** convertible to a routine cron under any
-circumstances. May never produce a `prune*Retention` procedure.
+**Status:** **SHIPPED ✓** (2026-05-13) — service + tRPC + UI live at
+PRs #696 / #697 / #698. The body of this document is preserved as the
+**historical specification** plus standing-policy reference; the
+deletion-blocked / 7-year-floor / generic-factory-exclusion invariants
+documented below remain in force in the shipped code.
 
-**Owner:** TBD.
+**Standing policy preserved:** Track 2 is **NOT** convertible to a
+routine cron and **MUST NEVER** produce a `prune*Retention` procedure.
+The shipped `archiveReleaseAuditRef` workflow + `deleteReleaseAuditRef`
+always-throws marker enforce this at the service layer.
+
+**Implementation reference:**
+- Service: `server/agent-studio/services/release-audit-refs-archival.ts`.
+- tRPC: `publishRouter` adminProcedures `listReleaseAuditRefsArchivalCandidates` + `archiveReleaseAuditRef` (#697).
+- UI: `client/src/modules/agent-studio/pages/RetrofitPage.tsx` archival panel (#698).
+- 22-PR ledger: [Retention arc state-of-the-union §"Post-closure addendum"](./agent-studio-retention-arc-state-of-the-union.md#post-closure-addendum--approval-lifecycle-deferral-resolution-2026-05-13).
+
+**Owner:** Shipped under the autonomous-execution authority recorded in
+`feedback_autonomous_pmb_execution.md`.
 **Source policy:** user 2026-05-12 §§0-9 + schema-gap audit 2026-05-12.
-**Companion track:** [Track 1 — lifecycle-governance schema extension](./approval-lifecycle-retention-track-1-lifecycle-governance-schema.md).
+**Companion track:** [Track 1 — lifecycle-governance schema extension](./approval-lifecycle-retention-track-1-lifecycle-governance-schema.md) **(SHIPPED at PRs #682–#695, #699–#702)**.
 **Closure context:** [Retention arc state-of-the-union](./agent-studio-retention-arc-state-of-the-union.md).
 
 ## Why this is its own track
