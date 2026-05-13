@@ -180,6 +180,18 @@ describe("deriveApprovalStepEligibility", () => {
     const result = deriveApprovalStepEligibility({ ...BASE, terminalAt: null });
     expect(result.retentionBlockers).toContain("NO_TERMINAL_TIMESTAMP");
   });
+
+  it("inherits parent-level holds: a legal_hold on the parent publish-request protects the step", () => {
+    // Loader contract: own-holds + parent-holds are concatenated before
+    // reaching the deriver. Test by passing a parent-hold via activeHolds
+    // and confirming the deriver classifies it the same way as own-holds.
+    const result = deriveApprovalStepEligibility({
+      ...BASE,
+      activeHolds: [HOLD("legal_hold")],
+    });
+    expect(result.retentionEligible).toBe(false);
+    expect(result.retentionBlockers).toContain("LEGAL_HOLD");
+  });
 });
 
 // ── note-promotion deriver ──────────────────────────────────────────────────
