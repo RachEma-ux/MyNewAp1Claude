@@ -620,9 +620,28 @@ export const agsReleaseAuditRefs = pgTable(
     externalRef: text("external_ref").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().default({}),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // ── Track 2 — compliance archival workflow ─────────────────────────────
+    //
+    // agsReleaseAuditRefs is PERMANENTLY excluded from the generic retention
+    // factory. This is a compliance long-retention table; minimum 7-year
+    // window applies if any finite retention is ever set. Deletion is
+    // blocked by default — only the `archive` workflow can update these
+    // rows in place. See server/agent-studio/services/release-audit-refs-
+    // archival.ts for the policy.
+    archivedAt: timestamp("archived_at"),
+    archivedBy: integer("archived_by"),
+    archiveReason: text("archive_reason"),
+    /**
+     * `complianceApprovalRef` carries the external compliance-approval
+     * identifier (e.g. ticket/jira ID) authorizing the archive. Required
+     * for any archive action; service-layer enforced (varchar default
+     * null means existing rows are not retroactively flagged).
+     */
+    complianceApprovalRef: varchar("compliance_approval_ref", { length: 128 }),
   },
   (t) => ({
     releaseIdx: index("idx_ags_audit_release").on(t.releaseId),
+    archivedAtIdx: index("idx_ags_audit_archived_at").on(t.archivedAt),
   })
 );
 
