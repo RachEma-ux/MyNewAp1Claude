@@ -45,3 +45,12 @@ export {
   type InvokeFromExtensionOutcome,
   type InvokeFromExtensionOptions,
 } from "./runtime.js";
+
+// V1+ Phase 18-β: extension lane hook registry.
+export {
+  registerLaneHook,
+  getLaneHook,
+  listRegisteredLaneHookLanes,
+  type LaneHookFn,
+  type LaneHookOutcome,
+} from "./lane-hooks.js";

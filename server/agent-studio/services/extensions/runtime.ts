@@ -47,6 +47,11 @@ import {
   type ExtensionRecord,
   type InvokeFromExtensionInput,
 } from "./contracts.js";
+import {
+  getLaneHook,
+  type LaneHookFn,
+  type LaneHookOutcome,
+} from "./lane-hooks.js";
 
 function rowToExtension(r: Record<string, unknown>): ExtensionRecord {
   const status =
@@ -90,16 +95,19 @@ async function loadExtensionById(id: number): Promise<ExtensionRecord> {
   return rowToExtension(rows[0] as Record<string, unknown>);
 }
 
-async function recordInvocation(input: {
-  extensionId: number;
-  lane: ExtensionCapabilityLane;
-  toolName?: string;
-  outcome: CapabilityCheckOutcome;
-  succeeded?: boolean;
-  errorMessage?: string;
-  details?: Record<string, unknown>;
-}): Promise<void> {
-  const db = getAsDb();
+async function recordInvocation(
+  input: {
+    extensionId: number;
+    lane: ExtensionCapabilityLane;
+    toolName?: string;
+    outcome: CapabilityCheckOutcome;
+    succeeded?: boolean;
+    errorMessage?: string;
+    details?: Record<string, unknown>;
+  },
+  getDb: typeof getAsDb = getAsDb,
+): Promise<void> {
+  const db = getDb();
   if (!db) return;
   await db.insert(agsExtensionInvocations).values({
     extensionId: input.extensionId,
@@ -116,6 +124,8 @@ export interface InvokeFromExtensionOutcome {
   readonly capability: CapabilityCheckOutcome;
   readonly dispatched: boolean;
   readonly dispatchResult: DispatchMcpToolCallResult | null;
+  /** Set by V1+ Phase 18-β when a non-tool lane hook executes. */
+  readonly laneHookOutcome?: LaneHookOutcome;
 }
 
 export interface InvokeFromExtensionOptions {
@@ -130,6 +140,13 @@ export interface InvokeFromExtensionOptions {
    *  wrapper only fills in audit fields; the caller still supplies
    *  the tool name + args + source identification. */
   readonly dispatchInput?: DispatchMcpToolCallInput;
+  /** V1+ Phase 18-β test seam — substitute the lane-hook lookup. */
+  readonly resolveLaneHook?: (
+    lane: ExtensionCapabilityLane,
+  ) => LaneHookFn | undefined;
+  /** Test seam for ledger writes — substitute `getAsDb`. Tests pass
+   *  `() => null` to take the no-op fall-through path. */
+  readonly getDb?: typeof getAsDb;
 }
 
 /**
@@ -151,29 +168,69 @@ export async function invokeFromExtension(
     lane: input.lane,
     toolName: input.toolName,
   });
+  const getDb = options.getDb ?? getAsDb;
 
   if (capability.check !== "allowed") {
-    await recordInvocation({
-      extensionId: extension.id,
-      lane: input.lane,
-      toolName: input.toolName,
-      outcome: capability,
-      succeeded: false,
-    });
+    await recordInvocation(
+      {
+        extensionId: extension.id,
+        lane: input.lane,
+        toolName: input.toolName,
+        outcome: capability,
+        succeeded: false,
+      },
+      getDb,
+    );
     return { capability, dispatched: false, dispatchResult: null };
   }
 
-  // For non-tool lanes, the wrapper's job is capability assertion +
-  // ledger recording. Lane-specific hook execution lands in the
-  // next V1+ slice (one per lane).
+  // V1+ Phase 18-β (#767): non-tool lanes look up a registered
+  // hook. When present, the hook executes the lane's concrete
+  // capability and its outcome is ledgered. Otherwise the wrapper
+  // falls back to the α behavior (assert + ledger, no execution).
   if (input.lane !== "tool" || !options.dispatchInput) {
-    await recordInvocation({
-      extensionId: extension.id,
-      lane: input.lane,
-      toolName: input.toolName,
-      outcome: capability,
-      succeeded: true,
-    });
+    const resolveHook = options.resolveLaneHook ?? getLaneHook;
+    const hook = resolveHook(input.lane);
+    if (hook) {
+      let hookOutcome: LaneHookOutcome;
+      try {
+        hookOutcome = await hook({ extension, input });
+      } catch (err) {
+        hookOutcome = {
+          succeeded: false,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        };
+      }
+      await recordInvocation(
+        {
+          extensionId: extension.id,
+          lane: input.lane,
+          toolName: input.toolName,
+          outcome: capability,
+          succeeded: hookOutcome.succeeded,
+          errorMessage: hookOutcome.errorMessage,
+          details: hookOutcome.details,
+        },
+        getDb,
+      );
+      return {
+        capability,
+        dispatched: false,
+        dispatchResult: null,
+        laneHookOutcome: hookOutcome,
+      };
+    }
+    // No hook registered — α fall-through.
+    await recordInvocation(
+      {
+        extensionId: extension.id,
+        lane: input.lane,
+        toolName: input.toolName,
+        outcome: capability,
+        succeeded: true,
+      },
+      getDb,
+    );
     return { capability, dispatched: false, dispatchResult: null };
   }
 
@@ -182,24 +239,30 @@ export async function invokeFromExtension(
   let result: DispatchMcpToolCallResult;
   try {
     result = await dispatch(options.dispatchInput);
-    await recordInvocation({
-      extensionId: extension.id,
-      lane: input.lane,
-      toolName: input.toolName,
-      outcome: capability,
-      succeeded: result.ok === true,
-      errorMessage: result.ok === false ? result.errorCode : undefined,
-    });
+    await recordInvocation(
+      {
+        extensionId: extension.id,
+        lane: input.lane,
+        toolName: input.toolName,
+        outcome: capability,
+        succeeded: result.ok === true,
+        errorMessage: result.ok === false ? result.errorCode : undefined,
+      },
+      getDb,
+    );
     return { capability, dispatched: true, dispatchResult: result };
   } catch (err) {
-    await recordInvocation({
-      extensionId: extension.id,
-      lane: input.lane,
-      toolName: input.toolName,
-      outcome: capability,
-      succeeded: false,
-      errorMessage: err instanceof Error ? err.message : String(err),
-    });
+    await recordInvocation(
+      {
+        extensionId: extension.id,
+        lane: input.lane,
+        toolName: input.toolName,
+        outcome: capability,
+        succeeded: false,
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+      getDb,
+    );
     throw err;
   }
 }
