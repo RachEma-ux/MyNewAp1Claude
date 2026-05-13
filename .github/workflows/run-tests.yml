@@ -229,6 +229,41 @@ jobs:
             server/openrouter/model-access/execute.test.ts \
             --pool=forks --poolOptions.forks.singleFork --reporter=verbose
 
+      # ── Layer 9: Native Graph Workspace closure surface ─────────────
+      # Per the 2026-05-13 closure addendum (PR #723 + #724), the
+      # Native Graph Workspace plan ships three CI-relevant guard
+      # tests that the curated Layer 8 list does not cover:
+      #
+      #   - graph-bench harness static integrity (PR #724) — pins the
+      #     scenario library, target invariants, DEFAULT_FIXTURE, and
+      #     CLI entrypoint shape. The G3 benchmark runbook §9 names
+      #     this as the per-PR drift guard.
+      #
+      #   - golden-questions seed integrity (PR #723) — shape, no
+      #     duplicates, skill-pack + Cypher-template linkage, and
+      #     upsert-helper walk. The G10 evaluation runbook §3 names
+      #     this as the per-PR seed-to-registry contract guard.
+      #
+      #   - graph-retrieval-resolved-skill-trace — exercises the live
+      #     ASDB query path through GraphRetrievalRouter +
+      #     template-execution-gate. Fails on Termux dev boxes due
+      #     to the documented `u0_a296` role mismatch
+      #     (`~/.claude/projects/-root/memory/reference_local_asdb_role_mismatch.md`);
+      #     CI's `testdb` Postgres container has the expected role
+      #     so it passes here. Wired in alongside the closure-addendum
+      #     guards so the previously-claimed "passes in CI" property
+      #     becomes a real CI assertion.
+      - name: Native Graph Workspace closure surface (Layer 9)
+        run: |
+          npx vitest run \
+            tests/agent-studio/graph-bench/harness-integrity.test.ts \
+            tests/agent-studio/graph-skill/golden-questions/seed-integrity.test.ts \
+            tests/agent-studio/graph-retrieval-resolved-skill-trace.test.ts \
+            --pool=forks --poolOptions.forks.singleFork --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+          DATABASE_URL_ASDB: postgres://testuser:testpass@localhost:5432/testdb
+
       # ── Static Governance Guard ─────────────────────────────────────
       # Scans source code for forbidden patterns that violate governance invariants.
       - name: Static governance invariant scan

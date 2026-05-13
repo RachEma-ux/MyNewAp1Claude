@@ -181,9 +181,10 @@ If §6.1 returns the **Reopened** outcome:
 
 ## 9. CI / staging constraints
 
-- This runbook is **not** part of CI. It cannot run on Termux device (no Docker, no Neo4j CE deploy, no 10k-row fixture).
+- This runbook is **not** part of per-PR CI. It cannot run on Termux device (no Docker, no Neo4j CE deploy, no 10k-row fixture).
 - A **static integrity test** for the harness shape (scenario library compiles, 10 canonical scenario keys, p50 < p95, default fixture sizes match the spec, CLI imports + exit-code wiring intact) lives at `tests/agent-studio/graph-bench/harness-integrity.test.ts`. It runs in CI on every PR. It is not a substitute for execution; it only prevents harness drift between operator runs.
-- CI must not attempt to run `pnpm tsx scripts/graph-bench/run-benchmark.ts`. Any future job under `.github/workflows/` that touches the harness MUST be gated on `if: github.event_name == 'workflow_dispatch'`.
+- A **`workflow_dispatch`-gated** GitHub Actions workflow lives at `.github/workflows/graph-bench-neo4j-ce.yml`. The operator triggers it from the Actions tab or via `gh workflow run "Graph Backend Benchmark — Neo4j CE (G3)"`. The workflow brings up Postgres + Neo4j 5.x CE service containers, runs the harness, archives the markdown report under `docs/evidence/graph-backend/<date>-*/` as a workflow artifact, and exits 0 on overall pass / 1 on fail. Operator-side closure (runbook §7 / §8) still owns the evidence commit + ADR update.
+- Per-PR CI **must not** attempt to run `pnpm tsx scripts/graph-bench/run-benchmark.ts`. Any future job under `.github/workflows/` that touches the harness MUST be gated on `workflow_dispatch`.
 
 ## 10. Hard-rule compliance reminder
 
