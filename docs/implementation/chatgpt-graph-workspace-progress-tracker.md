@@ -124,7 +124,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | Phase | PR | Merge SHA |
 |---|---|---|
 | J-1-β  (V1.0 health-alert cron + tRPC status) | #758 | `660303f6` |
-| 19-β   (V1.0 publish-target default pushers) | #759 | pending |
+| 19-β   (V1.0 publish-target default pushers) | #759 | `525c5f8b` |
+| 15-β   (V1.5 attachment library service) | #760 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and

@@ -366,7 +366,8 @@ All 9 first-slice PRs landed on main on 2026-05-13. Each carries:
 | PR | Phase | Scope | Merge SHA |
 |---|---|---|---|
 | #758 (PR-V1-7) | Phase J-1-β | Health-alert cron (`services/graph/health-alert-cron.ts`) wrapping PR-V1-1 evaluator via `makeRetentionCron` factory at `*/5 * * * *`; boot Step 3.25; admin tRPC `agentStudio.graphHealth.getAlertCronStatus` + `listOpen` | `660303f6` |
-| #759 (PR-V1-8) | Phase 19-β | Shared `makeHttpPusher` factory + `registerDefaultPublishPushers()` wiring the 3 target types (`staging_env` POST /promote / `remote_vault` PUT /vault/notes / `external_kb` POST /ingest); boot Step 3.26 | pending |
+| #759 (PR-V1-8) | Phase 19-β | Shared `makeHttpPusher` factory + `registerDefaultPublishPushers()` wiring the 3 target types (`staging_env` POST /promote / `remote_vault` PUT /vault/notes / `external_kb` POST /ingest); boot Step 3.26 | `525c5f8b` |
+| #760 (PR-V1-9) | Phase 15-β | Attachment library service (`services/vault/attachment-library.ts`): browseAttachmentLibrary (vault-wide + mime-class filter + sort) + findUnusedAttachments (LEFT JOIN to vault_notes for trash detection) + computeAttachmentQuota + closed 6-value mime-class taxonomy | pending |
 
 ---
 
