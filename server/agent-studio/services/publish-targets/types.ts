@@ -92,3 +92,46 @@ export type PublishPusher = (input: {
   readonly target: PublishTargetRecord;
   readonly payload: PublishPayload;
 }) => Promise<PublishExecutionOutcome>;
+
+// ============================================================================
+// V1+ Phase 19-γ — governance gate (publish-request workflow)
+// ============================================================================
+
+/**
+ * Closed governance decision taxonomy. The executor branches on
+ * this value:
+ *   - `"approved"`  → run the pusher (in_flight → succeeded/failed).
+ *   - `"pending"`   → stage a `pending` ledger row; do not run the
+ *                     pusher. Caller re-invokes after governance
+ *                     sign-off.
+ *   - `"rejected"`  → stage a `failed` ledger row with errorMessage
+ *                     `"governance_rejected"`. Pusher never runs.
+ */
+export const GOVERNANCE_DECISIONS = [
+  "approved",
+  "pending",
+  "rejected",
+] as const;
+
+export type GovernanceDecision = (typeof GOVERNANCE_DECISIONS)[number];
+
+export function isGovernanceDecision(s: unknown): s is GovernanceDecision {
+  return (
+    typeof s === "string" &&
+    (GOVERNANCE_DECISIONS as readonly string[]).includes(s)
+  );
+}
+
+/**
+ * Optional governance gate. When omitted, the executor proceeds as
+ * if the gate returned `"approved"` (backward compatible with the
+ * Phase 19-α + β executor).
+ *
+ * Real governance integration (wiring through `agsApprovalSteps` +
+ * `evaluateGovernance`) is operator-supplied via this hook; the
+ * executor itself stays governance-agnostic.
+ */
+export type GovernanceGateFn = (input: {
+  readonly target: PublishTargetRecord;
+  readonly payload: PublishPayload;
+}) => Promise<GovernanceDecision>;
