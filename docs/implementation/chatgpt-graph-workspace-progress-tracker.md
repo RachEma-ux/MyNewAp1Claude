@@ -119,6 +119,17 @@ data-model + service + boundary-test layer. UI surfaces, lane-
 specific runtime hooks, and Phase β/γ extensions land in subsequent
 PRs per each phase's "out of scope for the α slice" section.
 
+**V1+ second-slice (β/γ) opened 2026-05-13:**
+
+| Phase | PR | Merge SHA |
+|---|---|---|
+| J-1-β  (V1.0 health-alert cron + tRPC status) | #758 | pending |
+
+Phase J-1-β wires the PR-V1-1 evaluator into the shared
+`makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
+adds boot Step 3.25 + admin tRPC `agentStudio.graphHealth.*`. No new
+data model.
+
 ## 8. Why this tracker was rewritten
 
 The earlier version of this file rolled up *plan-ready* + *runbook-

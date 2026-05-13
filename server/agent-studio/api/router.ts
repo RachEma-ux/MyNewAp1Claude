@@ -75,6 +75,7 @@ import { graphAgentRouter } from "../services/graph-agent/router";
 import { workspaceObservabilityRouter } from "../services/workspace-observability/router";
 import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
+import { graphHealthRouter } from "../services/graph/health-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
 import {
@@ -2909,6 +2910,10 @@ export const agentStudioRouter = router({
   // `agentStudio.graphProjection.getDriftCronStatus` to display the
   // last drift scan's outcome alongside the 18 retention crons.
   graphProjection: graphProjectionRouter,
+  // V1+ Phase J-1-β (2026-05-13): graph health-alert cron + open
+  // alerts read surface. Pair to graphProjection — both expose
+  // cron status to the operator dashboard's single panel pattern.
+  graphHealth: graphHealthRouter,
   // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
   // findings + finding→proposal conversion surface for operator UI.
   graphQuality: graphQualityRouter,

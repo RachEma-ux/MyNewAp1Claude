@@ -361,6 +361,12 @@ All 9 first-slice PRs landed on main on 2026-05-13. Each carries:
 
 **Status:** V1.0 + V1.5 + V2.0 first slices are now **FULLY IMPLEMENTED** at the data-model + service + boundary-test layer. UI surfaces and lane-specific runtime hooks land in subsequent β/γ slices per each phase's "out of scope for the α slice" section.
 
+### 6.1 Second-slice (β/γ) PR ledger — opened 2026-05-13
+
+| PR | Phase | Scope | Merge SHA |
+|---|---|---|---|
+| #758 (PR-V1-7) | Phase J-1-β | Health-alert cron (`services/graph/health-alert-cron.ts`) wrapping PR-V1-1 evaluator via `makeRetentionCron` factory at `*/5 * * * *`; boot Step 3.25; admin tRPC `agentStudio.graphHealth.getAlertCronStatus` + `listOpen` | pending |
+
 ---
 
 ## 7. Connection back to MVP 0–4 closure

@@ -53,7 +53,13 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #755 PR-V2-2 | CRDT-α (presence service + 5-min idle TTL) | `0b36c820` |
 | #756 PR-V2-3 | OL-1 (offline queue + load-bearing deny-list) | `3e6bae92` |
 
-**Next material work:** Phase β/γ slices per each phase's "out of scope for the α slice" section. V1.0 priorities: Phase J-1 cron wiring (boot-step periodic health-alert scan); Phase 19-β (pusher registration for the three target types). V1.5 priorities: Phase 15-β attachment library; Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
+**V1+ second-slice work (β/γ) opened 2026-05-13:**
+
+| PR | Phase | Scope | Merge SHA |
+|---|---|---|---|
+| #758 PR-V1-7 | J-1-β (V1.0) | Health-alert cron + tRPC status (`*/5 * * * *`; boot Step 3.25) | pending |
+
+**Next material work:** Continue Phase β/γ slices. V1.0 remaining: Phase 19-β (pusher registration for `staging_env` / `remote_vault` / `external_kb`). V1.5 priorities: Phase 15-β attachment library; Phase 17-β `CANVAS_REFERENCES_NOTE` projection edge. V2.0 priorities: Phase CRDT-β Yjs document layer + WebSocket transport; Phase OL-2 IndexedDB persistence; Phase MR-2 connection-helper integration.
 
 The historical (pre-strict-audit) recovery context follows.
 
