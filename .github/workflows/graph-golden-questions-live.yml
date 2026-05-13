@@ -28,6 +28,14 @@ on:
         description: 'Suite key to run (or "all")'
         required: false
         default: 'all'
+      require_live:
+        description: 'Fail the run if the script is still in inventory-only mode (no live wiring). Gate-the-workflow flag for post-adapter-composition operator runs.'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   evaluate:
@@ -87,8 +95,13 @@ jobs:
       - name: Run Golden Questions evaluation
         run: |
           mkdir -p "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions"
+          REQUIRE_LIVE_FLAG=""
+          if [ "${{ github.event.inputs.require_live }}" = "true" ]; then
+            REQUIRE_LIVE_FLAG="--require-live"
+          fi
           npx tsx scripts/agent-studio/run-golden-questions.ts \
             --suite "${{ github.event.inputs.suite }}" \
+            $REQUIRE_LIVE_FLAG \
             --output "docs/evidence/graph-agent-lite/${{ steps.date.outputs.date }}-golden-questions/report.md"
 
       - name: Upload evaluation evidence

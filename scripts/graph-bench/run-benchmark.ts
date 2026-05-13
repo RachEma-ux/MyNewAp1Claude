@@ -16,7 +16,7 @@ import { writeFileSync, mkdirSync } from "fs";
 import { dirname, isAbsolute, resolve } from "path";
 
 import { getGraphRepository } from "../../server/agent-studio/services/graph/repository/index.js";
-import { getScenarios } from "./lib/scenarios.js";
+import { validateScenarioKeys } from "./lib/scenarios.js";
 import { generateFixture, DEFAULT_FIXTURE } from "./lib/fixtures.js";
 import { runBenchmark } from "./lib/runner.js";
 import { formatReport } from "./lib/reporter.js";
@@ -52,6 +52,30 @@ function parseArgs(argv: string[]): CliArgs {
 
 async function main() {
   const args = parseArgs(process.argv);
+
+  // Strict scenario-key validation BEFORE touching the repository.
+  // The G3 runbook + the closure mission both require unknown keys
+  // to fail loudly; silent-empty-then-report-pass is the bug that
+  // motivates this guard.
+  const validation = validateScenarioKeys(args.scenarios);
+  if (validation.unknown.length > 0) {
+    console.error(
+      `[graph-bench] unknown scenario key(s): ${validation.unknown.join(", ")}.`,
+    );
+    console.error(
+      "[graph-bench] valid keys: all, " +
+        validation.valid.join(", "),
+    );
+    process.exit(2);
+  }
+  if (validation.resolved.length === 0) {
+    console.error(
+      "[graph-bench] no scenarios resolved from --scenarios input. " +
+        "Use --scenarios all or supply at least one valid key.",
+    );
+    process.exit(2);
+  }
+
   const repo = getGraphRepository();
   console.log(`[graph-bench] backend=${repo.backendKey}`);
 
@@ -67,7 +91,7 @@ async function main() {
     }
   }
 
-  const scenarios = getScenarios(args.scenarios);
+  const scenarios = validation.resolved;
   console.log(`[graph-bench] running ${scenarios.length} scenarios × ${args.iterations} iterations…`);
 
   const report = await runBenchmark({

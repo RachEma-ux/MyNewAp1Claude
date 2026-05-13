@@ -44,14 +44,16 @@ import {
 interface CliArgs {
   suite: string;
   output: string | null;
+  requireLive: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { suite: "all", output: null };
+  const args: CliArgs = { suite: "all", output: null, requireLive: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--suite") args.suite = argv[++i] ?? "all";
     else if (a === "--output") args.output = argv[++i] ?? null;
+    else if (a === "--require-live") args.requireLive = true;
   }
   return args;
 }
@@ -203,28 +205,45 @@ async function main() {
 
   const markdown = formatReport(date, liveWired, reason, allSuites, questionsBySuite);
 
+  // Exit-code contract:
+  //   - Default (no --require-live): exit 0 even when liveWired=false.
+  //     Inventory report is valuable closure-evidence pre-live-wiring.
+  //   - --require-live: exit 1 when liveWired=false. This is the flag
+  //     the operator-implementation PR for adapter composition will
+  //     use to gate the workflow on real live wiring being present.
+  //   - When live wiring DOES land, this function additionally exits
+  //     non-zero if any suite has a failed question (per runbook §4.4
+  //     pass/fail criteria).
+  const requireLiveFailed = args.requireLive && !liveWired;
+  const exitCode = requireLiveFailed ? 1 : 0;
+
   if (args.output) {
     const path = isAbsolute(args.output) ? args.output : resolve(process.cwd(), args.output);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, markdown, "utf8");
     console.log(
       JSON.stringify({
-        ok: true,
+        ok: !requireLiveFailed,
         liveWired,
         reason,
+        requireLive: args.requireLive,
         suiteCount: allSuites.length,
         questionCount: Array.from(questionsBySuite.values()).reduce((a, b) => a + b.length, 0),
         output: path,
+        exitCode,
       }),
     );
   } else {
     process.stdout.write(markdown + "\n");
   }
 
-  // Exit 0 — inventory report is valuable evidence even pre-live-wiring.
-  // The runbook §5 explicitly distinguishes "failure to evaluate" from
-  // "evaluation reports no live wiring yet".
-  process.exit(0);
+  if (requireLiveFailed) {
+    console.error(
+      "[golden-questions] --require-live set but live wiring is not present. " +
+        "See runbook §4.4 for the adapter-composition implementation PR.",
+    );
+  }
+  process.exit(exitCode);
 }
 
 main().catch((e) => {

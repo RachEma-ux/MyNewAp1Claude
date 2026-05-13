@@ -75,7 +75,14 @@ export async function runBenchmark(input: RunBenchmarkInput): Promise<BenchmarkR
     backendKey: input.repository.backendKey,
     fixtureSize: input.fixtureSize,
     results,
-    overallPassed: results.every((r) => r.passedP50 && r.passedP95),
+    // An empty scenario list MUST NOT report `overallPassed: true`.
+    // `[].every(...)` returns true by JS spec, which would silently
+    // declare every backend a pass when 0 scenarios actually ran. The
+    // `length > 0` guard is the explicit silent-success defense
+    // required by the G3 benchmark runbook §6 + the closure mission
+    // acceptance criteria.
+    overallPassed:
+      results.length > 0 && results.every((r) => r.passedP50 && r.passedP95),
     generatedAt: new Date().toISOString(),
   };
 }
