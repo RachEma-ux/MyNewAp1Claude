@@ -1624,15 +1624,12 @@ function RuntimeRunsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Runtime-runs retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 04:00 UTC (env: AGS_RUNTIME_RUNS_RETENTION_CRON_EXPR
@@ -1776,15 +1773,12 @@ function ToolCallTracesRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Tool-call-traces retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 05:00 UTC (env: AGS_TOOL_CALL_TRACES_RETENTION_CRON_EXPR
@@ -1920,15 +1914,12 @@ function McpTransitionsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>MCP transitions retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 06:00 UTC (env:
@@ -2078,15 +2069,12 @@ function CatalogSyncLogRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Catalog sync log retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 07:00 UTC (env:
@@ -2257,15 +2245,12 @@ function RacRuntimeTracesRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>RAC runtime traces retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 08:00 UTC (env:
@@ -2451,15 +2436,12 @@ function CagPackEventsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>CAG pack events retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 09:00 UTC (env:
@@ -2646,15 +2628,12 @@ function SimulationRunsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Simulation runs retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 10:00 UTC (env:
@@ -2855,15 +2834,12 @@ function TestRunsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Test runs retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 11:00 UTC (env:
@@ -3086,15 +3062,12 @@ function GraphQualityScansRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Graph quality scans retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 12:00 UTC (env:
@@ -3332,15 +3305,12 @@ function GraphCorrectionProposalsRetentionPanel() {
             <SectionLabel>
               Graph correction proposals retention cron
             </SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 13:00 UTC (env:
@@ -3578,15 +3548,12 @@ function GraphQualityAgentRunsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Graph quality agent runs retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 14:00 UTC (env:
@@ -3786,15 +3753,12 @@ function IngestionJobsRetentionPanel() {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Ingestion jobs retention cron</SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 15:00 UTC (env:
@@ -4015,15 +3979,12 @@ function GraphChangeProposalsRetentionPanel() {
             <SectionLabel>
               Graph change proposals retention cron
             </SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 16:00 UTC (env:
@@ -4244,15 +4205,12 @@ function GraphAgentRuntimeTracesRetentionPanel() {
             <SectionLabel>
               Graph agent runtime traces retention cron
             </SectionLabel>
-            {statusQuery.isLoading ? (
-              <Badge variant="secondary">loading</Badge>
-            ) : status?.lastError ? (
-              <Badge variant="destructive">error</Badge>
-            ) : status?.lastRunAt ? (
-              <Badge>healthy</Badge>
-            ) : (
-              <Badge variant="secondary">never run</Badge>
-            )}
+            <CronStatusBadge
+              isLoading={statusQuery.isLoading}
+              lastError={status?.lastError}
+              lastRunAt={status?.lastRunAt}
+            />
+
           </div>
           <div className="text-xs text-zinc-400">
             Default: daily 17:00 UTC, 90-day window (env:
