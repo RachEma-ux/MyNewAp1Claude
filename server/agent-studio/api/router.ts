@@ -1441,6 +1441,77 @@ const publishRouter = router({
       });
       return { success: true };
     }),
+
+  // ── Approval-lifecycle retention ──────────────────────────────────────────
+  //
+  // Manual sweep + cron status for the two publishRouter-owned approval-
+  // lifecycle tables: agsPublishRequests and agsApprovalSteps. Procedure
+  // names noun-qualified to disambiguate from the existing publish-CRUD
+  // surface. adminProcedure because retention is cross-tenant.
+
+  prunePublishRequestsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          agentId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { prunePublishRequestsRetention } = await import(
+        "../services/publish-requests-retention"
+      );
+      const days = input?.retentionDays ?? 90;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return prunePublishRequestsRetention({
+        olderThan,
+        agentId: input?.agentId,
+      });
+    }),
+  getPublishRequestsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getPublishRequestsRetentionCronStatus } = await import(
+      "../services/publish-requests-retention-cron"
+    );
+    return getPublishRequestsRetentionCronStatus();
+  }),
+
+  pruneApprovalStepsRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          publishRequestId: z
+            .union([
+              z.number().int().positive(),
+              z.array(z.number().int().positive()).max(50),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneApprovalStepsRetention } = await import(
+        "../services/approval-steps-retention"
+      );
+      const days = input?.retentionDays ?? 90;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneApprovalStepsRetention({
+        olderThan,
+        publishRequestId: input?.publishRequestId,
+      });
+    }),
+  getApprovalStepsRetentionCronStatus: adminProcedure.query(async () => {
+    const { getApprovalStepsRetentionCronStatus } = await import(
+      "../services/approval-steps-retention-cron"
+    );
+    return getApprovalStepsRetentionCronStatus();
+  }),
 });
 
 // ── Phase 0b: openllm-agent2 native parity sub-routers ──────────────────────

@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../../../_core/trpc.js";
 import { PromotionLifecycle, type PromotionAdapter, type PromotionRequest } from "./lifecycle.js";
 import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
 
@@ -114,6 +114,45 @@ export const promotionRouter = router({
       }
       return await lifecycle().rollback(input.promotionId, userId);
     }),
+
+  // ── Approval-lifecycle retention ──────────────────────────────────────────
+  //
+  // Manual sweep + cron status for the agsNotePromotions retention service.
+  // adminProcedure (not protected) because retention operates across all
+  // tenants and operators reading status are doing cross-tenant ops
+  // monitoring.
+
+  pruneRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+          promotionKind: z
+            .union([
+              z.string().min(1).max(64),
+              z.array(z.string().min(1).max(64)).max(20),
+            ])
+            .optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const { pruneNotePromotionsRetention } = await import(
+        "../note-promotions-retention.js"
+      );
+      const days = input?.retentionDays ?? 90;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneNotePromotionsRetention({
+        olderThan,
+        promotionKind: input?.promotionKind,
+      });
+    }),
+  getRetentionCronStatus: adminProcedure.query(async () => {
+    const { getNotePromotionsRetentionCronStatus } = await import(
+      "../note-promotions-retention-cron.js"
+    );
+    return getNotePromotionsRetentionCronStatus();
+  }),
 });
 
 export type PromotionRouter = typeof promotionRouter;
