@@ -89,6 +89,26 @@ export type {
   ListAttachmentsInput,
 } from "./attachments.js";
 
+// Phase 15-β attachment library surfaces (V1+, 2026-05-13).
+export {
+  ATTACHMENT_MIME_CLASSES,
+  BROWSE_SORT_KEYS,
+  isAttachmentMimeClass,
+  classifyMimeType,
+  browseAttachmentLibrary,
+  findUnusedAttachments,
+  computeAttachmentQuota,
+} from "./attachment-library.js";
+export type {
+  AttachmentMimeClass,
+  BrowseSortKey,
+  BrowseAttachmentLibraryInput,
+  AttachmentLibraryRow,
+  FindUnusedAttachmentsInput,
+  AttachmentQuotaResult,
+  ComputeAttachmentQuotaOptions,
+} from "./attachment-library.js";
+
 export {
   createSavedView,
   getSavedViewById,
