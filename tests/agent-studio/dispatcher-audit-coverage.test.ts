@@ -91,26 +91,63 @@ function walkTsFiles(dir: string): string[] {
  * list. The argument list is delimited by the matching `)` of the
  * opening `(` — count parens to handle nested object literals + calls.
  */
+/**
+ * Replace block comments (`/* ... *\/`) and single-line comments (`// ...`)
+ * with same-length whitespace so byte offsets stay aligned for accurate
+ * line-number reporting. Comment matches in JSDoc (e.g. the boundary-rule
+ * header in `services/graph-agent/engine.ts:7`) and inline doc refs (e.g.
+ * `chat-stream.ts:1174`) would otherwise trip the dispatch-pattern regex
+ * even though no real call exists there.
+ */
+function stripCommentsPreservingOffsets(src: string): string {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    const next = src[i + 1];
+    if (ch === "/" && next === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      for (let k = i; k < stop; k++) {
+        out += src[k] === "\n" ? "\n" : " ";
+      }
+      i = stop;
+    } else if (ch === "/" && next === "/") {
+      let k = i;
+      while (k < src.length && src[k] !== "\n") {
+        out += " ";
+        k++;
+      }
+      i = k;
+    } else {
+      out += ch;
+      i++;
+    }
+  }
+  return out;
+}
+
 function dispatchCallSitesMissingRuntimeRunId(src: string): string[] {
+  const scanSrc = stripCommentsPreservingOffsets(src);
   const violations: string[] = [];
   const callPattern = /dispatchMcpToolCall\s*\(/g;
   let match;
-  while ((match = callPattern.exec(src)) !== null) {
+  while ((match = callPattern.exec(scanSrc)) !== null) {
     const startIdx = match.index;
     const openParenIdx = startIdx + match[0].length - 1;
     let depth = 1;
     let i = openParenIdx + 1;
-    while (i < src.length && depth > 0) {
-      const ch = src[i];
+    while (i < scanSrc.length && depth > 0) {
+      const ch = scanSrc[i];
       if (ch === "(") depth++;
       else if (ch === ")") depth--;
       i++;
     }
     if (depth !== 0) continue; // unbalanced — skip
-    const argBlock = src.slice(openParenIdx + 1, i - 1);
+    const argBlock = scanSrc.slice(openParenIdx + 1, i - 1);
     if (!/\bruntimeRunId\b/.test(argBlock)) {
       // Capture the line number of the call for the error message.
-      const lineNum = src.slice(0, startIdx).split("\n").length;
+      const lineNum = scanSrc.slice(0, startIdx).split("\n").length;
       violations.push(`line ${lineNum}`);
     }
   }

@@ -132,11 +132,13 @@ const EXPECTED_REGISTERED: ReadonlyArray<{
  */
 const EXPECTED_PER_FILE: Record<string, number> = {
   "server/agent-studio/api/cag-router.ts": 1,
+  "server/agent-studio/api/graph-skill-router.ts": 2,
   "server/agent-studio/api/kb-router.ts": 2,
   "server/agent-studio/api/mcp-schema-sync-router.ts": 1,
   "server/agent-studio/api/router.ts": 6,
   "server/agent-studio/api/tool-approvals-router.ts": 1,
   "server/agent-studio/api/workspace-default-bindings-router.ts": 2,
+  "server/agent-studio/services/graph-agent/router.ts": 1,
   "server/agents/router.ts": 8,
   "server/ai-types/taxonomy/router.ts": 1,
   "server/automation/automation-router.ts": 7,
@@ -288,7 +290,7 @@ describe("RETROFIT R1-c3 — every governedProcedure is accounted for repo-wide"
   describe("drift detection — per-file declaration counts match EXPECTED_PER_FILE", () => {
     const discovered = discoverGovernedProcedureCounts();
 
-    it("total declaration count matches the cycle-3 baseline (656)", () => {
+    it("total declaration count matches the cycle-3 baseline (660 after Native Graph Workspace MVP 4)", () => {
       const total = Object.values(discovered).reduce((a, b) => a + b, 0);
       const expected = Object.values(EXPECTED_PER_FILE).reduce((a, b) => a + b, 0);
       expect(
@@ -298,7 +300,7 @@ describe("RETROFIT R1-c3 — every governedProcedure is accounted for repo-wide"
       ).toBe(expected);
     });
 
-    it("file count matches the cycle-3 baseline (99 files)", () => {
+    it("file count matches the cycle-3 baseline (101 files after Native Graph Workspace MVP 4)", () => {
       const expectedKeys = new Set(Object.keys(EXPECTED_PER_FILE));
       const discoveredKeys = new Set(Object.keys(discovered));
 
