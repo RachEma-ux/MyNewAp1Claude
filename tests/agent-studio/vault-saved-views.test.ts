@@ -406,6 +406,10 @@ describe("updateSavedView — Phase 16", () => {
         },
       ],
     });
+    // V1+ Phase 16-γ: updateSavedView now calls getSavedViewById
+    // TWICE — once to snapshot the prior row, once to return the
+    // updated row. Both share the same `rows` fixture in our fake.
+    state.selectQueue.push("byId");
     state.selectQueue.push("byId");
     state.active.viewId = 7;
     const result = await updateSavedView(
@@ -423,7 +427,10 @@ describe("updateSavedView — Phase 16", () => {
     expect(result.updatedAt.getTime()).toBeGreaterThanOrEqual(now.getTime());
   });
 
-  it("throws SavedViewNotFoundError when row is missing after update", async () => {
+  it("throws SavedViewNotFoundError when row is missing (prior snapshot lookup fails first)", async () => {
+    // V1+ Phase 16-γ moved the not-found check earlier: the prior
+    // snapshot lookup runs BEFORE the update, so a missing row throws
+    // at the snapshot read step (not at the post-update lookup).
     const { db, state } = makeFakeDb({});
     state.selectQueue.push("byId");
     state.active.viewId = 999;

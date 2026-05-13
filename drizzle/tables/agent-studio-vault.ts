@@ -479,9 +479,40 @@ export const agsVaultSavedViews = pgTable(
   },
 );
 
+// V1+ Phase 16-γ — immutable saved-view version history.
+// Mirrors `agsNoteVersions` shape: every updateSavedView() captures
+// a snapshot of the prior row (pre-mutation) here so the operator
+// can browse / restore prior view definitions.
+export const agsVaultSavedViewVersions = pgTable(
+  "ags_vault_saved_view_versions",
+  {
+    id: serial("id").primaryKey(),
+    savedViewId: integer("saved_view_id")
+      .notNull()
+      .references(() => agsVaultSavedViews.id),
+    version: integer("version").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    viewKind: varchar("view_kind", { length: 50 }).notNull(),
+    filters: json("filters").$type<Record<string, unknown>>(),
+    sort: json("sort").$type<Record<string, unknown>>(),
+    columns: json("columns").$type<string[]>(),
+    visibility: varchar("visibility", { length: 30 }).notNull(),
+    capturedByUserId: integer("captured_by_user_id"),
+    capturedAt: timestamp("captured_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    savedViewIdx: index("idx_ags_vault_saved_view_versions_view").on(t.savedViewId),
+    versionUnique: uniqueIndex(
+      "uniq_ags_vault_saved_view_versions_view_version",
+    ).on(t.savedViewId, t.version),
+  }),
+);
+
 export type AgsVault = typeof agsVaults.$inferSelect;
 export type AgsVaultMember = typeof agsVaultMembers.$inferSelect;
 export type AgsVaultNote = typeof agsVaultNotes.$inferSelect;
 export type AgsVaultNoteVersion = typeof agsVaultNoteVersions.$inferSelect;
 export type AgsVaultWikilink = typeof agsVaultWikilinks.$inferSelect;
 export type AgsVaultBacklink = typeof agsVaultBacklinks.$inferSelect;
+export type AgsVaultSavedViewVersion =
+  typeof agsVaultSavedViewVersions.$inferSelect;
