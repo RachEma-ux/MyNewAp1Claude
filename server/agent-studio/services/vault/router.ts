@@ -48,6 +48,9 @@ import {
   createSavedView,
   getSavedViewById,
   listSavedViews,
+  listVisibleSavedViewsForUser,
+  listSavedViewVersions,
+  getSavedViewVersionById,
   updateSavedView,
   deleteSavedView,
   SavedViewNotFoundError,
@@ -507,6 +510,67 @@ export const vaultRouter = router({
         }));
       }
       return view;
+    }),
+
+  // V1+ Phase 16-β follow-up: viewer-scoped saved-view listing.
+  // Wraps the service-layer `listVisibleSavedViewsForUser` so the
+  // client can ask for "all saved views I'm allowed to see in this
+  // vault" without thinking about visibility semantics.
+  listVisibleSavedViews: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive(),
+        ownerScope: z.enum(["mine", "all"]).optional(),
+        viewKind: z.string().min(1).max(50).optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const ctxAny = ctx as unknown as { user?: { id?: number } };
+      const userId = ctxAny.user?.id ?? null;
+      const ownerUserId =
+        input.ownerScope === "mine" ? userId : undefined;
+      try {
+        return await listVisibleSavedViewsForUser({
+          vaultId: input.vaultId,
+          ownerUserId,
+          viewKind: input.viewKind,
+          limit: input.limit,
+          viewerUserId: userId,
+        });
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // V1+ Phase 16-γ surface: version history.
+  listSavedViewVersions: protectedProcedure
+    .input(z.object({ savedViewId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      try {
+        return await listSavedViewVersions(input.savedViewId);
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  getSavedViewVersion: protectedProcedure
+    .input(z.object({ versionId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const version = await getSavedViewVersionById(input.versionId);
+      if (!version) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "NOT_FOUND",
+          message: `Saved view version ${input.versionId} not found`,
+        }));
+      }
+      return version;
     }),
 
   updateSavedView: protectedProcedure
