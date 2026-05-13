@@ -554,6 +554,25 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
+  // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
+  // wakes the scan automatically every 5 minutes so operators don't
+  // need to invoke `runHealthAlertScan()` manually. Faster than the
+  // daily retention crons because alerting needs minute-level
+  // detection latency. Persists alert rows to ags_runtime_alerts.
+  // Env-flag-gated via AGS_GRAPH_HEALTH_ALERT_CRON_DISABLED.
+  try {
+    const { ensureHealthAlertCronStarted } = await import(
+      "./services/graph/health-alert-cron"
+    );
+    ensureHealthAlertCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-graph-health-alert-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3b: H1-c5 (cycle-5 audit closure §H1-c5) — install MCP auto-sync
   // subscriber. Bridges live registry snapshots → agsMcpToolKnowledge
   // mirror so operator UIs see current tool catalog. Pre-cycle-5 the
