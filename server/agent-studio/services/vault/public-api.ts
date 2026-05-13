@@ -89,6 +89,22 @@ export type {
   ListAttachmentsInput,
 } from "./attachments.js";
 
+// V2 Phase CRDT-β (2026-05-13): realtime document layer.
+export {
+  REALTIME_DOC_TEXT_KEY,
+  InMemoryRealtimeDocBackend,
+  RealtimeDocSession,
+  getCanonicalContentForSave,
+  getOrCreateRealtimeDocSession,
+  dropRealtimeDocSession,
+  listLiveRealtimeDocSessions,
+} from "./realtime-doc.js";
+export type {
+  RealtimeDocBackend,
+  RealtimeDocSessionKey,
+  RealtimeDocBackendFactory,
+} from "./realtime-doc.js";
+
 // Phase 15-β attachment library surfaces (V1+, 2026-05-13).
 export {
   ATTACHMENT_MIME_CLASSES,
