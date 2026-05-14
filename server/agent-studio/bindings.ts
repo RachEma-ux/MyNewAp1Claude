@@ -25,7 +25,7 @@
  */
 
 import { eq, and } from "drizzle-orm";
-import { getAsDb } from "./db/connection";
+import { getAsDb, getAsDbForWorkspace } from "./db/connection";
 import {
   agsAgentProviderBindings,
   type AgsAgentProviderBinding,
@@ -545,7 +545,13 @@ export async function validateBindingPolicy(
   let writtenAt: Date | null = priorValidatedAt;
   if (refreshTimestamp) {
     const now = new Date();
-    const db = getAsDb();
+    // V1+ MR-3 twenty-ninth batch (PR-V1-97): split-handle via the
+    // already-loaded binding. `getAgentProviderBinding` returned the
+    // binding row, which carries `workspaceId` (it's a non-null
+    // column on agsAgentProviderBindings). Route the UPDATE via
+    // getAsDbForWorkspace(binding.workspaceId) — no extra round-trip
+    // because workspaceId was already pulled in the earlier SELECT.
+    const db = getAsDbForWorkspace(binding.workspaceId);
     await db
       .update(agsAgentProviderBindings)
       .set({ lastValidatedAt: now, updatedAt: now })
