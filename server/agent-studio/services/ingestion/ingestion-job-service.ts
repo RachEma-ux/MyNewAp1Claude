@@ -57,7 +57,20 @@ export interface CompleteJobInput {
 }
 
 export async function completeJob(input: CompleteJobInput): Promise<void> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-third batch (PR-V1-91): split-handle pattern.
+  // SELECT-by-id (Cat C bootstrap) discovers workspaceId, then
+  // UPDATE routes via getAsDbForWorkspace. If the job vanished
+  // (lookup empty), soft-return — completion is observability,
+  // not source of truth.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsIngestionJobs.workspaceId })
+    .from(agsIngestionJobs)
+    .where(eq(agsIngestionJobs.id, input.jobId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   await db
     .update(agsIngestionJobs)
