@@ -326,13 +326,22 @@ export async function patchRacRuntimeTrace(
   traceId: number,
   patch: RacTracePatchInput,
 ): Promise<void> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 twenty-second batch (PR-V1-90): split-handle pattern
+  // (same shape as #831 / #838 / #839 / #840). H4-c7 early-return
+  // preserved — empty patch still short-circuits BEFORE the
+  // discovery SELECT so we don't pay the round-trip for a no-op.
   const norm = buildRacTracePatch(patch);
-  // H4-c7: spread only the keys the caller provided. An UPDATE with
-  // empty SET is a SQL syntax error AND a wasted round-trip — skip
-  // the call entirely when there's nothing to write.
   if (Object.keys(norm).length === 0) return;
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsRacRuntimeTraces.workspaceId })
+    .from(agsRacRuntimeTraces)
+    .where(eq(agsRacRuntimeTraces.id, traceId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
+  if (!db) throw new Error("ASDB unavailable");
   await db
     .update(agsRacRuntimeTraces)
     .set(norm)

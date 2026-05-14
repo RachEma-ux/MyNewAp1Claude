@@ -69,10 +69,19 @@ describe("MR-3 ninth batch source-scan — services/runtime/trace-writer.ts", ()
     expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(false);
   });
 
-  it("patchRacRuntimeTrace is Category B (traceId-scoped) — still calls getAsDb()", () => {
+  it("patchRacRuntimeTrace still references getAsDb() (post-#841 split-handle)", () => {
+    // NOTE: `patchRacRuntimeTrace` was Cat B at the time of #821
+    // (traceId-scoped) and was promoted to Cat A in PR-V1-90 / #841
+    // (twenty-second batch) via the split-handle pattern (SELECT
+    // via getAsDb() for the workspaceId discovery, then UPDATE via
+    // getAsDbForWorkspace(lookup[0].workspaceId)). See
+    // tests/agent-studio/mr-3-twentysecond-batch-trace-writer-
+    // patch.test.ts for the up-to-date two-handle assertions. We
+    // weaken this assertion to just "the function still references
+    // getAsDb()" (true — for the discovery SELECT) so the prior
+    // batch's regression assertion isn't outright deleted.
     const body = extractFunctionBody(src, "patchRacRuntimeTrace");
     expect(body.length).toBeGreaterThan(0);
     expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(true);
-    expect(/getAsDbForWorkspace/.test(body)).toBe(false);
   });
 });
