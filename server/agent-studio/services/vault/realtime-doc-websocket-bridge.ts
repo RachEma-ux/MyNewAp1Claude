@@ -156,12 +156,14 @@ export interface InstallRealtimeDocUpgradeOpts {
   readonly authorize?: AuthorizeRealtimeDocConnectionFn;
   /** Production-required resolver: parse the upgrade request's
    *  cookies/headers and return the authenticated userId, or `null`
-   *  for unauthenticated requests. The first slice ships a default
-   *  that always returns `null` — production wires the real resolver
-   *  in a follow-up PR once the cookie shape is locked. */
+   *  for unauthenticated requests. Sync or async — the dispatcher
+   *  awaits the return value so DB-backed session lookups are fine.
+   *  The first slice's default returns `null` synchronously;
+   *  production callers supply `createDefaultGetUserIdFromUpgradeRequest()`
+   *  from `realtime-doc-default-getuserid.ts` (PR-V1-52). */
   readonly getUserIdFromUpgradeRequest?: (
     req: IncomingMessage,
-  ) => number | null;
+  ) => number | null | Promise<number | null>;
   /** Test seam — override the transport. Defaults to the module
    *  singleton via `getRealtimeDocTransport()`. */
   readonly transport?: Pick<RealtimeDocTransport, "attachConnection">;
@@ -234,7 +236,11 @@ export function installRealtimeDocUpgradeOnServer(
         }
 
         wss.handleUpgrade(req, socket, head, async (ws) => {
-          const userId = getUserId(req);
+          // PR-V1-52: getUserId may return a Promise — production
+          // resolvers consult the OAuth SDK to verify session cookies
+          // (DB-backed). Await unconditionally; sync returns are
+          // resolved to their value by Promise.resolve.
+          const userId = await getUserId(req);
           const conn = adaptWsToRealtimeDocConnection(ws);
           await runUpgradeHandler({
             conn,

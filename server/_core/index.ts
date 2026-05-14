@@ -270,13 +270,21 @@ async function startServer() {
     // V1+ PR-V1-51: wire the production `getVaultIdsForUser` closure
     // (backed by `AsdbVaultRepository.listVaultsForUser`) so the
     // upgrade handler authorizes against real vault membership when
-    // the env flag is set. Auth-cookie resolver still defaults to
-    // null until a separate PR lands (see ADR §"out of scope").
+    // the env flag is set.
     const { createDefaultGetVaultIdsForUser } = await import(
       "../agent-studio/services/vault/realtime-doc-default-getvaultids"
     );
+    // V1+ PR-V1-52: wire the production `getUserIdFromUpgradeRequest`
+    // closure — the OAuth-SDK-backed resolver that verifies the
+    // session cookie. The first slice's null-default deferred this
+    // to a follow-up; we close it here so the env-flagged upgrade
+    // path authenticates against real users.
+    const { createDefaultGetUserIdFromUpgradeRequest } = await import(
+      "../agent-studio/services/vault/realtime-doc-default-getuserid"
+    );
     const result = installRealtimeDocUpgradeOnServer(server, {
       getVaultIdsForUser: createDefaultGetVaultIdsForUser(),
+      getUserIdFromUpgradeRequest: createDefaultGetUserIdFromUpgradeRequest(),
     });
     if (result.installed) {
       console.log(
