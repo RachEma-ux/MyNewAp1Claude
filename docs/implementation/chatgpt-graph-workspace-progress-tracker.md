@@ -157,7 +157,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | WebSocket upgrade pipeline ADR + first slice (V2.0) | #789 | `a40ab696` |
 | CRDT-γ-3-framing message framing primitives + dispatcher (V2.0) | #790 | `e99fcbf5` |
 | CRDT-γ-3-framing transport wire-up (V2.0) | #791 | `337753e6` |
-| 17-γ canvas projection events sink + caller hook (V1.5) | #792 | pending |
+| 17-γ canvas projection events sink + caller hook (V1.5) | #792 | `0540c826` |
+| 18-γ-contracts extension lane hook contracts (V1.5) | #793 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and

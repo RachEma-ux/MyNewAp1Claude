@@ -54,3 +54,16 @@ export {
   type LaneHookFn,
   type LaneHookOutcome,
 } from "./lane-hooks.js";
+
+// V1+ 18-γ-contracts: typed per-lane contract surface.
+export {
+  CONTRACTED_EXTENSION_LANES,
+  type ContractedExtensionLane,
+  type ContractedChunkProvenance,
+  type ContractedRetrievalChunk,
+  type ContractedRetrieveOutcome,
+  type ContractedAssembleOutcome,
+  type ContractedComposeOutcome,
+  type ContractedLaneHookOutcome,
+  type ContractedLaneHookFn,
+} from "./lane-hook-contracts.js";
