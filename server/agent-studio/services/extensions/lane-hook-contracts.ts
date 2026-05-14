@@ -21,7 +21,6 @@
 import type {
   RetrievalPlanItem,
 } from "../rac/retrieval-planner.js";
-import type { BuildPackInput } from "../cag/builder.js";
 import type { ExtensionRecord, InvokeFromExtensionInput } from "./contracts.js";
 import type { LaneHookOutcome } from "./lane-hooks.js";
 
@@ -107,13 +106,23 @@ export interface ContractedAssembleOutcome extends LaneHookOutcome {
 
 /**
  * Compose-lane outcome. Returns supplemental CAG block contributions
- * merged INTO the pack's `userBlocks` slot. CAG hash invariant
+ * merged INTO the pack's user-block slot. CAG hash invariant
  * preserved — a different contribution produces a different pack id.
+ *
+ * NOTE (PR-V1-82 fix): the original #793 contract referenced
+ * `BuildPackInput["userBlocks"]`, but the current `BuildPackInput`
+ * (server/agent-studio/services/cag/builder.ts) does NOT carry a
+ * `userBlocks` field — that was a planned-but-not-shipped slot. To
+ * keep this contract type-buildable when the boot import chain
+ * resolves it (via #833 boot Step 3.31), the supplemental-blocks
+ * field is typed as an opaque array. The hash invariant still
+ * applies via the eventual CAG builder integration.
  */
 export interface ContractedComposeOutcome extends LaneHookOutcome {
-  /** Block contributions in CAG `BuildPackInput.userBlocks` shape.
-   *  The builder hashes the final pack including these blocks. */
-  readonly supplementalBlocks?: BuildPackInput["userBlocks"];
+  /** Opaque block contributions. The eventual CAG-builder integration
+   *  is responsible for projecting these into whatever slot the
+   *  builder accepts; the wrapper does not inspect the payload. */
+  readonly supplementalBlocks?: ReadonlyArray<Record<string, unknown>>;
 }
 
 // ============================================================================
