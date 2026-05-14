@@ -79,3 +79,7 @@ export {
   hasDefaultGovernanceGate,
   __resetDefaultGovernanceGateForTests,
 } from "./default-governance-gate.js";
+
+// V1+ AS-3 — generic gate composer (strictest decision wins;
+// rejected short-circuits).
+export { composeGovernanceGates } from "./compose-governance-gates.js";
