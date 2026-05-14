@@ -41,6 +41,7 @@ import {
   type CreateCanvasInput,
   type CreateCanvasNodeInput,
 } from "./types.js";
+import { recordCanvasProjectionEvent } from "./projection-events-sink.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -160,7 +161,23 @@ export async function createCanvasNode(
     })
     .returning();
   if (!inserted) throw new Error("Failed to insert canvas node");
-  return rowToNode(inserted as Record<string, unknown>);
+  const node = rowToNode(inserted as Record<string, unknown>);
+  // V1+ 17-γ-canvas-events: emit the projection event when this
+  // node references a vault note. No-op when no sink is registered
+  // (default state — preserves existing behavior). Errors are
+  // caught inside recordCanvasProjectionEvent so a faulty sink
+  // never breaks the mutation path.
+  if (node.referencedNoteId != null) {
+    await recordCanvasProjectionEvent({
+      kind: "canvas.note_reference_changed",
+      payload: {
+        canvasId: node.canvasId,
+        canvasNodeId: node.id,
+        referencedNoteId: node.referencedNoteId,
+      },
+    });
+  }
+  return node;
 }
 
 export async function createCanvasEdge(

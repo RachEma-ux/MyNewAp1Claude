@@ -44,3 +44,17 @@ export type {
   CanvasReferenceRemovalInput,
   BuildAllCanvasReferencesInput,
 } from "./projection.js";
+
+// V1+ 17-γ: canvas → graph projection events sink (caller→worker
+// glue). Mirrors AS-2's default-governance-gate registry pattern.
+export {
+  registerCanvasProjectionEventSink,
+  getCanvasProjectionEventSink,
+  hasCanvasProjectionEventSink,
+  __resetCanvasProjectionEventSinkForTests,
+  recordCanvasProjectionEvent,
+} from "./projection-events-sink.js";
+export type {
+  CanvasProjectionEvent,
+  CanvasProjectionEventSink,
+} from "./projection-events-sink.js";

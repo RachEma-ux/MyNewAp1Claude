@@ -413,7 +413,7 @@ The MVP 0–4 work above is **closed**; the V1+ successor execution plan (`agent
 3. **CRDT-γ-3-reconnect** — client-side reconnect + server-side session-resume semantics.
 4. **Production auth-cookie resolver** for `getUserIdFromUpgradeRequest` (DI seam shipped in #789).
 5. **`getVaultIdsForUser` production wiring** from `VaultRepository.listVaultsForUser` at the install point.
-6. **17-γ canvas caller migration** — needs event-bus seam decision (`ProjectionSyncWorker` has no singleton/event-bus today).
+6. **17-γ canvas persistence sink + drain wiring** — PR-V1-41 (#792) shipped the sink-registry + caller-side hook. Follow-ups: add `ags_canvas_projection_events` table + DB-backed sink + boot-installed drain that connects sink → `ProjectionSyncWorker.handle()`.
 7. **18-γ extension lane hooks** — needs RAC pipeline integration knowledge per lane.
 8. **MR-3 caller migration** — bounded campaign over `getAsDb()` call sites.
 9. **15-δ / 16-δ UI surfaces** — focused component-per-PR work.
