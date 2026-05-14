@@ -160,7 +160,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | 17-γ canvas projection events sink + caller hook (V1.5) | #792 | `0540c826` |
 | 18-γ-contracts extension lane hook contracts (V1.5) | #793 | `0d8bb0fc` |
 | MR-3 getAsDb caller inventory + first batch migration (V2.0) | #794 | `d7297ad6` |
-| 16-δ SavedViewVersionHistoryPanel first UI surface (V1.5) | #795 | pending |
+| 16-δ SavedViewVersionHistoryPanel first UI surface (V1.5) | #795 | `370308dd` |
+| 15-δ AttachmentListPanel second UI surface (V1.5) | #796 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
