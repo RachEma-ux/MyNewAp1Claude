@@ -69,6 +69,10 @@ const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
 const VaultAttachmentsPage = lazy(() => import("../pages/VaultAttachmentsPage"));
 // V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin page.
 const VaultSavedViewsPage = lazy(() => import("../pages/VaultSavedViewsPage"));
+// V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
+const CanvasProjectionEventsDrainPage = lazy(
+  () => import("../pages/CanvasProjectionEventsDrainPage"),
+);
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
@@ -176,6 +180,14 @@ function parseRoute(path: string): ParsedRoute {
   // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-saved-views")) {
     return { ...empty, view: "vault-saved-views" as any, homeMode: null };
+  }
+  // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
+  if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
+    return {
+      ...empty,
+      view: "canvas-projection-events-drain" as any,
+      homeMode: null,
+    };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -327,6 +339,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/vault-saved-views");
       return;
     }
+    // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
+    if ((key as string) === "canvas-projection-events-drain") {
+      navigate("/agent-studio/canvas-projection-events-drain");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -395,6 +412,9 @@ export default function AgentStudioShell() {
         // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
         case "vault-saved-views" as any:
           return <VaultSavedViewsPage />;
+        // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
+        case "canvas-projection-events-drain" as any:
+          return <CanvasProjectionEventsDrainPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
