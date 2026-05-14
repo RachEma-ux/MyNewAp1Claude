@@ -24,7 +24,7 @@
 
 import { createHash } from "crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import {
   agsKnowledgeUnits,
   agsDataValidationResults,
@@ -50,7 +50,10 @@ export interface InsertUnitResult {
 export async function insertUnit(
   input: InsertUnitInput,
 ): Promise<InsertUnitResult> {
-  const db = getAsDb();
+  // V1+ MR-3 fourth batch: workspaceId is required on InsertUnitInput
+  // (via NormalizedKnowledgeUnitInput). Phase-1 shim delegates to
+  // default DB; Phase-2 will route to the workspace's home region.
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   // ── Contract checks (D-NKU-3 + D-UI-2) ──
