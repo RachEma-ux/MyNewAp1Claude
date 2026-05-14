@@ -42,7 +42,7 @@
  * operators flip in staging.
  */
 
-import { getAsDb } from "../../db/connection";
+import { getAsDbForWorkspace } from "../../db/connection";
 import { agsDraftMcpServers } from "../../../../drizzle/tables/agent-studio";
 import { eq } from "drizzle-orm";
 import { listSourcesForWorkspace } from "../rac/sources/store";
@@ -67,7 +67,7 @@ export const defaultAutoSyncResolver: AutoSyncContextResolver = async (
   const fallbackWorkspaceId = readWorkspaceFallback();
   if (fallbackWorkspaceId === null) return null;
 
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(fallbackWorkspaceId);
   if (!db) return null;
 
   // 1. Look up the per-process serverId in agsDraftMcpServers.
