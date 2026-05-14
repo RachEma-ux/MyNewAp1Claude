@@ -38,6 +38,7 @@ import {
   agsPublishTargetExecutions,
 } from "../../../../drizzle/tables/agent-studio-publish-targets.js";
 import { getPublishPusher } from "./registry.js";
+import { getDefaultGovernanceGate } from "./default-governance-gate.js";
 import {
   isPublishTargetType,
   type GovernanceGateFn,
@@ -183,14 +184,18 @@ export async function executePublish(
     target.id,
     input.payload.sourcePromotionId,
   );
-  // V1+ Phase 19-γ — governance gate. When supplied, branch BEFORE
-  // staging the ledger row. The gate result drives the row's status:
+  // V1+ Phase 19-γ — governance gate. Per-call `input.governanceGate`
+  // wins; otherwise the module-default installed via
+  // `installDefaultGovernanceGate` is consulted (AS-2). When neither
+  // is set, no gate runs and the decision stays "approved".
+  // The gate result drives the row's status:
   //   approved → continue (pusher runs, in_flight → succeeded/failed)
   //   pending  → stage a `pending` ledger row; pusher NEVER runs;
   //              caller re-invokes after governance sign-off.
   //   rejected → stage a `failed` ledger row with errorMessage
   //              "governance_rejected"; pusher NEVER runs.
-  const governanceGate = input.governanceGate;
+  const governanceGate =
+    input.governanceGate ?? getDefaultGovernanceGate();
   let governanceDecision: "approved" | "pending" | "rejected" = "approved";
   if (governanceGate) {
     governanceDecision = await governanceGate({

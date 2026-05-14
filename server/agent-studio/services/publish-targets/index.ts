@@ -70,3 +70,12 @@ export {
   type ResolvePublishRequestIdFn,
   type CreateApprovalStepsGovernanceGateOptions,
 } from "./governance-gate-approval-steps.js";
+
+// V1+ AS-2 — default gate registry consulted by the executor when
+// callers do not supply an explicit `governanceGate`.
+export {
+  installDefaultGovernanceGate,
+  getDefaultGovernanceGate,
+  hasDefaultGovernanceGate,
+  __resetDefaultGovernanceGateForTests,
+} from "./default-governance-gate.js";
