@@ -707,6 +707,37 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.31 — V1+ 18-γ follow-up (2026-05-14): env-flag-gated
+  // default observability-only lane hooks install. PR-V1-82 (#833).
+  // PR-V1-81 (#832) shipped the typed observability hook factory +
+  // installObservabilityLaneHooks helper; this step wires an
+  // env-flag opt-in at boot.
+  //
+  // AGS_EXTENSIONS_LANE_HOOKS_OBSERVABILITY=on → installs the
+  // observability hooks for retrieve / assemble / compose lanes.
+  // Anything else / unset → no-op (default OFF; the α "assert +
+  // ledger" fallback runs unchanged).
+  try {
+    const { maybeInstallDefaultObservabilityLaneHooks } = await import(
+      "./services/extensions/install-default-observability-lane-hooks"
+    );
+    const result = maybeInstallDefaultObservabilityLaneHooks();
+    if (result.installed) {
+      console.log(
+        `[ags-extensions-lane-observability] installed — lanes=${result.installedLanes.join(",")}`,
+      );
+    } else {
+      console.log(
+        `[ags-extensions-lane-observability] not installed — env flag unset (α fallback active)`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-extensions-lane-observability] install skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't

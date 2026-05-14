@@ -281,12 +281,17 @@ describe("source-scan boundary", () => {
     );
   });
 
-  it("CAG types are imported type-only", () => {
-    expect(
-      /import\s+type\s*\{[^}]*\}\s*from\s+["']\.\.\/cag\//s.test(src),
-    ).toBe(true);
-    expect(/import\s+\{[^}]*\}\s*from\s+["']\.\.\/cag\//s.test(src)).toBe(
-      false,
+  it("CAG types, if imported at all, are imported type-only", () => {
+    // PR-V1-82 (#833) dropped the `BuildPackInput` import — the
+    // `userBlocks` field it referenced doesn't exist on
+    // BuildPackInput, so the type was rewritten as an opaque
+    // `ReadonlyArray<Record<string, unknown>>`. As a result this
+    // file no longer imports anything from `../cag/`. The boundary
+    // assertion is now: IF a CAG import exists, it must be
+    // type-only. Zero CAG imports is also acceptable.
+    const valueImportMatch = /import\s+\{[^}]*\}\s*from\s+["']\.\.\/cag\//s.test(
+      src,
     );
+    expect(valueImportMatch).toBe(false);
   });
 });
