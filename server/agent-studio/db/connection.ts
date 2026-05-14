@@ -57,3 +57,37 @@ export function getAsDb() {
 export function resetAsDb() {
   _asDb = null;
 }
+
+/**
+ * V1+ MR-3 caller migration shim. Workspace-aware accessor for
+ * service-layer call sites that need to be multi-region-ready
+ * WITHOUT becoming region-aware today.
+ *
+ * Phase 1 (this PR): `workspaceId` is observed but unused; the shim
+ * delegates to `getAsDb()`. Single-region operational baseline is
+ * preserved bit-for-bit — see
+ * `docs/implementation/agent-studio-mr-3-getasdb-inventory.md`.
+ *
+ * Phase 2 (follow-up): once the workspace→region lookup table is
+ * wired, this shim consults the region helper and routes accordingly.
+ * Single-region deployments still get the existing behavior; multi-
+ * region deployments route the workspace's writes to its home region.
+ *
+ * Returns null on connection failure (same contract as `getAsDb`).
+ *
+ * Why a shim and not direct `getDbForWorkspace`:
+ *   `getDbForWorkspace` (from `services/region/connection-helper.ts`)
+ *   requires the caller to pass `{ availableRegions, workspaceRegionKey }`
+ *   pre-resolved. Wiring that at every call site is a heavyweight
+ *   coupling change. The shim takes only `workspaceId` and performs
+ *   the lookup internally (Phase 2). Callers don't become region-aware.
+ */
+export function getAsDbForWorkspace(
+  workspaceId: number,
+): ReturnType<typeof getAsDb> {
+  // Phase 1 — observe + delegate. Future phase consults the region
+  // helper. We accept `workspaceId` as a number to lock in the API
+  // shape callers will need under Phase 2.
+  void workspaceId;
+  return getAsDb();
+}
