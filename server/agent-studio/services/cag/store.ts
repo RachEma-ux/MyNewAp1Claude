@@ -17,7 +17,7 @@
 
 import { createHash } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import {
   agsCagCapabilityPacks,
 } from "../../../../drizzle/tables/agent-studio";
@@ -77,7 +77,7 @@ function rowToPack(row: typeof agsCagCapabilityPacks.$inferSelect): CagCapabilit
  * for a draft starts at version 1.
  */
 export async function createPack(input: CreatePackInput): Promise<CreatePackResult> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const newHashMap = manifestToHashMap(input.sourceManifest);
@@ -189,7 +189,7 @@ export async function getPackById(
   workspaceId: number,
   packId: number,
 ): Promise<CagCapabilityPack | null> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const rows = await db
@@ -258,7 +258,7 @@ export async function listPacksForAgent(
   workspaceId: number,
   agentId: number,
 ): Promise<CagCapabilityPack[]> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const rows = await db
