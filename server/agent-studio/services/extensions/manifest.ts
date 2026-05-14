@@ -84,7 +84,18 @@ export async function installExtension(
 export async function approveExtension(
   input: ApproveExtensionInput,
 ): Promise<ExtensionRecord> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-first batch (PR-V1-89): split-handle pattern.
+  // SELECT-by-id (Cat C bootstrap) discovers workspaceId, then
+  // UPDATE routes via getAsDbForWorkspace.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const lookup = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, input.extensionId))
+    .limit(1);
+  if (lookup.length === 0) throw new ExtensionNotFoundError(input.extensionId);
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new AsdbUnavailableError();
   await db
     .update(agsExtensions)
@@ -108,7 +119,17 @@ export async function setExtensionStatus(
   if (!isExtensionGovernanceStatus(status)) {
     throw new ExtensionStatusInvalidError(status);
   }
-  const db = getAsDb();
+  // V1+ MR-3 twenty-first batch (PR-V1-89): split-handle pattern
+  // (same shape as approveExtension above).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const lookup = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, extensionId))
+    .limit(1);
+  if (lookup.length === 0) throw new ExtensionNotFoundError(extensionId);
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new AsdbUnavailableError();
   const patch: Record<string, unknown> = {
     governanceStatus: status,
