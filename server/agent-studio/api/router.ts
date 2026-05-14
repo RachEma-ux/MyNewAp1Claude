@@ -76,6 +76,7 @@ import { workspaceObservabilityRouter } from "../services/workspace-observabilit
 import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
+import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
 import {
@@ -2914,6 +2915,12 @@ export const agentStudioRouter = router({
   // alerts read surface. Pair to graphProjection — both expose
   // cron status to the operator dashboard's single panel pattern.
   graphHealth: graphHealthRouter,
+  // V1+ 17-γ follow-up (2026-05-14): canvas projection events
+  // drain scheduler observability — `getDrainStatus` reads the
+  // module-singleton tick state (#810) so operators can verify
+  // the scheduler (#811 / #812) is running + per-workspace
+  // cursor progress without ssh-ing the process.
+  canvasProjectionEventsDrain: canvasProjectionEventsDrainRouter,
   // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
   // findings + finding→proposal conversion surface for operator UI.
   graphQuality: graphQualityRouter,
