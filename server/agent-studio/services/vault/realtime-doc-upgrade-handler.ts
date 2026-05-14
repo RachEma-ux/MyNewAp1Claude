@@ -129,12 +129,16 @@ export async function handleRealtimeDocUpgrade(
     return { attached: true, disposer };
   }
 
-  const closeCode = REALTIME_DOC_DENY_CLOSE_CODES[decision.reason];
+  // Narrow `decision` to the deny variant. Repo runs `strict: false`
+  // so the discriminated union does not auto-narrow after the early
+  // return above; pull the deny payload out explicitly.
+  const denyReason = (decision as { allow: false; reason: RealtimeDocAuthorizationDenyReason }).reason;
+  const closeCode = REALTIME_DOC_DENY_CLOSE_CODES[denyReason];
   try {
-    input.conn.close(closeCode, decision.reason);
+    input.conn.close(closeCode, denyReason);
   } catch {
     // Tolerate a connection that's already closed (race against
     // client-side abort). The deny outcome is unchanged.
   }
-  return { attached: false, reason: decision.reason, closeCode };
+  return { attached: false, reason: denyReason, closeCode };
 }

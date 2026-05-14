@@ -395,3 +395,28 @@ The execution prompt §15 mandates this artifact when "tool/runtime limits physi
 - Existing inventory: `docs/implementation/native-graph-workspace-existing-inventory.md`
 - Backend decision: `docs/architecture/agent-studio-active-graph-backend-decision.md`
 - Roadmap V3 (predecessor) closure: `~/.claude/projects/-root/memory/project_runtime_hardening_complete.md`
+
+---
+
+## V1+ Resume State (post-PR #789, 2026-05-14)
+
+The MVP 0–4 work above is **closed**; the V1+ successor execution plan (`agent-studio-native-graph-workspace-v1-v2-execution-plan.md`) has been actively shipping since 2026-05-13. As of PR #789 (WebSocket upgrade pipeline ADR + first slice) the V1+ ledger holds 38 entries (PR-V1-1..PR-V1-38). Key arcs:
+
+- **OL-1..OL-9 — offline-cache chain end-to-end live.** Boot wires the queue (OL-7), `enqueueOfflineVaultMutation` puts entries in (OL-8), `routeVaultMutation` lets UI call sites decide live-vs-offline (OL-9).
+- **AS-1..AS-4 — publish-target governance composition stack.** Adapter (AS-1) + default-gate registry (AS-2) + `composeGovernanceGates` (AS-3) + payload resolver + env-flag boot install (AS-4). Operators flip `AGS_PUBLISH_GOVERNANCE_GATE=approval_steps_payload_resolver` to enable; default OFF preserves prior "no gate ⇒ approved" semantics.
+- **CRDT-γ-3 stack — auth + upgrade-handler + WebSocket bridge.** Authorization rule (#787) + composition entry-point (#788) + `ws` v8 bridge with `noServer:true` (#789, this PR) wire the realtime-doc transport into the shared `http.Server` via `installRealtimeDocUpgradeOnServer`. Env-flag gated (`AGS_REALTIME_DOC_WEBSOCKET_ENABLED=true`); default OFF. ADR at `docs/architecture/agent-studio-websocket-upgrade-pipeline.md`.
+
+**Next named follow-ups (each independent, each its own PR):**
+
+1. **CRDT-γ-3-framing** — y-protocols sync + awareness framing dispatch inside the `RealtimeDocSession` message handler. Transport layer (this PR) is stable across this rollout.
+2. **CRDT-γ-3-reconnect** — client-side reconnect + server-side session-resume semantics.
+3. **Production auth-cookie resolver** for `getUserIdFromUpgradeRequest` (DI seam shipped in #789).
+4. **`getVaultIdsForUser` production wiring** from `VaultRepository.listVaultsForUser` at the install point.
+5. **17-γ canvas caller migration** — needs event-bus seam decision (`ProjectionSyncWorker` has no singleton/event-bus today).
+6. **18-γ extension lane hooks** — needs RAC pipeline integration knowledge per lane.
+7. **MR-3 caller migration** — bounded campaign over `getAsDb()` call sites.
+8. **15-δ / 16-δ UI surfaces** — focused component-per-PR work.
+
+### Resume Instruction (V1+)
+
+> **Resume by picking the next item from the §V1+ Resume State follow-up list.** Continue under the standing autonomous-execution directive. Each follow-up names files explicitly in the V1+ plan ledger (`agent-studio-native-graph-workspace-v1-v2-execution-plan.md` §6). Skip nothing; surface a real hard blocker by its precise name if one appears (see `~/.claude/projects/-root/memory/feedback_native_graph_workspace_continuing_rule.md` for the blocker definition). Default OFF for any new env-gated install; preserve existing call-site behavior unless an ADR explicitly authorizes a behavior flip.
