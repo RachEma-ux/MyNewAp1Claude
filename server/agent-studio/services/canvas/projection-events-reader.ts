@@ -40,7 +40,10 @@ export interface ReadCanvasProjectionEventsAfterInput {
 
 export interface ReadCanvasProjectionEventsAfterOptions {
   /** Test seam — override the DB accessor. Production defaults to
-   *  `getAsDb()`. */
+   *  `getAsDbForWorkspace(input.workspaceId)` (Phase-1 shim still
+   *  delegates to `getAsDb()`). Test fixtures retain the nullary
+   *  signature: they construct their own per-test DB so workspace
+   *  routing isn't relevant in unit tests. */
   readonly getDb?: () =>
     | {
         select: (
@@ -85,7 +88,7 @@ export async function readCanvasProjectionEventsAfter(
   const db =
     options.getDb != null
       ? options.getDb()
-      : (await loadDefaultGetDb())();
+      : (await loadDefaultGetDbForWorkspace())(input.workspaceId);
   if (!db) return [];
 
   const rows = await (db as {
@@ -122,7 +125,14 @@ export async function readCanvasProjectionEventsAfter(
   return rows;
 }
 
-async function loadDefaultGetDb() {
+async function loadDefaultGetDbForWorkspace() {
+  // V1+ MR-3 sixteenth batch (PR-V1-77): widened from getAsDb()
+  // to getAsDbForWorkspace(workspaceId). Phase-1 shim still
+  // delegates to getAsDb() so single-region behavior is preserved
+  // bit-for-bit; Phase-2 routes by region without further caller
+  // changes.
   const mod = await import("../../db/connection.js");
-  return mod.getAsDb as unknown as () => unknown;
+  return mod.getAsDbForWorkspace as unknown as (
+    workspaceId: number,
+  ) => unknown;
 }

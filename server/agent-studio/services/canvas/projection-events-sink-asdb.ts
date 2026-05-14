@@ -89,7 +89,10 @@ export function createAsdbCanvasProjectionEventSink(
       return;
     }
 
-    const db = (options.getDb ?? (await loadDefaultGetDb()))();
+    const db =
+      options.getDb != null
+        ? options.getDb()
+        : (await loadDefaultGetDbForWorkspace())(workspaceId);
     if (!db) {
       console.warn(
         "[ags-canvas-projection-asdb] ASDB unavailable — event dropped",
@@ -120,11 +123,20 @@ export function createAsdbCanvasProjectionEventSink(
   };
 }
 
-async function loadDefaultGetDb(): Promise<
-  () => { insert: unknown; select: unknown } | null
+async function loadDefaultGetDbForWorkspace(): Promise<
+  (workspaceId: number) => { insert: unknown; select: unknown } | null
 > {
+  // V1+ MR-3 sixteenth batch (PR-V1-77): widened to
+  // getAsDbForWorkspace(workspaceId). By the time this lazy loader
+  // fires, the sink has already resolved workspaceId via the
+  // resolveWorkspaceId hook (which legitimately remains on
+  // getAsDb() — it's the bootstrapping lookup before workspaceId
+  // is known). Phase-1 shim still delegates to getAsDb() so
+  // single-region behavior is preserved bit-for-bit.
   const mod = await import("../../db/connection.js");
-  return mod.getAsDb as unknown as () => {
+  return mod.getAsDbForWorkspace as unknown as (
+    workspaceId: number,
+  ) => {
     insert: unknown;
     select: unknown;
   } | null;
