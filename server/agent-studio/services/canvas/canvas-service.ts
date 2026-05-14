@@ -23,12 +23,13 @@
 
 import { and, asc, eq } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
   agsCanvases,
   agsCanvasNodes,
   agsCanvasEdges,
 } from "../../../../drizzle/tables/agent-studio-canvas.js";
+import { agsVaults } from "../../../../drizzle/tables/agent-studio-vault.js";
 import {
   CanvasNodeKindError,
   CanvasNotFoundError,
@@ -96,7 +97,24 @@ function rowToEdge(r: Record<string, unknown>): CanvasEdgeRecord {
 export async function createCanvas(
   input: CreateCanvasInput,
 ): Promise<CanvasRecord> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-fifth batch (PR-V1-93): split-handle pattern with
+  // a vault→workspace lookup. The Canvas table itself doesn't carry
+  // workspaceId, but its parent vault does (agsVaults.workspaceId).
+  // We SELECT-by-id to discover the vault's workspaceId (Cat C
+  // bootstrap lookup), then route the INSERT through
+  // getAsDbForWorkspace. If the vault row is missing OR the column
+  // is null (legacy rows), we fall back to getAsDb() — the FK
+  // constraint on the INSERT will surface the missing-vault error.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const lookup = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaults)
+    .where(eq(agsVaults.id, input.vaultId))
+    .limit(1);
+  const workspaceId = lookup[0]?.workspaceId ?? null;
+  const db =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupDb;
   if (!db) throw new AsdbUnavailableError();
   const [inserted] = await db
     .insert(agsCanvases)
