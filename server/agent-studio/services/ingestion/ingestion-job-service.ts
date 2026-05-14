@@ -12,7 +12,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import { agsIngestionJobs } from "../../../../drizzle/tables/agent-studio";
 
 export interface StartJobInput {
@@ -25,7 +25,10 @@ export interface StartJobInput {
 }
 
 export async function startJob(input: StartJobInput): Promise<number> {
-  const db = getAsDb();
+  // V1+ MR-3 third batch: workspaceId is required on StartJobInput.
+  // Phase-1 shim delegates to default DB; Phase-2 will route to the
+  // workspace's home region.
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const [row] = await db
     .insert(agsIngestionJobs)
