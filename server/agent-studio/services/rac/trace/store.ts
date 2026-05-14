@@ -182,7 +182,14 @@ export async function writeContextBlocks(
   rows: WriteContextBlockInput[],
 ): Promise<void> {
   if (rows.length === 0) return;
-  const db = getAsDb();
+  // V1+ MR-3 seventeenth batch (PR-V1-78): route via the workspaceId
+  // carried on the first row. Caller invariant: every row in a single
+  // writeContextBlocks call belongs to the same workspace (context
+  // blocks share a parent trace, which is workspace-scoped). Phase-1
+  // shim still delegates to getAsDb() so single-region behavior is
+  // preserved bit-for-bit; Phase-2 will route by region without
+  // caller changes.
+  const db = getAsDbForWorkspace(rows[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   await db.insert(agsRacContextBlocks).values(
     rows.map((r) => ({
