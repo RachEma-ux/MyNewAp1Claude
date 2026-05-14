@@ -12,7 +12,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import { agsProvenanceRecords } from "../../../../drizzle/tables/agent-studio";
 
 export interface RecordProvenanceInput {
@@ -28,7 +28,10 @@ export interface RecordProvenanceInput {
 export async function recordProvenance(
   input: RecordProvenanceInput,
 ): Promise<number> {
-  const db = getAsDb();
+  // V1+ MR-3 fifth batch: workspaceId is required on
+  // RecordProvenanceInput. Phase-1 shim delegates to default DB;
+  // Phase-2 will route to the workspace's home region.
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const [row] = await db
     .insert(agsProvenanceRecords)
