@@ -67,6 +67,8 @@ const AgentMcpManagerPage = lazy(() => import("../pages/AgentMcpManagerPage"));
 const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
 // V1+ 15-δ slice (PR-V1-83): Vault Attachments admin page.
 const VaultAttachmentsPage = lazy(() => import("../pages/VaultAttachmentsPage"));
+// V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin page.
+const VaultSavedViewsPage = lazy(() => import("../pages/VaultSavedViewsPage"));
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
@@ -170,6 +172,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── V1+ 15-δ slice (PR-V1-83): Vault Attachments admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-attachments")) {
     return { ...empty, view: "vault-attachments" as any, homeMode: null };
+  }
+  // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin (no agent context) ──
+  if (path.startsWith("/agent-studio/vault-saved-views")) {
+    return { ...empty, view: "vault-saved-views" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -316,6 +322,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/vault-attachments");
       return;
     }
+    // V1+ 16-δ slice (PR-V1-85): vault-saved-views is a global view.
+    if ((key as string) === "vault-saved-views") {
+      navigate("/agent-studio/vault-saved-views");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -381,6 +392,9 @@ export default function AgentStudioShell() {
         // ── V1+ 15-δ slice (PR-V1-83): Vault Attachments admin ──
         case "vault-attachments" as any:
           return <VaultAttachmentsPage />;
+        // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
+        case "vault-saved-views" as any:
+          return <VaultSavedViewsPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
