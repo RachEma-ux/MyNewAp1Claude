@@ -33,7 +33,7 @@
  */
 
 import { and, eq, isNull, ne, sql } from "drizzle-orm";
-import { getAsDb } from "../../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../../db/connection";
 import { agsKnowledgeUnits } from "../../../../../drizzle/tables/agent-studio";
 import type {
   RacIngestionAdapter,
@@ -88,7 +88,7 @@ export const knowledgeUnitAdapter: RacIngestionAdapter = {
   async search(input: RacRetrievalRequest): Promise<RacRetrievalResult> {
     const start = Date.now();
     const warnings: string[] = [];
-    const db = getAsDb();
+    const db = getAsDbForWorkspace(input.workspaceId);
     if (!db) {
       return { chunks: [], latencyMs: 0, warnings: ["asdb_unavailable"] };
     }
