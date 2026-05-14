@@ -161,7 +161,9 @@ PRs per each phase's "out of scope for the α slice" section.
 | 18-γ-contracts extension lane hook contracts (V1.5) | #793 | `0d8bb0fc` |
 | MR-3 getAsDb caller inventory + first batch migration (V2.0) | #794 | `d7297ad6` |
 | 16-δ SavedViewVersionHistoryPanel first UI surface (V1.5) | #795 | `370308dd` |
-| 15-δ AttachmentListPanel second UI surface (V1.5) | #796 | pending |
+| 15-δ AttachmentListPanel second focused UI surface (V1.5) | #796 | `81fbe761` |
+| MR-3 second batch — `vault/repository-asdb.ts::createVault` (V2.0) | #797 | pending |
+| MR-3 third batch — `ingestion/ingestion-job-service.ts::startJob` (V2.0) | #798 | `176befbb` |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and

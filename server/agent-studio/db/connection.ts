@@ -83,11 +83,13 @@ export function resetAsDb() {
  *   the lookup internally (Phase 2). Callers don't become region-aware.
  */
 export function getAsDbForWorkspace(
-  workspaceId: number,
+  workspaceId: number | null | undefined,
 ): ReturnType<typeof getAsDb> {
   // Phase 1 — observe + delegate. Future phase consults the region
-  // helper. We accept `workspaceId` as a number to lock in the API
-  // shape callers will need under Phase 2.
+  // helper. We accept `workspaceId` as nullable because some callers
+  // (e.g. createVault with optional workspaceId on the input schema)
+  // can't always supply one. Phase 2 will treat null/undefined as
+  // "use the default region" rather than throwing.
   void workspaceId;
   return getAsDb();
 }
