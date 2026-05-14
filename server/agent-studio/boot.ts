@@ -610,6 +610,34 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.28 — V1+ 17-γ follow-up (2026-05-14): env-flag-gated
+  // default canvas projection events sink install. PR-V1-41 (#792)
+  // shipped the sink registry with a no-op default; PR-V1-53 (#804)
+  // shipped the ags_canvas_projection_events table; PR-V1-54 (#805)
+  // shipped the ASDB-backed sink. This wire-up registers the sink
+  // when AGS_CANVAS_PROJECTION_EVENTS_SINK=asdb. Default OFF —
+  // preserves the silent-swallow default behavior on first install.
+  try {
+    const { maybeInstallDefaultCanvasProjectionEventsSink } = await import(
+      "./services/canvas/install-default-projection-events-sink"
+    );
+    const result = maybeInstallDefaultCanvasProjectionEventsSink();
+    if (result.installed) {
+      console.log(
+        `[ags-canvas-projection-events] default sink installed — mode=${result.mode}`,
+      );
+    } else {
+      console.log(
+        `[ags-canvas-projection-events] default sink not installed — env flag unset (events swallowed by no-op default)`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-canvas-projection-events] default sink install skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
