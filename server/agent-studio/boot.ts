@@ -672,6 +672,41 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.30 — V1+ 17-γ follow-up (2026-05-14): env-flag-gated
+  // default canvas projection events drain forwarder install.
+  // PR-V1-79 (#830). Closes the "operator-supplied forwarder" gap:
+  // the #811 scheduler ticks the drain on a fixed cadence, but a
+  // tick with no forwarder is a no-op + WARN. This installer wires
+  // a default forwarder when an operator opts in via env flag.
+  //
+  // AGS_CANVAS_PROJECTION_EVENTS_DRAIN_FORWARDER=log → installs a
+  // log-only forwarder (one structured line per event). Useful for
+  // smoke-tests + phased rollouts. Future `sync-worker` mode lands
+  // in a separate installer under services/graph/projection/.
+  // Default OFF — preserves operator-supplied semantics + WARN.
+  try {
+    const { maybeInstallDefaultCanvasProjectionEventsDrainForwarder } =
+      await import(
+        "./services/canvas/install-default-projection-events-drain-forwarder"
+      );
+    const result =
+      await maybeInstallDefaultCanvasProjectionEventsDrainForwarder();
+    if (result.installed) {
+      console.log(
+        `[ags-canvas-projection-events-drain] default forwarder installed — mode=${result.mode}`,
+      );
+    } else {
+      console.log(
+        `[ags-canvas-projection-events-drain] default forwarder not installed — env flag unset (operator-supplied via installCanvasProjectionEventsDrainForwarder)`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-canvas-projection-events-drain] default forwarder install skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
