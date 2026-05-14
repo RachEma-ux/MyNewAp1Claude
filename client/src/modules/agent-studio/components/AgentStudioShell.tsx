@@ -311,6 +311,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/mcp-manager");
       return;
     }
+    // V1+ 15-δ slice (PR-V1-84): vault-attachments is a global view.
+    if ((key as string) === "vault-attachments") {
+      navigate("/agent-studio/vault-attachments");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");

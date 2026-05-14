@@ -34,6 +34,7 @@ import {
   Store,
   Network,
   ScanSearch,
+  Folder,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -71,7 +72,9 @@ export type AgentStudioView =
   // ── Phase 14c: Marketplace (global, no agent context) ──
   | "marketplace"
   // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
-  | "mcp-manager";
+  | "mcp-manager"
+  // ── V1+ 15-δ slice (PR-V1-84): Vault Attachments admin ──
+  | "vault-attachments";
 
 interface SectionGroup {
   label: string;
@@ -108,6 +111,15 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "MCP",
     items: [
       { key: "mcp-manager", label: "MCP Manager", icon: Network },
+    ],
+  },
+  // ── V1+ 15-δ slice (PR-V1-84): Vault Attachments admin entry.
+  // Reaches /agent-studio/vault-attachments; PR-V1-83 (#834) wired
+  // the URL parser + render case in the Shell.
+  {
+    label: "Vaults",
+    items: [
+      { key: "vault-attachments", label: "Attachments", icon: Folder },
     ],
   },
 ];
