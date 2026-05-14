@@ -53,6 +53,21 @@ import {
   type RealtimeDocSession,
   type RealtimeDocSessionKey,
 } from "./realtime-doc.js";
+import {
+  RealtimeDocFrameEmptyError,
+  RealtimeDocFrameTooLargeError,
+  dispatchRealtimeDocFrame,
+  type RealtimeDocFrameHandlers,
+} from "./realtime-doc-framing.js";
+
+/** Stable close codes for frame-error driven disconnects (V1+
+ *  CRDT-γ-3-framing transport wire-up). 4xxx is the WebSocket
+ *  private-use range — will not collide with future IETF assignments. */
+export const REALTIME_DOC_FRAME_CLOSE_CODES = {
+  empty_frame: 4400,
+  frame_too_large: 4413, // mirrors HTTP 413 Payload Too Large
+  handler_error: 4500,
+} as const;
 
 // ============================================================================
 // Narrow connection interface
@@ -98,6 +113,22 @@ export interface AttachConnectionOptions {
    *  suppress broadcast (e.g. invalid message). Default: always
    *  broadcast. */
   readonly shouldBroadcast?: (data: Uint8Array) => boolean;
+  /** V1+ CRDT-γ-3-framing transport wire-up: when supplied, every
+   *  inbound message is routed through `dispatchRealtimeDocFrame`
+   *  with these handlers. Sync / awareness / unknown frames go to
+   *  the corresponding handler; the framing layer strips the leading
+   *  type byte before invoking the per-type handler. When omitted,
+   *  the existing CRDT-γ-2 behavior is preserved (raw `data` →
+   *  `session.handleUpdate`) — no breaking change. */
+  readonly frameHandlers?: RealtimeDocFrameHandlers;
+  /** V1+ CRDT-γ-3-framing transport wire-up: override the default
+   *  2 MiB frame-size cap. When `frameHandlers` is unset this option
+   *  is ignored. */
+  readonly maxFrameBytes?: number;
+  /** V1+ CRDT-γ-3-framing transport wire-up: when set, frame-parse
+   *  errors (empty / oversize / handler throw) close the connection
+   *  with a stable WebSocket close code. Defaults to `true`. */
+  readonly closeOnFrameError?: boolean;
 }
 
 /**
@@ -155,8 +186,48 @@ export class RealtimeDocTransport {
       // Tolerate a transport that's already closed at attach time.
     }
 
+    const closeOnFrameError = options.closeOnFrameError ?? true;
     const onMessage: RealtimeDocMessageHandler = (data) => {
       if (options.shouldBroadcast && !options.shouldBroadcast(data)) return;
+      if (options.frameHandlers) {
+        // V1+ CRDT-γ-3-framing transport wire-up: route through the
+        // dispatcher. Parse errors / handler throws close the
+        // connection with a stable code (unless `closeOnFrameError`
+        // is explicitly false). Successful dispatch still broadcasts
+        // the raw frame to peers — peers re-parse on their own end.
+        Promise.resolve(
+          dispatchRealtimeDocFrame({
+            data,
+            handlers: options.frameHandlers,
+            ctx: { session },
+            maxBytes: options.maxFrameBytes,
+          }),
+        )
+          .then(() => {
+            this.broadcastToPeers(options.sessionKey, conn, data);
+          })
+          .catch((err) => {
+            if (!closeOnFrameError) return;
+            const code =
+              err instanceof RealtimeDocFrameEmptyError
+                ? REALTIME_DOC_FRAME_CLOSE_CODES.empty_frame
+                : err instanceof RealtimeDocFrameTooLargeError
+                  ? REALTIME_DOC_FRAME_CLOSE_CODES.frame_too_large
+                  : REALTIME_DOC_FRAME_CLOSE_CODES.handler_error;
+            const reason =
+              err instanceof Error ? err.name : "frame_dispatch_error";
+            try {
+              conn.close(code, reason);
+            } catch {
+              // Tolerate already-closed connections.
+            }
+          });
+        return;
+      }
+      // CRDT-γ-2 default behavior — preserved when `frameHandlers`
+      // is not supplied. Raw `data` (including any leading type
+      // byte) is forwarded to the session backend; peers receive
+      // the same raw frame.
       session.handleUpdate(data);
       this.broadcastToPeers(options.sessionKey, conn, data);
     };

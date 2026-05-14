@@ -155,7 +155,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | CRDT-γ-3-auth (V2.0 realtime-doc authorization rule) | #787 | `329526de` |
 | CRDT-γ-3-upgrade-handler (V2.0 auth + transport composition) | #788 | `388a575a` |
 | WebSocket upgrade pipeline ADR + first slice (V2.0) | #789 | `a40ab696` |
-| CRDT-γ-3-framing message framing primitives + dispatcher (V2.0) | #790 | pending |
+| CRDT-γ-3-framing message framing primitives + dispatcher (V2.0) | #790 | `e99fcbf5` |
+| CRDT-γ-3-framing transport wire-up (V2.0) | #791 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
