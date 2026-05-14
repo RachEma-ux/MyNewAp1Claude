@@ -14,15 +14,20 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import { router, protectedProcedure } from "../../_core/trpc";
-import { getAsDb } from "../db/connection";
+import { getAsDbForWorkspace } from "../db/connection";
 import { agsMcpToolKnowledge } from "../../../drizzle/tables/agent-studio";
 
 const workspaceRefSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
-function asdb() {
-  const db = getAsDb();
+function asdb(workspaceId: number) {
+  // V1+ MR-3 fifteenth batch (PR-V1-76): every procedure is
+  // workspace-scoped via `workspaceRefSchema`, so the per-call shim
+  // handle is routed through `getAsDbForWorkspace(workspaceId)`.
+  // Phase-1 shim still delegates to `getAsDb()`; Phase-2 routes by
+  // region without further caller changes.
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ASDB unavailable" });
   }
@@ -39,7 +44,7 @@ export const toolKnowledgeRouter = router({
       }),
     )
     .query(async ({ input }) => {
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const conds = [eq(agsMcpToolKnowledge.workspaceId, input.workspaceId)];
       if (input.mcpServerId) {
         conds.push(eq(agsMcpToolKnowledge.mcpServerId, input.mcpServerId));
@@ -63,7 +68,7 @@ export const toolKnowledgeRouter = router({
       }),
     )
     .query(async ({ input }) => {
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const rows = await db
         .select()
         .from(agsMcpToolKnowledge)
