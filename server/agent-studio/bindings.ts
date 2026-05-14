@@ -215,7 +215,10 @@ export async function upsertAgentProviderBinding(
     }
   }
 
-  const db = getAsDb();
+  // V1+ MR-3 twenty-eighth batch (PR-V1-96): workspaceId is required
+  // on UpsertAgentProviderBindingInput. Phase-1 shim delegates to
+  // getAsDb(); Phase-2 will route by region without caller changes.
+  const db = getAsDbForWorkspace(input.workspaceId);
   const now = new Date();
 
   const insertRow: InsertAgsAgentProviderBinding = {
