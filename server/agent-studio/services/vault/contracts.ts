@@ -45,6 +45,16 @@ export const NoteUpdateInput = z.object({
 });
 export type NoteUpdateInput = z.infer<typeof NoteUpdateInput>;
 
+export const NoteDeleteInput = z.object({
+  noteId: z.number().int(),
+  /** Optional optimistic-lock check. Required for online deletes,
+   *  optional for offline-queue drains where the client may not
+   *  know the current version (per OFFLINE_OPERATION_KINDS
+   *  vault.note.delete contract). */
+  expectedVersion: z.number().int().optional(),
+});
+export type NoteDeleteInput = z.infer<typeof NoteDeleteInput>;
+
 export const NoteConflictResolution = z.object({
   noteId: z.number().int(),
   resolution: z.enum(["save_copy", "merge_manual", "discard_draft"]),

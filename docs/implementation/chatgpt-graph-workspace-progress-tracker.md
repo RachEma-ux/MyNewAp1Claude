@@ -144,7 +144,8 @@ PRs per each phase's "out of scope for the α slice" section.
 | AS-1 (V1.0 ApprovalSteps gate adapter for 19-γ) | #776 | `1798c1bc` |
 | OL-4 (V2.0 offline drain dispatcher registry) | #777 | `a16cf4f8` |
 | OL-5 (V2.0 offline drain default impls) | #778 | `8fc11b49` |
-| OL-6 (V2.0 offline cache full bootstrap composer) | #779 | pending |
+| OL-6 (V2.0 offline cache full bootstrap composer) | #779 | `4d9abb01` |
+| NV-1 (V1.0 server-side vault.note.delete procedure) | #780 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and

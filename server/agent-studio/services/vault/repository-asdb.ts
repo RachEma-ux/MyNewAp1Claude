@@ -25,6 +25,7 @@ import type {
 import { computeContentHash } from "./repository.js";
 import type {
   NoteCreateInput,
+  NoteDeleteInput,
   NoteUpdateInput,
   VaultCreateInput,
   VaultMemberAddInput,
@@ -245,5 +246,56 @@ export class AsdbVaultRepository implements VaultRepository {
       .orderBy(desc(agsVaultNotes.updatedAt))
       .limit(options?.limit ?? 100);
     return rows;
+  }
+
+  async deleteNote(
+    input: NoteDeleteInput,
+    _userId: number,
+  ): Promise<
+    | { deleted: true }
+    | { deleted: false; alreadyDeleted: true }
+    | { deleted: false; conflict: true; latestVersion: number }
+    | { deleted: false; notFound: true }
+  > {
+    const conn = getAsDb();
+
+    const [row] = await conn
+      .select({
+        id: agsVaultNotes.id,
+        deletedAt: agsVaultNotes.deletedAt,
+      })
+      .from(agsVaultNotes)
+      .where(eq(agsVaultNotes.id, input.noteId))
+      .limit(1);
+
+    if (!row) {
+      return { deleted: false, notFound: true };
+    }
+    if (row.deletedAt != null) {
+      return { deleted: false, alreadyDeleted: true };
+    }
+
+    if (input.expectedVersion != null) {
+      const latest = await this.getLatestNoteVersion(input.noteId);
+      if (latest && latest.version !== input.expectedVersion) {
+        return {
+          deleted: false,
+          conflict: true,
+          latestVersion: latest.version,
+        };
+      }
+    }
+
+    await conn
+      .update(agsVaultNotes)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(agsVaultNotes.id, input.noteId),
+          sql`${agsVaultNotes.deletedAt} IS NULL`,
+        ),
+      );
+
+    return { deleted: true };
   }
 }
