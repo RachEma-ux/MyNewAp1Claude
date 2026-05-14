@@ -408,16 +408,15 @@ The MVP 0–4 work above is **closed**; the V1+ successor execution plan (`agent
 
 **Next named follow-ups (each independent, each its own PR):**
 
-1. **CRDT-γ-3-framing transport wire-up** — compose `parseRealtimeDocFrame` + `dispatchRealtimeDocFrame` (shipped in #790) inside the CRDT-γ-2 transport's per-connection `onMessage` handler. Frame primitives (taxonomy, parser, dispatcher) are in main; the transport message handler currently forwards raw frames to `session.handleUpdate` — the wire-up swaps that for the dispatcher.
-2. **CRDT-γ-3-y-protocols-sync-engine** — concrete handler that decodes a sync frame (Sync Step 1 / Step 2 / update) and applies it to the session backend. Plugs into `handlers.onSync` from PR-V1-39's dispatcher; adds `y-protocols/sync` as a runtime dep (lockfile-divergence pattern matches CRDT-γ #765).
-3. **CRDT-γ-3-y-protocols-awareness-engine** — concrete handler for the awareness wire format; plugs into `handlers.onAwareness`.
-4. **CRDT-γ-3-reconnect** — client-side reconnect + server-side session-resume semantics.
-5. **Production auth-cookie resolver** for `getUserIdFromUpgradeRequest` (DI seam shipped in #789).
-6. **`getVaultIdsForUser` production wiring** from `VaultRepository.listVaultsForUser` at the install point.
-7. **17-γ canvas caller migration** — needs event-bus seam decision (`ProjectionSyncWorker` has no singleton/event-bus today).
-8. **18-γ extension lane hooks** — needs RAC pipeline integration knowledge per lane.
-9. **MR-3 caller migration** — bounded campaign over `getAsDb()` call sites.
-10. **15-δ / 16-δ UI surfaces** — focused component-per-PR work.
+1. **CRDT-γ-3-y-protocols-sync-engine** — concrete handler that decodes a sync frame (Sync Step 1 / Step 2 / update) and applies it to the session backend. Plugs into `handlers.onSync` from PR-V1-39's dispatcher (now installable into the transport via `AttachConnectionOptions.frameHandlers` per PR-V1-40); adds `y-protocols/sync` as a runtime dep (lockfile-divergence pattern matches CRDT-γ #765).
+2. **CRDT-γ-3-y-protocols-awareness-engine** — concrete handler for the awareness wire format; plugs into `handlers.onAwareness`.
+3. **CRDT-γ-3-reconnect** — client-side reconnect + server-side session-resume semantics.
+4. **Production auth-cookie resolver** for `getUserIdFromUpgradeRequest` (DI seam shipped in #789).
+5. **`getVaultIdsForUser` production wiring** from `VaultRepository.listVaultsForUser` at the install point.
+6. **17-γ canvas caller migration** — needs event-bus seam decision (`ProjectionSyncWorker` has no singleton/event-bus today).
+7. **18-γ extension lane hooks** — needs RAC pipeline integration knowledge per lane.
+8. **MR-3 caller migration** — bounded campaign over `getAsDb()` call sites.
+9. **15-δ / 16-δ UI surfaces** — focused component-per-PR work.
 
 ### Resume Instruction (V1+)
 
