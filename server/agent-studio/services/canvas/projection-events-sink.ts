@@ -45,7 +45,14 @@ export type CanvasProjectionEvent =
     }
   | {
       readonly kind: "canvas.note_reference_removed";
-      readonly payload: { readonly canvasNodeId: number };
+      readonly payload: {
+        readonly canvasId: number;
+        readonly canvasNodeId: number;
+        /** The PRIOR referencedNoteId (the value being cleared).
+         *  Captured at remove-time so audit consumers can correlate
+         *  the unlinked note. */
+        readonly priorReferencedNoteId: number;
+      };
     };
 
 export type CanvasProjectionEventSink = (
