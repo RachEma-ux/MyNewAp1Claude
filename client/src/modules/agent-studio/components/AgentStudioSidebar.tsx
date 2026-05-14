@@ -76,7 +76,9 @@ export type AgentStudioView =
   // ── V1+ 15-δ slice (PR-V1-84): Vault Attachments admin ──
   | "vault-attachments"
   // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
-  | "vault-saved-views";
+  | "vault-saved-views"
+  // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain ──
+  | "canvas-projection-events-drain";
 
 interface SectionGroup {
   label: string;
@@ -124,6 +126,19 @@ const HOME_GROUPS: SectionGroup[] = [
     items: [
       { key: "vault-attachments", label: "Attachments", icon: Folder },
       { key: "vault-saved-views", label: "Saved Views", icon: GitBranch },
+    ],
+  },
+  // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain
+  // operator observability page. Reaches
+  // /agent-studio/canvas-projection-events-drain.
+  {
+    label: "Canvas",
+    items: [
+      {
+        key: "canvas-projection-events-drain",
+        label: "Projection Drain",
+        icon: Activity,
+      },
     ],
   },
 ];
