@@ -6,7 +6,7 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import { agsCagPackEvents } from "../../../../drizzle/tables/agent-studio";
 import type { AppendEventInput, CagPackEvent } from "./types";
 
@@ -37,7 +37,7 @@ function rowToEvent(row: typeof agsCagPackEvents.$inferSelect): CagPackEvent {
  * not source of truth.
  */
 export async function appendPackEvent(input: AppendEventInput): Promise<void> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) return;
 
   try {
@@ -93,7 +93,7 @@ export async function listEventsByPack(
   packId: number,
   limit = 100,
 ): Promise<CagPackEvent[]> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const rows = await db
