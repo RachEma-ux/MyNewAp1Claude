@@ -118,5 +118,6 @@ This locks in the pattern; future migrations follow the same shape. The test doe
 ## 4. Reference
 
 - `docs/implementation/agent-studio-native-graph-workspace-v1-v2-execution-plan.md` — MR phases
+- `docs/implementation/agent-studio-mr-3-state-of-the-union-2026-05-14.md` — 29-batch progress snapshot (this doc is the *plan*; SOTU is the *progress*)
 - `server/agent-studio/services/region/connection-helper.ts` — `getDbForRegion` + `getDbForWorkspace` (helpers shipped in PR-V1-12 / #763)
 - `server/agent-studio/db/connection.ts` — `getAsDb()` provider
