@@ -49,6 +49,7 @@ import {
   buildAttachmentEmbedSnippet,
   AttachmentNotFoundError,
 } from "./attachments.js";
+import { computeAttachmentQuota } from "./attachment-library.js";
 import {
   createSavedView,
   getSavedViewById,
@@ -415,6 +416,29 @@ export const vaultRouter = router({
           ...a,
           embedSnippet: buildAttachmentEmbedSnippet(a),
         }));
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  /**
+   * V1+ 15-δ (PR-V1-64): get a vault's attachment storage quota.
+   * Wraps `computeAttachmentQuota` from #760's attachment-library
+   * service. Reads `AGS_VAULT_ATTACHMENT_BYTES_LIMIT` via the same
+   * `resolveDefaultAttachmentBytesLimit` helper #771 uses to enforce
+   * the write-gate, so the panel's "X% used" line matches the actual
+   * `createAttachment` rejection threshold bit-for-bit.
+   */
+  getAttachmentQuota: protectedProcedure
+    .input(z.object({ vaultId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      try {
+        return await computeAttachmentQuota(input.vaultId, {
+          bytesLimit: resolveDefaultAttachmentBytesLimit(),
+        });
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
