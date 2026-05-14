@@ -16,7 +16,7 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
-import { getAsDb } from "../../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../../db/connection";
 import {
   agsRacProfiles,
   agsRacSources,
@@ -122,7 +122,7 @@ function rowToWorkspaceDefault(
 // ── Profile CRUD ───────────────────────────────────────────────────
 
 export async function createProfile(input: CreateProfileInput): Promise<RacProfile> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const [row] = await db
     .insert(agsRacProfiles)
@@ -187,7 +187,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<RacProfi
  * embedding refs, the workspace MUST have a default registered.
  */
 export async function createSource(input: CreateSourceInput): Promise<RacSource> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const hasOwnEmbedding =
@@ -253,7 +253,7 @@ export async function listSourcesForWorkspace(
   workspaceId: number,
   sourceType?: RacSourceType,
 ): Promise<RacSource[]> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const where = sourceType
     ? and(
@@ -329,7 +329,7 @@ export async function getPolicyForProfile(
 }
 
 export async function upsertPolicy(input: UpsertPolicyInput): Promise<RacPolicy> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const existing = await getPolicyForProfile(input.profileId);
@@ -380,7 +380,7 @@ export async function upsertPolicy(input: UpsertPolicyInput): Promise<RacPolicy>
 export async function getWorkspaceEmbeddingDefault(
   workspaceId: number,
 ): Promise<RacWorkspaceEmbeddingDefault | null> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const rows = await db
     .select()
@@ -393,7 +393,7 @@ export async function getWorkspaceEmbeddingDefault(
 export async function upsertWorkspaceEmbeddingDefault(
   input: UpsertWorkspaceEmbeddingDefaultInput,
 ): Promise<RacWorkspaceEmbeddingDefault> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const existing = await getWorkspaceEmbeddingDefault(input.workspaceId);
