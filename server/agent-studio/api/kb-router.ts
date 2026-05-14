@@ -16,7 +16,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
-import { getAsDb } from "../db/connection";
+import { getAsDbForWorkspace } from "../db/connection";
 import { hasWorkspaceAccess } from "../../db/workspaces";
 import {
   agsKnowledgeUnits,
@@ -28,8 +28,14 @@ const workspaceRefSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
-function asdb() {
-  const db = getAsDb();
+function asdb(workspaceId: number) {
+  // V1+ MR-3 fourteenth batch (PR-V1-75): every kb-router procedure
+  // is workspace-scoped via `workspaceRefSchema`, so the per-call
+  // shim handle is routed through `getAsDbForWorkspace(workspaceId)`.
+  // Phase-1 shim still delegates to `getAsDb()` — single-region
+  // behavior preserved bit-for-bit; Phase-2 will route by region
+  // without further caller changes.
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ASDB unavailable" });
   }
@@ -64,7 +70,7 @@ export const kbRouter = router({
     )
     .query(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const conds = [eq(agsKnowledgeUnits.workspaceId, input.workspaceId)];
       if (typeof input.sourceId === "number") {
         conds.push(eq(agsKnowledgeUnits.sourceId, input.sourceId));
@@ -89,7 +95,7 @@ export const kbRouter = router({
     )
     .query(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const rows = await db
         .select()
         .from(agsKnowledgeUnits)
@@ -114,7 +120,7 @@ export const kbRouter = router({
     )
     .query(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const rows = await db
         .select()
         .from(agsProvenanceRecords)
@@ -135,7 +141,7 @@ export const kbRouter = router({
     .input(workspaceRefSchema)
     .query(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const rows = await db
         .select({
           freshnessState: agsKnowledgeUnits.freshnessState,
@@ -169,7 +175,7 @@ export const kbRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
       const [updated] = await db
         .update(agsKnowledgeUnits)
         .set({ license: input.license, updatedAt: new Date() })
@@ -210,7 +216,7 @@ export const kbRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await assertWorkspaceAccess(ctx.user.id, input.workspaceId);
-      const db = asdb();
+      const db = asdb(input.workspaceId);
 
       // 1. Read the unit + its referenced validation result.
       const [unit] = await db
