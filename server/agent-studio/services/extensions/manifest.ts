@@ -9,7 +9,7 @@
 
 import { and, eq } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import { agsExtensions } from "../../../../drizzle/tables/agent-studio-extensions.js";
 import {
   ExtensionNotFoundError,
@@ -56,7 +56,11 @@ function rowToExtension(r: Record<string, unknown>): ExtensionRecord {
 export async function installExtension(
   input: InstallExtensionInput,
 ): Promise<ExtensionRecord> {
-  const db = getAsDb();
+  // V1+ MR-3 caller migration: workspaceId is in scope, so this
+  // call site is in inventory Category A. Phase-1 shim delegates
+  // to getAsDb(); Phase-2 will route by region without caller
+  // changes. See docs/implementation/agent-studio-mr-3-getasdb-inventory.md.
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new AsdbUnavailableError();
   const [inserted] = await db
     .insert(agsExtensions)
@@ -140,7 +144,9 @@ export async function listExtensionsByWorkspace(
   workspaceId: number,
   filterStatus?: ExtensionGovernanceStatus,
 ): Promise<ReadonlyArray<ExtensionRecord>> {
-  const db = getAsDb();
+  // V1+ MR-3 caller migration: workspaceId is the first parameter.
+  // Phase-1 shim delegates to getAsDb(); Phase-2 routes by region.
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) return [];
   const filters = [eq(agsExtensions.workspaceId, workspaceId)];
   if (filterStatus !== undefined) {
