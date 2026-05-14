@@ -68,10 +68,18 @@ describe("MR-3 fourth batch source-scan — ingestion/knowledge-unit-service.ts"
     expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(false);
   });
 
-  it("archiveUnit is Category B (unitId-scoped, no workspaceId plumbing) — still calls getAsDb()", () => {
+  // NOTE: `archiveUnit` was Cat B at the time of #807 (unitId-scoped)
+  // and was promoted to Cat A in PR-V1-92 / #843 (twenty-fourth
+  // batch) via the split-handle pattern (SELECT via getAsDb() for
+  // workspaceId discovery, then UPDATE via
+  // getAsDbForWorkspace(lookup[0].workspaceId)). See
+  // tests/agent-studio/mr-3-twentyfourth-batch-knowledge-unit-
+  // archive.test.ts for the up-to-date two-handle assertions. We
+  // weaken the prior assertion to just "archiveUnit still references
+  // getAsDb()" (true — for the discovery SELECT).
+  it("archiveUnit still references getAsDb() (post-#843 split-handle)", () => {
     const body = extractFunctionBody(src, "archiveUnit");
     expect(body.length).toBeGreaterThan(0);
     expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(true);
-    expect(/getAsDbForWorkspace/.test(body)).toBe(false);
   });
 });
