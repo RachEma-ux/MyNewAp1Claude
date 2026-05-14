@@ -157,13 +157,43 @@ export async function listCanvasesByVault(
   return rows.map((r) => rowToCanvas(r as Record<string, unknown>));
 }
 
+/**
+ * Internal helper — resolve the workspaceId for a given canvasId by
+ * JOIN-ing agsCanvases × agsVaults. Returns null when the canvas
+ * row is missing OR the parent vault's workspaceId column is null
+ * (legacy rows). Used by createCanvasNode + createCanvasEdge so the
+ * routing handle can be chosen consistently. Single Cat C bootstrap
+ * SELECT — workspaceId is not in scope on the input.
+ */
+async function resolveWorkspaceIdForCanvas(
+  lookupDb: NonNullable<ReturnType<typeof getAsDb>>,
+  canvasId: number,
+): Promise<number | null> {
+  const rows = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsCanvases)
+    .innerJoin(agsVaults, eq(agsCanvases.vaultId, agsVaults.id))
+    .where(eq(agsCanvases.id, canvasId))
+    .limit(1);
+  return rows[0]?.workspaceId ?? null;
+}
+
 export async function createCanvasNode(
   input: CreateCanvasNodeInput,
 ): Promise<CanvasNodeRecord> {
   if (!isCanvasNodeKind(input.kind)) {
     throw new CanvasNodeKindError(input.kind);
   }
-  const db = getAsDb();
+  // V1+ MR-3 twenty-sixth batch (PR-V1-94): cross-table split-handle.
+  // canvas→vault→workspace JOIN resolves the routing handle. When
+  // the chain returns null (vault missing OR vault.workspaceId IS
+  // NULL), fall back to the default lookupDb so the FK constraint
+  // on the INSERT surfaces the missing-canvas error.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, input.canvasId);
+  const db =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupDb;
   if (!db) throw new AsdbUnavailableError();
   const [inserted] = await db
     .insert(agsCanvasNodes)
@@ -201,7 +231,13 @@ export async function createCanvasNode(
 export async function createCanvasEdge(
   input: CreateCanvasEdgeInput,
 ): Promise<CanvasEdgeRecord> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-sixth batch (PR-V1-94): cross-table split-handle
+  // (same shape as createCanvasNode above).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, input.canvasId);
+  const db =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupDb;
   if (!db) throw new AsdbUnavailableError();
   const [inserted] = await db
     .insert(agsCanvasEdges)
