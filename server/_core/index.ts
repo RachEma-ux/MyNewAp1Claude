@@ -267,7 +267,17 @@ async function startServer() {
     const { installRealtimeDocUpgradeOnServer } = await import(
       "../agent-studio/services/vault/realtime-doc-websocket-bridge"
     );
-    const result = installRealtimeDocUpgradeOnServer(server);
+    // V1+ PR-V1-51: wire the production `getVaultIdsForUser` closure
+    // (backed by `AsdbVaultRepository.listVaultsForUser`) so the
+    // upgrade handler authorizes against real vault membership when
+    // the env flag is set. Auth-cookie resolver still defaults to
+    // null until a separate PR lands (see ADR §"out of scope").
+    const { createDefaultGetVaultIdsForUser } = await import(
+      "../agent-studio/services/vault/realtime-doc-default-getvaultids"
+    );
+    const result = installRealtimeDocUpgradeOnServer(server, {
+      getVaultIdsForUser: createDefaultGetVaultIdsForUser(),
+    });
     if (result.installed) {
       console.log(
         "[ags-realtime-doc] WebSocket upgrade installed — path=/api/agent-studio/vault/realtime",
