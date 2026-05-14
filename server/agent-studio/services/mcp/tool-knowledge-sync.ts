@@ -24,7 +24,7 @@
  */
 
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDbForWorkspace } from "../../db/connection";
 import {
   agsMcpToolKnowledge,
 } from "../../../../drizzle/tables/agent-studio";
@@ -92,7 +92,7 @@ export interface SyncToolKnowledgeResult {
 export async function syncToolKnowledge(
   input: SyncToolKnowledgeInput,
 ): Promise<SyncToolKnowledgeResult> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   // Existing rows for this server + workspace.
