@@ -189,7 +189,20 @@ export async function insertUnit(
 
 /** Archive (non-destructive) — sets `archivedAt`. Retrieval skips archived units. */
 export async function archiveUnit(unitId: number): Promise<void> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-fourth batch (PR-V1-92): split-handle pattern.
+  // SELECT-by-id (Cat C bootstrap) discovers workspaceId, then
+  // UPDATE routes via getAsDbForWorkspace. Soft-return on vanished
+  // unitId (archival is idempotent — no point throwing if the unit
+  // is already gone).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsKnowledgeUnits.workspaceId })
+    .from(agsKnowledgeUnits)
+    .where(eq(agsKnowledgeUnits.id, unitId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   await db
     .update(agsKnowledgeUnits)
