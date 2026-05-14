@@ -15,7 +15,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../_core/trpc.js";
-import { NoteCreateInput, NoteUpdateInput, VaultCreateInput, VaultMemberAddInput, SearchInput } from "./contracts.js";
+import { NoteCreateInput, NoteDeleteInput, NoteUpdateInput, VaultCreateInput, VaultMemberAddInput, SearchInput } from "./contracts.js";
 import { VaultRepositoryStub } from "./repository.js";
 import { AsdbVaultRepository } from "./repository-asdb.js";
 import type { VaultRepository } from "./repository.js";
@@ -147,6 +147,36 @@ export const vaultRouter = router({
         return { conflict: true, latestVersion: result.latestVersion };
       }
       return { conflict: false, versionId: result.versionId };
+    }),
+
+  deleteNote: protectedProcedure
+    .input(NoteDeleteInput)
+    .mutation(async ({ input, ctx }) => {
+      const userId = (ctx as unknown as { user?: { id?: number } }).user?.id ?? 1;
+      const result = await getRepo().deleteNote(input, userId);
+      if (result.deleted) {
+        return { deleted: true as const };
+      }
+      if ("notFound" in result) {
+        throwTrpcAndCapture(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: `Note ${input.noteId} not found`,
+          }),
+        );
+      }
+      if ("conflict" in result) {
+        return {
+          deleted: false as const,
+          conflict: true as const,
+          latestVersion: result.latestVersion,
+        };
+      }
+      // alreadyDeleted — idempotent success
+      return {
+        deleted: false as const,
+        alreadyDeleted: true as const,
+      };
     }),
 
   getNote: protectedProcedure

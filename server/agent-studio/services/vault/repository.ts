@@ -7,6 +7,7 @@
 import { createHash } from "crypto";
 import type {
   NoteCreateInput,
+  NoteDeleteInput,
   NoteUpdateInput,
   VaultCreateInput,
   VaultMemberAddInput,
@@ -43,6 +44,22 @@ export interface VaultRepository {
   getNoteVersion(noteId: number, version: number): Promise<NoteVersionSelectResult | null>;
   getLatestNoteVersion(noteId: number): Promise<NoteVersionSelectResult | null>;
   updateNote(input: NoteUpdateInput, userId: number): Promise<{ versionId: number; conflict?: true; latestVersion?: number }>;
+  /**
+   * Soft-deletes a note by setting `deletedAt = NOW()`. Existing
+   * version rows are preserved for audit. Idempotent on already-
+   * deleted notes (returns `{ deleted: false, alreadyDeleted: true }`).
+   * Optimistic-lock check is optional — when supplied, mismatch
+   * returns `{ deleted: false, conflict: true, latestVersion }`.
+   */
+  deleteNote(
+    input: NoteDeleteInput,
+    userId: number,
+  ): Promise<
+    | { deleted: true }
+    | { deleted: false; alreadyDeleted: true }
+    | { deleted: false; conflict: true; latestVersion: number }
+    | { deleted: false; notFound: true }
+  >;
   listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }): Promise<NoteSelectByIdResult[]>;
 }
 
@@ -153,5 +170,31 @@ export class VaultRepositoryStub implements VaultRepository {
   async listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }) {
     const filtered = this.notes.filter((n) => n.vaultId === vaultId);
     return filtered.slice(0, options?.limit ?? 100);
+  }
+
+  private deletedNoteIds = new Set<number>();
+
+  async deleteNote(input: NoteDeleteInput, _userId: number) {
+    if (this.deletedNoteIds.has(input.noteId)) {
+      return { deleted: false as const, alreadyDeleted: true as const };
+    }
+    const noteIndex = this.notes.findIndex((n) => n.id === input.noteId);
+    if (noteIndex === -1) {
+      return { deleted: false as const, notFound: true as const };
+    }
+    if (input.expectedVersion != null) {
+      const list = this.versions.get(input.noteId);
+      const latest = list?.[list.length - 1];
+      if (latest && latest.version !== input.expectedVersion) {
+        return {
+          deleted: false as const,
+          conflict: true as const,
+          latestVersion: latest.version,
+        };
+      }
+    }
+    this.deletedNoteIds.add(input.noteId);
+    this.notes.splice(noteIndex, 1);
+    return { deleted: true as const };
   }
 }
