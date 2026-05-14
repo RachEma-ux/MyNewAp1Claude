@@ -324,7 +324,27 @@ export async function removeAgentProviderBinding(
   draftId: number,
   role: string = "primary",
 ): Promise<boolean> {
-  const db = getAsDb();
+  // V1+ MR-3 thirtieth batch (PR-V1-99): split-handle pattern.
+  // The binding row itself carries `workspaceId` (non-null), so the
+  // discovery SELECT picks it up and the DELETE routes via
+  // getAsDbForWorkspace. If no row exists for (draftId, role), the
+  // function returns false (preserves the idempotent contract — no
+  // row to delete, no row deleted).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsAgentProviderBindings.workspaceId })
+    .from(agsAgentProviderBindings)
+    .where(
+      and(
+        eq(agsAgentProviderBindings.draftId, draftId),
+        eq(agsAgentProviderBindings.role, role),
+      ),
+    )
+    .limit(1);
+  if (lookup.length === 0) return false;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
+  if (!db) throw new Error("ASDB unavailable");
   const result = await db
     .delete(agsAgentProviderBindings)
     .where(
