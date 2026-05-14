@@ -23,7 +23,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import {
   agsRacRuntimeTraces,
   agsToolCallTraces,
@@ -292,7 +292,7 @@ export function buildRacTracePatch(input: RacTracePatchInput): RacTracePatch {
 export async function recordToolCallTrace(
   input: ToolCallTraceInput,
 ): Promise<{ id: number }> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const row = buildToolCallTraceRow(input);
   const [created] = await db
