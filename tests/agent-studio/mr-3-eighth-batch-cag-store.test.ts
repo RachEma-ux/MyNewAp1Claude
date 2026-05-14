@@ -94,15 +94,16 @@ describe("MR-3 eighth batch source-scan — services/cag/store.ts", () => {
   describe("Category B — still on getAsDb() pending caller plumbing", () => {
     // NOTE: `markPackStale` was Cat B at the time of #820 and was
     // promoted to Cat A in #831 (eighteenth batch) via the
-    // discovering-helper / split-handle pattern (SELECT via
-    // getAsDb(), UPDATE via getAsDbForWorkspace(row.workspaceId)).
-    // See tests/agent-studio/mr-3-eighteenth-batch-cag-
-    // discovering-helpers.test.ts for the up-to-date assertion.
+    // discovering-helper / split-handle pattern. The same
+    // split-handle pattern was extended to UPDATE-only helpers in
+    // #838 (nineteenth batch): `markPackUsed` and
+    // `recordPackTokenActual` are now Cat A too. Only the read-
+    // only `getLatestPack` + `listPacks` siblings remain Cat B
+    // (intentional — no UPDATE/DELETE means no routing benefit
+    // from a split-handle round-trip).
     const CATEGORY_B: ReadonlyArray<string> = [
       "getLatestPack",
       "listPacks",
-      "markPackUsed",
-      "recordPackTokenActual",
     ];
 
     for (const fn of CATEGORY_B) {

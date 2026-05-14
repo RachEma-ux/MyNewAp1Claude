@@ -297,7 +297,25 @@ export async function listPacksForAgent(
  * heavily a pack is exercised.
  */
 export async function markPackUsed(packId: number): Promise<number> {
-  const db = getAsDb();
+  // V1+ MR-3 nineteenth batch (PR-V1-87): split-handle pattern for
+  // an UPDATE-only mutation that takes only packId. We first SELECT
+  // the row's workspaceId (Cat C bootstrap lookup; workspaceId is
+  // not in scope without a read), then route the UPDATE via
+  // getAsDbForWorkspace(workspaceId). In single-region Phase-1 both
+  // handles delegate to the same getAsDb() — bit-for-bit identical;
+  // in Phase-2 the UPDATE routes to the workspace-region pool.
+  // Extra cost: one round-trip SELECT per call. Acceptable for the
+  // load-bearing observability path where multi-region correctness
+  // matters more than nanosecond latency.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsCagCapabilityPacks.workspaceId })
+    .from(agsCagCapabilityPacks)
+    .where(eq(agsCagCapabilityPacks.id, packId))
+    .limit(1);
+  if (lookup.length === 0) return 0;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const [row] = await db
     .update(agsCagCapabilityPacks)
@@ -321,7 +339,17 @@ export async function recordPackTokenActual(
   packId: number,
   tokensActual: number,
 ): Promise<void> {
-  const db = getAsDb();
+  // V1+ MR-3 nineteenth batch (PR-V1-87): split-handle pattern
+  // (same shape as markPackUsed above).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsCagCapabilityPacks.workspaceId })
+    .from(agsCagCapabilityPacks)
+    .where(eq(agsCagCapabilityPacks.id, packId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   await db
     .update(agsCagCapabilityPacks)
