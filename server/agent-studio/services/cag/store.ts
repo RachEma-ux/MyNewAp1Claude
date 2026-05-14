@@ -215,10 +215,17 @@ export async function markPackStale(
   reason: string,
   actorId: number,
 ): Promise<void> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 eighteenth batch (PR-V1-80): "discovering-helper"
+  // pattern. The SELECT-by-id legitimately uses getAsDb() because
+  // workspaceId isn't known yet (intentional Category C bootstrap
+  // lookup). After the row is loaded, the workspace-routed handle
+  // takes over for the UPDATE — preserves the Phase-2 invariant
+  // that mutations route by region without requiring callers to
+  // plumb workspaceId.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
 
-  const rows = await db
+  const rows = await lookupDb
     .select()
     .from(agsCagCapabilityPacks)
     .where(eq(agsCagCapabilityPacks.id, packId))
@@ -228,6 +235,9 @@ export async function markPackStale(
   if (!row) throw new Error(`Pack ${packId} not found`);
   if (row.status === "archived") throw new Error("pack_archived");
   if (row.status === "stale") return;
+
+  const db = getAsDbForWorkspace(row.workspaceId);
+  if (!db) throw new Error("ASDB unavailable");
 
   await db
     .update(agsCagCapabilityPacks)
