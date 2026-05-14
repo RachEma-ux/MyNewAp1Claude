@@ -9,7 +9,7 @@
  */
 
 import { and, desc, eq, sql } from "drizzle-orm";
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
   agsVaults,
   agsVaultMembers,
@@ -33,7 +33,10 @@ import type {
 
 export class AsdbVaultRepository implements VaultRepository {
   async createVault(input: VaultCreateInput, createdByUserId: number): Promise<{ id: number }> {
-    const conn = getAsDb();
+    // V1+ MR-3 second batch: workspaceId is on the input schema
+    // (optional). Phase-1 shim delegates to default DB; Phase-2 will
+    // route to the workspace's home region (or default when null).
+    const conn = getAsDbForWorkspace(input.workspaceId);
     const [row] = await conn
       .insert(agsVaults)
       .values({
