@@ -65,6 +65,8 @@ const AgentMarketplacePage = lazy(() => import("../pages/AgentMarketplacePage"))
 // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
 const AgentMcpManagerPage = lazy(() => import("../pages/AgentMcpManagerPage"));
 const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
+// V1+ 15-δ slice (PR-V1-83): Vault Attachments admin page.
+const VaultAttachmentsPage = lazy(() => import("../pages/VaultAttachmentsPage"));
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
@@ -164,6 +166,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── Phase 13 §7: Native Graph Workspace observability (no agent context) ──
   if (path.startsWith("/agent-studio/graph-workspace")) {
     return { ...empty, view: "graph-workspace" as any, homeMode: null };
+  }
+  // ── V1+ 15-δ slice (PR-V1-83): Vault Attachments admin (no agent context) ──
+  if (path.startsWith("/agent-studio/vault-attachments")) {
+    return { ...empty, view: "vault-attachments" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -367,6 +373,9 @@ export default function AgentStudioShell() {
         // ── Phase 13 §7: Native Graph Workspace observability ──
         case "graph-workspace" as any:
           return <GraphWorkspacePage />;
+        // ── V1+ 15-δ slice (PR-V1-83): Vault Attachments admin ──
+        case "vault-attachments" as any:
+          return <VaultAttachmentsPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
