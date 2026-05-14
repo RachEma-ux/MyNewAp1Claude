@@ -129,3 +129,71 @@ export type AgsCanvasNode = typeof agsCanvasNodes.$inferSelect;
 export type NewAgsCanvasNode = typeof agsCanvasNodes.$inferInsert;
 export type AgsCanvasEdge = typeof agsCanvasEdges.$inferSelect;
 export type NewAgsCanvasEdge = typeof agsCanvasEdges.$inferInsert;
+
+/**
+ * V1+ Phase 17-γ — Canvas → graph projection event log.
+ *
+ * Audit trail for projection-sink fan-out. Sink registry shipped in
+ * PR-V1-41 (#792); the no-op default suppresses recording. This
+ * table is the persistence target for an ASDB-backed sink that
+ * will land in a follow-up PR composing on top of this schema.
+ *
+ * Closed-taxonomy `kind`:
+ *   - `note_reference_changed` — CanvasNode.referencedNoteId was
+ *     set or updated (caller hook in `createCanvasNode` already
+ *     emits this for first-set; future `updateCanvasNode` will
+ *     emit for changes).
+ *   - `note_reference_removed` — CanvasNode.referencedNoteId
+ *     cleared (delete path).
+ *
+ * The kind list mirrors `CanvasProjectionEvent` in
+ * `services/canvas/projection-events-sink.ts` (the structural
+ * declaration) — keep in lockstep when adding kinds.
+ *
+ * Workspace scoping is INTENTIONAL even though the source event
+ * doesn't carry workspaceId: ASDB-backed retention + multi-region
+ * routing (MR-2 onwards) need the column. Sink writers resolve
+ * workspaceId via the canvas's vault before insert.
+ *
+ * Append-only — no UPDATE / DELETE in the sink's contract. The
+ * projection-sync worker reads sequentially via `createdAt` /
+ * `id` and is free to drain idempotently.
+ */
+export const agsCanvasProjectionEvents = pgTable(
+  "ags_canvas_projection_events",
+  {
+    id: serial("id").primaryKey(),
+    /** Closed taxonomy — see `CanvasProjectionEvent` in
+     *  `services/canvas/projection-events-sink.ts`. */
+    kind: varchar("kind", { length: 64 }).notNull(),
+    /** Workspace scoping for retention + multi-region routing. */
+    workspaceId: integer("workspace_id").notNull(),
+    /** Canvas + node that originated the event. */
+    canvasId: integer("canvas_id").notNull(),
+    canvasNodeId: integer("canvas_node_id").notNull(),
+    /** The referenced note id captured at event time. For
+     *  `note_reference_removed` events this is the PRIOR value
+     *  (post-clear the column is null on the node row). */
+    referencedNoteId: integer("referenced_note_id"),
+    /** Optional caller-supplied metadata payload (provenance,
+     *  change reason, etc.). */
+    metadata: json("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    workspaceCreatedIdx: index("idx_ags_canvas_projection_events_ws_created").on(
+      t.workspaceId,
+      t.createdAt,
+    ),
+    canvasIdx: index("idx_ags_canvas_projection_events_canvas").on(t.canvasId),
+    nodeIdx: index("idx_ags_canvas_projection_events_node").on(
+      t.canvasNodeId,
+    ),
+    kindIdx: index("idx_ags_canvas_projection_events_kind").on(t.kind),
+  }),
+);
+
+export type AgsCanvasProjectionEvent =
+  typeof agsCanvasProjectionEvents.$inferSelect;
+export type NewAgsCanvasProjectionEvent =
+  typeof agsCanvasProjectionEvents.$inferInsert;
