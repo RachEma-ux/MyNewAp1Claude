@@ -145,7 +145,16 @@ PRs per each phase's "out of scope for the α slice" section.
 | OL-4 (V2.0 offline drain dispatcher registry) | #777 | `a16cf4f8` |
 | OL-5 (V2.0 offline drain default impls) | #778 | `8fc11b49` |
 | OL-6 (V2.0 offline cache full bootstrap composer) | #779 | `4d9abb01` |
-| NV-1 (V1.0 server-side vault.note.delete procedure) | #780 | pending |
+| NV-1 (V1.0 server-side vault.note.delete procedure) | #780 | `f26c3829` |
+| OL-7 (V2.0 main.tsx wire-up to vanilla tRPC client) | #781 | `75313ad2` |
+| AS-2 (V1.0 default governance-gate registry) | #782 | `b0e906e3` |
+| OL-8 (V2.0 enqueue helper for vault-note mutations) | #783 | `192dc42b` |
+| AS-3 (V1.0 composeGovernanceGates helper) | #784 | `a15583c5` |
+| OL-9 (V2.0 offline-or-live mutation router) | #785 | `912a8490` |
+| AS-4 (V1.0 payload resolver + env-flag boot install) | #786 | `439c5335` |
+| CRDT-γ-3-auth (V2.0 realtime-doc authorization rule) | #787 | `329526de` |
+| CRDT-γ-3-upgrade-handler (V2.0 auth + transport composition) | #788 | `388a575a` |
+| WebSocket upgrade pipeline ADR + first slice (V2.0) | #789 | pending |
 
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and

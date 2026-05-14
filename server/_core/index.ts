@@ -258,6 +258,32 @@ async function startServer() {
 
   const server = createServer(app);
 
+  // V1+ CRDT-γ-3-websocket-bridge (PR-V1-38): install the realtime-
+  // doc WebSocket upgrade dispatcher on the shared http.Server.
+  // Env-flag gated via AGS_REALTIME_DOC_WEBSOCKET_ENABLED=true.
+  // Default OFF — preserves existing behavior on first install.
+  // See docs/architecture/agent-studio-websocket-upgrade-pipeline.md.
+  try {
+    const { installRealtimeDocUpgradeOnServer } = await import(
+      "../agent-studio/services/vault/realtime-doc-websocket-bridge"
+    );
+    const result = installRealtimeDocUpgradeOnServer(server);
+    if (result.installed) {
+      console.log(
+        "[ags-realtime-doc] WebSocket upgrade installed — path=/api/agent-studio/vault/realtime",
+      );
+    } else {
+      console.log(
+        `[ags-realtime-doc] WebSocket upgrade install skipped — reason=${result.reason}`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[ags-realtime-doc] WebSocket upgrade install error —",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
   // CORS — restrict origins in production, allow localhost in dev
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",").map(o => o.trim())
