@@ -13,7 +13,7 @@
 
 import { createHash } from "crypto";
 import { and, eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDbForWorkspace } from "../../db/connection";
 import {
   agsIngestionArtifacts,
   agsExtractionResults,
@@ -204,7 +204,8 @@ export async function runIngestion(
     // never breaks the rest of the job (mirrors the per-unit insertUnit
     // skip pattern above for KnowledgeUnitContractError).
     if (request.extractorKeys && request.extractorKeys.length > 0) {
-      const db = getAsDb();
+      // V1+ MR-3 sixth batch: request.workspaceId in scope.
+      const db = getAsDbForWorkspace(request.workspaceId);
       if (!db) throw new Error("ASDB unavailable");
       for (const extractorKey of request.extractorKeys) {
         const extractor = getExtractor(extractorKey);
@@ -268,7 +269,8 @@ async function persistArtifact(input: {
   contentType: string;
   sizeBytes: number;
 }): Promise<{ id: number; created: boolean }> {
-  const db = getAsDb();
+  // V1+ MR-3 sixth batch: input.workspaceId in scope.
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   // Idempotent: unique on (workspaceId, contentHash).
   const existing = await db
