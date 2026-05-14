@@ -638,6 +638,40 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.29 — V1+ 17-γ follow-up (2026-05-14): env-flag-gated
+  // default canvas projection events drain scheduler install.
+  // PR-V1-56..#810 shipped the drain helpers + module-singleton
+  // tick wrapper; PR-V1-60 (#811) shipped this installer.
+  // Env flag AGS_CANVAS_PROJECTION_EVENTS_DRAIN=interval →
+  // installs setInterval that calls the tick on a fixed cadence.
+  // Override AGS_CANVAS_PROJECTION_EVENTS_DRAIN_INTERVAL_MS (default
+  // 60_000ms). Forwarder is OPERATOR-supplied via
+  // `installCanvasProjectionEventsDrainForwarder` — this scheduler
+  // does NOT install one; ticks are no-ops + WARN until a forwarder
+  // is installed. Default OFF — preserves no-tick behavior on first
+  // install.
+  try {
+    const { maybeInstallDefaultCanvasProjectionEventsDrainScheduler } =
+      await import(
+        "./services/canvas/install-default-projection-events-drain-scheduler"
+      );
+    const result = maybeInstallDefaultCanvasProjectionEventsDrainScheduler();
+    if (result.installed) {
+      console.log(
+        `[ags-canvas-projection-events-drain] scheduler installed — mode=${result.mode} intervalMs=${result.intervalMs}`,
+      );
+    } else {
+      console.log(
+        `[ags-canvas-projection-events-drain] scheduler not installed — env flag unset (no automatic drain)`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-canvas-projection-events-drain] scheduler install skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
