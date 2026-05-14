@@ -74,7 +74,9 @@ export type AgentStudioView =
   // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
   | "mcp-manager"
   // ── V1+ 15-δ slice (PR-V1-84): Vault Attachments admin ──
-  | "vault-attachments";
+  | "vault-attachments"
+  // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
+  | "vault-saved-views";
 
 interface SectionGroup {
   label: string;
@@ -113,13 +115,15 @@ const HOME_GROUPS: SectionGroup[] = [
       { key: "mcp-manager", label: "MCP Manager", icon: Network },
     ],
   },
-  // ── V1+ 15-δ slice (PR-V1-84): Vault Attachments admin entry.
-  // Reaches /agent-studio/vault-attachments; PR-V1-83 (#834) wired
-  // the URL parser + render case in the Shell.
+  // ── V1+ 15-δ slice (PR-V1-84) + 16-δ slice (PR-V1-85): Vault
+  // admin entries. Reach /agent-studio/vault-attachments and
+  // /agent-studio/vault-saved-views; PRs #834 + #836 wire the URL
+  // parser + render cases in the Shell.
   {
     label: "Vaults",
     items: [
       { key: "vault-attachments", label: "Attachments", icon: Folder },
+      { key: "vault-saved-views", label: "Saved Views", icon: GitBranch },
     ],
   },
 ];
