@@ -18,7 +18,7 @@
 
 import { createHash } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { getAsDb } from "../../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../../db/connection";
 import {
   agsRacRuntimeTraces,
   agsRacContextBlocks,
@@ -135,7 +135,7 @@ function rowToBlock(row: typeof agsRacContextBlocks.$inferSelect): AgsRacContext
 // ── writeTrace ─────────────────────────────────────────────────────
 
 export async function writeTrace(input: WriteTraceInput): Promise<number> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const perSourceJson: Record<string, number> = {};
   if (input.perSourceLatencyMs) {
@@ -218,7 +218,7 @@ export interface UpdateTraceScoresInput {
 export async function updateTraceScores(
   input: UpdateTraceScoresInput,
 ): Promise<AgsRacRuntimeTrace> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const patch: Record<string, unknown> = {};
   if (input.citationCoverage !== undefined) {
@@ -252,7 +252,7 @@ export async function getTraceById(
   workspaceId: number,
   traceId: number,
 ): Promise<AgsRacRuntimeTrace | null> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const rows = await db
     .select()
@@ -271,7 +271,7 @@ export async function getTraceForMessage(
   workspaceId: number,
   messageId: number,
 ): Promise<AgsRacRuntimeTrace | null> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const rows = await db
     .select()
@@ -305,7 +305,7 @@ export async function listContextBlocks(
 export async function recordFeedback(
   input: RecordFeedbackInput,
 ): Promise<AgsRacFeedback> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(input.workspaceId);
   if (!db) throw new Error("ASDB unavailable");
 
   const existing = await db
@@ -346,7 +346,7 @@ export async function getFeedbackForMessage(
   workspaceId: number,
   messageId: number,
 ): Promise<AgsRacFeedback | null> {
-  const db = getAsDb();
+  const db = getAsDbForWorkspace(workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const rows = await db
     .select()
