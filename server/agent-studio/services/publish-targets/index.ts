@@ -83,3 +83,18 @@ export {
 // V1+ AS-3 — generic gate composer (strictest decision wins;
 // rejected short-circuits).
 export { composeGovernanceGates } from "./compose-governance-gates.js";
+
+// V1+ AS-4 — payload-based publishRequestId resolver +
+// env-flag-gated boot installer for the default gate.
+export {
+  parsePublishRequestIdFromBody,
+  resolvePublishRequestIdFromPayload,
+} from "./payload-publish-request-id-resolver.js";
+export {
+  maybeInstallDefaultGovernanceGate,
+  PUBLISH_GOVERNANCE_GATE_ENV_VAR,
+  APPROVAL_STEPS_PAYLOAD_RESOLVER_MODE,
+  type DefaultGovernanceGateMode,
+  type MaybeInstallDefaultGovernanceGateOptions,
+  type MaybeInstallDefaultGovernanceGateResult,
+} from "./install-default-governance-gate.js";

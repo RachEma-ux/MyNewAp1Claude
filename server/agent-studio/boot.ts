@@ -582,6 +582,34 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.27 — V1+ AS-4 (2026-05-14): env-flag-gated default
+  // governance-gate install for executePublish. PR-V1-31 (#782)
+  // shipped the AS-2 default-gate registry and PR-V1-25 (#776)
+  // shipped the AS-1 ApprovalSteps adapter; this wire-up composes
+  // them via the AS-4 payload-based resolver and installs the
+  // result when AGS_PUBLISH_GOVERNANCE_GATE=approval_steps_payload_resolver.
+  // Default OFF — preserves existing "no gate ⇒ approved" behavior.
+  try {
+    const { maybeInstallDefaultGovernanceGate } = await import(
+      "./services/publish-targets/install-default-governance-gate"
+    );
+    const result = maybeInstallDefaultGovernanceGate();
+    if (result.installed) {
+      console.log(
+        `[ags-publish-targets] default governance gate installed — mode=${result.mode}`,
+      );
+    } else {
+      console.log(
+        `[ags-publish-targets] default governance gate not installed — env flag unset (executePublish defaults to approved when no per-call gate supplied)`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-publish-targets] default governance gate install skipped — ${message}`,
+    );
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
