@@ -72,13 +72,26 @@ describe("MR-3 third batch source-scan — ingestion/ingestion-job-service.ts", 
     expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(false);
   });
 
-  it.each(["completeJob", "getJob"])(
-    "%s is Category B (jobId-scoped, no workspaceId plumbing) — still calls getAsDb()",
-    (fnName) => {
-      const body = extractFunctionBody(src, fnName);
-      expect(body.length).toBeGreaterThan(0);
-      expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(true);
-      expect(/getAsDbForWorkspace/.test(body)).toBe(false);
-    },
-  );
+  // NOTE: `completeJob` was Cat B at the time of #806 (jobId-scoped)
+  // and was promoted to Cat A in PR-V1-91 / #842 (twenty-third batch)
+  // via the split-handle pattern (SELECT via getAsDb() for
+  // workspaceId discovery, then UPDATE via
+  // getAsDbForWorkspace(lookup[0].workspaceId)). See
+  // tests/agent-studio/mr-3-twentythird-batch-ingestion-job-
+  // complete.test.ts for the up-to-date two-handle assertions. We
+  // weaken the prior assertion to just "completeJob still references
+  // getAsDb()" (true — for the discovery SELECT). `getJob` remains
+  // Cat B (read-only; intentional).
+  it("completeJob still references getAsDb() (post-#842 split-handle)", () => {
+    const body = extractFunctionBody(src, "completeJob");
+    expect(body.length).toBeGreaterThan(0);
+    expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(true);
+  });
+
+  it("getJob is Category B (jobId-scoped, no workspaceId plumbing) — still calls getAsDb()", () => {
+    const body = extractFunctionBody(src, "getJob");
+    expect(body.length).toBeGreaterThan(0);
+    expect(/\bgetAsDb\b\s*\(\s*\)/.test(body)).toBe(true);
+    expect(/getAsDbForWorkspace/.test(body)).toBe(false);
+  });
 });
