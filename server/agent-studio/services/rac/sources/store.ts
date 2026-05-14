@@ -165,7 +165,22 @@ export async function listProfilesForDraft(
 }
 
 export async function updateProfile(input: UpdateProfileInput): Promise<RacProfile> {
-  const db = getAsDb();
+  // V1+ MR-3 twentieth batch (PR-V1-88): split-handle pattern.
+  // SELECT-by-id (Cat C bootstrap) discovers the workspaceId,
+  // then the UPDATE routes via getAsDbForWorkspace. Phase-1 shim
+  // still delegates to getAsDb() so single-region behavior is
+  // preserved bit-for-bit; Phase-2 routes by region.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsRacProfiles.workspaceId })
+    .from(agsRacProfiles)
+    .where(eq(agsRacProfiles.id, input.profileId))
+    .limit(1);
+  if (lookup.length === 0) {
+    throw new Error(`profile ${input.profileId} not found`);
+  }
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.enabled !== undefined) patch.enabled = input.enabled;
@@ -270,7 +285,19 @@ export async function listSourcesForWorkspace(
 }
 
 export async function updateSource(input: UpdateSourceInput): Promise<RacSource> {
-  const db = getAsDb();
+  // V1+ MR-3 twentieth batch (PR-V1-88): split-handle pattern.
+  // See updateProfile for the same pattern.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsRacSources.workspaceId })
+    .from(agsRacSources)
+    .where(eq(agsRacSources.id, input.sourceId))
+    .limit(1);
+  if (lookup.length === 0) {
+    throw new Error(`source ${input.sourceId} not found`);
+  }
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.enabled !== undefined) patch.enabled = input.enabled;
@@ -308,7 +335,17 @@ export async function updateSource(input: UpdateSourceInput): Promise<RacSource>
 }
 
 export async function deleteSource(sourceId: number): Promise<void> {
-  const db = getAsDb();
+  // V1+ MR-3 twentieth batch (PR-V1-88): split-handle pattern for
+  // a DELETE-only mutation. See updateProfile for the same shape.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const lookup = await lookupDb
+    .select({ workspaceId: agsRacSources.workspaceId })
+    .from(agsRacSources)
+    .where(eq(agsRacSources.id, sourceId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) throw new Error("ASDB unavailable");
   await db.delete(agsRacSources).where(eq(agsRacSources.id, sourceId));
 }

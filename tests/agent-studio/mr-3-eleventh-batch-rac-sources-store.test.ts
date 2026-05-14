@@ -103,14 +103,18 @@ describe("MR-3 eleventh batch source-scan — services/rac/sources/store.ts", ()
   });
 
   describe("Category B — still on getAsDb() pending caller plumbing", () => {
+    // NOTE: `updateProfile`, `updateSource`, and `deleteSource`
+    // were Cat B at the time of #823 and were promoted to Cat A
+    // in #839 (twentieth batch) via the split-handle pattern
+    // (SELECT-by-id via getAsDb(), UPDATE/DELETE via
+    // getAsDbForWorkspace(lookup[0].workspaceId)). See
+    // tests/agent-studio/mr-3-twentieth-batch-rac-sources-
+    // mutations.test.ts for the up-to-date assertion.
     const CATEGORY_B: ReadonlyArray<string> = [
       "getProfile",
       "listProfilesForDraft",
-      "updateProfile",
       "getSource",
       "listSourcesForProfile",
-      "updateSource",
-      "deleteSource",
       "getPolicyForProfile",
     ];
 
