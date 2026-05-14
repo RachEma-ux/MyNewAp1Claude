@@ -6,6 +6,7 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl, isOAuthConfigured } from "./const";
 import { isAuthRequiredError } from "@/lib/appBlockers";
+import { wireOfflineCacheToTrpc } from "./modules/agent-studio/services/offline-cache-app-wireup";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,8 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+void wireOfflineCacheToTrpc();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
