@@ -26,7 +26,7 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { getAsDb } from "./db/connection";
+import { getAsDbForWorkspace } from "./db/connection";
 import {
   agsWorkspaceDefaultProviderBindings,
   type AgsWorkspaceDefaultProviderBinding,
@@ -80,7 +80,10 @@ export interface ResolveWorkspaceDefaultBindingResult {
 export async function resolveWorkspaceDefaultBinding(
   input: ResolveWorkspaceDefaultBindingInput,
 ): Promise<ResolveWorkspaceDefaultBindingResult | null> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-seventh batch (PR-V1-95): workspaceId is required
+  // on ResolveWorkspaceDefaultBindingInput. Phase-1 shim delegates to
+  // getAsDb(); Phase-2 will route by region without caller changes.
+  const db = getAsDbForWorkspace(input.workspaceId);
   const rows = await db
     .select()
     .from(agsWorkspaceDefaultProviderBindings)
@@ -178,7 +181,8 @@ export async function upsertWorkspaceDefaultBinding(
     return { ok: false, reason };
   }
 
-  const db = getAsDb();
+  // V1+ MR-3 twenty-seventh batch (PR-V1-95).
+  const db = getAsDbForWorkspace(input.workspaceId);
   const insertRow: InsertAgsWorkspaceDefaultProviderBinding = {
     workspaceId: input.workspaceId,
     role: input.role,
@@ -216,7 +220,8 @@ export async function upsertWorkspaceDefaultBinding(
 export async function deleteWorkspaceDefaultBinding(
   input: ResolveWorkspaceDefaultBindingInput,
 ): Promise<boolean> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-seventh batch (PR-V1-95).
+  const db = getAsDbForWorkspace(input.workspaceId);
   const result = await db
     .delete(agsWorkspaceDefaultProviderBindings)
     .where(
@@ -235,7 +240,8 @@ export async function deleteWorkspaceDefaultBinding(
 export async function listWorkspaceDefaultBindings(
   workspaceId: number,
 ): Promise<AgsWorkspaceDefaultProviderBinding[]> {
-  const db = getAsDb();
+  // V1+ MR-3 twenty-seventh batch (PR-V1-95).
+  const db = getAsDbForWorkspace(workspaceId);
   return db
     .select()
     .from(agsWorkspaceDefaultProviderBindings)
