@@ -103,8 +103,12 @@ describe("MR-3 twelfth batch source-scan — services/rac/trace/store.ts", () =>
   });
 
   describe("Category B — still on getAsDb() pending caller plumbing", () => {
+    // NOTE: `writeContextBlocks` was Cat B at the time of #824 and
+    // migrated to Cat A in #829 (seventeenth batch) using
+    // rows[0].workspaceId per the "context blocks share a parent
+    // trace" invariant. See tests/agent-studio/mr-3-seventeenth-
+    // batch-context-blocks.test.ts for the up-to-date assertion.
     const CATEGORY_B: ReadonlyArray<string> = [
-      "writeContextBlocks",
       "listContextBlocks",
     ];
 
