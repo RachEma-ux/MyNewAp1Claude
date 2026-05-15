@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveSubagentRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  subagentId: number,
+) {
+  // V1+ MR-3 fifty-seventh batch (PR-V1-127): shared subagentId→
+  // routed-conn helper. agsDraftSubagents.draftId is a direct FK —
+  // single SELECT, then chain into resolveDraftRoutedConn.
+  // Fifteenth sister helper.
+  const subagentRows = await lookupConn
+    .select({ draftId: agsDraftSubagents.draftId })
+    .from(agsDraftSubagents)
+    .where(eq(agsDraftSubagents.id, subagentId))
+    .limit(1);
+  const draftId = subagentRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
 async function resolveSkillRoutedConn(
   lookupConn: ReturnType<typeof db>,
   skillId: number,
@@ -2436,8 +2454,13 @@ export async function saveSubagent(input: {
   initialPrompt?: string | null;
   criticalSystemReminder?: string | null;
 }): Promise<typeof agsDraftSubagents.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 fifty-seventh batch (PR-V1-127): Path B consumer.
+  // UPDATE branch routes via resolveSubagentRoutedConn (subagentId→
+  // draftId), INSERT branch routes via
+  // resolveDraftRoutedConn(input.draftId).
+  const lookupConn = db();
   if (input.subagentId) {
+    const conn = await resolveSubagentRoutedConn(lookupConn, input.subagentId);
     const [updated] = await conn
       .update(agsDraftSubagents)
       .set({
@@ -2461,6 +2484,7 @@ export async function saveSubagent(input: {
     if (!updated) throw new Error(`Subagent ${input.subagentId} not found`);
     return updated;
   }
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
   const [created] = await conn
     .insert(agsDraftSubagents)
     .values({
@@ -2485,7 +2509,11 @@ export async function saveSubagent(input: {
 }
 
 export async function removeSubagent(subagentId: number) {
-  await db().delete(agsDraftSubagents).where(eq(agsDraftSubagents.id, subagentId));
+  // V1+ MR-3 fifty-seventh batch (PR-V1-127): Path B consumer via
+  // resolveSubagentRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveSubagentRoutedConn(lookupConn, subagentId);
+  await conn.delete(agsDraftSubagents).where(eq(agsDraftSubagents.id, subagentId));
 }
 
 export async function replaceSubagents(
@@ -2506,7 +2534,11 @@ export async function replaceSubagents(
     criticalSystemReminder?: string | null;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-seventh batch (PR-V1-127): Path B consumer via
+  // resolveDraftRoutedConn. DELETE-all + bulk-INSERT share a single
+  // routed conn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn.delete(agsDraftSubagents).where(eq(agsDraftSubagents.draftId, draftId));
   if (subagents.length === 0) return;
   await conn.insert(agsDraftSubagents).values(
