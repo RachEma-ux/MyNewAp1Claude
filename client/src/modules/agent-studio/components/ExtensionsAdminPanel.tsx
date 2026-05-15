@@ -240,6 +240,45 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
               })()}
             </p>
           ) : null}
+          {/* PR-V1-217: per-lane breakdown — how many extensions
+              registered for each EXTENSION_CAPABILITY_LANES bucket.
+              An extension can hook multiple lanes, so the per-lane
+              counts can sum to more than the total extension count.
+              Closed taxonomy: retrieve / assemble / compose / tool. */}
+          {listQ.data && listQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="extensions-lanes-aggregate-summary"
+            >
+              {(() => {
+                const laneCounts = {
+                  retrieve: 0,
+                  assemble: 0,
+                  compose: 0,
+                  tool: 0,
+                };
+                for (const ext of listQ.data) {
+                  for (const lane of ext.capabilityLanes) {
+                    if (lane in laneCounts) {
+                      laneCounts[lane as keyof typeof laneCounts] += 1;
+                    }
+                  }
+                }
+                return (
+                  <>
+                    <span className="font-medium">By lane:</span>{" "}
+                    <span className="font-mono">{laneCounts.retrieve}</span>{" "}
+                    retrieve /{" "}
+                    <span className="font-mono">{laneCounts.assemble}</span>{" "}
+                    assemble /{" "}
+                    <span className="font-mono">{laneCounts.compose}</span>{" "}
+                    compose /{" "}
+                    <span className="font-mono">{laneCounts.tool}</span> tool
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-2 text-sm">
             <label
               className="font-medium"
