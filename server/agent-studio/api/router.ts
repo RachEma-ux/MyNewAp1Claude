@@ -76,6 +76,7 @@ import { workspaceObservabilityRouter } from "../services/workspace-observabilit
 import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
+import { regionAdminRouter } from "../services/region/region-admin-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
@@ -2915,6 +2916,10 @@ export const agentStudioRouter = router({
   // alerts read surface. Pair to graphProjection — both expose
   // cron status to the operator dashboard's single panel pattern.
   graphHealth: graphHealthRouter,
+  // V1+ Phase MR-1 Phase-2 (2026-05-15, PR-V1-156): region admin
+  // surface — listActiveRegions, registerRegion, listPins, getPin,
+  // setPin, removePin, getCacheStatus, getRewarmCronStatus.
+  region: regionAdminRouter,
   // V1+ 17-γ follow-up (2026-05-14): canvas projection events
   // drain scheduler observability — `getDrainStatus` reads the
   // module-singleton tick state (#810) so operators can verify
