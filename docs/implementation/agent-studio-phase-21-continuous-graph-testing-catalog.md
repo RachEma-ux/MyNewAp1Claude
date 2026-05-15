@@ -179,6 +179,7 @@ runtime catches up.
 | `lens-snapshot-summary.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensSnapshot` (visible/hidden node + edge counts + per-typeKey histograms + truncated passthrough) | T-F.11 / #1055 |
 | `failure-state-event-list-summary.test.ts` | `services/failure-states/observability-bridge` — `summarizeFailureStateEventList` (closed-taxonomy vs free-form classification + occurrence summary + distinctSourceKinds + oldestAt/newestAt) | T-I.25 / #1056 |
 | `quality-finding-list-summary.test.ts` | `services/graph-quality/scanner-metadata` — `summarizeQualityFindings` (byScanKind / bySeverity / byCategory + unknownScanKindCount drift signal) | T-D.8 / #1057 |
+| `extract-failure-state-annotations.test.ts` | `services/failure-states/observability-bridge` — `extractFailureStateAnnotations` (inverse of `getCanonicalFailureStateAnnotations`; round-trip + severity-override validation) | T-I.26 / #1058 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

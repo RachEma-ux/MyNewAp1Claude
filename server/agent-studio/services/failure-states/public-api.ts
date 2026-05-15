@@ -24,6 +24,7 @@ export {
   failureStateErrorClass,
   parseFailureStateFromErrorClass,
   getCanonicalFailureStateAnnotations,
+  extractFailureStateAnnotations,
   recordFailureStateEvent,
   recordFailureStateEvents,
   summarizeFailureStateEventList,

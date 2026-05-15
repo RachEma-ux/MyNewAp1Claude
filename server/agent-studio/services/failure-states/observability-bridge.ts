@@ -23,6 +23,7 @@
 
 import {
   FAILURE_STATE_METADATA,
+  FAILURE_STATE_SEVERITIES,
   summarizeFailureStateOccurrences,
   type FailureState,
   type FailureStateMetadata,
@@ -200,6 +201,40 @@ export interface FailureStateEventListSummary {
   readonly oldestAt: Date | null;
   /** Newest `createdAt` in the input (null for empty input). */
   readonly newestAt: Date | null;
+}
+
+/**
+ * Reads the canonical failure-state annotations off a raw observability
+ * row. Returns null when:
+ *  - The row's `errorClass` doesn't carry the `failure_state:` prefix
+ *    (free-form emission), or
+ *  - The kind portion isn't in the closed taxonomy (stale ingest).
+ *
+ * The annotations are reconstructed from `errorClass` + `metadata` —
+ * `errorClass` carries the kind, and the metadata payload should
+ * mirror the canonical stamps. When metadata is missing or has been
+ * stripped, the fallback is the canonical default for that kind.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function extractFailureStateAnnotations(
+  row: Pick<ErrorEventRow, "errorClass" | "metadata">,
+): CanonicalFailureStateAnnotations | null {
+  const kind = parseFailureStateFromErrorClass(row.errorClass);
+  if (kind === null) return null;
+  const meta = row.metadata ?? {};
+  const sevFromMeta = meta["failureStateSeverity"];
+  const severityOverride = isFailureStateSeverity(sevFromMeta)
+    ? sevFromMeta
+    : undefined;
+  return getCanonicalFailureStateAnnotations(kind, severityOverride);
+}
+
+function isFailureStateSeverity(value: unknown): value is FailureStateSeverity {
+  return (
+    typeof value === "string" &&
+    (FAILURE_STATE_SEVERITIES as readonly string[]).includes(value)
+  );
 }
 
 /**
