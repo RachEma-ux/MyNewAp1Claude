@@ -11,3 +11,14 @@ export {
   type InstitutionalMemoryNodeType,
   type InstitutionalMemorySourceMapping,
 } from "./contracts.js";
+
+export {
+  projectInstitutionalMemoryNode,
+  projectInstitutionalMemoryNodeWithReason,
+  projectInstitutionalMemoryNodes,
+  isInstitutionalMemoryMappable,
+  type ProjectedInstitutionalMemoryNode,
+  type InstitutionalMemoryProjectionSkipReason,
+  type ProjectInstitutionalMemoryNodeOutcome,
+  type ProjectInstitutionalMemoryNodesResult,
+} from "./project-node.js";
