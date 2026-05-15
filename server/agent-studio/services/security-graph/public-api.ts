@@ -15,6 +15,7 @@ export {
   compareSecuritySeverity,
   sortBySeverityDesc,
   getMostSevereItem,
+  summarizeSecurityFindings,
   isCanonicalImpactStep,
   getNextCanonicalImpactStep,
   getPreviousCanonicalImpactStep,
@@ -23,5 +24,6 @@ export {
   type SecurityGraphNodeType,
   type SecurityGraphCanonicalPathStep,
   type SecurityFindingSeverity,
+  type SecurityFindingSummary,
   type CanonicalImpactPathValidationOutcome,
 } from "./contracts.js";
