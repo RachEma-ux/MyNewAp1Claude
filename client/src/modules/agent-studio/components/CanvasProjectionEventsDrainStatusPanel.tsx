@@ -8,12 +8,35 @@
 // small focused extracted component with its own data fetch +
 // test file.
 
+import { useState } from "react";
+
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionLabel } from "./ui";
 import { formatRelative } from "./format-relative";
 
 export function CanvasProjectionEventsDrainStatusPanel() {
+  const utils = trpc.useUtils();
+  const [forceTickFeedback, setForceTickFeedback] = useState<string | null>(
+    null,
+  );
+  const forceTickMutation =
+    trpc.agentStudio.canvasProjectionEventsDrain.forceTick.useMutation({
+      onSuccess: (data) => {
+        if (data.ran) {
+          setForceTickFeedback(
+            data.result == null
+              ? "Tick ran (no aggregate returned)."
+              : `Tick ran — processed ${data.result.totalProcessed} events across ${data.result.workspacesScanned} workspace${data.result.workspacesScanned === 1 ? "" : "s"}.`,
+          );
+        } else {
+          setForceTickFeedback(`Tick skipped: ${data.reason}.`);
+        }
+        void utils.agentStudio.canvasProjectionEventsDrain.getDrainStatus.invalidate();
+      },
+      onError: (err) => setForceTickFeedback(`Force-tick failed: ${err.message}`),
+    });
+
   const statusQuery =
     trpc.agentStudio.canvasProjectionEventsDrain.getDrainStatus.useQuery(
       undefined,
@@ -90,6 +113,26 @@ export function CanvasProjectionEventsDrainStatusPanel() {
             )}
           </div>
         )}
+        {/* PR-V1-175: operator-triggered manual tick. */}
+        <div className="flex items-center gap-2 pt-2 border-t">
+          <button
+            type="button"
+            className="text-sm underline"
+            disabled={forceTickMutation.isPending}
+            onClick={() => forceTickMutation.mutate()}
+            data-testid="drain-force-tick-button"
+          >
+            {forceTickMutation.isPending ? "Ticking…" : "Force tick now"}
+          </button>
+          {forceTickFeedback ? (
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="drain-force-tick-feedback"
+            >
+              {forceTickFeedback}
+            </span>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );
