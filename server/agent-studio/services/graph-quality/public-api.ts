@@ -204,10 +204,14 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
 
 export {
   QUALITY_SCANNER_METADATA,
+  QUALITY_FINDING_SEVERITIES,
   getScannerMetadata,
   listScannerMetadata,
+  summarizeQualityFindings,
 } from "./scanner-metadata.js";
 export type {
   QualityScannerCategory,
   QualityScannerMetadata,
+  QualityFindingSeverity,
+  QualityFindingListSummary,
 } from "./scanner-metadata.js";
