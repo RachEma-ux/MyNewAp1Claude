@@ -66,6 +66,9 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
     void utils.agentStudio.extensions.workspaceInvocationSummaries.invalidate({
       workspaceId,
     });
+    void utils.agentStudio.extensions.recentInvocations.invalidate({
+      workspaceId,
+    });
   }
   function onMutationSuccess() {
     setMutationError(null);
@@ -120,6 +123,26 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
         lastInvokedAt: s.lastInvokedAt,
       });
     }
+  }
+
+  // PR-V1-182: operator activity feed. Filter dropdown lets the
+  // operator narrow to a single extension; `undefined` ⇒ workspace-
+  // wide. Limit fixed at 50 — sufficient for "recent" without
+  // becoming a paged log viewer.
+  const [recentFilterExtId, setRecentFilterExtId] = useState<string>("");
+  const recentExtId =
+    recentFilterExtId === "" ? undefined : Number.parseInt(recentFilterExtId, 10);
+  const recentQ = trpc.agentStudio.extensions.recentInvocations.useQuery(
+    {
+      workspaceId,
+      extensionId: Number.isFinite(recentExtId) ? recentExtId : undefined,
+      limit: 50,
+    },
+    { refetchOnWindowFocus: false },
+  );
+  const extensionKeyById = new Map<number, string>();
+  if (listQ.data) {
+    for (const e of listQ.data) extensionKeyById.set(e.id, e.extensionKey);
   }
 
   return (
@@ -289,6 +312,102 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Recent invocations</SectionLabel>
+          <div className="flex items-center gap-2 text-sm">
+            <label
+              className="font-medium"
+              htmlFor="extensions-recent-filter-extid"
+            >
+              Filter by extension:
+            </label>
+            <select
+              id="extensions-recent-filter-extid"
+              className="text-xs border rounded px-1 py-0.5"
+              value={recentFilterExtId}
+              onChange={(e) => setRecentFilterExtId(e.target.value)}
+            >
+              <option value="">(all)</option>
+              {(listQ.data ?? []).map((ext) => (
+                <option key={ext.id} value={String(ext.id)}>
+                  {ext.extensionKey}
+                </option>
+              ))}
+            </select>
+          </div>
+          {recentQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading recent invocations…
+            </p>
+          ) : recentQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load recent invocations: {recentQ.error.message}
+            </p>
+          ) : !recentQ.data || recentQ.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No invocations recorded for this workspace yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table
+                className="w-full text-sm border-collapse"
+                data-testid="extensions-recent-invocations-table"
+              >
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 pr-3">When</th>
+                    <th className="py-1 pr-3">Extension</th>
+                    <th className="py-1 pr-3">Lane</th>
+                    <th className="py-1 pr-3">Tool</th>
+                    <th className="py-1 pr-3">Capability</th>
+                    <th className="py-1 pr-3">OK?</th>
+                    <th className="py-1 pr-3">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentQ.data.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                        {fmtTs(r.invokedAt)}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {extensionKeyById.get(r.extensionId) ??
+                          `#${r.extensionId}`}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {r.lane}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {r.invokedToolName ?? "—"}
+                      </td>
+                      <td
+                        className={`py-1 pr-3 font-mono text-xs ${r.capabilityCheck === "allowed" ? "" : "text-destructive"}`}
+                      >
+                        {r.capabilityCheck}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {r.succeeded === null
+                          ? "—"
+                          : r.succeeded
+                            ? "✓"
+                            : "✗"}
+                      </td>
+                      <td
+                        className="py-1 pr-3 text-xs truncate max-w-[40ch]"
+                        title={r.errorMessage ?? undefined}
+                      >
+                        {r.errorMessage ?? ""}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
