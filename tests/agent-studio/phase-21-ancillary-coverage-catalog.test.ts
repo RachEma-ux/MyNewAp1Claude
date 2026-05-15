@@ -84,6 +84,7 @@ const ANCILLARY_TESTS = [
   "security-graph-node-type-metadata.test.ts",
   "code-graph-node-type-metadata.test.ts",
   "institutional-memory-node-type-metadata.test.ts",
+  "impact-analysis-kind-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

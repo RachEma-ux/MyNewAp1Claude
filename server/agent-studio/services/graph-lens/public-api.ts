@@ -56,12 +56,15 @@ export {
   ABSOLUTE_IMPACT_MAX_DEPTH,
   normalizeImpactMaxDepth,
   summarizeImpactAnalysisResult,
+  IMPACT_ANALYSIS_KIND_METADATA,
+  getImpactAnalysisKindMetadata,
   type ImpactAnalysisKind,
   type ImpactAnalysisRequest,
   type ImpactAnalysisNode,
   type ImpactAnalysisEdge,
   type ImpactAnalysisResult,
   type ImpactAnalysisResultSummary,
+  type ImpactAnalysisKindMetadata,
 } from "./impact-analysis-contracts.js";
 
 export {

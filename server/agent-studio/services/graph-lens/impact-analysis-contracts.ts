@@ -61,6 +61,63 @@ export function isImpactAnalysisKind(s: unknown): s is ImpactAnalysisKind {
 }
 
 // ============================================================================
+// Per-kind operator-facing metadata (T-F.14)
+// ============================================================================
+
+export interface ImpactAnalysisKindMetadata {
+  /** Display label for operator UI tabs / pickers. */
+  readonly label: string;
+  /** Short description of what this kind of impact analysis answers. */
+  readonly description: string;
+}
+
+export const IMPACT_ANALYSIS_KIND_METADATA: Readonly<
+  Record<ImpactAnalysisKind, ImpactAnalysisKindMetadata>
+> = {
+  knowledge_impact: {
+    label: "Knowledge Impact",
+    description:
+      "What knowledge (notes / docs / CAG blocks) is downstream of this node?",
+  },
+  runtime_impact: {
+    label: "Runtime Impact",
+    description:
+      "Which live agent runs / queries depend on this node's state?",
+  },
+  code_impact: {
+    label: "Code Impact",
+    description:
+      "Which code (files / classes / endpoints) depends on this node?",
+  },
+  security_impact: {
+    label: "Security Impact",
+    description:
+      "Which services / customers are exposed if this node is compromised?",
+  },
+  governance_impact: {
+    label: "Governance Impact",
+    description:
+      "Which approvals / policies bind operations on this node?",
+  },
+  tool_impact: {
+    label: "Tool Impact",
+    description:
+      "Which MCP tools dispatch on this node, and which downstream tools they call?",
+  },
+  workflow_impact: {
+    label: "Workflow Impact",
+    description:
+      "Which automation workflows trigger / depend on this node?",
+  },
+};
+
+export function getImpactAnalysisKindMetadata(
+  kind: ImpactAnalysisKind,
+): ImpactAnalysisKindMetadata {
+  return IMPACT_ANALYSIS_KIND_METADATA[kind];
+}
+
+// ============================================================================
 // Request shape
 // ============================================================================
 
