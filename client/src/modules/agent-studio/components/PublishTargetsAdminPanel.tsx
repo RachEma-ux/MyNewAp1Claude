@@ -469,6 +469,20 @@ export function PublishTargetsAdminPanel() {
             </p>
           ) : (
             <div className="overflow-x-auto">
+              {/* PR-V1-213: count label above the executions table.
+                  Most-recent N (default 50) with a "+ more" hint when
+                  the page is at the cap so operators know they're
+                  looking at a window, not the whole history. */}
+              <p
+                className="text-xs text-muted-foreground mb-1"
+                data-testid="publish-executions-count-label"
+              >
+                Showing{" "}
+                <span className="font-mono">{recentQ.data.length}</span>{" "}
+                most-recent execution
+                {recentQ.data.length === 1 ? "" : "s"}
+                {recentQ.data.length >= 50 ? " (capped at 50)" : ""}.
+              </p>
               <table
                 className="w-full text-sm border-collapse"
                 data-testid="publish-targets-executions-table"
