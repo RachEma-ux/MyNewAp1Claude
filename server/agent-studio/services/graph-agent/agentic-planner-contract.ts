@@ -95,6 +95,56 @@ export type AgenticPlannerAction =
 export const AGENTIC_PLANNER_ACTION_KINDS = ["retrieve", "answer", "stop"] as const;
 export type AgenticPlannerActionKind = (typeof AGENTIC_PLANNER_ACTION_KINDS)[number];
 
+// ============================================================================
+// Per-action-kind operator-facing metadata (T-G.35)
+// ============================================================================
+
+export interface AgenticPlannerActionKindMetadata {
+  /** Display label rendered in the agent-trace UI's step list. */
+  readonly label: string;
+  /** Short operator-facing description of what the action does. */
+  readonly description: string;
+  /** Whether this action ends the planning loop (true) or continues it
+   *  with another iteration (false). The engine reads this to decide
+   *  whether to call the planner again. */
+  readonly terminatesLoop: boolean;
+  /** Whether this action produces a user-visible answer (true) — only
+   *  `answer` does. */
+  readonly producesAnswer: boolean;
+}
+
+export const AGENTIC_PLANNER_ACTION_KIND_METADATA: Readonly<
+  Record<AgenticPlannerActionKind, AgenticPlannerActionKindMetadata>
+> = {
+  retrieve: {
+    label: "Retrieve",
+    description:
+      "Planner requests another retrieval pass with a specified mode — the engine invokes the retrieval pipeline and re-plans.",
+    terminatesLoop: false,
+    producesAnswer: false,
+  },
+  answer: {
+    label: "Answer",
+    description:
+      "Planner has sufficient evidence to answer — engine synthesizes the response from the accumulated retrieval context and stops.",
+    terminatesLoop: true,
+    producesAnswer: true,
+  },
+  stop: {
+    label: "Stop",
+    description:
+      "Planner cannot proceed (e.g. iteration budget exceeded, retrieval failed irreversibly) — engine emits a partial-answer trace with the reason.",
+    terminatesLoop: true,
+    producesAnswer: false,
+  },
+};
+
+export function getAgenticPlannerActionKindMetadata(
+  kind: AgenticPlannerActionKind,
+): AgenticPlannerActionKindMetadata {
+  return AGENTIC_PLANNER_ACTION_KIND_METADATA[kind];
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Planner interface
 // ─────────────────────────────────────────────────────────────────────

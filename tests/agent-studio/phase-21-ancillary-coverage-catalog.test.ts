@@ -108,6 +108,7 @@ const ANCILLARY_TESTS = [
   "publish-target-type-metadata.test.ts",
   "publish-execution-status-metadata.test.ts",
   "publish-governance-decision-metadata.test.ts",
+  "agentic-planner-action-kind-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
