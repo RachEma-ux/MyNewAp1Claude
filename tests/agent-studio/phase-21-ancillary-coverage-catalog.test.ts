@@ -75,6 +75,7 @@ const ANCILLARY_TESTS = [
   "failure-state-category-severity-matrix.test.ts",
   "annotate-rows-with-failure-state.test.ts",
   "code-graph-cardinality-summary.test.ts",
+  "institutional-memory-projection-summary.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
