@@ -38,6 +38,10 @@ export function RegionAdminPanel() {
     undefined,
     { refetchOnWindowFocus: false },
   );
+  const pubsubQ = trpc.agentStudio.region.getPubsubStatus.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false },
+  );
   const regionsQ = trpc.agentStudio.region.listActiveRegions.useQuery(
     undefined,
     { refetchOnWindowFocus: false },
@@ -114,6 +118,49 @@ export function RegionAdminPanel() {
                   {cronQ.data.lastError}
                 </div>
               ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Cross-process pubsub status (PR-V1-167) */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Cross-process pubsub</SectionLabel>
+          {pubsubQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading pubsub status…</p>
+          ) : pubsubQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load pubsub status: {pubsubQ.error.message}
+            </p>
+          ) : pubsubQ.data == null ? (
+            <p className="text-sm text-muted-foreground">No pubsub status.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="font-medium">Subscribed:</span>{" "}
+                {pubsubQ.data.subscribed ? "yes" : "no"}
+              </div>
+              <div>
+                <span className="font-medium">Connected at:</span>{" "}
+                {fmtTs(pubsubQ.data.connectedAt)}
+              </div>
+              <div>
+                <span className="font-medium">Last message:</span>{" "}
+                {fmtTs(pubsubQ.data.lastMessageAt)}
+              </div>
+              <div>
+                <span className="font-medium">Reason:</span>{" "}
+                {pubsubQ.data.lastMessageReason ?? "—"}
+              </div>
+              <div>
+                <span className="font-medium">Messages received:</span>{" "}
+                {pubsubQ.data.messagesReceived}
+              </div>
+              <div>
+                <span className="font-medium">Reconnect attempts:</span>{" "}
+                {pubsubQ.data.reconnectAttempts}
+              </div>
             </div>
           )}
         </CardContent>

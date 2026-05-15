@@ -57,6 +57,12 @@ interface SubscriberState {
   reconnectMs: number;
   stopped: boolean;
   timer: NodeJS.Timeout | null;
+  /** PR-V1-167: observability counters. */
+  connectedAt: Date | null;
+  lastMessageAt: Date | null;
+  lastMessageReason: string | null;
+  messagesReceived: number;
+  reconnectAttempts: number;
 }
 
 const _subscriber: SubscriberState = {
@@ -65,6 +71,11 @@ const _subscriber: SubscriberState = {
   reconnectMs: 10_000,
   stopped: false,
   timer: null,
+  connectedAt: null,
+  lastMessageAt: null,
+  lastMessageReason: null,
+  messagesReceived: 0,
+  reconnectAttempts: 0,
 };
 
 /**
@@ -124,8 +135,12 @@ export function subscribeRegionCacheInvalidations(
     _subscriber.client = client;
     client.on("notification", (msg) => {
       if (msg.channel !== CHANNEL) return;
+      const reason = msg.payload ?? "";
+      _subscriber.lastMessageAt = new Date();
+      _subscriber.lastMessageReason = reason;
+      _subscriber.messagesReceived += 1;
       try {
-        _subscriber.handler?.(msg.payload ?? "");
+        _subscriber.handler?.(reason);
       } catch (err) {
         const m = err instanceof Error ? err.message : String(err);
         console.warn(`[ags-region-cache-pubsub] handler threw: ${m}`);
@@ -134,6 +149,7 @@ export function subscribeRegionCacheInvalidations(
     client.on("error", (err) => {
       const m = err instanceof Error ? err.message : String(err);
       console.warn(`[ags-region-cache-pubsub] client error: ${m}`);
+      _subscriber.connectedAt = null;
       scheduleReconnect();
     });
     void (async () => {
@@ -145,6 +161,7 @@ export function subscribeRegionCacheInvalidations(
         );
         // Reset backoff on success.
         _subscriber.reconnectMs = 10_000;
+        _subscriber.connectedAt = new Date();
       } catch (err) {
         const m = err instanceof Error ? err.message : String(err);
         console.warn(`[ags-region-cache-pubsub] connect failed: ${m}`);
@@ -156,6 +173,7 @@ export function subscribeRegionCacheInvalidations(
   function scheduleReconnect(): void {
     if (_subscriber.stopped) return;
     if (_subscriber.timer) return;
+    _subscriber.reconnectAttempts += 1;
     const delay = Math.min(_subscriber.reconnectMs, 60_000);
     _subscriber.reconnectMs = Math.min(_subscriber.reconnectMs + 10_000, 60_000);
     _subscriber.timer = setTimeout(() => {
@@ -192,6 +210,11 @@ export function unsubscribeRegionCacheInvalidations(): void {
     _subscriber.client = null;
   }
   _subscriber.handler = null;
+  _subscriber.connectedAt = null;
+  // Preserve lastMessageAt / lastMessageReason / messagesReceived /
+  // reconnectAttempts so operators can still see the lifetime
+  // counters after a stop. A fresh process restart resets them
+  // (module reload).
 }
 
 /**
@@ -204,4 +227,36 @@ export function maybeSubscribeRegionCachePubsub(
   if (process.env.AGS_REGION_PUBSUB !== "on") return false;
   subscribeRegionCacheInvalidations(handler);
   return true;
+}
+
+/**
+ * PR-V1-167: operator observability surface — current subscriber
+ * state, including whether the LISTEN connection is up, when the
+ * last cross-process notification arrived, and how many reconnect
+ * cycles have happened over the process's lifetime.
+ *
+ * Useful for the operator dashboard to verify multi-process
+ * pubsub is actually wired up. A `connectedAt == null` after the
+ * boot opt-in fired means LISTEN never succeeded; a stale
+ * `lastMessageAt` on a process that should be receiving traffic
+ * suggests a config issue.
+ */
+export interface RegionCachePubsubStatus {
+  readonly subscribed: boolean;
+  readonly connectedAt: Date | null;
+  readonly lastMessageAt: Date | null;
+  readonly lastMessageReason: string | null;
+  readonly messagesReceived: number;
+  readonly reconnectAttempts: number;
+}
+
+export function getRegionCachePubsubStatus(): RegionCachePubsubStatus {
+  return {
+    subscribed: _subscriber.handler !== null,
+    connectedAt: _subscriber.connectedAt,
+    lastMessageAt: _subscriber.lastMessageAt,
+    lastMessageReason: _subscriber.lastMessageReason,
+    messagesReceived: _subscriber.messagesReceived,
+    reconnectAttempts: _subscriber.reconnectAttempts,
+  };
 }

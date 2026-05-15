@@ -108,4 +108,6 @@ export {
   subscribeRegionCacheInvalidations,
   unsubscribeRegionCacheInvalidations,
   maybeSubscribeRegionCachePubsub,
+  getRegionCachePubsubStatus,
+  type RegionCachePubsubStatus,
 } from "./region-cache-pubsub.js";
