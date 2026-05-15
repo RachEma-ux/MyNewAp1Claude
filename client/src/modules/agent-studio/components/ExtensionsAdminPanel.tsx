@@ -220,7 +220,34 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                       <td className="py-1 pr-3 font-mono text-xs">
                         {ext.extensionKey}
                       </td>
-                      <td className="py-1 pr-3">{ext.name}</td>
+                      <td className="py-1 pr-3">
+                        {ext.name}
+                        {/* PR-V1-197: signing indicator. Surfaces
+                            an unsigned extension as an inline
+                            destructive badge so the operator
+                            doesn't have to inspect the signing
+                            key id field separately to spot
+                            dev-mode / unsigned bundles. Signed
+                            extensions show the key id as a small
+                            muted chip. */}
+                        {ext.signingKeyId == null ? (
+                          <span
+                            className="ml-1 text-xs text-destructive font-mono"
+                            data-testid={`extension-row-unsigned-${ext.id}`}
+                            title="No signing key id — dev-mode or unsigned bundle"
+                          >
+                            [unsigned]
+                          </span>
+                        ) : (
+                          <span
+                            className="ml-1 text-xs text-muted-foreground font-mono"
+                            data-testid={`extension-row-signing-${ext.id}`}
+                            title={`Signed by key ${ext.signingKeyId}`}
+                          >
+                            ({ext.signingKeyId})
+                          </span>
+                        )}
+                      </td>
                       <td className="py-1 pr-3 font-mono text-xs">
                         {ext.version}
                       </td>
