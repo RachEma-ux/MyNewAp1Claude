@@ -82,4 +82,20 @@ describe("Phase 22 emission audit covers all 25 closed-taxonomy kinds", () => {
       expect(audit).toContain(pr);
     }
   });
+
+  it("§7 query examples section exists with 10 example queries", () => {
+    expect(audit).toContain("## 7. Operator dashboard query examples");
+    // The 10 example sub-sections are numbered 7.1 through 7.10.
+    for (let i = 1; i <= 10; i++) {
+      expect(audit).toContain(`### 7.${i} —`);
+    }
+  });
+
+  it("query examples use the canonical failure_state:<kind> prefix and metadata schema", () => {
+    expect(audit).toContain("error_class LIKE 'failure_state:%'");
+    expect(audit).toContain("metadata->>'failureStateKind'");
+    expect(audit).toContain("metadata->>'failureStateCategory'");
+    expect(audit).toContain("metadata->>'failureStateSeverity'");
+    expect(audit).toContain("metadata->>'failureStateRecoverable'");
+  });
 });

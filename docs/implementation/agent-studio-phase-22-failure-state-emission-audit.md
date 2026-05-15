@@ -174,9 +174,152 @@ The 23 ⚠️/🟡/❌ states are ordered by emitter-callsite proximity. Reading
 
 ---
 
-## 7. References
+## 7. Operator dashboard query examples
+
+Once the 11 batch-A + batch-B emitters are emitting into ASDB, operators can run the following queries to surface the closed-taxonomy view of failure events. Every emission carries `errorClass = 'failure_state:<kind>'` and a JSONB `metadata` column with canonical fields (`failureStateKind`, `failureStateCategory`, `failureStateSeverity`, `failureStateRecoverable`).
+
+### 7.1 — All failure-state emissions in the last hour
+
+```sql
+SELECT id, source_kind, error_class, error_message, created_at
+FROM ags_workspace_error_events
+WHERE error_class LIKE 'failure_state:%'
+  AND created_at > now() - interval '1 hour'
+ORDER BY created_at DESC;
+```
+
+### 7.2 — Count by closed kind (last 24h)
+
+```sql
+SELECT
+  metadata->>'failureStateKind' AS kind,
+  metadata->>'failureStateCategory' AS category,
+  COUNT(*) AS n
+FROM ags_workspace_error_events
+WHERE error_class LIKE 'failure_state:%'
+  AND created_at > now() - interval '24 hours'
+GROUP BY 1, 2
+ORDER BY n DESC;
+```
+
+### 7.3 — Operator-action-required events (recoverable = false)
+
+```sql
+SELECT id, source_kind, metadata->>'failureStateKind' AS kind, error_message, created_at
+FROM ags_workspace_error_events
+WHERE error_class LIKE 'failure_state:%'
+  AND metadata->>'failureStateRecoverable' = 'false'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+### 7.4 — Critical-severity emissions by category
+
+```sql
+SELECT
+  metadata->>'failureStateCategory' AS category,
+  metadata->>'failureStateKind' AS kind,
+  COUNT(*) AS n
+FROM ags_workspace_error_events
+WHERE error_class LIKE 'failure_state:%'
+  AND metadata->>'failureStateSeverity' = 'critical'
+  AND created_at > now() - interval '7 days'
+GROUP BY 1, 2
+ORDER BY n DESC;
+```
+
+### 7.5 — Drift detection runs that produced findings (kind-specific)
+
+```sql
+SELECT id, source_id AS scope, error_message, metadata->>'driftCount' AS drifts, created_at
+FROM ags_workspace_error_events
+WHERE error_class = 'failure_state:neo4j_projection_drift_detected'
+  AND created_at > now() - interval '7 days'
+ORDER BY created_at DESC;
+```
+
+### 7.6 — Promotions rejected at validation (vs operator-rejected)
+
+```sql
+SELECT
+  metadata->>'rejectionStage' AS stage,
+  COUNT(*) AS n
+FROM ags_workspace_error_events
+WHERE error_class = 'failure_state:promotion_failed'
+  AND created_at > now() - interval '30 days'
+GROUP BY 1;
+```
+
+### 7.7 — Permission-denied references that fired the dedicated kind (#1030)
+
+```sql
+SELECT
+  source_id AS run_id,
+  metadata->>'permissionDeniedCount' AS hidden_count,
+  metadata->>'workspaceId' AS workspace_id,
+  created_at
+FROM ags_workspace_error_events
+WHERE error_class = 'failure_state:runtime_reference_hidden_by_permission'
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+### 7.8 — MCP tool-schema changes by server
+
+```sql
+SELECT
+  source_id AS server_id,
+  metadata->>'changeCount' AS changes,
+  metadata->>'kindCounts' AS by_kind,
+  created_at
+FROM ags_workspace_error_events
+WHERE error_class = 'failure_state:tool_schema_changed'
+ORDER BY created_at DESC;
+```
+
+### 7.9 — Graph-agent budget-exhaustion rate vs total runs
+
+```sql
+WITH incomplete_runs AS (
+  SELECT COUNT(*) AS n
+  FROM ags_workspace_error_events
+  WHERE error_class = 'failure_state:graph_agent_answer_incomplete'
+    AND created_at > now() - interval '24 hours'
+), total_runs AS (
+  SELECT COUNT(*) AS n
+  FROM ags_runtime_runs
+  WHERE created_at > now() - interval '24 hours'
+)
+SELECT
+  i.n AS incomplete,
+  t.n AS total,
+  CASE WHEN t.n > 0 THEN ROUND(100.0 * i.n / t.n, 2) ELSE NULL END AS pct
+FROM incomplete_runs i, total_runs t;
+```
+
+### 7.10 — Per-workspace failure-state spread
+
+```sql
+SELECT
+  metadata->>'workspaceId' AS workspace_id,
+  metadata->>'failureStateKind' AS kind,
+  COUNT(*) AS n
+FROM ags_workspace_error_events
+WHERE error_class LIKE 'failure_state:%'
+  AND metadata ? 'workspaceId'
+  AND created_at > now() - interval '7 days'
+GROUP BY 1, 2
+ORDER BY workspace_id, n DESC;
+```
+
+Note: queries assume the JSONB `metadata` column. Drizzle's column name in the schema is `metadata`; the SQL above is written against the underlying Postgres column.
+
+---
+
+## 8. References
 
 - Closed taxonomy: `server/agent-studio/services/failure-states/contracts.ts` (#1002)
+- Bridge: `server/agent-studio/services/failure-states/observability-bridge.ts` (#1013)
 - Existing recorder: `server/agent-studio/services/workspace-observability/error-events.ts`
 - Storage table: `drizzle/tables/agent-studio-graph-quality.ts` — `agsWorkspaceErrorEvents`
 - Roadmap: `docs/implementation/agent-studio-native-graph-workspace-roadmap.md` §Phase 22
