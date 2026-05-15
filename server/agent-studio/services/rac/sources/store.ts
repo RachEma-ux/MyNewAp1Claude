@@ -141,8 +141,18 @@ export async function createProfile(input: CreateProfileInput): Promise<RacProfi
 }
 
 export async function getProfile(profileId: number): Promise<RacProfile | null> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-seventh batch (PR-V1-137): Path-A discovering-
+  // helper read. agsRacProfiles.workspaceId is non-null; pull it up
+  // first, then route the full SELECT to the home region.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsRacProfiles.workspaceId })
+    .from(agsRacProfiles)
+    .where(eq(agsRacProfiles.id, profileId))
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsRacProfiles)
@@ -390,8 +400,21 @@ export async function deleteSource(sourceId: number): Promise<void> {
 export async function getPolicyForProfile(
   profileId: number,
 ): Promise<RacPolicy | null> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-seventh batch (PR-V1-137): Path-A discovering-
+  // helper read. agsRacPolicies has no workspaceId column; resolve
+  // via the parent agsRacProfiles row, then route the SELECT on
+  // agsRacPolicies to the home region under Phase-2.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsRacProfiles.workspaceId })
+    .from(agsRacProfiles)
+    .where(eq(agsRacProfiles.id, profileId))
+    .limit(1);
+  const db =
+    wsRows.length > 0
+      ? (getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsRacPolicies)
