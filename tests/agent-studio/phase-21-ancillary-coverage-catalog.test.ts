@@ -49,6 +49,7 @@ const ANCILLARY_TESTS = [
   "failure-state-bridge-wiring-coverage.test.ts",
   "graph-quality-missing-source-version-scanner.test.ts",
   "phase-21-gap-18-timeline-event-projection.test.ts",
+  "phase-22-burst-summary-coverage.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
