@@ -181,6 +181,67 @@ export function normalizeRecommendationLimit(
   return Math.floor(input);
 }
 
+// ============================================================================
+// Aggregation helper (T-G.13)
+// ============================================================================
+
+export interface RecommendationResponseSummary {
+  readonly total: number;
+  readonly visible: number;
+  readonly redacted: number;
+  /** Always == response.fullyHiddenCount; mirrored here so a single
+   *  summary value carries the full permission-shape. */
+  readonly fullyHidden: number;
+  /** Mean confidence across `visible` results only — redacted / hidden
+   *  contribute no confidence signal. `null` when there are zero
+   *  visible results. */
+  readonly meanConfidenceVisible: number | null;
+  /** Min / max confidence across `visible` results only. `null` when
+   *  there are zero visible results. */
+  readonly minConfidenceVisible: number | null;
+  readonly maxConfidenceVisible: number | null;
+}
+
+/**
+ * Aggregates a `RecommendationResponse` into a stable-shape summary
+ * suitable for operator dashboards. All counts are present at zero
+ * or higher; confidence stats are `null` when there are zero visible
+ * results (rather than NaN / 0, which would mislead the dashboard).
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeRecommendationResponse(
+  response: RecommendationResponse,
+): RecommendationResponseSummary {
+  let visible = 0;
+  let redacted = 0;
+  let confidenceSum = 0;
+  let minConf = Number.POSITIVE_INFINITY;
+  let maxConf = Number.NEGATIVE_INFINITY;
+  for (const r of response.results) {
+    if (r.permissionStatus === "visible") {
+      visible += 1;
+      confidenceSum += r.confidence;
+      if (r.confidence < minConf) minConf = r.confidence;
+      if (r.confidence > maxConf) maxConf = r.confidence;
+    } else if (r.permissionStatus === "redacted") {
+      redacted += 1;
+    }
+  }
+  const meanConfidenceVisible = visible > 0 ? confidenceSum / visible : null;
+  const minConfidenceVisible = visible > 0 ? minConf : null;
+  const maxConfidenceVisible = visible > 0 ? maxConf : null;
+  return {
+    total: response.results.length,
+    visible,
+    redacted,
+    fullyHidden: response.fullyHiddenCount,
+    meanConfidenceVisible,
+    minConfidenceVisible,
+    maxConfidenceVisible,
+  };
+}
+
 /**
  * Validate + normalize `minConfidence`. Returns the value in [0, 1].
  * Throws on out-of-range or non-finite.
