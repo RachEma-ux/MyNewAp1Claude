@@ -560,6 +560,69 @@ export const AGS_RUN_STATUSES = [
 ] as const;
 export type AgsRunStatus = (typeof AGS_RUN_STATUSES)[number];
 
+// ============================================================================
+// Per-run-status operator-facing metadata (T-S.8)
+// ============================================================================
+
+export interface AgsRunStatusMetadata {
+  /** Display label rendered in run dashboards / runtime trace. */
+  readonly label: string;
+  /** Short operator-facing description of the run state. */
+  readonly description: string;
+  /** Whether the run is in a terminal state (true for completed /
+   *  failed / cancelled). */
+  readonly terminal: boolean;
+  /** Whether the run finished successfully (true for completed only;
+   *  always false when terminal=false). */
+  readonly successful: boolean;
+}
+
+export const AGS_RUN_STATUS_METADATA: Readonly<
+  Record<AgsRunStatus, AgsRunStatusMetadata>
+> = {
+  queued: {
+    label: "Queued",
+    description:
+      "Run is scheduled and awaiting executor pickup — has not yet started any work.",
+    terminal: false,
+    successful: false,
+  },
+  running: {
+    label: "Running",
+    description:
+      "Run is actively executing — heartbeat is current; runtime trace is being recorded.",
+    terminal: false,
+    successful: false,
+  },
+  completed: {
+    label: "Completed",
+    description:
+      "Run finished successfully — all steps reached terminal accept state with the expected output shape.",
+    terminal: true,
+    successful: true,
+  },
+  failed: {
+    label: "Failed",
+    description:
+      "Run terminated with an error — runtime trace captures the failure cause; operator inspects in the trace UI.",
+    terminal: true,
+    successful: false,
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "Run was cancelled by the operator or by the runtime (e.g. budget cap exceeded) — terminal without explicit success/failure.",
+    terminal: true,
+    successful: false,
+  },
+};
+
+export function getAgsRunStatusMetadata(
+  status: AgsRunStatus,
+): AgsRunStatusMetadata {
+  return AGS_RUN_STATUS_METADATA[status];
+}
+
 export const AGS_TEST_VERDICTS = ["pass", "fail", "skipped", "error"] as const;
 export type AgsTestVerdict = (typeof AGS_TEST_VERDICTS)[number];
 
