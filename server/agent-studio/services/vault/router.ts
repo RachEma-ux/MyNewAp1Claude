@@ -28,6 +28,9 @@ import {
 } from "./templates.js";
 import {
   computeTemplateDigest,
+  countDistinctDigestsForTemplate,
+  listInstantiationsByNote,
+  listInstantiationsByTemplate,
   recordTemplateInstantiation,
 } from "./template-instantiations.js";
 import {
@@ -783,6 +786,47 @@ export const vaultRouter = router({
         noteId: note.id,
         versionId: note.versionId,
         templateKey: template.templateKey,
+      };
+    }),
+
+  /**
+   * V1+ Phase 15-δ follow-up (PR-V1-164): expose the existing
+   * `listInstantiationsByTemplate` / `listInstantiationsByNote` /
+   * `countDistinctDigestsForTemplate` helpers via tRPC. The
+   * underlying service has shipped since Phase 15-α (#750) but no
+   * router exposure existed — operators couldn't ask "which notes
+   * were created from template X?" or "how many distinct digests
+   * has this template churned through?" without a direct DB query.
+   *
+   * All three are protected reads (any logged-in user can inspect
+   * their workspace's vault history; the underlying ledger is
+   * already workspace-scoped via the `templateId` FK).
+   */
+  listInstantiationsByTemplate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.number().int().positive(),
+        limit: z.number().int().positive().max(500).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return listInstantiationsByTemplate(input.templateId, input.limit ?? 100);
+    }),
+
+  listInstantiationsByNote: protectedProcedure
+    .input(z.object({ noteId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return listInstantiationsByNote(input.noteId);
+    }),
+
+  countDistinctDigestsForTemplate: protectedProcedure
+    .input(z.object({ templateId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return {
+        templateId: input.templateId,
+        distinctDigests: await countDistinctDigestsForTemplate(
+          input.templateId,
+        ),
       };
     }),
 });
