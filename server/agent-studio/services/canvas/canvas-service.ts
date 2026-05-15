@@ -32,6 +32,7 @@ import {
 import { agsVaults } from "../../../../drizzle/tables/agent-studio-vault.js";
 import {
   CanvasNodeKindError,
+  CanvasNodeNotFoundError,
   CanvasNotFoundError,
   isCanvasNodeKind,
   type CanvasEdgeRecord,
@@ -41,6 +42,7 @@ import {
   type CreateCanvasEdgeInput,
   type CreateCanvasInput,
   type CreateCanvasNodeInput,
+  type UpdateCanvasNodeInput,
 } from "./types.js";
 import { recordCanvasProjectionEvent } from "./projection-events-sink.js";
 
@@ -249,6 +251,139 @@ export async function createCanvasNode(
     });
   }
   return node;
+}
+
+/**
+ * V1+ Phase 17-γ follow-up (PR-V1-169): update a canvas node.
+ *
+ * Routes through the same canvas→vault→workspace split-handle that
+ * `createCanvasNode` uses. Emits the appropriate projection event
+ * when `referencedNoteId` changes:
+ *   - `null → noteX`           → `note_reference_changed`
+ *   - `noteX → noteY` (Y≠X)    → `note_reference_changed`
+ *   - `noteX → null`           → `note_reference_removed` (carries
+ *                                priorReferencedNoteId = X)
+ *   - `null → null` / `X → X`  → no event
+ *
+ * Throws `CanvasNodeNotFoundError` when the node row is missing.
+ * Throws `CanvasNodeKindError` when an invalid `kind` is supplied.
+ */
+export async function updateCanvasNode(
+  input: UpdateCanvasNodeInput,
+): Promise<CanvasNodeRecord> {
+  if (input.kind !== undefined && !isCanvasNodeKind(input.kind)) {
+    throw new CanvasNodeKindError(input.kind);
+  }
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  // First fetch the existing row so we know the canvasId for the
+  // workspace routing and the prior referencedNoteId for the
+  // event-payload diff. Single query.
+  const priorRows = await lookupDb
+    .select()
+    .from(agsCanvasNodes)
+    .where(eq(agsCanvasNodes.id, input.nodeId))
+    .limit(1);
+  if (!priorRows[0]) throw new CanvasNodeNotFoundError(input.nodeId);
+  const prior = rowToNode(priorRows[0] as Record<string, unknown>);
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, prior.canvasId);
+  const db =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupDb;
+  if (!db) throw new AsdbUnavailableError();
+
+  // Build the partial UPDATE — only set fields the caller supplied.
+  // `referencedNoteId: undefined` means "leave alone"; `null` means
+  // "clear" (the column is nullable).
+  const patch: Record<string, unknown> = {};
+  if (input.kind !== undefined) patch.kind = input.kind;
+  if (input.referencedNoteId !== undefined)
+    patch.referencedNoteId = input.referencedNoteId;
+  if (input.x !== undefined) patch.x = input.x;
+  if (input.y !== undefined) patch.y = input.y;
+  if (input.width !== undefined) patch.width = input.width;
+  if (input.height !== undefined) patch.height = input.height;
+  if (input.data !== undefined) patch.data = input.data;
+  if (Object.keys(patch).length === 0) {
+    // No-op update: return the prior row without round-tripping.
+    return prior;
+  }
+
+  const [updated] = await db
+    .update(agsCanvasNodes)
+    .set(patch)
+    .where(eq(agsCanvasNodes.id, input.nodeId))
+    .returning();
+  if (!updated) throw new CanvasNodeNotFoundError(input.nodeId);
+  const node = rowToNode(updated as Record<string, unknown>);
+
+  // Emit projection event when the note reference actually changed.
+  // No-op when no sink is registered (default state).
+  if (input.referencedNoteId !== undefined) {
+    const before = prior.referencedNoteId;
+    const after = node.referencedNoteId;
+    if (before !== after) {
+      if (after != null) {
+        await recordCanvasProjectionEvent({
+          kind: "canvas.note_reference_changed",
+          payload: {
+            canvasId: node.canvasId,
+            canvasNodeId: node.id,
+            referencedNoteId: after,
+          },
+        });
+      } else if (before != null) {
+        await recordCanvasProjectionEvent({
+          kind: "canvas.note_reference_removed",
+          payload: {
+            canvasId: node.canvasId,
+            canvasNodeId: node.id,
+            priorReferencedNoteId: before,
+          },
+        });
+      }
+    }
+  }
+  return node;
+}
+
+/**
+ * V1+ Phase 17-γ follow-up (PR-V1-169): delete a canvas node.
+ *
+ * Routes via the canvas→vault→workspace split-handle. When the
+ * deleted node carried a `referencedNoteId`, emits
+ * `canvas.note_reference_removed` with the prior id so the 17-γ
+ * sink can unlink the projected edge.
+ *
+ * Returns `true` when a row was deleted, `false` when no row
+ * matched (idempotent — `deleteCanvasNode(nodeId)` after the row
+ * has already been deleted is not an error).
+ */
+export async function deleteCanvasNode(nodeId: number): Promise<boolean> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) return false;
+  const priorRows = await lookupDb
+    .select()
+    .from(agsCanvasNodes)
+    .where(eq(agsCanvasNodes.id, nodeId))
+    .limit(1);
+  if (!priorRows[0]) return false;
+  const prior = rowToNode(priorRows[0] as Record<string, unknown>);
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, prior.canvasId);
+  const db =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupDb;
+  if (!db) return false;
+  await db.delete(agsCanvasNodes).where(eq(agsCanvasNodes.id, nodeId));
+  if (prior.referencedNoteId != null) {
+    await recordCanvasProjectionEvent({
+      kind: "canvas.note_reference_removed",
+      payload: {
+        canvasId: prior.canvasId,
+        canvasNodeId: prior.id,
+        priorReferencedNoteId: prior.referencedNoteId,
+      },
+    });
+  }
+  return true;
 }
 
 export async function createCanvasEdge(
