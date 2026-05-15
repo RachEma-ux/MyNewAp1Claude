@@ -462,6 +462,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveDraftRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  draftId: number,
+) {
+  // V1+ MR-3 forty-third batch (PR-V1-113): shared draftId→routed-
+  // conn helper for draftId-scoped replace* mutations. Path B
+  // resolver + bootstrap fallback. Mirrors the
+  // resolveBindingRoutedConn pattern from #863 but skips the
+  // bindingId→draftId step.
+  const { resolveWorkspaceIdForDraft } = await import(
+    "./services/region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupConn, draftId);
+  if (workspaceId == null) return lookupConn;
+  const { getAsDbForWorkspace } = await import("./db/connection");
+  return getAsDbForWorkspace(workspaceId) ?? lookupConn;
+}
+
 export async function replaceToolBindings(
   draftId: number,
   bindings: Array<{
@@ -475,7 +493,12 @@ export async function replaceToolBindings(
     auditRequired?: boolean;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 forty-third batch (PR-V1-113): Path B consumer via
+  // resolveDraftRoutedConn. Both the DELETE-all and the bulk-INSERT
+  // share a single routed conn — preserves atomicity (Phase-2: no
+  // cross-region writes within one function).
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn
     .delete(agsDraftToolBindings)
     .where(eq(agsDraftToolBindings.draftId, draftId));
@@ -516,7 +539,10 @@ export async function replaceKnowledgeBindings(
     contextBudget?: number;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 forty-third batch (PR-V1-113): Path B consumer via
+  // resolveDraftRoutedConn. Single conn shared by DELETE + INSERT.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn
     .delete(agsDraftKnowledgeBindings)
     .where(eq(agsDraftKnowledgeBindings.draftId, draftId));
@@ -556,7 +582,10 @@ export async function replaceMemoryConfigs(
     privacyRules?: Record<string, unknown>;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 forty-third batch (PR-V1-113): Path B consumer via
+  // resolveDraftRoutedConn. Single conn shared by DELETE + INSERT.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn
     .delete(agsDraftMemoryConfigs)
     .where(eq(agsDraftMemoryConfigs.draftId, draftId));
@@ -608,7 +637,11 @@ export async function replaceWorkflowGraph(
     condition?: Record<string, unknown>;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 forty-third batch (PR-V1-113): Path B consumer via
+  // resolveDraftRoutedConn. Single conn shared by 2 DELETEs + up to 2
+  // INSERTs — preserves atomicity for the full graph swap.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn
     .delete(agsDraftWorkflowNodes)
     .where(eq(agsDraftWorkflowNodes.draftId, draftId));
