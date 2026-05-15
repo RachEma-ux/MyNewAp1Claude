@@ -32,6 +32,7 @@ import {
 import {
   approveExtension,
   getExtensionById,
+  getExtensionInvocationById,
   getInvocationSummariesByWorkspace,
   installExtension,
   listExtensionsByWorkspace,
@@ -189,5 +190,17 @@ export const extensionsAdminRouter = router({
         extensionId: input.extensionId,
         limit: input.limit,
       });
+    }),
+
+  /**
+   * PR-V1-204: single invocation detail with `details` JSON.
+   * Symmetric with `getPublishExecutionById` (#940). Fetched
+   * on-demand from a UI row click so the recent-invocations
+   * payload doesn't ship every blob.
+   */
+  getInvocationById: adminProcedure
+    .input(z.object({ invocationId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return getExtensionInvocationById(input.invocationId);
     }),
 });
