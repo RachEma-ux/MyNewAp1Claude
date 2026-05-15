@@ -329,3 +329,61 @@ export function listAlgorithmsAvailableOnCe(): ReadonlyArray<GraphAlgorithmKind>
       GRAPH_ALGORITHM_METADATA[k].backendSupport === "neo4j_ce_via_apoc",
   );
 }
+
+// ============================================================================
+// Algorithm backend coverage summary (T-G.17)
+// ============================================================================
+
+export interface GraphAlgorithmCoverageSummary {
+  readonly total: number;
+  readonly byBackendSupport: Readonly<
+    Record<GraphAlgorithmBackendSupport, number>
+  >;
+  readonly availableOnCe: number;
+  readonly triggersAuraUpgrade: number;
+  /** Percentage available on CE, 1-decimal precision. */
+  readonly cePercent: number;
+}
+
+/**
+ * Returns a stable-shape summary of algorithm backend coverage:
+ * how many algorithms each backend-support level applies to, how
+ * many run on CE today, and how many trigger the Phase 27 Aura
+ * upgrade consideration.
+ *
+ * Operator dashboards use this for the lens-UI's "advanced
+ * algorithms" toggle availability header.
+ *
+ * Pure function. Reads only from the canonical
+ * `GRAPH_ALGORITHM_METADATA`.
+ */
+export function summarizeGraphAlgorithmCoverage(): GraphAlgorithmCoverageSummary {
+  const byBackendSupport: Record<string, number> = {};
+  for (const s of GRAPH_ALGORITHM_BACKEND_SUPPORT) byBackendSupport[s] = 0;
+
+  let availableOnCe = 0;
+  let triggersAuraUpgrade = 0;
+  for (const k of GRAPH_ALGORITHM_KINDS) {
+    const meta = GRAPH_ALGORITHM_METADATA[k];
+    byBackendSupport[meta.backendSupport] += 1;
+    if (
+      meta.backendSupport === "neo4j_ce_native" ||
+      meta.backendSupport === "neo4j_ce_via_apoc"
+    ) {
+      availableOnCe += 1;
+    }
+    if (meta.triggersAuraUpgrade) triggersAuraUpgrade += 1;
+  }
+  const total = GRAPH_ALGORITHM_KINDS.length;
+  const cePercent =
+    total === 0 ? 0 : Math.round((availableOnCe / total) * 1000) / 10;
+  return {
+    total,
+    byBackendSupport: byBackendSupport as Readonly<
+      Record<GraphAlgorithmBackendSupport, number>
+    >,
+    availableOnCe,
+    triggersAuraUpgrade,
+    cePercent,
+  };
+}
