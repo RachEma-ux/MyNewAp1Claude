@@ -55,7 +55,18 @@ export const agentStudioClientManifest: ClientModuleManifest = {
     "/agent-studio/catalog/tools",
     "/agent-studio/catalog/:section",
     "/agent-studio/marketplace",
+    "/agent-studio/mcp-manager",
     "/agent-studio/graph-workspace",
+    // V1+ 15-δ / 16-δ / 17-γ / 18-γ / MR-1 Phase-2 / 17-closure
+    // admin pages all dispatch off path-match in the Shell. The
+    // manifest needs to list them so the route-ownership tooling
+    // doesn't flag them as undeclared.
+    "/agent-studio/vault-attachments",
+    "/agent-studio/vault-saved-views",
+    "/agent-studio/canvas-projection-events-drain",
+    "/agent-studio/canvas-operator",
+    "/agent-studio/region-admin",
+    "/agent-studio/extensions-admin",
     "/agent-studio/:agentId",
     "/agent-studio/:agentId/:section",
     "/agent-studio/:agentId/runs/:runId",
