@@ -441,7 +441,13 @@ export function PublishTargetsAdminPanel() {
           {/* PR-V1-206: workspace-aggregate health summary above the
               recent log. Sums the per-target executionSummaries data
               so operators see at-a-glance whether anything is wrong
-              without scrolling through the table. */}
+              without scrolling through the table.
+              PR-V1-223: appended a settled success-rate metric —
+              succeeded / (succeeded + failed) as a percentage,
+              ignoring pending so the rate isn't suppressed by a
+              backlog. Color-mirrors a "≥99% emerald / ≥90% amber /
+              else destructive" SLO heuristic that matches the
+              existing aggregate's status palette. */}
           {summariesQ.data && summariesQ.data.length > 0 ? (
             <p
               className="text-xs text-muted-foreground"
@@ -458,6 +464,18 @@ export function PublishTargetsAdminPanel() {
                   pending += s.pendingCount;
                   failed += s.failedCount;
                 }
+                const settled = succeeded + failed;
+                const rate = settled > 0
+                  ? Math.round((succeeded / settled) * 1000) / 10
+                  : null;
+                const rateClass =
+                  rate === null
+                    ? ""
+                    : rate >= 99
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : rate >= 90
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-destructive";
                 return (
                   <>
                     <span className="font-medium">Workspace totals:</span>{" "}
@@ -483,6 +501,19 @@ export function PublishTargetsAdminPanel() {
                     >
                       <span className="font-mono">{failed}</span> failed
                     </span>
+                    {rate !== null ? (
+                      <>
+                        {" — "}
+                        <span
+                          className={rateClass}
+                          data-testid="publish-executions-success-rate"
+                          title="succeeded / (succeeded + failed) — pending excluded so a backlog doesn't suppress the rate"
+                        >
+                          <span className="font-mono">{rate}%</span> success
+                          rate (settled)
+                        </span>
+                      </>
+                    ) : null}
                   </>
                 );
               })()}
