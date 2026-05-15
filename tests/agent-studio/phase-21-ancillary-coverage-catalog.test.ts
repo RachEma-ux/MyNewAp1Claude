@@ -73,6 +73,7 @@ const ANCILLARY_TESTS = [
   "quality-finding-severity-helpers.test.ts",
   "failure-state-severity-helpers.test.ts",
   "failure-state-category-severity-matrix.test.ts",
+  "annotate-rows-with-failure-state.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
