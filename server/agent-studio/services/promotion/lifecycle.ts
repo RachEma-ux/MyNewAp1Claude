@@ -11,6 +11,8 @@
  * ADR: docs/architecture/agent-studio-note-promotion-binding-semantics.md
  */
 
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
+
 export type PromotionKind =
   | "knowledge_unit"
   | "cag_block"
@@ -71,6 +73,28 @@ export class PromotionLifecycle {
   async submit(request: PromotionRequest): Promise<{ promotionId: number; status: PromotionStatus }> {
     const validation = await this.adapter.validate(request);
     if (!validation.ok) {
+      // T-I.5 batch B — bridge validation-rejected promotions to the
+      // Phase 22 closed-taxonomy emission surface. Critical severity
+      // because a validation reject means the source note can't be
+      // promoted as-requested — operator action required to remediate.
+      // Fire-and-forget.
+      void recordFailureStateEvent({
+        failureState: "promotion_failed",
+        sourceKind: "promotion-lifecycle.submit",
+        sourceId: `note:${request.noteId}`,
+        errorMessage: `Promotion validation rejected for ${request.promotionKind}: ${validation.errors.length} error(s)`,
+        metadata: {
+          noteId: request.noteId,
+          noteVersionId: request.noteVersionId,
+          promotionKind: request.promotionKind,
+          initiatedByUserId: request.initiatedByUserId,
+          rejectionStage: "validation",
+          errorCount: validation.errors.length,
+          errorFields: validation.errors.map((e) => e.field),
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
       return { promotionId: -1, status: "rejected" };
     }
 
@@ -95,6 +119,23 @@ export class PromotionLifecycle {
 
   async reject(promotionId: number, _decidedByUserId: number): Promise<{ status: PromotionStatus }> {
     await this.adapter.emitProjectionEvent(promotionId, "rejected");
+    // T-I.5 batch B — operator-rejected promotions also flow through
+    // the Phase 22 closed-taxonomy emission surface. Distinguished
+    // from validation-stage rejection via `rejectionStage: "operator"`
+    // in metadata. Fire-and-forget.
+    void recordFailureStateEvent({
+      failureState: "promotion_failed",
+      sourceKind: "promotion-lifecycle.reject",
+      sourceId: String(promotionId),
+      errorMessage: `Promotion ${promotionId} rejected by operator`,
+      metadata: {
+        promotionId,
+        decidedByUserId: _decidedByUserId,
+        rejectionStage: "operator",
+      },
+    }).catch(() => {
+      // Fail-soft.
+    });
     return { status: "rejected" };
   }
 
