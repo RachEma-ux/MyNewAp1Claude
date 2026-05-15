@@ -184,6 +184,10 @@ export function getFailureStateSeverityMetadata(
 // ============================================================================
 
 export interface FailureStateMetadata {
+  /** Display label for operator dashboard cards / notification headers
+   *  (T-I.33). The state name (e.g. `promotion_failed`) is the
+   *  technical identifier; the label is human-readable. */
+  readonly label: string;
   readonly category: FailureStateCategory;
   readonly defaultSeverity: FailureStateSeverity;
   /** True when the system retries / falls back automatically; false
@@ -198,6 +202,7 @@ export const FAILURE_STATE_METADATA: Readonly<
   Record<FailureState, FailureStateMetadata>
 > = {
   promotion_failed: {
+    label: "Promotion Failed",
     category: "governance",
     defaultSeverity: "critical",
     recoverable: false,
@@ -205,6 +210,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A note promotion to KB / CAG / Graph Skill rejected — governance gate failed or downstream write errored.",
   },
   note_conflict: {
+    label: "Note Conflict",
     category: "runtime",
     defaultSeverity: "warning",
     recoverable: true,
@@ -212,6 +218,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Concurrent edit detected; conflict-resolution UI is the recovery path.",
   },
   entity_resolution_conflict: {
+    label: "Entity Resolution Conflict",
     category: "governance",
     defaultSeverity: "warning",
     recoverable: true,
@@ -219,6 +226,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Two entities flagged as merge candidates with conflicting evidence; awaits operator review.",
   },
   neo4j_unavailable: {
+    label: "Neo4j Unavailable",
     category: "infrastructure",
     defaultSeverity: "critical",
     recoverable: false,
@@ -226,6 +234,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Neo4j CE health check failed; graph queries return cached + flag stale.",
   },
   neo4j_degraded: {
+    label: "Neo4j Degraded",
     category: "infrastructure",
     defaultSeverity: "warning",
     recoverable: true,
@@ -233,6 +242,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Neo4j CE latency above warning threshold; graph queries served but slow.",
   },
   neo4j_query_timeout: {
+    label: "Neo4j Query Timeout",
     category: "infrastructure",
     defaultSeverity: "warning",
     recoverable: true,
@@ -240,6 +250,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Specific Cypher query exceeded its budget; partial results returned with truncation flag.",
   },
   neo4j_projection_stale: {
+    label: "Neo4j Projection Stale",
     category: "infrastructure",
     defaultSeverity: "info",
     recoverable: true,
@@ -247,6 +258,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Projection sync lag exceeds freshness target; queries return slightly-old data.",
   },
   neo4j_projection_drift_detected: {
+    label: "Projection Drift Detected",
     category: "infrastructure",
     defaultSeverity: "warning",
     recoverable: false,
@@ -254,6 +266,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Drift cron detected a Postgres vs Neo4j divergence; awaits operator triage via Phase 23 correction proposal.",
   },
   projection_sync_failed: {
+    label: "Projection Sync Failed",
     category: "infrastructure",
     defaultSeverity: "critical",
     recoverable: false,
@@ -261,6 +274,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Projection sync job threw an unrecoverable error; subsequent ticks accumulate backlog.",
   },
   graph_query_timeout: {
+    label: "Graph Query Timeout",
     category: "retrieval",
     defaultSeverity: "warning",
     recoverable: true,
@@ -268,6 +282,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "GraphRAG retrieval timed out for a specific plan item; partial results delivered.",
   },
   backlink_refresh_failed: {
+    label: "Backlink Refresh Failed",
     category: "runtime",
     defaultSeverity: "info",
     recoverable: true,
@@ -275,6 +290,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Backlink index refresh threw on a specific note; the rest of the index is current.",
   },
   runtime_reference_hidden_by_permission: {
+    label: "Reference Hidden by Permission",
     category: "governance",
     defaultSeverity: "info",
     recoverable: true,
@@ -282,6 +298,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A CAG block or skill pack referenced a note the viewer cannot access; the reference is redacted in the trace.",
   },
   cag_reference_invalidated: {
+    label: "CAG Reference Invalidated",
     category: "governance",
     defaultSeverity: "warning",
     recoverable: false,
@@ -289,6 +306,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A CAG block's source note version was deleted / superseded; the CAG block is marked invalid.",
   },
   graph_skill_reference_invalidated: {
+    label: "Skill Pack Reference Invalidated",
     category: "governance",
     defaultSeverity: "warning",
     recoverable: false,
@@ -296,6 +314,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A Skill Pack's source note version was deleted / superseded; the pack is marked invalid.",
   },
   tool_schema_changed: {
+    label: "Tool Schema Changed",
     category: "governance",
     defaultSeverity: "warning",
     recoverable: false,
@@ -303,6 +322,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "An MCP tool's schema was updated; recorded tool-knowledge promotions need re-validation.",
   },
   search_index_stale: {
+    label: "Search Index Stale",
     category: "retrieval",
     defaultSeverity: "info",
     recoverable: true,
@@ -310,6 +330,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Search index lag exceeds freshness target; query results may miss recent notes.",
   },
   query_cache_stale: {
+    label: "Query Cache Stale",
     category: "retrieval",
     defaultSeverity: "info",
     recoverable: true,
@@ -317,6 +338,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A specific query cache entry is past its TTL; the next read refreshes.",
   },
   text2cypher_rejected: {
+    label: "Text2Cypher Rejected",
     category: "retrieval",
     defaultSeverity: "info",
     recoverable: true,
@@ -324,6 +346,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A Text2Cypher attempt was rejected by the read-only guardrails; the user prompt is logged for evaluation.",
   },
   cypher_query_template_failed: {
+    label: "Cypher Template Failed",
     category: "retrieval",
     defaultSeverity: "warning",
     recoverable: false,
@@ -331,6 +354,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A registered Cypher template threw on execution; the template needs operator review.",
   },
   retrieval_safety_filter_blocked_content: {
+    label: "Safety Filter Blocked Content",
     category: "retrieval",
     defaultSeverity: "info",
     recoverable: false,
@@ -338,6 +362,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Retrieval safety filter pruned content from the response; redaction recorded with reason.",
   },
   graph_agent_answer_incomplete: {
+    label: "Graph Agent Answer Incomplete",
     category: "agent",
     defaultSeverity: "warning",
     recoverable: true,
@@ -345,6 +370,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "Graph Agent hit its iteration budget without converging; partial answer delivered with explainability trace.",
   },
   golden_question_failed: {
+    label: "Golden Question Failed",
     category: "agent",
     defaultSeverity: "warning",
     recoverable: false,
@@ -352,6 +378,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A regression suite golden question failed; needs explicit waiver or correction proposal.",
   },
   graph_correction_rejected: {
+    label: "Graph Correction Rejected",
     category: "governance",
     defaultSeverity: "info",
     recoverable: true,
@@ -359,6 +386,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A correction proposal was rejected by approval; audit row written.",
   },
   semantic_enrichment_rejected: {
+    label: "Semantic Enrichment Rejected",
     category: "governance",
     defaultSeverity: "info",
     recoverable: true,
@@ -366,6 +394,7 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A semantic-enrichment proposal was rejected (confidence below threshold OR operator-rejected); audit row written.",
   },
   background_job_failed: {
+    label: "Background Job Failed",
     category: "runtime",
     defaultSeverity: "warning",
     recoverable: true,
@@ -373,6 +402,16 @@ export const FAILURE_STATE_METADATA: Readonly<
       "A workspace background job threw and was auto-failed by the stale-running sweep.",
   },
 };
+
+/**
+ * Returns the operator-facing display label for a failure state. The
+ * state name (e.g. `promotion_failed`) is the technical identifier;
+ * the label is the human-readable name for dashboards / notification
+ * headers.
+ */
+export function getFailureStateLabel(state: FailureState): string {
+  return FAILURE_STATE_METADATA[state].label;
+}
 
 // ============================================================================
 // Coverage helpers
