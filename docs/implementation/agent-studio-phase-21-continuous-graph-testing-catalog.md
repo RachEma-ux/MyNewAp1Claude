@@ -28,7 +28,7 @@ This document maps the roadmap's enumerated test catalog onto the actual test fi
 | 14 | `graph-ontology.test.ts` | `tests/agent-studio/graph-ontology-registry.test.ts` | ✅ Present |
 | 15 | `graph-constraints.test.ts` | `tests/agent-studio/graph-constraints.test.ts` | ✅ Present |
 | 16 | `graph-entity-resolution.test.ts` | `tests/agent-studio/entity-resolution-*.test.ts` | ✅ Present |
-| 17 | `graph-provenance-lineage.test.ts` | `tests/agent-studio/graph-quality-missing-provenance-scanner.test.ts` (T-D.1, #986) + per-source provenance assertions | ✅ Present (post T-D.1) |
+| 17 | `graph-provenance-lineage.test.ts` | `tests/agent-studio/graph-quality-missing-provenance-scanner.test.ts` (T-D.1, #986) + `graph-quality-missing-source-version-scanner.test.ts` (T-D.6, #1031) + per-source provenance assertions | ✅ Present (post T-D.6 — both `sourceId` and `sourceVersionId` covered) |
 | 18 | `graph-temporal-observations.test.ts` | (none yet) | ❌ **GAP** — temporal observation model is roadmap §3.x deferred-but-mentioned; closure depends on Phase 25 institutional memory timeline_event projection (T-G.1, #994) being implemented |
 | 19 | `graphrag-retrieval-router.test.ts` | `tests/agent-studio/graphrag-router-*.test.ts` (multiple) | ✅ Present |
 | 20 | `query-template-guardrails.test.ts` | `tests/agent-studio/cypher-template-guardrails.test.ts` | ✅ Present |
@@ -160,6 +160,7 @@ runtime catches up.
 | `graph-algorithm-contracts.test.ts` | `services/graph-algorithm/contracts` | T-G.5 / #1004 |
 | `graph-algorithm-preflight.test.ts` | `services/graph-algorithm/contracts` (preflight) | T-G.9 / #1009 |
 | `failure-states-contracts.test.ts` | `services/failure-states/contracts` | T-I.3 / #1002 |
+| `graph-quality-missing-source-version-scanner.test.ts` | `services/graph-quality/scanners/missing-source-version-scanner` | T-D.6 / #1031 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
