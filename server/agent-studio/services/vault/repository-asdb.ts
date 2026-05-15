@@ -214,7 +214,25 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async updateNote(input: NoteUpdateInput, userId: number): Promise<{ versionId: number; conflict?: true; latestVersion?: number }> {
-    const conn = getAsDb();
+    // V1+ MR-3 thirty-fourth batch (PR-V1-103): note→vault→workspace
+    // split-handle. updateNote performs up to three writes (conflict
+    // ledger row, version INSERT, currentVersionId UPDATE) plus a
+    // read-only getLatestNoteVersion. All routed via a single conn
+    // resolved once at the top by JOIN-ing agsVaultNotes × agsVaults
+    // on vaultId. Falls back to bootstrap handle when note missing OR
+    // workspaceId IS NULL.
+    const lookupConn = getAsDb();
+    if (!lookupConn) throw new Error("ASDB unavailable");
+    const lookup = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaultNotes)
+      .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+      .where(eq(agsVaultNotes.id, input.noteId))
+      .limit(1);
+    const workspaceId = lookup[0]?.workspaceId ?? null;
+    const conn =
+      workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupConn;
+    if (!conn) throw new Error("ASDB unavailable");
     const latest = await this.getLatestNoteVersion(input.noteId);
     if (!latest) {
       throw new Error(`Note ${input.noteId} not found`);
