@@ -16,3 +16,11 @@ export {
   type FailureStateSeverity,
   type FailureStateMetadata,
 } from "./contracts.js";
+
+export {
+  FAILURE_STATE_ERROR_CLASS_PREFIX,
+  failureStateErrorClass,
+  parseFailureStateFromErrorClass,
+  recordFailureStateEvent,
+  type RecordFailureStateEventInput,
+} from "./observability-bridge.js";
