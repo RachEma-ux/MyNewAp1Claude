@@ -231,6 +231,42 @@ export default function GraphAgentExplainPanel({ initialRunId }: Props = {}) {
 
             <div className="space-y-1.5">
               <SectionLabel>Steps</SectionLabel>
+              {/* PR-V1-232: step-kind distribution above the per-step
+                  ledger. Tells operators "what shape was this run?"
+                  at a glance — a 50-step run that's 90% one kind
+                  hints at a loop or fallback chain; a balanced
+                  distribution is healthy. Sorted by count desc so
+                  the heaviest kind shows first; reuses the
+                  pin-distribution shape from RegionAdminPanel
+                  (#969). */}
+              {explanation.steps.length > 0 ? (
+                <p
+                  className="text-[10px] text-muted-foreground"
+                  data-testid="graph-agent-explain-step-kind-distribution"
+                >
+                  {(() => {
+                    const byKind = new Map<string, number>();
+                    for (const s of explanation.steps) {
+                      byKind.set(s.stepKind, (byKind.get(s.stepKind) ?? 0) + 1);
+                    }
+                    const sorted = Array.from(byKind.entries()).sort(
+                      (a, b) => b[1] - a[1],
+                    );
+                    return (
+                      <>
+                        <span className="font-medium">By kind:</span>{" "}
+                        {sorted.map(([kind, n], i) => (
+                          <span key={kind}>
+                            {i > 0 ? " / " : ""}
+                            <span className="tabular-nums">{n}</span>{" "}
+                            <span className="text-foreground/80">{kind}</span>
+                          </span>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </p>
+              ) : null}
               {explanation.steps.length === 0 ? (
                 <p className="text-[10px] text-muted-foreground/70">
                   No steps recorded.
