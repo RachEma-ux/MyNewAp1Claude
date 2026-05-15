@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
+  getPublishExecutionById,
   getPublishTargetExecutionSummaries,
   listPublishTargets,
   listRecentPublishExecutions,
@@ -83,4 +84,15 @@ export const publishTargetsAdminRouter = router({
   executionSummaries: adminProcedure.query(async () => {
     return getPublishTargetExecutionSummaries();
   }),
+
+  /**
+   * PR-V1-189: single execution detail with `details` JSON blob.
+   * Fetched on-demand from a UI row click so the panel doesn't
+   * ship every blob in the recent-list. Returns null on no-match.
+   */
+  getExecutionById: adminProcedure
+    .input(z.object({ executionId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return getPublishExecutionById(input.executionId);
+    }),
 });

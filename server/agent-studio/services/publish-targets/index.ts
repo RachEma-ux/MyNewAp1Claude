@@ -102,14 +102,17 @@ export {
 // V1+ Phase 19 admin (PR-V1-186): operator-facing read-only surface.
 // PR-V1-187: + setEnabled mutation.
 // PR-V1-188: + per-target execution summary aggregate.
+// PR-V1-189: + single-execution detail surface (with details JSON).
 export {
   listPublishTargets,
   listRecentPublishExecutions,
   setPublishTargetEnabled,
   getPublishTargetExecutionSummaries,
+  getPublishExecutionById,
   PublishTargetNotFoundForToggleError,
   type PublishTargetSummary,
   type PublishExecutionRow,
   type PublishTargetExecutionSummary,
+  type PublishExecutionDetail,
 } from "./admin-queries.js";
 export { publishTargetsAdminRouter } from "./admin-router.js";

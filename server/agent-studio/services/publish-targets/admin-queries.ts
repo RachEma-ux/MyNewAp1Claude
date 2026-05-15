@@ -51,6 +51,16 @@ export interface PublishExecutionRow {
 }
 
 /**
+ * PR-V1-189: full execution-row detail including the `details`
+ * JSON blob. Kept off `listRecentPublishExecutions` because the
+ * blob can be large (per-pusher response body, http headers,
+ * etc.) — operators fetch on-demand by clicking a row.
+ */
+export interface PublishExecutionDetail extends PublishExecutionRow {
+  readonly details: Record<string, unknown> | null;
+}
+
+/**
  * List every publish target row in the registry. Operator dashboard
  * primary read. No filters — registries are O(targets) typically
  * dozens, not thousands.
@@ -153,6 +163,40 @@ export class PublishTargetNotFoundForToggleError extends Error {
     super(`Publish target ${targetId} not found`);
     this.name = "PublishTargetNotFoundForToggleError";
   }
+}
+
+/**
+ * PR-V1-189: fetch a single execution by id, including the
+ * `details` JSON blob. Returns null when not found — the UI
+ * surfaces this as a friendly "not found" rather than throwing.
+ */
+export async function getPublishExecutionById(
+  executionId: number,
+): Promise<PublishExecutionDetail | null> {
+  const db = getAsDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(agsPublishTargetExecutions)
+    .where(eq(agsPublishTargetExecutions.id, executionId))
+    .limit(1);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: Number(r.id),
+    targetId: Number(r.targetId),
+    sourcePromotionId: Number(r.sourcePromotionId),
+    sourceVersionId: (r.sourceVersionId as string | null) ?? null,
+    attempt: Number(r.attempt),
+    status: String(r.status),
+    payloadDigest: (r.payloadDigest as string | null) ?? null,
+    upstreamArtifactId: (r.upstreamArtifactId as string | null) ?? null,
+    errorMessage: (r.errorMessage as string | null) ?? null,
+    startedAt: (r.startedAt as Date | null) ?? null,
+    completedAt: (r.completedAt as Date | null) ?? null,
+    createdAt: r.createdAt as Date,
+    details: (r.details as Record<string, unknown> | null) ?? null,
+  };
 }
 
 /**

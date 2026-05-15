@@ -6,7 +6,7 @@
  * follow-up.
  */
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,6 +62,21 @@ export function PublishTargetsAdminPanel() {
       },
       onError: (err) => setMutationError(err.message),
     });
+
+  // PR-V1-189: on-demand single-execution detail. UI tracks the
+  // currently-expanded executionId; the query is lazy-enabled so
+  // we don't pay the JSON-fetch cost unless the operator clicks.
+  const [expandedExecutionId, setExpandedExecutionId] = useState<number | null>(
+    null,
+  );
+  const detailQ =
+    trpc.agentStudio.publishTargets.getExecutionById.useQuery(
+      { executionId: expandedExecutionId ?? -1 },
+      {
+        enabled: expandedExecutionId !== null,
+        refetchOnWindowFocus: false,
+      },
+    );
 
   // PR-V1-188: per-target execution health summary joined into
   // the registry table by targetId. Zero-filled service-side so
@@ -302,42 +317,92 @@ export function PublishTargetsAdminPanel() {
                     <th className="py-1 pr-3">Status</th>
                     <th className="py-1 pr-3">Upstream</th>
                     <th className="py-1 pr-3">Error</th>
+                    <th className="py-1 pr-3">Details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentQ.data.map((r) => (
-                    <tr key={r.id} className="border-t">
-                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
-                        {fmtTs(r.createdAt)}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {targetKeyById.get(r.targetId) ?? `#${r.targetId}`}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {r.sourcePromotionId}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {r.attempt}
-                      </td>
-                      <td
-                        className={`py-1 pr-3 font-mono text-xs ${statusClass(r.status)}`}
-                      >
-                        {r.status}
-                      </td>
-                      <td
-                        className="py-1 pr-3 font-mono text-xs truncate max-w-[24ch]"
-                        title={r.upstreamArtifactId ?? undefined}
-                      >
-                        {r.upstreamArtifactId ?? "—"}
-                      </td>
-                      <td
-                        className="py-1 pr-3 text-xs truncate max-w-[40ch]"
-                        title={r.errorMessage ?? undefined}
-                      >
-                        {r.errorMessage ?? ""}
-                      </td>
-                    </tr>
-                  ))}
+                  {recentQ.data.map((r) => {
+                    const isExpanded = expandedExecutionId === r.id;
+                    return (
+                      <React.Fragment key={r.id}>
+                        <tr className="border-t">
+                          <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                            {fmtTs(r.createdAt)}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {targetKeyById.get(r.targetId) ?? `#${r.targetId}`}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {r.sourcePromotionId}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {r.attempt}
+                          </td>
+                          <td
+                            className={`py-1 pr-3 font-mono text-xs ${statusClass(r.status)}`}
+                          >
+                            {r.status}
+                          </td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs truncate max-w-[24ch]"
+                            title={r.upstreamArtifactId ?? undefined}
+                          >
+                            {r.upstreamArtifactId ?? "—"}
+                          </td>
+                          <td
+                            className="py-1 pr-3 text-xs truncate max-w-[40ch]"
+                            title={r.errorMessage ?? undefined}
+                          >
+                            {r.errorMessage ?? ""}
+                          </td>
+                          <td className="py-1 pr-3">
+                            <button
+                              type="button"
+                              className="text-xs underline"
+                              data-testid={`publish-execution-details-toggle-${r.id}`}
+                              onClick={() =>
+                                setExpandedExecutionId(
+                                  isExpanded ? null : r.id,
+                                )
+                              }
+                            >
+                              {isExpanded ? "hide" : "view"}
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr
+                            className="bg-muted/30"
+                            data-testid={`publish-execution-details-row-${r.id}`}
+                          >
+                            <td colSpan={8} className="p-2">
+                              {detailQ.isLoading ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Loading details…
+                                </p>
+                              ) : detailQ.error ? (
+                                <p className="text-xs text-destructive">
+                                  Failed to load: {detailQ.error.message}
+                                </p>
+                              ) : !detailQ.data ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Execution not found.
+                                </p>
+                              ) : (
+                                <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                  {JSON.stringify(
+                                    detailQ.data.details ?? {},
+                                    null,
+                                    2,
+                                  )}
+                                </pre>
+                              )}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
