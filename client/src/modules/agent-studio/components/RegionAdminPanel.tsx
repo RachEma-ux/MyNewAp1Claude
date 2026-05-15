@@ -18,7 +18,7 @@
  * slim wrapper page.
  */
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +43,11 @@ export function RegionAdminPanel() {
     notes: string;
   }>({ workspaceId: "", regionKey: "", isReplicated: false, notes: "" });
   const [mutationError, setMutationError] = useState<string | null>(null);
+  // PR-V1-205: per-row settings drill-down on the active regions
+  // table. `settings` JSON is already on `RegionRecord` (returned
+  // by `listActiveRegions`), so no extra fetch.
+  const [expandedRegionSettingsKey, setExpandedRegionSettingsKey] =
+    useState<string | null>(null);
 
   const setPinMutation = trpc.agentStudio.region.setPin.useMutation({
     onSuccess: () => {
@@ -335,28 +340,75 @@ export function RegionAdminPanel() {
                     <th className="py-1 pr-3">Primary</th>
                     <th className="py-1 pr-3">Postgres URI</th>
                     <th className="py-1 pr-3">Neo4j URI</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Plan v3 D1 credential binding id; null when the region uses local-only credentials"
+                    >
+                      Cred binding
+                    </th>
+                    <th className="py-1 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {regionsQ.data.map((r) => (
-                    <tr key={r.regionKey} className="border-t">
-                      <td className="py-1 pr-3 font-mono">{r.regionKey}</td>
-                      <td className="py-1 pr-3">{r.name}</td>
-                      <td className="py-1 pr-3">{r.isPrimary ? "yes" : "no"}</td>
-                      <td
-                        className="py-1 pr-3 font-mono text-xs truncate max-w-[20ch]"
-                        title={r.postgresUri}
-                      >
-                        {r.postgresUri.replace(/:([^:@]+)@/, ":****@")}
-                      </td>
-                      <td
-                        className="py-1 pr-3 font-mono text-xs truncate max-w-[20ch]"
-                        title={r.neo4jUri ?? ""}
-                      >
-                        {r.neo4jUri ?? "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {regionsQ.data.map((r) => {
+                    const isSettingsExpanded =
+                      expandedRegionSettingsKey === r.regionKey;
+                    return (
+                      <React.Fragment key={r.regionKey}>
+                        <tr className="border-t">
+                          <td className="py-1 pr-3 font-mono">{r.regionKey}</td>
+                          <td className="py-1 pr-3">{r.name}</td>
+                          <td className="py-1 pr-3">{r.isPrimary ? "yes" : "no"}</td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs truncate max-w-[20ch]"
+                            title={r.postgresUri}
+                          >
+                            {r.postgresUri.replace(/:([^:@]+)@/, ":****@")}
+                          </td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs truncate max-w-[20ch]"
+                            title={r.neo4jUri ?? ""}
+                          >
+                            {r.neo4jUri ?? "—"}
+                          </td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs"
+                            data-testid={`region-row-cred-binding-${r.regionKey}`}
+                          >
+                            {r.credentialBindingId ?? "—"}
+                          </td>
+                          <td className="py-1 pr-3">
+                            <button
+                              type="button"
+                              className="text-xs underline"
+                              data-testid={`region-row-settings-toggle-${r.regionKey}`}
+                              onClick={() =>
+                                setExpandedRegionSettingsKey(
+                                  isSettingsExpanded ? null : r.regionKey,
+                                )
+                              }
+                            >
+                              {isSettingsExpanded
+                                ? "hide settings"
+                                : "view settings"}
+                            </button>
+                          </td>
+                        </tr>
+                        {isSettingsExpanded ? (
+                          <tr
+                            className="bg-muted/30"
+                            data-testid={`region-row-settings-row-${r.regionKey}`}
+                          >
+                            <td colSpan={7} className="p-2">
+                              <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                {JSON.stringify(r.settings ?? {}, null, 2)}
+                              </pre>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
