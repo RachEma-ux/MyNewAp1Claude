@@ -148,5 +148,6 @@ The Phase 22 failure-state taxonomy (`FAILURE_STATES`, 25 closed kinds, #1002) r
 | Phase 21 §7 ancillary coverage catalog | #1021 | Lockstep on 27 ancillary contract / validator / wiring tests |
 | Phase 28 catalog §6 emission shipment | #1022 | This section; lockstep guard at `phase-28-catalog-emission-section-coverage.test.ts` |
 | Wire graph-agent budget exhaustion | #1023 | `graph_agent_answer_incomplete` (first batch-B wiring); fires for `max_iterations` / `wall_clock_budget` only |
+| Wire projection sync worker | #1025 | `projection_sync_failed` (second batch-B wiring); fires when apply step returns ≥1 error, including partial-success |
 
-**7 of 25 closed kinds have live emitters today** (batch A: 6 + first batch B: 1). The audit (#1012) names the remaining 18 with batch-B / detection-first / phase-gated tier assignments.
+**8 of 25 closed kinds have live emitters today** (batch A: 6 + batch B: 2). The audit (#1012) names the remaining 17 with batch-B / detection-first / phase-gated tier assignments.

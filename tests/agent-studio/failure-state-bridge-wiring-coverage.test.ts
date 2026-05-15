@@ -69,6 +69,11 @@ const EXPECTED_WIRINGS: ReadonlyArray<ExpectedWiring> = [
     kind: "graph_agent_answer_incomplete",
     sliceId: "T-I.5.B.1",
   },
+  {
+    file: "server/agent-studio/services/graph/projection/sync-worker.ts",
+    kind: "projection_sync_failed",
+    sliceId: "T-I.5.B.2",
+  },
 ];
 
 function readRepoFile(file: string): string {
@@ -76,8 +81,8 @@ function readRepoFile(file: string): string {
 }
 
 describe("Failure-state bridge wiring coverage", () => {
-  it("expected-wirings table covers batch A (≥6) + at least one batch B", () => {
-    expect(EXPECTED_WIRINGS.length).toBeGreaterThanOrEqual(7);
+  it("expected-wirings table covers batch A (≥6) + batch B in progress", () => {
+    expect(EXPECTED_WIRINGS.length).toBeGreaterThanOrEqual(8);
   });
 
   it("every expected closed kind appears in FAILURE_STATES", () => {
@@ -125,8 +130,8 @@ describe("Failure-state bridge wiring coverage", () => {
     },
   );
 
-  it("at least 7 distinct closed kinds are wired (batch A + first batch B)", () => {
+  it("at least 8 distinct closed kinds are wired (batch A + batch B in progress)", () => {
     const distinctKinds = new Set(EXPECTED_WIRINGS.map((w) => w.kind));
-    expect(distinctKinds.size).toBeGreaterThanOrEqual(7);
+    expect(distinctKinds.size).toBeGreaterThanOrEqual(8);
   });
 });

@@ -28,6 +28,7 @@ const EXPECTED_SHIPMENTS = [
   { pr: "#1019", fragment: "cypher_query_template_failed" },
   { pr: "#1020", fragment: "coverage guard" },
   { pr: "#1023", fragment: "graph_agent_answer_incomplete" },
+  { pr: "#1025", fragment: "projection_sync_failed" },
 ];
 
 describe("Phase 28 catalog §6 emission shipment lockstep", () => {
@@ -50,8 +51,8 @@ describe("Phase 28 catalog §6 emission shipment lockstep", () => {
     },
   );
 
-  it("notes 7 of 25 closed kinds have live emitters today", () => {
-    expect(catalog).toContain("7 of 25 closed kinds have live emitters");
+  it("notes 8 of 25 closed kinds have live emitters today", () => {
+    expect(catalog).toContain("8 of 25 closed kinds have live emitters");
   });
 
   it("references the Phase 22 emission audit doc path", () => {

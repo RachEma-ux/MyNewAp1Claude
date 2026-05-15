@@ -19,6 +19,7 @@ import {
   buildCanvasReferenceProjection,
   buildCanvasReferenceRemoval,
 } from "../../canvas/projection.js";
+import { recordFailureStateEvent } from "../../failure-states/observability-bridge.js";
 
 export type ProjectionEvent =
   | { kind: "note.created"; payload: { noteId: number; vaultId: number; slug: string; title: string; versionId: number } }
@@ -64,9 +65,40 @@ export class ProjectionSyncWorker {
     const startedAt = Date.now();
     const writes = this.buildWrites(event);
     const result = await this.options.repository.applyProjectionJob(writes);
+    const status: "completed" | "failed" =
+      result.errors.length === 0 ? "completed" : "failed";
+
+    // T-I.5 batch B — bridge projection-sync failures to the Phase 22
+    // closed-taxonomy emission surface. Only fires on `status="failed"`;
+    // partial-success jobs (some writes succeeded + at least one
+    // error) still emit, because the projection is now in an
+    // inconsistent state. Fire-and-forget; observability writes never
+    // propagate.
+    if (status === "failed") {
+      void recordFailureStateEvent({
+        failureState: "projection_sync_failed",
+        sourceKind: "graph-projection-sync-worker",
+        sourceId: event.kind,
+        errorMessage: `Projection sync failed for ${event.kind}: ${result.errors.length} error(s)`,
+        metadata: {
+          eventKind: event.kind,
+          errorCount: result.errors.length,
+          firstError: result.errors[0]?.error ?? null,
+          writes:
+            result.nodesCreated +
+            result.nodesUpdated +
+            result.edgesCreated +
+            result.edgesUpdated,
+          durationMs: Date.now() - startedAt,
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
+    }
+
     return {
       eventKind: event.kind,
-      status: result.errors.length === 0 ? "completed" : "failed",
+      status,
       writes: result.nodesCreated + result.nodesUpdated + result.edgesCreated + result.edgesUpdated,
       errors: result.errors.map((e) => e.error),
       durationMs: Date.now() - startedAt,
