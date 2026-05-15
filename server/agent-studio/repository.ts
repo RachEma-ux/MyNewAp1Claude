@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveSuiteRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  suiteId: number,
+) {
+  // V1+ MR-3 forty-seventh batch (PR-V1-117): shared suiteId→routed-
+  // conn helper. 3-step: SELECTs agentId from agsTestSuites.id =
+  // suiteId, then chains into resolveAgentRoutedConn (agentId→draft→
+  // workspaceId). Falls back to lookupConn on any null.
+  const suiteRows = await lookupConn
+    .select({ agentId: agsTestSuites.agentId })
+    .from(agsTestSuites)
+    .where(eq(agsTestSuites.id, suiteId))
+    .limit(1);
+  const agentId = suiteRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
 async function resolveDraftRoutedConn(
   lookupConn: ReturnType<typeof db>,
   draftId: number,
@@ -1150,8 +1168,14 @@ export async function saveTestSuite(input: {
   description?: string;
   createdBy?: number;
 }): Promise<typeof agsTestSuites.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 forty-seventh batch (PR-V1-117): Path B consumer. The
+  // function dispatches on input.suiteId — UPDATE branch routes via
+  // resolveSuiteRoutedConn (suiteId→agentId→draft→workspaceId),
+  // INSERT branch routes via resolveAgentRoutedConn(input.agentId).
+  // Each branch routes once at top, then performs its single write.
+  const lookupConn = db();
   if (input.suiteId) {
+    const conn = await resolveSuiteRoutedConn(lookupConn, input.suiteId);
     const [updated] = await conn
       .update(agsTestSuites)
       .set({ name: input.name, description: input.description, updatedAt: new Date() })
@@ -1162,6 +1186,7 @@ export async function saveTestSuite(input: {
     }
     return updated;
   }
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
   const [created] = await conn
     .insert(agsTestSuites)
     .values({
@@ -1241,7 +1266,13 @@ export async function createTestRun(input: {
   agentId: number;
   triggeredBy?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 forty-seventh batch (PR-V1-117): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId). The
+  // function takes both suiteId and agentId; we route by agentId
+  // since that's the more direct (one-hop) lookup.
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
+  const [created] = await conn
     .insert(agsTestRuns)
     .values({
       suiteId: input.suiteId,
