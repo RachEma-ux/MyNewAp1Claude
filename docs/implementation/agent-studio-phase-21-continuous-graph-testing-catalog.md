@@ -216,6 +216,7 @@ runtime catches up.
 | `graphrag-retrieval-method-metadata.test.ts` | `services/rac/planner-mode` — `GRAPHRAG_RETRIEVAL_METHOD_METADATA` (5-entry per-method label + description + costClass {low/medium/high} + invokesLlm boolean for local/global/traversal/text2cypher/algorithm) | T-A.6 / #1092 |
 | `rac-planner-mode-metadata.test.ts` | `services/rac/planner-mode` — `RAC_PLANNER_MODE_METADATA` (15-entry per-mode label + description + family + reserved boolean) + `RAC_PLANNER_MODE_FAMILIES` 6-family taxonomy (no_retrieval / cag_only / knowledge_retrieval / hybrid_cag / graphrag_pure / graphrag_hybrid) | T-A.7 / #1093 |
 | `rac-source-type-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_TYPE_METADATA` (7-entry per-source-type label + description + retrievalMechanism {precompiled / vector / graph / external_api / structured} + requiresEmbeddings boolean) + `RAC_SOURCE_RETRIEVAL_MECHANISMS` 5-family taxonomy | T-A.8 / #1094 |
+| `rac-retrieval-health-status-metadata.test.ts` | `services/rac/ingestion/types` — `RAC_RETRIEVAL_HEALTH_STATUS_METADATA` (4-entry per-status label + description + attemptRetrieval + notifyOperator booleans); union→tuple promotion of `RacRetrievalHealthStatus` | T-A.9 / #1095 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

@@ -107,11 +107,77 @@ export interface RacRetrievalResult {
 
 // ── Health contract ──────────────────────────────────────────────────
 
+/**
+ * Closed-taxonomy retrieval health status. Promoted from a union to a
+ * tuple-derived constant at T-A.9 so it.each-style lockstep tests can
+ * enumerate every value.
+ */
+export const RAC_RETRIEVAL_HEALTH_STATUSES = [
+  "ok",
+  "degraded",
+  "unavailable",
+  "unknown",
+] as const;
+
 export type RacRetrievalHealthStatus =
-  | "ok"
-  | "degraded"
-  | "unavailable"
-  | "unknown";
+  (typeof RAC_RETRIEVAL_HEALTH_STATUSES)[number];
+
+// ============================================================================
+// Per-health-status operator-facing metadata (T-A.9)
+// ============================================================================
+
+export interface RacRetrievalHealthStatusMetadata {
+  /** Display label rendered in the operator UI's source health badges. */
+  readonly label: string;
+  /** Short operator-facing description of what this status means. */
+  readonly description: string;
+  /** Whether requests routed to this source should still attempt
+   *  retrieval (true) or skip and fall back (false). Drives the
+   *  planner's source-selection logic. */
+  readonly attemptRetrieval: boolean;
+  /** Whether this status warrants an operator notification (i.e.
+   *  represents a degradation from normal operation). */
+  readonly notifyOperator: boolean;
+}
+
+export const RAC_RETRIEVAL_HEALTH_STATUS_METADATA: Readonly<
+  Record<RacRetrievalHealthStatus, RacRetrievalHealthStatusMetadata>
+> = {
+  ok: {
+    label: "OK",
+    description:
+      "Source is healthy and serving requests normally — no operator action needed.",
+    attemptRetrieval: true,
+    notifyOperator: false,
+  },
+  degraded: {
+    label: "Degraded",
+    description:
+      "Source is partially functional — latency or error-rate above threshold but still serving requests.",
+    attemptRetrieval: true,
+    notifyOperator: true,
+  },
+  unavailable: {
+    label: "Unavailable",
+    description:
+      "Source backend cannot be reached or is returning errors — planner skips it and falls back.",
+    attemptRetrieval: false,
+    notifyOperator: true,
+  },
+  unknown: {
+    label: "Unknown",
+    description:
+      "Health probe not yet wired or last probe failed inconclusively — planner attempts the source anyway and learns from the response.",
+    attemptRetrieval: true,
+    notifyOperator: false,
+  },
+};
+
+export function getRacRetrievalHealthStatusMetadata(
+  status: RacRetrievalHealthStatus,
+): RacRetrievalHealthStatusMetadata {
+  return RAC_RETRIEVAL_HEALTH_STATUS_METADATA[status];
+}
 
 export interface RacRetrievalHealth {
   status: RacRetrievalHealthStatus;
