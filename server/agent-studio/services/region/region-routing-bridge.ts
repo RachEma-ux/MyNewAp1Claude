@@ -43,6 +43,7 @@
 
 import { configureRegionRouter } from "../../db/connection.js";
 import { getDbForRegion } from "./connection-helper.js";
+import { notifyRegionCacheInvalidation } from "./region-cache-pubsub.js";
 import { setRegionChangeHook } from "./region-service.js";
 import {
   getCachedRegionForWorkspace,
@@ -75,6 +76,11 @@ function reloadCacheAfterChange(label: string): void {
       `[ags-region-routing-bridge] re-warm after ${label} failed — ${msg}`,
     );
   });
+  // Cross-process fan-out via Postgres LISTEN/NOTIFY (#910). Other
+  // processes' subscribers (when AGS_REGION_PUBSUB=on) receive the
+  // notification and invalidate + re-warm their local cache too.
+  // Fire-and-forget; the in-process invalidate above already ran.
+  void notifyRegionCacheInvalidation(label);
 }
 
 export function installRegionRouter(): void {

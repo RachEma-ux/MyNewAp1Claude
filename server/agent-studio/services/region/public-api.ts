@@ -101,3 +101,11 @@ export {
   createCrossRegionMiddleware,
   type CreateCrossRegionMiddlewareOptions,
 } from "./cross-region-trpc-middleware.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-160): cross-process pubsub.
+export {
+  notifyRegionCacheInvalidation,
+  subscribeRegionCacheInvalidations,
+  unsubscribeRegionCacheInvalidations,
+  maybeSubscribeRegionCachePubsub,
+} from "./region-cache-pubsub.js";

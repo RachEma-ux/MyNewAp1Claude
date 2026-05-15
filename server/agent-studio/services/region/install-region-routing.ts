@@ -35,8 +35,12 @@
  *   - Postgres = source of truth. Cache derives from ASDB rows.
  */
 
+import { maybeSubscribeRegionCachePubsub } from "./region-cache-pubsub.js";
 import { installRegionRouter } from "./region-routing-bridge.js";
-import { warmRegionRoutingCache } from "./workspace-region-cache.js";
+import {
+  invalidateRegionRoutingCache,
+  warmRegionRoutingCache,
+} from "./workspace-region-cache.js";
 
 export interface InstallRegionRoutingResult {
   readonly installed: boolean;
@@ -44,6 +48,7 @@ export interface InstallRegionRoutingResult {
   readonly activeRegionCount?: number;
   readonly pinCount?: number;
   readonly primaryRegionKey?: string | null;
+  readonly pubsubSubscribed?: boolean;
 }
 
 /**
@@ -64,10 +69,23 @@ export async function maybeInstallRegionRouting(): Promise<InstallRegionRoutingR
     return { installed: false, reason: `cache warm failed — ${msg}` };
   }
   installRegionRouter();
+  // Subscribe to cross-process invalidations (opt-in via
+  // AGS_REGION_PUBSUB=on). Subscriber falls back to no-op when the
+  // flag is unset — same shape as the routing toggle itself.
+  const pubsubSubscribed = maybeSubscribeRegionCachePubsub(() => {
+    invalidateRegionRoutingCache();
+    void warmRegionRoutingCache().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[ags-region-routing] re-warm after pubsub notification failed — ${msg}`,
+      );
+    });
+  });
   return {
     installed: true,
     activeRegionCount: summary.activeRegionCount,
     pinCount: summary.pinCount,
     primaryRegionKey: summary.primaryRegionKey,
+    pubsubSubscribed,
   };
 }
