@@ -174,6 +174,72 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
           <SectionLabel>
             Installed extensions (workspace {workspaceId})
           </SectionLabel>
+          {/* PR-V1-210: status breakdown above the table — same
+              aggregate-summary pattern as #957–#960. pending_approval
+              > 0 → amber, rejected/revoked > 0 → destructive, the
+              others muted. */}
+          {listQ.data && listQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="extensions-list-aggregate-summary"
+            >
+              {(() => {
+                let approved = 0;
+                let pending = 0;
+                let rejected = 0;
+                let disabled = 0;
+                let revoked = 0;
+                for (const ext of listQ.data) {
+                  switch (ext.governanceStatus) {
+                    case "approved":
+                      approved += 1;
+                      break;
+                    case "pending_approval":
+                      pending += 1;
+                      break;
+                    case "rejected":
+                      rejected += 1;
+                      break;
+                    case "disabled":
+                      disabled += 1;
+                      break;
+                    case "revoked":
+                      revoked += 1;
+                      break;
+                  }
+                }
+                return (
+                  <>
+                    <span className="font-medium">Installed:</span>{" "}
+                    <span className="font-mono">{listQ.data.length}</span>{" "}
+                    total —{" "}
+                    <span className="font-mono">{approved}</span> approved
+                    {" / "}
+                    <span
+                      className={
+                        pending > 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : ""
+                      }
+                    >
+                      <span className="font-mono">{pending}</span> pending
+                    </span>
+                    {" / "}
+                    <span
+                      className={
+                        rejected + revoked > 0 ? "text-destructive" : ""
+                      }
+                    >
+                      <span className="font-mono">{rejected}</span> rejected /{" "}
+                      <span className="font-mono">{revoked}</span> revoked
+                    </span>
+                    {" / "}
+                    <span className="font-mono">{disabled}</span> disabled
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-2 text-sm">
             <label
               className="font-medium"
