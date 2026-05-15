@@ -783,6 +783,62 @@ export const AGS_MCP_STATUSES = [
 ] as const;
 export type AgsMcpStatus = (typeof AGS_MCP_STATUSES)[number];
 
+// ============================================================================
+// Per-MCP-status operator-facing metadata (T-S.10)
+// ============================================================================
+
+export interface AgsMcpStatusMetadata {
+  /** Display label rendered on the MCP server card. */
+  readonly label: string;
+  /** Short operator-facing description of the connection state. */
+  readonly description: string;
+  /** Whether tool dispatch to this MCP server can proceed (true for
+   *  `connected` only). */
+  readonly dispatchable: boolean;
+  /** Whether this state is an error condition warranting an operator
+   *  banner (true for `error`/`disconnected`). */
+  readonly errorState: boolean;
+}
+
+export const AGS_MCP_STATUS_METADATA: Readonly<
+  Record<AgsMcpStatus, AgsMcpStatusMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "MCP server is being negotiated — connection handshake in progress. Tool dispatch waits or fails fast.",
+    dispatchable: false,
+    errorState: false,
+  },
+  connected: {
+    label: "Connected",
+    description:
+      "MCP server is healthy and ready — tools registered via this server are dispatchable.",
+    dispatchable: true,
+    errorState: false,
+  },
+  disconnected: {
+    label: "Disconnected",
+    description:
+      "MCP server lost its connection — reconnection attempts may be in flight. Tools are unavailable until reconnect.",
+    dispatchable: false,
+    errorState: true,
+  },
+  error: {
+    label: "Error",
+    description:
+      "MCP server handshake or runtime threw an unrecoverable error — operator must investigate; auto-reconnect won't help.",
+    dispatchable: false,
+    errorState: true,
+  },
+};
+
+export function getAgsMcpStatusMetadata(
+  status: AgsMcpStatus,
+): AgsMcpStatusMetadata {
+  return AGS_MCP_STATUS_METADATA[status];
+}
+
 /**
  * 15 LLM providers supported by openllm-agent2 (per `SkillsTools.md`).
  * Used for the runtime config provider picker.
