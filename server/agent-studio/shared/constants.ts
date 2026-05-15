@@ -230,6 +230,70 @@ export const AGS_AUTONOMY_LEVELS = [
 ] as const;
 export type AgsAutonomyLevel = (typeof AGS_AUTONOMY_LEVELS)[number];
 
+// ============================================================================
+// Per-autonomy-level operator-facing metadata (T-S.3)
+// ============================================================================
+
+export interface AgsAutonomyLevelMetadata {
+  /** Display label rendered in the autonomy picker / agent card. */
+  readonly label: string;
+  /** Short operator-facing description of what this level entails. */
+  readonly description: string;
+  /** Stable rank 0-3 used for comparator-style "minimum autonomy"
+   *  checks. 0 = manual (most restrictive), 3 = autonomous
+   *  (least restrictive). */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether actions at this level require a human-in-the-loop
+   *  approval before tool dispatch (true for manual/supervised). */
+  readonly requiresHumanApproval: boolean;
+  /** Whether the agent runs continuously without prompt (true for
+   *  autonomous only). */
+  readonly runsContinuously: boolean;
+}
+
+export const AGS_AUTONOMY_LEVEL_METADATA: Readonly<
+  Record<AgsAutonomyLevel, AgsAutonomyLevelMetadata>
+> = {
+  manual: {
+    label: "Manual",
+    description:
+      "Operator approves every tool invocation — agent never acts without explicit per-call go-ahead.",
+    rank: 0,
+    requiresHumanApproval: true,
+    runsContinuously: false,
+  },
+  supervised: {
+    label: "Supervised",
+    description:
+      "Operator approves at strategic decision points but not every micro-action. Default for new agents.",
+    rank: 1,
+    requiresHumanApproval: true,
+    runsContinuously: false,
+  },
+  semi_autonomous: {
+    label: "Semi-Autonomous",
+    description:
+      "Agent acts on its own within a defined sandbox — escalates only for out-of-scope decisions or governance breaches.",
+    rank: 2,
+    requiresHumanApproval: false,
+    runsContinuously: false,
+  },
+  autonomous: {
+    label: "Autonomous",
+    description:
+      "Agent runs continuously on its own — operator inspects results via dashboards rather than per-action approval.",
+    rank: 3,
+    requiresHumanApproval: false,
+    runsContinuously: true,
+  },
+};
+
+export function getAgsAutonomyLevelMetadata(
+  level: AgsAutonomyLevel,
+): AgsAutonomyLevelMetadata {
+  return AGS_AUTONOMY_LEVEL_METADATA[level];
+}
+
 export const AGS_ENVIRONMENTS = [
   "draft",
   "sandbox",
