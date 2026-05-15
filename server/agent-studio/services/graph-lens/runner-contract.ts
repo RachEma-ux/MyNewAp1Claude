@@ -27,6 +27,7 @@
  *     bypass it fail their own per-lens source-scan tests.
  */
 
+import { GRAPH_LENS_KINDS } from "./contracts.js";
 import type {
   GraphLensDefinition,
   GraphLensKind,
@@ -173,6 +174,47 @@ export function listLensRunnerKinds(): ReadonlyArray<GraphLensKind> {
  */
 export function __resetLensRunnerRegistryForTests(): void {
   runnersByKind.clear();
+}
+
+// ============================================================================
+// Runner registry coverage summary (T-F.12)
+// ============================================================================
+
+export interface LensRunnerRegistryCoverageSummary {
+  readonly totalKinds: number;
+  readonly registeredKinds: number;
+  readonly missingKinds: ReadonlyArray<GraphLensKind>;
+  /** 0..100, 1-decimal. Useful for "X% of lens kinds have runners"
+   *  operator gauge. 0% when totalKinds is 0 (avoids NaN). */
+  readonly coveragePercent: number;
+}
+
+/**
+ * Returns a stable-shape summary of runner-registry coverage relative
+ * to the closed `GRAPH_LENS_KINDS` taxonomy. `missingKinds` lists the
+ * kinds without runners — operator dashboards can use this to render
+ * a "still placeholder" badge.
+ *
+ * Reads the module-local registry. Pure with respect to its inputs.
+ */
+export function summarizeLensRunnerRegistry(): LensRunnerRegistryCoverageSummary {
+  const totalKinds = GRAPH_LENS_KINDS.length;
+  const registered: GraphLensKind[] = [];
+  const missing: GraphLensKind[] = [];
+  for (const k of GRAPH_LENS_KINDS) {
+    if (runnersByKind.has(k)) registered.push(k);
+    else missing.push(k);
+  }
+  const coveragePercent =
+    totalKinds === 0
+      ? 0
+      : Math.round((registered.length / totalKinds) * 1000) / 10;
+  return {
+    totalKinds,
+    registeredKinds: registered.length,
+    missingKinds: missing,
+    coveragePercent,
+  };
 }
 
 // ============================================================================

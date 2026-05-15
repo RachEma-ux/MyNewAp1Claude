@@ -189,6 +189,7 @@ runtime catches up.
 | `annotate-rows-with-failure-state.test.ts` | `services/failure-states/observability-bridge` — `annotateRowsWithFailureState` (batch wrapper around extractFailureStateAnnotations; preserves row reference; null for free-form) | T-I.29 / #1065 |
 | `code-graph-cardinality-summary.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `summarizeCodeGraphCardinality` (oneToOne / oneToMany / manyToMany counts over edge-type constraints) | T-G.21 / #1066 |
 | `institutional-memory-projection-summary.test.ts` | `services/institutional-memory/project-node` — `summarizeInstitutionalMemoryProjectionResult` (projected/skipped + 4-key stable-shape reason axis + projectedPercent) + new exported `INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS` constant | T-G.22 / #1067 |
+| `lens-runner-registry-coverage.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensRunnerRegistry` (registeredKinds / missingKinds list / coveragePercent over the runtime runner registry) | T-F.12 / #1068 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
