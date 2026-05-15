@@ -151,7 +151,20 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async getNoteById(noteId: number): Promise<NoteSelectByIdResult | null> {
-    const conn = getAsDb();
+    // V1+ MR-3 seventieth batch (PR-V1-140): Path-A read consumer.
+    // Notes × Vaults JOIN keyed on noteId pulls workspaceId up in
+    // one round-trip, then the projected SELECT routes via
+    // getAsDbForWorkspace.
+    const lookupConn = getAsDb();
+    if (!lookupConn) return null;
+    const ws = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaultNotes)
+      .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+      .where(eq(agsVaultNotes.id, noteId))
+      .limit(1);
+    if (ws.length === 0) return null;
+    const conn = getAsDbForWorkspace(ws[0].workspaceId) ?? lookupConn;
     const [row] = await conn
       .select({
         id: agsVaultNotes.id,
@@ -170,7 +183,24 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async getNoteVersion(noteId: number, version: number): Promise<NoteVersionSelectResult | null> {
-    const conn = getAsDb();
+    // V1+ MR-3 seventieth batch (PR-V1-140): Path-A read consumer.
+    // noteVersion's workspace lookup walks
+    // agsVaultNoteVersions.noteId → agsVaultNotes.vaultId →
+    // agsVaults.workspaceId. Three-table JOIN-via-INNER would also
+    // work; we do the simpler 2-step (Notes × Vaults keyed by
+    // noteId) since noteId is already in scope.
+    const lookupConn = getAsDb();
+    if (!lookupConn) return null;
+    const ws = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaultNotes)
+      .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+      .where(eq(agsVaultNotes.id, noteId))
+      .limit(1);
+    const conn =
+      ws.length > 0
+        ? (getAsDbForWorkspace(ws[0].workspaceId) ?? lookupConn)
+        : lookupConn;
     const [row] = await conn
       .select({
         id: agsVaultNoteVersions.id,
@@ -194,7 +224,20 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async getLatestNoteVersion(noteId: number): Promise<NoteVersionSelectResult | null> {
-    const conn = getAsDb();
+    // V1+ MR-3 seventieth batch (PR-V1-140): Path-A read consumer.
+    // Same Notes × Vaults JOIN as getNoteVersion.
+    const lookupConn = getAsDb();
+    if (!lookupConn) return null;
+    const ws = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaultNotes)
+      .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+      .where(eq(agsVaultNotes.id, noteId))
+      .limit(1);
+    const conn =
+      ws.length > 0
+        ? (getAsDbForWorkspace(ws[0].workspaceId) ?? lookupConn)
+        : lookupConn;
     const [row] = await conn
       .select({
         id: agsVaultNoteVersions.id,
