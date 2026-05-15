@@ -21,6 +21,7 @@ import { z } from "zod";
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
   getPublishExecutionById,
+  getPublishTargetById,
   getPublishTargetExecutionSummaries,
   listPublishTargets,
   listRecentPublishExecutions,
@@ -94,5 +95,16 @@ export const publishTargetsAdminRouter = router({
     .input(z.object({ executionId: z.number().int().positive() }))
     .query(async ({ input }) => {
       return getPublishExecutionById(input.executionId);
+    }),
+
+  /**
+   * PR-V1-193: single target with `config` JSON. Same on-demand
+   * pattern as `getExecutionById` — UI fetches when operator
+   * clicks "view config" so the registry list stays small.
+   */
+  getTargetById: adminProcedure
+    .input(z.object({ targetId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return getPublishTargetById(input.targetId);
     }),
 });
