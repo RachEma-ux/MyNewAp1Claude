@@ -52,7 +52,24 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async addMember(input: VaultMemberAddInput, addedByUserId: number): Promise<{ id: number }> {
-    const conn = getAsDb();
+    // V1+ MR-3 thirty-second batch (PR-V1-101): vault→workspace split-
+    // handle. agsVaultMembers does not carry workspaceId; the parent
+    // vault does. Discovery SELECT pulls workspaceId, INSERT routes
+    // via getAsDbForWorkspace. Fall back to the default handle when
+    // the vault is missing OR vault.workspaceId IS NULL — the FK
+    // constraint on the INSERT will surface the missing-vault error
+    // (preserves pre-migration unhappy-path semantics).
+    const lookupConn = getAsDb();
+    if (!lookupConn) throw new Error("ASDB unavailable");
+    const lookup = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaults)
+      .where(eq(agsVaults.id, input.vaultId))
+      .limit(1);
+    const workspaceId = lookup[0]?.workspaceId ?? null;
+    const conn =
+      workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupConn;
+    if (!conn) throw new Error("ASDB unavailable");
     const [row] = await conn
       .insert(agsVaultMembers)
       .values({
