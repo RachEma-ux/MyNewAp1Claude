@@ -165,6 +165,47 @@ export const BROWSE_SORT_KEYS = [
 ] as const;
 export type BrowseSortKey = (typeof BROWSE_SORT_KEYS)[number];
 
+// ============================================================================
+// Per-sort-key operator-facing metadata (T-V.3)
+// ============================================================================
+
+export interface BrowseSortKeyMetadata {
+  /** Display label rendered in the sort picker. */
+  readonly label: string;
+  /** Short operator-facing description of what the sort does. */
+  readonly description: string;
+  /** Underlying SoT column the sort applies to. */
+  readonly sortColumn: "createdAt" | "byteSize";
+  /** Sort direction ascending (true) vs descending (false). Both
+   *  current sorts are descending. */
+  readonly ascending: boolean;
+}
+
+export const BROWSE_SORT_KEY_METADATA: Readonly<
+  Record<BrowseSortKey, BrowseSortKeyMetadata>
+> = {
+  created_at_desc: {
+    label: "Recently Added",
+    description:
+      "Sort attachments by upload time (newest first). Default sort for the attachment library browse view.",
+    sortColumn: "createdAt",
+    ascending: false,
+  },
+  size_desc: {
+    label: "Largest First",
+    description:
+      "Sort attachments by byte-size (largest first). Useful for finding storage hot-spots and operator cleanup candidates.",
+    sortColumn: "byteSize",
+    ascending: false,
+  },
+};
+
+export function getBrowseSortKeyMetadata(
+  key: BrowseSortKey,
+): BrowseSortKeyMetadata {
+  return BROWSE_SORT_KEY_METADATA[key];
+}
+
 export interface BrowseAttachmentLibraryInput {
   readonly vaultId: number;
   readonly mimeClass?: AttachmentMimeClass;
