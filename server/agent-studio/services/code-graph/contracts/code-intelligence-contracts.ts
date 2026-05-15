@@ -326,6 +326,78 @@ export function validateCodeGraphEdgeBatch(
 }
 
 // ============================================================================
+// Per-edge-type operator-facing metadata (T-G.30)
+// ============================================================================
+
+export interface CodeGraphEdgeTypeMetadata {
+  /** Display label for operator UI / lens overlays. */
+  readonly label: string;
+  /** Short description of what the edge represents. */
+  readonly description: string;
+}
+
+export const CODE_GRAPH_EDGE_TYPE_METADATA: Readonly<
+  Record<CodeGraphEdgeType, CodeGraphEdgeTypeMetadata>
+> = {
+  imports: {
+    label: "Imports",
+    description:
+      "Source file imports another file or package — module-level dependency.",
+  },
+  calls: {
+    label: "Calls",
+    description:
+      "Function or method invokes another function / method / API endpoint.",
+  },
+  declares: {
+    label: "Declares",
+    description:
+      "File declares a class / function / API endpoint — defining-side relationship.",
+  },
+  implements: {
+    label: "Implements",
+    description:
+      "Class implements another class or interface — inheritance / contract relationship.",
+  },
+  depends_on: {
+    label: "Depends On",
+    description:
+      "Package or service has a coarse-grained dependency on another package / service.",
+  },
+  reads_from_table: {
+    label: "Reads From Table",
+    description:
+      "Function or service reads from a DB table — data-flow inbound relationship.",
+  },
+  writes_to_table: {
+    label: "Writes To Table",
+    description:
+      "Function or service writes to a DB table — data-flow outbound relationship.",
+  },
+  routes_to: {
+    label: "Routes To",
+    description:
+      "API endpoint or frontend route maps to a downstream handler / component.",
+  },
+  renders_component: {
+    label: "Renders Component",
+    description:
+      "Frontend component renders another component — UI composition relationship.",
+  },
+  tests: {
+    label: "Tests",
+    description:
+      "Test file exercises a function / class / endpoint — coverage relationship.",
+  },
+};
+
+export function getCodeGraphEdgeTypeMetadata(
+  type: CodeGraphEdgeType,
+): CodeGraphEdgeTypeMetadata {
+  return CODE_GRAPH_EDGE_TYPE_METADATA[type];
+}
+
+// ============================================================================
 // Per-node-type operator-facing metadata (T-G.25)
 // ============================================================================
 
