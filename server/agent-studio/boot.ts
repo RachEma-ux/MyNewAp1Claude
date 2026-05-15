@@ -764,6 +764,30 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-region-routing] install skipped — ${message}`);
   }
 
+  // Step 3.34 — D-RESUME-5 (2026-05-15): approval event bus cross-process
+  // pubsub. PR-V1-165. Env-flag-gated opt-in via AGS_APPROVAL_BUS_PUBSUB=on.
+  // Single-process operators leave the flag unset; the existing local
+  // in-process bus continues to handle approvals. Multi-process operators
+  // flip the flag — every emit fires Postgres NOTIFY and every LISTEN
+  // notification re-emits on the local bus, so chat-stream waitFor on
+  // process P1 receives approval-decided events from process P2.
+  try {
+    const { maybeInstallApprovalBusPubsub } = await import(
+      "./services/runtime/install-approval-bus-pubsub"
+    );
+    const result = maybeInstallApprovalBusPubsub();
+    if (result.installed) {
+      console.log("[ags-approval-bus-pubsub] installed");
+    } else {
+      console.log(
+        `[ags-approval-bus-pubsub] not installed — ${result.reason ?? "unknown"}`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-approval-bus-pubsub] install skipped — ${message}`);
+  }
+
   // Step 3.33 — V1+ Phase MR-1 Phase-2 (2026-05-15): region cache re-warm
   // cron. PR-V1-155. Defensive periodic re-warm so pin/region changes on
   // other replicas (no cross-process pub-sub yet) eventually become
