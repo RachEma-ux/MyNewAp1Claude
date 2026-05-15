@@ -13,6 +13,7 @@ export type {
   CreateCanvasInput,
   CreateCanvasNodeInput,
   CreateCanvasEdgeInput,
+  UpdateCanvasNodeInput,
 } from "./types.js";
 
 export {
@@ -20,6 +21,7 @@ export {
   isCanvasNodeKind,
   CanvasNotFoundError,
   CanvasNodeKindError,
+  CanvasNodeNotFoundError,
 } from "./types.js";
 
 export {
@@ -28,6 +30,8 @@ export {
   getCanvasById,
   listCanvasesByVault,
   createCanvasNode,
+  updateCanvasNode,
+  deleteCanvasNode,
   createCanvasEdge,
   getCanvasSnapshot,
   listNoteReferencesForCanvas,

@@ -92,6 +92,37 @@ export interface CreateCanvasEdgeInput {
   readonly data?: Record<string, unknown>;
 }
 
+/**
+ * V1+ Phase 17-γ follow-up (PR-V1-169): update a canvas node.
+ *
+ * All fields except `nodeId` are optional — caller supplies only
+ * the columns they want to change. Note-reference changes
+ * (referencedNoteId added / changed / cleared) emit the appropriate
+ * projection event (`canvas.note_reference_changed` /
+ * `canvas.note_reference_removed`) so the existing 17-γ persistence
+ * sink + drain chain (#804–#812) automatically captures the change.
+ *
+ * Passing `referencedNoteId: null` explicitly clears the reference.
+ * Passing `referencedNoteId: undefined` leaves it untouched.
+ */
+export interface UpdateCanvasNodeInput {
+  readonly nodeId: number;
+  readonly kind?: CanvasNodeKind;
+  readonly referencedNoteId?: number | null;
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly data?: Record<string, unknown> | null;
+}
+
+export class CanvasNodeNotFoundError extends Error {
+  constructor(nodeId: number) {
+    super(`Canvas node ${nodeId} not found`);
+    this.name = "CanvasNodeNotFoundError";
+  }
+}
+
 export interface CanvasSnapshot {
   readonly canvas: CanvasRecord;
   readonly nodes: ReadonlyArray<CanvasNodeRecord>;
