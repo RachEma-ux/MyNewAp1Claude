@@ -1,0 +1,196 @@
+/**
+ * Code Intelligence Graph contracts — Phase 25 §T-G.2.
+ *
+ * Roadmap §"Phase 25 — V1.5 Expansion" enumerates 12 node types and
+ * 10 edge types for the Code Intelligence Graph. This module pins
+ * the closed taxonomies AHEAD of the parser spike (T-E #990) so the
+ * downstream emitter PR (T-E.2) and the eventual lens-runner know
+ * the canonical shape.
+ *
+ * Why ship contracts before the parser:
+ *   - The taxonomies are stable irrespective of which parser
+ *     strategy wins T-E. Whether tree-sitter or a per-language AST
+ *     tool emits the nodes, the SHAPE is the same.
+ *   - Locking the shape now means T-E.2's emitter has a fixed
+ *     target to write against.
+ *   - The Cypher query templates for code-graph impact analysis
+ *     (T-F.7 with `code_impact` IA kind from #993) can reference
+ *     these typeKeys at registration time.
+ *
+ * The spike target directory remains `services/code-graph/spike/`
+ * (#990); these contracts live in `services/code-graph/contracts/`
+ * so they're outside the spike-boundary source-scan and available
+ * to other modules.
+ *
+ * Hard-rule compliance (CLAUDE.md):
+ *   - Pure types. No DB I/O. No graph mutation.
+ *   - No `neo4j-driver` / `dispatchMcpToolCall` / `openrouter` /
+ *     `credential-resolver` imports.
+ *   - No `tree-sitter` import (the parser code lives in the spike
+ *     directory; this contract is parser-agnostic).
+ */
+
+// ============================================================================
+// Closed taxonomy — 12 code-graph node types
+// ============================================================================
+
+export const CODE_GRAPH_NODE_TYPES = [
+  "repository",
+  "package",
+  "file",
+  "class",
+  "function",
+  "method",
+  "api_endpoint",
+  "service",
+  "db_table",
+  "frontend_component",
+  "config_file",
+  "test_file",
+] as const;
+
+export type CodeGraphNodeType = (typeof CODE_GRAPH_NODE_TYPES)[number];
+
+export function isCodeGraphNodeType(s: unknown): s is CodeGraphNodeType {
+  return (
+    typeof s === "string" &&
+    (CODE_GRAPH_NODE_TYPES as readonly string[]).includes(s)
+  );
+}
+
+// ============================================================================
+// Closed taxonomy — 10 code-graph edge types
+// ============================================================================
+
+export const CODE_GRAPH_EDGE_TYPES = [
+  "imports",
+  "calls",
+  "declares",
+  "implements",
+  "depends_on",
+  "reads_from_table",
+  "writes_to_table",
+  "routes_to",
+  "renders_component",
+  "tests",
+] as const;
+
+export type CodeGraphEdgeType = (typeof CODE_GRAPH_EDGE_TYPES)[number];
+
+export function isCodeGraphEdgeType(s: unknown): s is CodeGraphEdgeType {
+  return (
+    typeof s === "string" &&
+    (CODE_GRAPH_EDGE_TYPES as readonly string[]).includes(s)
+  );
+}
+
+// ============================================================================
+// Edge cardinality + endpoint-typeKey constraints
+// ============================================================================
+
+export interface CodeGraphEdgeConstraint {
+  /** Closed-taxonomy source-node typeKey(s) the edge is allowed
+   *  to originate from. Empty = any. */
+  readonly sourceTypeKeys: ReadonlyArray<CodeGraphNodeType>;
+  /** Closed-taxonomy target-node typeKey(s) the edge is allowed
+   *  to point to. Empty = any. */
+  readonly targetTypeKeys: ReadonlyArray<CodeGraphNodeType>;
+  /** Cardinality hint — the lens-runner uses this to pick a
+   *  default layout (one-to-many → tree; many-to-many → matrix). */
+  readonly cardinality: "one_to_one" | "one_to_many" | "many_to_many";
+}
+
+export const CODE_GRAPH_EDGE_CONSTRAINTS: Readonly<
+  Record<CodeGraphEdgeType, CodeGraphEdgeConstraint>
+> = {
+  imports: {
+    sourceTypeKeys: ["file"],
+    targetTypeKeys: ["file", "package"],
+    cardinality: "many_to_many",
+  },
+  calls: {
+    sourceTypeKeys: ["function", "method"],
+    targetTypeKeys: ["function", "method", "api_endpoint"],
+    cardinality: "many_to_many",
+  },
+  declares: {
+    sourceTypeKeys: ["file"],
+    targetTypeKeys: ["class", "function", "api_endpoint"],
+    cardinality: "one_to_many",
+  },
+  implements: {
+    sourceTypeKeys: ["class"],
+    targetTypeKeys: ["class"],
+    cardinality: "many_to_many",
+  },
+  depends_on: {
+    sourceTypeKeys: ["package", "service"],
+    targetTypeKeys: ["package", "service"],
+    cardinality: "many_to_many",
+  },
+  reads_from_table: {
+    sourceTypeKeys: ["function", "method"],
+    targetTypeKeys: ["db_table"],
+    cardinality: "many_to_many",
+  },
+  writes_to_table: {
+    sourceTypeKeys: ["function", "method"],
+    targetTypeKeys: ["db_table"],
+    cardinality: "many_to_many",
+  },
+  routes_to: {
+    sourceTypeKeys: ["api_endpoint"],
+    targetTypeKeys: ["function", "method"],
+    cardinality: "one_to_many",
+  },
+  renders_component: {
+    sourceTypeKeys: ["frontend_component"],
+    targetTypeKeys: ["frontend_component"],
+    cardinality: "many_to_many",
+  },
+  tests: {
+    sourceTypeKeys: ["test_file"],
+    targetTypeKeys: ["file", "function", "method", "class", "api_endpoint"],
+    cardinality: "many_to_many",
+  },
+};
+
+// ============================================================================
+// Validation helpers
+// ============================================================================
+
+/**
+ * Validate that a (sourceTypeKey, edgeTypeKey, targetTypeKey) triple
+ * is allowed by the closed taxonomy + per-edge constraints. Returns
+ * `true` when valid; `false` otherwise. Used by the eventual
+ * emitter to reject malformed projections at write time.
+ */
+export function isAllowedCodeGraphEdge(
+  sourceTypeKey: CodeGraphNodeType,
+  edgeTypeKey: CodeGraphEdgeType,
+  targetTypeKey: CodeGraphNodeType,
+): boolean {
+  const c = CODE_GRAPH_EDGE_CONSTRAINTS[edgeTypeKey];
+  // Empty sourceTypeKeys / targetTypeKeys = "any" — but currently
+  // every edge declares concrete endpoints. Defensive code retains
+  // the "any" semantics for future flexibility.
+  const sourceOk =
+    c.sourceTypeKeys.length === 0 || c.sourceTypeKeys.includes(sourceTypeKey);
+  const targetOk =
+    c.targetTypeKeys.length === 0 || c.targetTypeKeys.includes(targetTypeKey);
+  return sourceOk && targetOk;
+}
+
+/**
+ * Returns the closed-taxonomy edges the given source typeKey is
+ * allowed to originate. Useful for the lens UI's "what can I add
+ * from this node" picker.
+ */
+export function listAllowedEdgeTypesFromSource(
+  sourceTypeKey: CodeGraphNodeType,
+): ReadonlyArray<CodeGraphEdgeType> {
+  return CODE_GRAPH_EDGE_TYPES.filter((edge) => {
+    const c = CODE_GRAPH_EDGE_CONSTRAINTS[edge];
+    return c.sourceTypeKeys.length === 0 || c.sourceTypeKeys.includes(sourceTypeKey);
+  });
+}
