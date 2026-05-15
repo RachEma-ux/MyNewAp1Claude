@@ -491,6 +491,13 @@ export async function decideApprovalRequest(
   expiresAt: Date | null;
   reason: string;
 }> {
+  // V1+ MR-3 thirty-ninth batch (PR-V1-109): Path B consumer.
+  // The agsPendingPermissionRequests UPDATE routes via the resolved
+  // workspaceId. We discover the draftId via a short pre-UPDATE
+  // SELECT (the row's agentDraftId is what Path B's resolver
+  // consumes). The post-UPDATE event-row INSERTs into
+  // agsRuntimePolicyEvents stay on the bootstrap handle (Cat C;
+  // cross-workspace observability).
   const db = getAsDb();
   if (!db) throw new Error("ASDB unavailable");
 
@@ -500,7 +507,25 @@ export async function decideApprovalRequest(
       ? computeExpiresAt(now, input.ttlSecondsOverride ?? null)
       : null;
 
-  const [updated] = await db
+  const draftLookup = await db
+    .select({ agentDraftId: agsPendingPermissionRequests.agentDraftId })
+    .from(agsPendingPermissionRequests)
+    .where(eq(agsPendingPermissionRequests.id, input.approvalRequestId))
+    .limit(1);
+  const draftId = draftLookup[0]?.agentDraftId ?? null;
+  let updateDb = db;
+  if (draftId != null) {
+    const { resolveWorkspaceIdForDraft } = await import(
+      "../region/draft-workspace-resolver"
+    );
+    const workspaceId = await resolveWorkspaceIdForDraft(db, draftId);
+    if (workspaceId != null) {
+      const routed = getAsDbForWorkspace(workspaceId);
+      if (routed) updateDb = routed;
+    }
+  }
+
+  const [updated] = await updateDb
     .update(agsPendingPermissionRequests)
     .set({
       status: input.status,
