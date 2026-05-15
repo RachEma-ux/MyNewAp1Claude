@@ -76,6 +76,54 @@ export const FRAME_TYPE_BYTE_SYNC = 0;
 /** Wire codepoint for y-protocols awareness messages. */
 export const FRAME_TYPE_BYTE_AWARENESS = 1;
 
+// ============================================================================
+// Per-frame-type operator-facing metadata (T-B.2)
+// ============================================================================
+
+export interface RealtimeDocFrameTypeMetadata {
+  /** Display label rendered in realtime-doc trace logs. */
+  readonly label: string;
+  /** Short operator-facing description of what the frame carries. */
+  readonly description: string;
+  /** Whether this frame type is a recognized y-protocols message
+   *  (true) vs. unknown / malformed / future-protocol (false). */
+  readonly recognized: boolean;
+  /** Wire codepoint for this frame type, or `null` for `unknown`. */
+  readonly wireCodepoint: number | null;
+}
+
+export const REALTIME_DOC_FRAME_TYPE_METADATA: Readonly<
+  Record<RealtimeDocFrameType, RealtimeDocFrameTypeMetadata>
+> = {
+  sync: {
+    label: "Sync",
+    description:
+      "y-protocols sync message — carries CRDT state updates. The framing dispatcher routes these to the realtime-doc transport.",
+    recognized: true,
+    wireCodepoint: FRAME_TYPE_BYTE_SYNC,
+  },
+  awareness: {
+    label: "Awareness",
+    description:
+      "y-protocols awareness message — carries per-user cursor / presence updates. Lower-priority than sync; subject to throttling.",
+    recognized: true,
+    wireCodepoint: FRAME_TYPE_BYTE_AWARENESS,
+  },
+  unknown: {
+    label: "Unknown",
+    description:
+      "Frame did not match a recognized y-protocols message codepoint — fall-through bucket for malformed or future-protocol frames. Dropped server-side.",
+    recognized: false,
+    wireCodepoint: null,
+  },
+};
+
+export function getRealtimeDocFrameTypeMetadata(
+  frameType: RealtimeDocFrameType,
+): RealtimeDocFrameTypeMetadata {
+  return REALTIME_DOC_FRAME_TYPE_METADATA[frameType];
+}
+
 /** Default frame-size cap. 2 MiB is generous for vault-note edits +
  *  multi-user cursor batches; tunable via `parseRealtimeDocFrame`
  *  option. */
