@@ -171,6 +171,36 @@ export async function getExtensionById(
   return rows[0] ? rowToExtension(rows[0] as Record<string, unknown>) : null;
 }
 
+/**
+ * PR-V1-179: hard uninstall an extension row.
+ *
+ * Distinct from `setExtensionStatus(..., "revoked")` which preserves
+ * the row for audit; `uninstallExtension` actually deletes the row.
+ * Idempotent — returns `false` when no row matched, `true` on
+ * delete. Routes via the same split-handle as setExtensionStatus.
+ *
+ * Operator-only — invocations from the extension framework itself
+ * are not allowed (extensions can't unilaterally uninstall
+ * themselves). Caller is responsible for ensuring the extension is
+ * not currently running.
+ */
+export async function uninstallExtension(
+  extensionId: number,
+): Promise<boolean> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) return false;
+  const lookup = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, extensionId))
+    .limit(1);
+  if (lookup.length === 0) return false;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
+  if (!db) return false;
+  await db.delete(agsExtensions).where(eq(agsExtensions.id, extensionId));
+  return true;
+}
+
 export async function listExtensionsByWorkspace(
   workspaceId: number,
   filterStatus?: ExtensionGovernanceStatus,
