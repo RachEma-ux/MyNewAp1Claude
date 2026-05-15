@@ -292,6 +292,102 @@ export function isNotePromotionTerminal(state: string): state is NotePromotionSt
   return NOTE_PROMOTION_TERMINAL_STATES.has(state as NotePromotionState);
 }
 
+// ============================================================================
+// Per-note-promotion-state operator-facing metadata (T-L.3)
+// ============================================================================
+
+export interface NotePromotionStateMetadata {
+  /** Display label rendered in the promotion ledger / note status. */
+  readonly label: string;
+  /** Short operator-facing description of what the state means. */
+  readonly description: string;
+  /** Closed-taxonomy outcome classification:
+   *  - `in_progress`: row is still being processed (pending /
+   *    validating / in_review).
+   *  - `accepted`: terminal — promoted successfully.
+   *  - `declined`: terminal — approver rejected.
+   *  - `reverted`: terminal — promotion rolled back after acceptance.
+   *  - `cancelled`: terminal — cancelled before acceptance.
+   *  - `obsolete`: terminal — superseded by a newer promotion. */
+  readonly outcome:
+    | "in_progress"
+    | "accepted"
+    | "declined"
+    | "reverted"
+    | "cancelled"
+    | "obsolete";
+  /** Whether this state is in the terminal set (mirrors
+   *  NOTE_PROMOTION_TERMINAL_STATES). */
+  readonly terminal: boolean;
+}
+
+export const NOTE_PROMOTION_STATE_METADATA: Readonly<
+  Record<NotePromotionState, NotePromotionStateMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Note promotion is queued and awaiting initial validation — nothing has touched the row yet.",
+    outcome: "in_progress",
+    terminal: false,
+  },
+  validating: {
+    label: "Validating",
+    description:
+      "Promotion is in automated validation (governance checks, schema validation, freshness gates) — system-controlled state.",
+    outcome: "in_progress",
+    terminal: false,
+  },
+  in_review: {
+    label: "In Review",
+    description:
+      "Promotion is in human review — approvers see it in their queue and have not yet acted.",
+    outcome: "in_progress",
+    terminal: false,
+  },
+  approved: {
+    label: "Approved",
+    description:
+      "Approvers accepted the promotion — note version is promoted to KB / CAG / Graph Skill and the projection is live.",
+    outcome: "accepted",
+    terminal: true,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Approvers explicitly rejected the promotion — submitter sees the rejection reason and the note is not promoted.",
+    outcome: "declined",
+    terminal: true,
+  },
+  rolled_back: {
+    label: "Rolled Back",
+    description:
+      "An approved promotion was reverted after acceptance — the underlying graph projection has been undone. Treated as terminal from retention's standpoint.",
+    outcome: "reverted",
+    terminal: true,
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "Promotion was cancelled by the system or operator before acceptance — terminal without explicit approver decision.",
+    outcome: "cancelled",
+    terminal: true,
+  },
+  superseded: {
+    label: "Superseded",
+    description:
+      "A newer promotion for the same note took precedence — this row is terminal-obsolete.",
+    outcome: "obsolete",
+    terminal: true,
+  },
+};
+
+export function getNotePromotionStateMetadata(
+  state: NotePromotionState,
+): NotePromotionStateMetadata {
+  return NOTE_PROMOTION_STATE_METADATA[state];
+}
+
 // ── ags_agent_releases ──────────────────────────────────────────────────────
 //
 // Release-state classification is consumed by the retention eligibility

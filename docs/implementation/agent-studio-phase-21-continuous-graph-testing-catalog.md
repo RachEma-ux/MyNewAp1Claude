@@ -229,6 +229,7 @@ runtime catches up.
 | `attachment-mime-class-metadata.test.ts` | `services/vault/attachment-library` — `ATTACHMENT_MIME_CLASS_METADATA` (6-entry per-class label + description + previewable + displayBucket {media / documents / other} for image/video/audio/document/archive/other) | T-V.2 / #1105 |
 | `publish-request-state-metadata.test.ts` | `services/retention/lifecycle-state-vocab` — `PUBLISH_REQUEST_STATE_METADATA` (7-entry per-state label + description + outcome {awaiting / accepted / declined / withdrawn / obsolete / terminal_failure} + terminal boolean; mirrors `PUBLISH_REQUEST_TERMINAL_STATES`) | T-L.1 / #1106 |
 | `approval-step-state-metadata.test.ts` | `services/retention/lifecycle-state-vocab` — `APPROVAL_STEP_STATE_METADATA` (7-entry per-state label + description + outcome {awaiting / accepted / declined / skipped / expired / cancelled / obsolete} + terminal boolean; mirrors `APPROVAL_STEP_TERMINAL_STATES`) | T-L.2 / #1107 |
+| `note-promotion-state-metadata.test.ts` | `services/retention/lifecycle-state-vocab` — `NOTE_PROMOTION_STATE_METADATA` (8-entry per-state label + description + outcome {in_progress / accepted / declined / reverted / cancelled / obsolete} + terminal boolean; mirrors `NOTE_PROMOTION_TERMINAL_STATES`) | T-L.3 / #1108 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
