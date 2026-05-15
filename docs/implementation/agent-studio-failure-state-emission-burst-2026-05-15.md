@@ -1,6 +1,6 @@
 # Phase 22 emission burst — 2026-05-15 closure summary
 
-**Status:** **31-PR continuation closed @ main `1acafbc0`**. The artifact landed in 4 self-update slices: #1037 (initial doc + lockstep) → #1038 (self-reference fix to reflect post-merge count) → #1040 (closure note, extended to 29 PRs after #1039 closed Phase 28 acceptance #30) → #1041 (this update reflecting Phase 22 acceptance checkbox flip + #1041 itself). Phase 22 closed-taxonomy emission surface is **live with 11 / 25 closed kinds emitting**; Phase 28 acceptance #30 ("Documentation complete") is **substantially closed @ #1039**; **Phase 22 roadmap acceptance checkboxes flipped @ #1041**.
+**Status:** **31-PR continuation closed @ main `1acafbc0`**. The artifact landed in 4 self-update slices: #1037 (initial doc + lockstep) → #1038 (self-reference fix to reflect post-merge count) → #1040 (closure note, extended to 29 PRs after #1039 closed Phase 28 acceptance #30) → #1041 (this update reflecting Phase 22 acceptance checkbox flip + #1041 itself). Phase 22 closed-taxonomy emission surface is **live with 12 / 25 closed kinds emitting**; Phase 28 acceptance #30 ("Documentation complete") is **substantially closed @ #1039**; **Phase 22 roadmap acceptance checkboxes flipped @ #1041**.
 
 This doc consolidates the 2026-05-15 emission burst (#1011 → #1039) into a single artifact so operators + future-Claude have one place to look. The audit doc (`agent-studio-phase-22-failure-state-emission-audit.md`) is the per-state map; this doc is the burst-level narrative.
 
@@ -10,7 +10,7 @@ This doc consolidates the 2026-05-15 emission burst (#1011 → #1039) into a sin
 
 | Metric | Before burst | After burst |
 |---|---|---|
-| Closed taxonomy kinds with live emitters | 0 | 11 of 25 (44%) |
+| Closed taxonomy kinds with live emitters | 0 | 12 of 25 (48%) |
 | Quality scanners (Phase 23 detection) | 9 | 10 |
 | CLAUDE.md hard rules locked by integrity mortgage | 13 | 30 |
 | Ancillary contract / validator tests indexed in Phase 21 §7 | 0 | 31 |
@@ -109,7 +109,7 @@ Five batch-B wirings with bundled guard-extensions (pattern shift from #1024's s
 | `semantic_enrichment_rejected` | 🔒 | — | (T-D.3 phase-gated) |
 | `background_job_failed` | ⚠️ | — | (count-pin blocker — see #1034) |
 
-11 LIVE / 4 ⚠️ partial / 3 🟡 detection-only / 6 ❌ phase-gated / 1 🔒 T-D.3.
+12 LIVE / 2 ⚠️ partial / 4 🟡 detection-only / 6 ❌ phase-gated / 1 🔒 T-D.3.
 
 ---
 

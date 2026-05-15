@@ -65,8 +65,17 @@ describe("Phase 22 emission burst summary lockstep", () => {
     },
   );
 
-  it("states the 11/25 live coverage outcome", () => {
-    expect(summary).toContain("11 of 25");
+  it("states the 12/25 live coverage outcome (post #1030 sibling-emit)", () => {
+    expect(summary).toContain("12 of 25");
+    expect(summary).toContain("48%");
+  });
+
+  it("§3 closing line tallies 12 LIVE / 2 ⚠️ / 4 🟡 / 6 ❌ / 1 🔒 (sums to 25)", () => {
+    expect(summary).toContain("12 LIVE");
+    expect(summary).toContain("2 ⚠️ partial");
+    expect(summary).toContain("4 🟡 detection-only");
+    expect(summary).toContain("6 ❌ phase-gated");
+    expect(summary).toContain("1 🔒 T-D.3");
   });
 
   it("references each of the 9 forward lessons (14-22)", () => {

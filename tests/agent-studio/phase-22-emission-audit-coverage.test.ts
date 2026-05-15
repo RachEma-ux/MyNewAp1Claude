@@ -60,8 +60,13 @@ describe("Phase 22 emission audit covers all 25 closed-taxonomy kinds", () => {
     expect(audit).toContain("T-I.5 batch C");
   });
 
-  it("audit summary reflects 11 LIVE closed kinds after batch-A + 5 batch-B", () => {
-    expect(audit).toContain("Live coverage: 11/25");
+  it("audit summary reflects 12 LIVE closed kinds (post #1030 sibling-emit)", () => {
+    expect(audit).toContain("Live coverage: 12/25");
+    expect(audit).toContain("48%");
+  });
+
+  it("audit summary table row counts sum to 25 (12+2+4+6+1)", () => {
+    expect(audit).toContain("12 + 2 + 4 + 6 + 1 = 25");
   });
 
   it("audit per-state table marks every shipped PR with 🟢 LIVE", () => {

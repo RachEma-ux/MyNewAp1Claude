@@ -3,7 +3,7 @@
 **Date:** 2026-05-15 (refreshed after batch-A + first 4 batch-B wirings landed)
 **Status:** Audit + active emission tracking. Maps the 25 closed-taxonomy failure states (#1002) onto existing emitters in `server/agent-studio/services/**`, so the future wiring slices have a fixed scope.
 
-**Live emission status:** **11 of 25 closed kinds have live emitters** (6 batch-A + 5 batch-B). Remaining 14: 8 batch-B candidates (existing detection or DB state) + 5 detection-first (no detection yet) + 1 phase-gated.
+**Live emission status:** **12 of 25 closed kinds have live emitters** (6 batch-A + 5 batch-B + 1 sibling-emit @ #1030). Remaining 13: 2 ⚠️ partial (count-pin / script-only) + 4 🟡 detection-only + 6 ❌ phase-gated + 1 🔒 T-D.3.
 
 This document is the bridge between two artifacts:
 - **Closed-taxonomy contract** (`services/failure-states/contracts.ts`, #1002) — the 25 named failure states + categories + severity + recoverable metadata.
@@ -17,13 +17,13 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **11** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21) |
-| ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written but not closed-taxonomy-encoded (kind #25 — locked by 20+ test assertions; deferred) |
-| 🟡 Detection state exists in DB but no observability surface | 3 | A status column / audit table carries the state; emission deferred (kinds #2, #7, #10) |
-| ❌ No detection yet — phase-gated | 10 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #6, #11, #12, #13, #14, #16, #17, #22, #23) plus partial-detection kind #12 captured indirectly today |
+| 🟢 LIVE via closed-taxonomy bridge | **12** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21) |
+| ⚠️ Has detection code, partial emission | 2 | Free-form `errorClass` written / detection only in script-runtime (kind #22 golden-question runner is script-only; kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
+| 🟡 Detection state exists in DB but no observability surface | 4 | A status column / audit table carries the state; emission deferred (kinds #2, #6, #7, #10) |
+| ❌ No detection yet — phase-gated | 6 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17, #23) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 11/25 closed kinds (44%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / additional follow-ups close.
+**Live coverage: 12/25 closed kinds (48%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / additional follow-ups close. Sum: 12 + 2 + 4 + 6 + 1 = 25 ✓.
 
 ---
 
