@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveTestRunRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  runId: number,
+) {
+  // V1+ MR-3 forty-ninth batch (PR-V1-119): shared testRunId→routed-
+  // conn helper. agsTestRuns.agentId is a direct FK — single
+  // SELECT, then chain into resolveAgentRoutedConn. Falls back to
+  // lookupConn on any null.
+  const runRows = await lookupConn
+    .select({ agentId: agsTestRuns.agentId })
+    .from(agsTestRuns)
+    .where(eq(agsTestRuns.id, runId))
+    .limit(1);
+  const agentId = runRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
 async function resolveCaseRoutedConn(
   lookupConn: ReturnType<typeof db>,
   caseId: number,
@@ -1317,7 +1335,11 @@ export async function updateTestRun(
   runId: number,
   patch: Partial<typeof agsTestRuns.$inferInsert>
 ) {
-  await db().update(agsTestRuns).set(patch).where(eq(agsTestRuns.id, runId));
+  // V1+ MR-3 forty-ninth batch (PR-V1-119): Path B consumer via
+  // resolveTestRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveTestRunRoutedConn(lookupConn, runId);
+  await conn.update(agsTestRuns).set(patch).where(eq(agsTestRuns.id, runId));
 }
 
 export async function recordTestResult(input: {
@@ -1328,7 +1350,11 @@ export async function recordTestResult(input: {
   failureMessage?: string;
   durationMs?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 forty-ninth batch (PR-V1-119): Path B consumer via
+  // resolveTestRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveTestRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsTestRunResults)
     .values({
       runId: input.runId,
