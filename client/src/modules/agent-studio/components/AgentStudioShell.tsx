@@ -366,6 +366,21 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/canvas-projection-events-drain");
       return;
     }
+    // V2 Phase MR-1 Phase-2 (PR-V1-177): region admin sidebar entry.
+    if ((key as string) === "region-admin") {
+      navigate("/agent-studio/region-admin");
+      return;
+    }
+    // V1+ Phase 18 follow-up (PR-V1-177): extensions admin sidebar entry.
+    if ((key as string) === "extensions-admin") {
+      navigate("/agent-studio/extensions-admin");
+      return;
+    }
+    // V1+ Phase 17 closure (PR-V1-177): canvas operator browser entry.
+    if ((key as string) === "canvas-operator") {
+      navigate("/agent-studio/canvas-operator");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
