@@ -35,6 +35,8 @@ import {
   Network,
   ScanSearch,
   Folder,
+  Globe,
+  LayoutGrid,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -78,7 +80,13 @@ export type AgentStudioView =
   // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
   | "vault-saved-views"
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain ──
-  | "canvas-projection-events-drain";
+  | "canvas-projection-events-drain"
+  // ── V2 Phase MR-1 Phase-2 (PR-V1-157): region admin ──
+  | "region-admin"
+  // ── V1+ Phase 18 follow-up (PR-V1-163): extensions admin ──
+  | "extensions-admin"
+  // ── V1+ Phase 17 closure (PR-V1-171): canvas operator browser ──
+  | "canvas-operator";
 
 interface SectionGroup {
   label: string;
@@ -130,15 +138,35 @@ const HOME_GROUPS: SectionGroup[] = [
   },
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain
   // operator observability page. Reaches
-  // /agent-studio/canvas-projection-events-drain.
+  // /agent-studio/canvas-projection-events-drain. Phase 17 closure
+  // (PR-V1-171) adds the canvas operator browser too.
   {
     label: "Canvas",
     items: [
+      {
+        key: "canvas-operator",
+        label: "Operator Browser",
+        icon: LayoutGrid,
+      },
       {
         key: "canvas-projection-events-drain",
         label: "Projection Drain",
         icon: Activity,
       },
+    ],
+  },
+  // ── V1+ Phase 18 follow-up (PR-V1-163): extensions admin ──
+  {
+    label: "Extensions",
+    items: [
+      { key: "extensions-admin", label: "Installed", icon: Plug },
+    ],
+  },
+  // ── V2 Phase MR-1 Phase-2 (PR-V1-157): region admin ──
+  {
+    label: "Multi-region",
+    items: [
+      { key: "region-admin", label: "Region Admin", icon: Globe },
     ],
   },
 ];
