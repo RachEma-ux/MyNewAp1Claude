@@ -151,8 +151,18 @@ export async function setExtensionStatus(
 export async function getExtensionById(
   extensionId: number,
 ): Promise<ExtensionRecord | null> {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 seventy-third batch (PR-V1-143): Path-A read consumer.
+  // agsExtensions.workspaceId is non-null FK; pre-projection pulls
+  // it up, then the full-row SELECT routes via getAsDbForWorkspace.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, extensionId))
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsExtensions)
