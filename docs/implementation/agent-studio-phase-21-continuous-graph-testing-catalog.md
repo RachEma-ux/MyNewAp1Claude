@@ -227,6 +227,7 @@ runtime catches up.
 | `export-eligibility-gate-metadata.test.ts` | `services/export-eligibility` — `EXPORT_ELIGIBILITY_GATE_METADATA` (10-entry per-gate label + description + concern {governance / metadata_completeness / provider_binding / idempotency / runtime_readiness} + operatorFixable boolean) | T-E.4 / #1103 |
 | `canvas-node-kind-metadata.test.ts` | `services/canvas/types` — `CANVAS_NODE_KIND_METADATA` (4-entry per-node-kind label + description + isReference + evaluatesAtRender booleans for note_ref/embedded_query/free_text/image_ref) | T-C.1 / #1104 |
 | `attachment-mime-class-metadata.test.ts` | `services/vault/attachment-library` — `ATTACHMENT_MIME_CLASS_METADATA` (6-entry per-class label + description + previewable + displayBucket {media / documents / other} for image/video/audio/document/archive/other) | T-V.2 / #1105 |
+| `publish-request-state-metadata.test.ts` | `services/retention/lifecycle-state-vocab` — `PUBLISH_REQUEST_STATE_METADATA` (7-entry per-state label + description + outcome {awaiting / accepted / declined / withdrawn / obsolete / terminal_failure} + terminal boolean; mirrors `PUBLISH_REQUEST_TERMINAL_STATES`) | T-L.1 / #1106 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

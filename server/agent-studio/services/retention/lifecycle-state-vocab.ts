@@ -44,6 +44,96 @@ export function isPublishRequestTerminal(state: string): state is PublishRequest
   return PUBLISH_REQUEST_TERMINAL_STATES.has(state as PublishRequestState);
 }
 
+// ============================================================================
+// Per-publish-request-state operator-facing metadata (T-L.1)
+// ============================================================================
+
+export interface PublishRequestStateMetadata {
+  /** Display label rendered in the publish-request ledger UI. */
+  readonly label: string;
+  /** Short operator-facing description of what the state means. */
+  readonly description: string;
+  /** Closed-taxonomy outcome classification:
+   *  - `awaiting`: row is in-flight, still possible to mutate.
+   *  - `accepted`: terminal success — request went through.
+   *  - `declined`: terminal explicit rejection by approver.
+   *  - `withdrawn`: terminal voluntary cancellation by submitter.
+   *  - `obsolete`: terminal, superseded by a newer request.
+   *  - `terminal_failure`: terminal unrecoverable error (e.g.
+   *    `failed_terminal`). */
+  readonly outcome:
+    | "awaiting"
+    | "accepted"
+    | "declined"
+    | "withdrawn"
+    | "obsolete"
+    | "terminal_failure";
+  /** Whether this state is in the terminal set (mirrors the
+   *  PUBLISH_REQUEST_TERMINAL_STATES check — exposed so callers can
+   *  branch on metadata alone without re-importing the set). */
+  readonly terminal: boolean;
+}
+
+export const PUBLISH_REQUEST_STATE_METADATA: Readonly<
+  Record<PublishRequestState, PublishRequestStateMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Publish request is awaiting approval — approvers have not yet acted on the row.",
+    outcome: "awaiting",
+    terminal: false,
+  },
+  approved: {
+    label: "Approved",
+    description:
+      "Approvers accepted the publish request — downstream pusher invocation is gated on this state.",
+    outcome: "accepted",
+    terminal: true,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Approvers explicitly rejected the publish request — submitter sees the rejection reason in the row.",
+    outcome: "declined",
+    terminal: true,
+  },
+  withdrawn: {
+    label: "Withdrawn",
+    description:
+      "Submitter voluntarily cancelled the publish request before approvers acted — row is terminal but not approver-declined.",
+    outcome: "withdrawn",
+    terminal: true,
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "Publish request was cancelled by the system (e.g. workspace deletion, parent-hold release) — terminal without explicit approver action.",
+    outcome: "withdrawn",
+    terminal: true,
+  },
+  superseded: {
+    label: "Superseded",
+    description:
+      "A newer publish request for the same source took precedence — this row is terminal-obsolete.",
+    outcome: "obsolete",
+    terminal: true,
+  },
+  failed_terminal: {
+    label: "Failed (Terminal)",
+    description:
+      "Publish request entered an unrecoverable failure state — operator-actionable diagnostic stored on the row.",
+    outcome: "terminal_failure",
+    terminal: true,
+  },
+};
+
+export function getPublishRequestStateMetadata(
+  state: PublishRequestState,
+): PublishRequestStateMetadata {
+  return PUBLISH_REQUEST_STATE_METADATA[state];
+}
+
 // ── ags_approval_steps ──────────────────────────────────────────────────────
 
 export const APPROVAL_STEP_STATES = [
