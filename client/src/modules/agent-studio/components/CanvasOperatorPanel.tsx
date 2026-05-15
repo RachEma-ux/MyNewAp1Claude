@@ -234,6 +234,33 @@ export function CanvasOperatorPanel({ initialVaultId = 1 }: Props) {
                 No note references on this canvas.
               </p>
             ) : (
+              <>
+                {/* PR-V1-227: distinct-notes gauge. Total references
+                    tells "how many node→note edges"; distinct-notes
+                    tells "how many UNIQUE notes appear". A 10-node
+                    canvas referencing only 3 distinct notes is a
+                    high-duplication shape — useful for operators
+                    auditing canvas hygiene without scanning the
+                    table. */}
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="canvas-note-references-distinct-count"
+                >
+                  {(() => {
+                    const distinctNotes = new Set<number>();
+                    for (const r of refsQ.data) distinctNotes.add(r.noteId);
+                    return (
+                      <>
+                        <span className="font-medium">Distinct notes:</span>{" "}
+                        <span className="font-mono">{distinctNotes.size}</span>{" "}
+                        across{" "}
+                        <span className="font-mono">{refsQ.data.length}</span>{" "}
+                        reference
+                        {refsQ.data.length === 1 ? "" : "s"}
+                      </>
+                    );
+                  })()}
+                </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
@@ -252,6 +279,7 @@ export function CanvasOperatorPanel({ initialVaultId = 1 }: Props) {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </CardContent>
         </Card>
