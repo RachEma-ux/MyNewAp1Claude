@@ -163,3 +163,69 @@ export function assembleRecommendationResponse(
     fullyHiddenCount,
   };
 }
+
+// ============================================================================
+// Candidate-list summary (T-G.18)
+// ============================================================================
+
+export interface RecommendationCandidateListSummary {
+  readonly totalCandidates: number;
+  readonly belowConfidenceFloor: number;
+  readonly aboveConfidenceFloor: number;
+  readonly visible: number;
+  readonly redacted: number;
+  readonly fullyHidden: number;
+  /** Mean / min / max confidence across ALL candidates (visible or
+   *  not). `null` for empty input. Useful for "is the model
+   *  generating low-quality candidates regardless of permission?"
+   *  diagnostics. */
+  readonly meanConfidence: number | null;
+  readonly minConfidence: number | null;
+  readonly maxConfidence: number | null;
+}
+
+/**
+ * Pre-assemble diagnostic: summarizes the raw candidate list BEFORE
+ * `assembleRecommendationResponse` filters, sorts, and truncates. Use
+ * this to monitor the recommendation runtime's upstream quality
+ * separately from the dashboard-facing post-assembly summary.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeRecommendationCandidates(
+  candidates: ReadonlyArray<RecommendationCandidate>,
+  minConfidence: number,
+): RecommendationCandidateListSummary {
+  let visible = 0;
+  let redacted = 0;
+  let fullyHidden = 0;
+  let belowFloor = 0;
+  let sum = 0;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const c of candidates) {
+    sum += c.confidence;
+    if (c.confidence < min) min = c.confidence;
+    if (c.confidence > max) max = c.confidence;
+    if (c.confidence < minConfidence) {
+      belowFloor += 1;
+      continue;
+    }
+    if (c.permissionStatus === "visible") visible += 1;
+    else if (c.permissionStatus === "redacted") redacted += 1;
+    else fullyHidden += 1;
+  }
+  const aboveFloor = candidates.length - belowFloor;
+  const total = candidates.length;
+  return {
+    totalCandidates: total,
+    belowConfidenceFloor: belowFloor,
+    aboveConfidenceFloor: aboveFloor,
+    visible,
+    redacted,
+    fullyHidden,
+    meanConfidence: total > 0 ? sum / total : null,
+    minConfidence: total > 0 ? min : null,
+    maxConfidence: total > 0 ? max : null,
+  };
+}

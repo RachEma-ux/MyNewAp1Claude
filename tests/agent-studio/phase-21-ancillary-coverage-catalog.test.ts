@@ -67,6 +67,7 @@ const ANCILLARY_TESTS = [
   "failure-state-event-list-summary.test.ts",
   "quality-finding-list-summary.test.ts",
   "extract-failure-state-annotations.test.ts",
+  "recommendation-candidate-list-summary.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
