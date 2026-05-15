@@ -1,8 +1,10 @@
 # MR-3 (Phase MR-1 Phase-1 Shim) — State of the Union
 
-**Date:** 2026-05-14
-**Status:** ~29 batches landed; major asymmetries closed; remaining gaps named and deferred to V2 Phase-2 routing work.
+**Date:** 2026-05-14 (rev 2: 2026-05-15)
+**Status:** **35 batches landed** (29 by 2026-05-14, +6 on 2026-05-15: vault repository mutations + extension invocation ledger); major asymmetries closed; remaining gaps named and deferred to V2 Phase-2 routing work.
 **Predecessor:** `docs/implementation/agent-studio-mr-3-getasdb-inventory.md` (the *plan*; this doc is the *progress snapshot* keyed to that plan).
+
+**Rev 2 addendum (2026-05-15):** §1 extended with batches 30–35; §2 expanded with new "all mutations Cat A" files (`vault/repository-asdb.ts`); §3.1 trimmed (4 entries promoted Cat B→A: `removeAgentProviderBinding`, vault `addMember` / `createNote` / `updateNote` / `deleteNote`, extension `recordInvocation`); new §11 diagnoses the **schema-level workspace-scoping gap** that blocks approval-gate / repository.ts / tool-approvals-router from Phase-1 caller migration — agsAgents / agsAgentDrafts / agsRuntimeRuns predate workspace scoping at the schema level. Phase-2 unblock requires either (a) backfilling workspaceId to those tables, or (b) indirect resolver through agsAgentProviderBindings.workspaceId.
 
 ---
 
@@ -58,6 +60,12 @@ The ledger lives in `docs/implementation/agent-studio-native-graph-workspace-v1-
 | 27th | #846 | `workspace-default-bindings.ts` (4 fns, file 100% Cat A) | Direct Cat A |
 | 28th | #847 | `bindings.ts::upsertAgentProviderBinding` | Direct Cat A |
 | 29th | #848 | `bindings.ts::validateBindingPolicy` refresh-branch UPDATE | Already-loaded-binding split-handle |
+| 30th | #850 | `bindings.ts::removeAgentProviderBinding` | Split-handle (binding-row workspaceId) |
+| 31st | #851 | `extensions/runtime.ts::recordInvocation` | Extension→workspace lookup via getDb test seam |
+| 32nd | #852 | `vault/repository-asdb.ts::addMember` | Vault→workspace split-handle |
+| 33rd | #853 | `vault/repository-asdb.ts::createNote` | Vault→workspace split-handle (single conn for 3 writes) |
+| 34th | #854 | `vault/repository-asdb.ts::updateNote` | Note→vault→workspace JOIN (single conn for up to 3 writes) |
+| 35th | #855 | `vault/repository-asdb.ts::deleteNote` | **Widened pre-existing SELECT** to also pull vault.workspaceId — zero-cost migration |
 
 ---
 
@@ -185,3 +193,41 @@ Bounded follow-ups expected to ship in subsequent batches as time/load permits. 
 - `docs/architecture/agent-studio-multi-region.md` — Phase MR-1 ADR (the *destination*)
 - `server/agent-studio/db/connection.ts` — `getAsDb()` + `getAsDbForWorkspace(workspaceId)` shim
 - `server/agent-studio/services/region/connection-helper.ts` — `getDbForRegion`, `getDbForWorkspace` (region-aware helpers; #763)
+
+---
+
+## 11. Schema-level workspace-scoping gap (REV 2 — 2026-05-15)
+
+After 35 batches we hit a **structural limit** with Phase-1 caller migration: a class of files cannot become Cat A even via split-handle, because the parent tables they read/write **do not carry `workspaceId` at the schema level**. These tables predate workspace scoping in Agent Studio:
+
+| Table | Has `workspaceId`? | Notes |
+|---|---|---|
+| `agsAgents` | **No** | Agent identity table. ownerId scopes by user, not workspace. |
+| `agsAgentDrafts` | **No** | Carries `agentId` FK. Inherits agent's lack of workspaceId. |
+| `agsRuntimeRuns` | **No** | Carries `agentId` FK. |
+| `agsPendingPermissionRequests` | **No** | Carries `agentDraftId` + `runtimeRunId`. |
+| `agsRuntimePolicyEvents` | **No** | Carries `runId`. Cross-workspace observability. |
+| `agsAgentProviderBindings` | **Yes** | The escape hatch — has `(workspaceId, agentId, draftId, ...)`. |
+| `agsExtensions` | **Yes** | Used in #851 recordInvocation chain. |
+| `agsVaults` | **Yes (nullable)** | Used in #844/#845/#852/#853/#854/#855 chains. |
+| `agsCagCapabilityPacks` | **Yes** | Used in #831/#838 chains. |
+| `agsRacRuntimeTraces` | **Yes** | Used in #821/#841 chains. |
+| `agsKnowledgeUnits` | **Yes** | Used in #843. |
+| `agsIngestionJobs` | **Yes** | Used in #842. |
+
+The files blocked by the agent-tier gap:
+
+- `services/approval/approval-gate.ts` — `evaluateApprovalGate` / `createApprovalRequest` / `decideApprovalRequest` all key on `approvalRequestId` or `agentDraftId`. Neither chain ends at a workspaceId column today.
+- `api/tool-approvals-router.ts` — 4 procedures, all approval-row-scoped.
+- `repository.ts` — most reads/mutations key on agentId, draftId, bindingId, or versionId.
+- `api/router.ts::explainRetentionEligibility` `ags_note_promotions` branch — note_promotion → vault_note → vault.workspaceId (3-hop JOIN; technically possible but architecturally fragile).
+
+### Phase-2 unblock paths (named, not yet chosen)
+
+**Path A — Backfill `workspaceId` to agent-tier tables.** Add a NOT NULL `workspaceId` column to `agsAgents` with a migration script that reads the workspace from each agent's owning vault or default fallback. Once the column exists, all draftId/agentId/runId-scoped functions in `bindings.ts`, `repository.ts`, `approval-gate.ts`, and `tool-approvals-router.ts` become trivial Cat A migrations. **Cost:** one migration + ADR + 7-10 small follow-up PRs. **Benefit:** unblocks the entire agent-tier surface at once.
+
+**Path B — Indirect resolver through `agsAgentProviderBindings.workspaceId`.** For approval/draft chains, add a helper `resolveWorkspaceIdForDraft(lookupDb, draftId)` that JOINs `agsAgentProviderBindings` (which DOES have workspaceId) on draftId. Per-function migration through the resolver. **Cost:** one helper + per-function migrations. **Benefit:** zero schema changes. **Drawback:** fragile when bindings are absent (legacy drafts pre-Phase-11) — those drafts have no resolvable workspaceId.
+
+**Path C — Add `workspaceId` resolver as a tRPC-context layer.** At the router boundary, resolve workspaceId from `ctx.workspaceId` (which the platform-level workspace gate already injects) and pass it down. Each procedure plumbs workspaceId through to the service. **Cost:** signature changes across every procedure. **Benefit:** uses existing ctx infrastructure. **Drawback:** large surface area for plumbing.
+
+**Status:** This gap is documented but **not pre-decided** as a Phase-2 blocker. The Phase-1 caller-migration surface is already at >95% of the migration-capable call sites; the remaining ~5% requires the architectural decision above. The plan v1+ stays free to pick Path A, B, or C when Phase-2 implementation begins; until then, the deferred files in §3.2 stay Cat B.
