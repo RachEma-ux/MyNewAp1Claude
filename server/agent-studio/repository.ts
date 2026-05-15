@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveSimulationRunRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  runId: number,
+) {
+  // V1+ MR-3 fiftieth batch (PR-V1-120): shared simulationRunId→
+  // routed-conn helper. agsSimulationRuns.agentId is a direct FK —
+  // single SELECT, then chain into resolveAgentRoutedConn. Falls
+  // back to lookupConn on any null.
+  const runRows = await lookupConn
+    .select({ agentId: agsSimulationRuns.agentId })
+    .from(agsSimulationRuns)
+    .where(eq(agsSimulationRuns.id, runId))
+    .limit(1);
+  const agentId = runRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
 async function resolveTestRunRoutedConn(
   lookupConn: ReturnType<typeof db>,
   runId: number,
@@ -1119,7 +1137,14 @@ export async function updateSimulationRun(
   runId: number,
   patch: Partial<typeof agsSimulationRuns.$inferInsert>
 ) {
-  await db().update(agsSimulationRuns).set(patch).where(eq(agsSimulationRuns.id, runId));
+  // V1+ MR-3 fiftieth batch (PR-V1-120): Path B consumer via
+  // resolveSimulationRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveSimulationRunRoutedConn(lookupConn, runId);
+  await conn
+    .update(agsSimulationRuns)
+    .set(patch)
+    .where(eq(agsSimulationRuns.id, runId));
 }
 
 export async function getSimulationRun(runId: number) {
@@ -1150,7 +1175,11 @@ export async function appendSimulationStep(input: {
   verdict?: string;
   durationMs?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fiftieth batch (PR-V1-120): Path B consumer via
+  // resolveSimulationRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveSimulationRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsSimulationRunSteps)
     .values({
       runId: input.runId,
