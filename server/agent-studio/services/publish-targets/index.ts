@@ -25,12 +25,15 @@ export {
   getPublishTargetTypeMetadata,
   PUBLISH_EXECUTION_STATUS_METADATA,
   getPublishExecutionStatusMetadata,
+  GOVERNANCE_DECISION_METADATA,
+  getGovernanceDecisionMetadata,
   isPublishTargetType,
   isGovernanceDecision,
 } from "./types.js";
 export type {
   PublishTargetTypeMetadata,
   PublishExecutionStatusMetadata,
+  GovernanceDecisionMetadata,
 } from "./types.js";
 
 export {
