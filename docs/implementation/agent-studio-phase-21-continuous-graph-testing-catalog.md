@@ -234,6 +234,7 @@ runtime catches up.
 | `extension-capability-lane-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_CAPABILITY_LANE_METADATA` (4-entry per-lane label + description + invokesTools + pipelineOrder 1..4 for retrieve/assemble/compose/tool) | T-X.2 / #1110 |
 | `extension-capability-check-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_CAPABILITY_CHECK_METADATA` (4-entry per-check label + description + proceeds + denialReason {null / manifest_mismatch / governance_revoked / operator_disabled}) | T-X.3 / #1111 |
 | `graph-health-alert-key-metadata.test.ts` | `services/graph/health-alert` — `GRAPH_HEALTH_ALERT_KEY_METADATA` (3-entry per-key label + description + defaultSeverity + recoverable boolean for graph_health_latency_high/graph_health_degraded/graph_health_unavailable) | T-H.1 / #1112 |
+| `realtime-doc-frame-type-metadata.test.ts` | `services/vault/realtime-doc-framing` — `REALTIME_DOC_FRAME_TYPE_METADATA` (3-entry per-frame-type label + description + recognized + wireCodepoint for sync/awareness/unknown) | T-B.2 / #1113 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

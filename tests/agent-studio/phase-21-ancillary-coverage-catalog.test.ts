@@ -121,6 +121,7 @@ const ANCILLARY_TESTS = [
   "extension-capability-lane-metadata.test.ts",
   "extension-capability-check-metadata.test.ts",
   "graph-health-alert-key-metadata.test.ts",
+  "realtime-doc-frame-type-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
