@@ -12,7 +12,7 @@
  * its own data fetch, mounted by a slim wrapper page.
  */
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,6 +60,12 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
   const utils = trpc.useUtils();
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [actorUserId, setActorUserId] = useState<string>("");
+  // PR-V1-203: per-row config drill-down. `config` is already on
+  // `ExtensionRecord` (returned by `listExtensionsByWorkspace`) so
+  // no extra fetch is needed — just toggle inline expansion.
+  const [expandedConfigId, setExpandedConfigId] = useState<number | null>(
+    null,
+  );
 
   function refreshList() {
     void utils.agentStudio.extensions.list.invalidate({ workspaceId });
@@ -220,8 +226,10 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                 <tbody>
                   {listQ.data.map((ext) => {
                     const s = summaryByExtId.get(ext.id);
+                    const isConfigExpanded = expandedConfigId === ext.id;
                     return (
-                    <tr key={ext.id} className="border-t">
+                    <React.Fragment key={ext.id}>
+                    <tr className="border-t">
                       <td className="py-1 pr-3 font-mono text-xs">
                         {ext.extensionKey}
                       </td>
@@ -366,8 +374,33 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                         >
                           uninstall
                         </button>
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          data-testid={`extension-row-config-toggle-${ext.id}`}
+                          onClick={() =>
+                            setExpandedConfigId(
+                              isConfigExpanded ? null : ext.id,
+                            )
+                          }
+                        >
+                          {isConfigExpanded ? "hide config" : "view config"}
+                        </button>
                       </td>
                     </tr>
+                    {isConfigExpanded ? (
+                      <tr
+                        className="bg-muted/30"
+                        data-testid={`extension-row-config-row-${ext.id}`}
+                      >
+                        <td colSpan={11} className="p-2">
+                          <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                            {JSON.stringify(ext.config ?? {}, null, 2)}
+                          </pre>
+                        </td>
+                      </tr>
+                    ) : null}
+                    </React.Fragment>
                     );
                   })}
                 </tbody>
