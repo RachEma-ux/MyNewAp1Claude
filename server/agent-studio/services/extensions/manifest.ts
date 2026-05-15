@@ -53,6 +53,9 @@ function rowToExtension(r: Record<string, unknown>): ExtensionRecord {
     installedAt: r.installedAt as Date,
     approvedAt: (r.approvedAt as Date | null) ?? null,
     disabledAt: (r.disabledAt as Date | null) ?? null,
+    installedByUserId: (r.installedByUserId as number | null) ?? null,
+    approvedByUserId: (r.approvedByUserId as number | null) ?? null,
+    disabledByUserId: (r.disabledByUserId as number | null) ?? null,
   };
 }
 

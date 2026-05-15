@@ -97,6 +97,16 @@ export interface ExtensionRecord {
   readonly installedAt: Date;
   readonly approvedAt: Date | null;
   readonly disabledAt: Date | null;
+  /**
+   * PR-V1-195: actor-audit fields. Already written by
+   * `installExtension` / `approveExtension` / `setExtensionStatus`
+   * but were not exposed on the read shape. Surfacing them here so
+   * the admin panel can render "who installed / approved / disabled
+   * this" without an extra fetch.
+   */
+  readonly installedByUserId: number | null;
+  readonly approvedByUserId: number | null;
+  readonly disabledByUserId: number | null;
 }
 
 export interface InstallExtensionInput {
