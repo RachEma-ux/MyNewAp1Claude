@@ -58,6 +58,10 @@ export {
   DEFAULT_ISOLATED_COMPONENT_THRESHOLD,
   type ScanForIsolatedSubgraphsOptions,
 } from "./scanners/isolated-subgraph-scanner.js";
+export {
+  scanForMissingSourceVersion,
+  missingSourceVersionScanner,
+} from "./scanners/missing-source-version-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -177,6 +181,7 @@ import { danglingEdgeEndpointScanner } from "./scanners/dangling-edge-endpoint-s
 import { parallelEdgesScanner } from "./scanners/parallel-edges-scanner.js";
 import { excessiveFanoutScanner } from "./scanners/excessive-fanout-scanner.js";
 import { isolatedSubgraphScanner } from "./scanners/isolated-subgraph-scanner.js";
+import { missingSourceVersionScanner } from "./scanners/missing-source-version-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -194,4 +199,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   parallelEdgesScanner,
   excessiveFanoutScanner,
   isolatedSubgraphScanner,
+  missingSourceVersionScanner,
 ];
