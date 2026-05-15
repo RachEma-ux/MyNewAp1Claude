@@ -97,6 +97,7 @@ const ANCILLARY_TESTS = [
   "graph-algorithm-kind-metadata.test.ts",
   "institutional-memory-skip-reason-metadata.test.ts",
   "graph-algorithm-preflight-decision-metadata.test.ts",
+  "impact-path-validation-reason-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
