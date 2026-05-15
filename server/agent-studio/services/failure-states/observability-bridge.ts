@@ -28,6 +28,7 @@ import {
 } from "./contracts.js";
 import {
   recordErrorEvent,
+  recordErrorEvents,
   type RecordErrorEventInput,
   type ErrorEventRow,
   type ServiceOptions,
@@ -75,17 +76,16 @@ export interface RecordFailureStateEventInput {
 }
 
 /**
- * Records a failure-state event through the canonical observability
- * recorder. Returns the recorded row, or `null` when ASDB is null
- * (fail-soft contract — observability never throws into an
- * already-failing flow).
+ * Internal helper — applies the bridge encoding to one
+ * `RecordFailureStateEventInput`, producing the underlying recorder's
+ * input shape. Extracted so the singular + batch helpers share the
+ * encoding logic verbatim.
  */
-export async function recordFailureStateEvent(
+function encodeForRecorder(
   input: RecordFailureStateEventInput,
-  options: ServiceOptions = {},
-): Promise<ErrorEventRow | null> {
+): RecordErrorEventInput {
   const meta = FAILURE_STATE_METADATA[input.failureState];
-  const recorderInput: RecordErrorEventInput = {
+  return {
     sourceKind: input.sourceKind,
     sourceId: input.sourceId ?? null,
     userId: input.userId ?? null,
@@ -100,5 +100,36 @@ export async function recordFailureStateEvent(
       failureStateRecoverable: meta.recoverable,
     },
   };
-  return recordErrorEvent(recorderInput, options);
+}
+
+/**
+ * Records a failure-state event through the canonical observability
+ * recorder. Returns the recorded row, or `null` when ASDB is null
+ * (fail-soft contract — observability never throws into an
+ * already-failing flow).
+ */
+export async function recordFailureStateEvent(
+  input: RecordFailureStateEventInput,
+  options: ServiceOptions = {},
+): Promise<ErrorEventRow | null> {
+  return recordErrorEvent(encodeForRecorder(input), options);
+}
+
+/**
+ * Bulk-emit failure-state events through the canonical batch recorder.
+ * Use this when one operation produces multiple emissions (e.g. a
+ * multi-finding scan, a multi-tool MCP schema diff, a fan-out worker
+ * with multiple per-child failures). Empty-array short-circuits
+ * BEFORE the ASDB probe (canonical observability contract).
+ *
+ * Each input is encoded individually — the per-emission
+ * `severityOverride` is preserved, so callers can mix severities in
+ * one batch.
+ */
+export async function recordFailureStateEvents(
+  inputs: ReadonlyArray<RecordFailureStateEventInput>,
+  options: ServiceOptions = {},
+): Promise<readonly ErrorEventRow[]> {
+  if (inputs.length === 0) return [];
+  return recordErrorEvents(inputs.map(encodeForRecorder), options);
 }
