@@ -34,6 +34,78 @@ export function isExtensionGovernanceStatus(
   );
 }
 
+// ============================================================================
+// Per-governance-status operator-facing metadata (T-X.1)
+// ============================================================================
+
+export interface ExtensionGovernanceStatusMetadata {
+  /** Display label rendered in the extension registry UI. */
+  readonly label: string;
+  /** Short operator-facing description of what the status means. */
+  readonly description: string;
+  /** Whether the extension can be invoked (capability-pinned dispatch
+   *  proceeds) — only `approved` extensions can invoke. */
+  readonly invocable: boolean;
+  /** Closed-taxonomy active/inactive classification:
+   *  - `awaiting_decision`: operator hasn't acted yet
+   *    (`pending_approval`).
+   *  - `active`: extension is approved + enabled.
+   *  - `dormant`: extension is approved but operator-disabled or
+   *    pre-rejected — recoverable.
+   *  - `revoked`: extension is hard-rejected by governance — terminal. */
+  readonly lifecycle:
+    | "awaiting_decision"
+    | "active"
+    | "dormant"
+    | "revoked";
+}
+
+export const EXTENSION_GOVERNANCE_STATUS_METADATA: Readonly<
+  Record<ExtensionGovernanceStatus, ExtensionGovernanceStatusMetadata>
+> = {
+  pending_approval: {
+    label: "Pending Approval",
+    description:
+      "Extension install request is awaiting operator approval — manifest is parked; no capabilities are active.",
+    invocable: false,
+    lifecycle: "awaiting_decision",
+  },
+  approved: {
+    label: "Approved",
+    description:
+      "Extension is approved and active — declared capabilities reach the RACT lane hooks; tool dispatches proceed.",
+    invocable: true,
+    lifecycle: "active",
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Operator explicitly rejected the install request — extension remains dormant; manifest preserved for audit.",
+    invocable: false,
+    lifecycle: "dormant",
+  },
+  disabled: {
+    label: "Disabled",
+    description:
+      "Approved extension has been temporarily disabled by an operator — capabilities are inactive but the row preserves state for re-enable.",
+    invocable: false,
+    lifecycle: "dormant",
+  },
+  revoked: {
+    label: "Revoked",
+    description:
+      "Approved extension has been hard-revoked by governance — terminal; the extension key cannot be re-approved without a new manifest.",
+    invocable: false,
+    lifecycle: "revoked",
+  },
+};
+
+export function getExtensionGovernanceStatusMetadata(
+  status: ExtensionGovernanceStatus,
+): ExtensionGovernanceStatusMetadata {
+  return EXTENSION_GOVERNANCE_STATUS_METADATA[status];
+}
+
 export const EXTENSION_CAPABILITY_LANES = [
   "retrieve",
   "assemble",
