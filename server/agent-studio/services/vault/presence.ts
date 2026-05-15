@@ -30,10 +30,36 @@
 
 import { and, eq, lt, sql } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
   agsVaultNotePresence,
+  agsVaultNotes,
+  agsVaults,
 } from "../../../../drizzle/tables/agent-studio-vault.js";
+
+/**
+ * V1+ MR-3 sixty-second batch (PR-V1-132): module-local Path-A
+ * discovering helper. agsVaultNotePresence rows are keyed by noteId;
+ * we walk noteId → agsVaultNotes.vaultId → agsVaults.workspaceId in a
+ * single two-table JOIN and return the workspace-routed handle.
+ * Falls back to the bootstrap lookup handle when the chain has any
+ * NULL link (missing note / missing vault / vault.workspaceId IS
+ * NULL — legacy pre-Phase-1 data).
+ */
+async function resolveNoteRoutedConn(
+  lookupDb: NonNullable<ReturnType<typeof getAsDb>>,
+  noteId: number,
+) {
+  const lookup = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaultNotes)
+    .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+    .where(eq(agsVaultNotes.id, noteId))
+    .limit(1);
+  const workspaceId = lookup[0]?.workspaceId;
+  if (workspaceId == null) return lookupDb;
+  return getAsDbForWorkspace(workspaceId) ?? lookupDb;
+}
 
 /**
  * Idle TTL for a presence row. After this many ms without a
@@ -78,8 +104,13 @@ function rowToPresence(r: Record<string, unknown>): PresenceRow {
 export async function enterPresence(
   input: EnterPresenceInput,
 ): Promise<PresenceRow | null> {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 sixty-second batch (PR-V1-132): Path-A consumer.
+  // resolveNoteRoutedConn walks noteId → workspaceId once at top;
+  // SELECT + UPDATE / INSERT all share the same routed handle to
+  // preserve atomicity.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const db = await resolveNoteRoutedConn(lookupDb, input.noteId);
   const now = new Date();
   // Check for existing session.
   const existing = await db
@@ -131,8 +162,11 @@ export async function heartbeat(input: {
   readonly sessionToken: string;
   readonly cursorState?: Record<string, unknown>;
 }): Promise<void> {
-  const db = getAsDb();
-  if (!db) return;
+  // V1+ MR-3 sixty-second batch (PR-V1-132): Path-A consumer via
+  // resolveNoteRoutedConn (noteId→vault→workspaceId).
+  const lookupDb = getAsDb();
+  if (!lookupDb) return;
+  const db = await resolveNoteRoutedConn(lookupDb, input.noteId);
   const patch: Record<string, unknown> = { lastActiveAt: new Date() };
   if (input.cursorState !== undefined) patch.cursorState = input.cursorState;
   await db
@@ -152,8 +186,11 @@ export async function leavePresence(input: {
   readonly userId: number;
   readonly sessionToken: string;
 }): Promise<void> {
-  const db = getAsDb();
-  if (!db) return;
+  // V1+ MR-3 sixty-second batch (PR-V1-132): Path-A consumer via
+  // resolveNoteRoutedConn (noteId→vault→workspaceId).
+  const lookupDb = getAsDb();
+  if (!lookupDb) return;
+  const db = await resolveNoteRoutedConn(lookupDb, input.noteId);
   await db
     .delete(agsVaultNotePresence)
     .where(
