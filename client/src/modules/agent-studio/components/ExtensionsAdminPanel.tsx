@@ -240,6 +240,42 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
               })()}
             </p>
           ) : null}
+          {/* PR-V1-222: never-invoked count using the existing
+              workspaceInvocationSummaries join — symmetric with
+              publish-targets never-published (#972). An approved
+              extension that has never been invoked is either
+              misconfigured, capability-gated out at every call site,
+              or freshly installed. Amber when > 0 to flag
+              investigation without screaming destructive-red. */}
+          {listQ.data && listQ.data.length > 0 && summariesQ.data ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="extensions-never-invoked-count"
+            >
+              {(() => {
+                let neverInvoked = 0;
+                for (const ext of listQ.data) {
+                  const s = summaryByExtId.get(ext.id);
+                  if (!s || s.totalInvocations === 0) neverInvoked += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Never invoked:</span>{" "}
+                    <span
+                      className={
+                        neverInvoked > 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : ""
+                      }
+                    >
+                      <span className="font-mono">{neverInvoked}</span> of{" "}
+                      <span className="font-mono">{listQ.data.length}</span>
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {/* PR-V1-217: per-lane breakdown — how many extensions
               registered for each EXTENSION_CAPABILITY_LANES bucket.
               An extension can hook multiple lanes, so the per-lane
