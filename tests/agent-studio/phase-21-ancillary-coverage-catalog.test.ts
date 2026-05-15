@@ -52,6 +52,7 @@ const ANCILLARY_TESTS = [
   "phase-22-burst-summary-coverage.test.ts",
   "phase-23-runbook-coverage.test.ts",
   "roadmap-phase-22-acceptance-coverage.test.ts",
+  "scanner-metadata-coverage.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

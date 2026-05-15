@@ -201,3 +201,13 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   isolatedSubgraphScanner,
   missingSourceVersionScanner,
 ];
+
+export {
+  QUALITY_SCANNER_METADATA,
+  getScannerMetadata,
+  listScannerMetadata,
+} from "./scanner-metadata.js";
+export type {
+  QualityScannerCategory,
+  QualityScannerMetadata,
+} from "./scanner-metadata.js";
