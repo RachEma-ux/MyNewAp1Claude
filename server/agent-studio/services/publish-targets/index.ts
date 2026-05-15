@@ -23,10 +23,15 @@ export {
   GOVERNANCE_DECISIONS,
   PUBLISH_TARGET_TYPE_METADATA,
   getPublishTargetTypeMetadata,
+  PUBLISH_EXECUTION_STATUS_METADATA,
+  getPublishExecutionStatusMetadata,
   isPublishTargetType,
   isGovernanceDecision,
 } from "./types.js";
-export type { PublishTargetTypeMetadata } from "./types.js";
+export type {
+  PublishTargetTypeMetadata,
+  PublishExecutionStatusMetadata,
+} from "./types.js";
 
 export {
   registerPublishPusher,
