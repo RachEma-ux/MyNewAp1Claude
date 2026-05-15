@@ -57,7 +57,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 22 | `golden_question_failed` | agent | ⚠️ | `runLiveEvaluation` invoked from a script, not server runtime — no obvious server-side emit point | Future wiring requires moving the evaluator into server runtime first |
 | 23 | `graph_correction_rejected` | governance | ❌ | No reject path exists in `services/graph-quality/` — only approve + dismiss | Phase-gated on graph-quality reject runtime |
 | 24 | `semantic_enrichment_rejected` | governance | 🔒 | Semantic enrichment agent does not exist yet | Gated on T-D.3 (semantic enrichment agent runtime) |
-| 25 | `background_job_failed` | runtime | ⚠️ | `background-jobs.ts:868,954` writes free-form `errorClass: "BackgroundJobFailed"` — locked by 20+ test/dashboard assertions | Additive wrapper (not retag) would double-emit — defer until dashboard query migration |
+| 25 | `background_job_failed` | runtime | ⚠️ | `background-jobs.ts:868,954` writes free-form `errorClass: "BackgroundJobFailed"` — locked by 20+ test/dashboard assertions | **Sibling-emit attempt found a stronger blocker** — 3 pre-existing tests pin EXACTLY 1 row written / 1 spy call per failed job. A second `recordFailureStateEvent` call breaks those tests. Closing this kind requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice (T-I.13.b future) AFTER operator dashboard query migration completes. See lesson 22 in `project_v1_plus_session_2026_05_15.md`. |
 
 ---
 
