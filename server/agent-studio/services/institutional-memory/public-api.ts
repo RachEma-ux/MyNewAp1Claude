@@ -24,9 +24,12 @@ export {
   isInstitutionalMemoryMappable,
   summarizeInstitutionalMemoryProjectionResult,
   INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS,
+  INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASON_METADATA,
+  getInstitutionalMemoryProjectionSkipReasonMetadata,
   type ProjectedInstitutionalMemoryNode,
   type InstitutionalMemoryProjectionSkipReason,
   type ProjectInstitutionalMemoryNodeOutcome,
   type ProjectInstitutionalMemoryNodesResult,
   type InstitutionalMemoryProjectionResultSummary,
+  type InstitutionalMemoryProjectionSkipReasonMetadata,
 } from "./project-node.js";

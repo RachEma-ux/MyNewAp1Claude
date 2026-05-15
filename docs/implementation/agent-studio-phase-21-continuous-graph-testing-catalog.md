@@ -208,6 +208,7 @@ runtime catches up.
 | `security-finding-severity-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_FINDING_SEVERITY_METADATA` (5-entry per-severity label + description + cvssRange + operatorAction {informational/monitor/schedule_patch/patch_soon/patch_now}) | T-G.29 / #1084 |
 | `code-graph-edge-type-metadata.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `CODE_GRAPH_EDGE_TYPE_METADATA` (10-entry per-edge-type label + description for imports/calls/declares/implements/depends_on/reads_from_table/writes_to_table/routes_to/renders_component/tests) | T-G.30 / #1085 |
 | `graph-algorithm-kind-metadata.test.ts` | `services/graph-algorithm/contracts` — `GRAPH_ALGORITHM_KIND_METADATA` (8-entry per-algorithm label + operatorIntent + closed-taxonomy `category` UI grouping over centrality/community/similarity/path_analysis/impact_analysis) | T-G.31 / #1086 |
+| `institutional-memory-skip-reason-metadata.test.ts` | `services/institutional-memory/project-node` — `INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASON_METADATA` (4-entry per-reason label + description + remediation + classification {taxonomy_gap / source_row_defect / source_schema_drift}) | T-G.32 / #1087 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

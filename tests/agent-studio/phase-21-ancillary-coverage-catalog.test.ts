@@ -95,6 +95,7 @@ const ANCILLARY_TESTS = [
   "security-finding-severity-metadata.test.ts",
   "code-graph-edge-type-metadata.test.ts",
   "graph-algorithm-kind-metadata.test.ts",
+  "institutional-memory-skip-reason-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
