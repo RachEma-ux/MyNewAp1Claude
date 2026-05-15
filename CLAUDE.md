@@ -101,17 +101,23 @@ Hard rules:
 - Cypher templates must be parameterized; no raw query strings outside `ags_query_templates` registry.
 - Read-only Text2Cypher; mutations forbidden.
 
-Out of scope for MVP 0–4:
+Out of scope for MVP 0–4 (eternal — boundary preserved even after V1+ shipments):
 - `kgra/` Python sidecar at repo root
 - `server/kgra-agent/` internal changes
 - `server/data-analysis/` internal changes
 - Full Canvas / full Bases / plugin framework
-- Real-time collaborative editing / CRDT
-- Offline sync / local-first mode
 - Neo4j Enterprise / Aura migration (Phase 27 documents the upgrade path)
-- Multi-region graph deployment
 
-ADR index: `docs/architecture/agent-studio-native-graph-workspace.md` (top-level), `agent-studio-postgres-neo4j-responsibility-split.md`, `agent-studio-graph-agent-integration-boundaries.md`, `agent-studio-graph-repository-and-backend-strategy.md`, `agent-studio-active-graph-backend-decision.md` (Phase 1.5 closure).
+**V1+ plan scope — first slices shipped 2026-05-13, full hardening in V2.0** (formerly listed as eternal MVP-0-4 deferrals; reclassified 2026-05-15 because the V1+ plan opened these phases and the strict-audit doc names the reclassification trigger):
+- Real-time collaborative editing / CRDT — V1+ plan Phase CRDT (`docs/architecture/agent-studio-realtime-collab-crdt.md`). Phases α/β/γ/γ-2/γ-3-auth/γ-3-upgrade/γ-3-framing/transport landed (#755/#764/#765/#774/#787-#791); full hardening (y-protocols framing, presence persistence, conflict UX) tracked in `agent-studio-native-graph-workspace-remaining-execution-plan.md` track T-B.
+- Offline sync / local-first mode — V1+ plan Phase OL-1 (`docs/architecture/agent-studio-offline-local-first.md`). Phases α through OL-9 landed (#756/#762/#773/#777–#781/#783/#785); operator rollout (App.tsx call site with real tRPC closures) tracked in remaining-plan T-B.
+- Multi-region graph deployment — V1+ plan Phase MR-1 (`docs/architecture/agent-studio-multi-region.md`). Phases α through MR×19 + caller-migration batches landed (#754/#763/#775/#794/#797/#798/…); production rollout (Aurora-style replication, failover runbook execution) tracked in remaining-plan T-H.2.
+
+The strategic intent of the original MVP-0-4 Non-Build List was to prevent over-scoping the *initial closure* — not to forbid those features in the V1+ successor plan. The V1+ plan and the remaining execution plan are the authoritative scope documents for these three areas going forward.
+
+ADR index: `docs/architecture/agent-studio-native-graph-workspace.md` (top-level), `agent-studio-postgres-neo4j-responsibility-split.md`, `agent-studio-graph-agent-integration-boundaries.md`, `agent-studio-graph-repository-and-backend-strategy.md`, `agent-studio-active-graph-backend-decision.md` (Phase 1.5 closure), `agent-studio-realtime-collab-crdt.md`, `agent-studio-offline-local-first.md`, `agent-studio-multi-region.md`.
+
+Execution plan index: `docs/implementation/agent-studio-native-graph-workspace-roadmap.md` (canonical 28-phase), `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` (active V1+ 10-phase), `agent-studio-native-graph-workspace-remaining-execution-plan.md` (forward T-A..T-H tracks).
 
 ---
 
