@@ -46,6 +46,44 @@ export function isSavedViewVisibility(s: unknown): s is SavedViewVisibility {
   );
 }
 
+// ============================================================================
+// Per-visibility operator-facing metadata (T-V.1)
+// ============================================================================
+
+export interface SavedViewVisibilityMetadata {
+  /** Display label rendered in the visibility picker / view-card badge. */
+  readonly label: string;
+  /** Short operator-facing description of who can see this view. */
+  readonly description: string;
+  /** Whether non-owner workspace members can see this view's
+   *  definition (true). The `personal` visibility scopes the view to
+   *  the owner only. */
+  readonly visibleToOthers: boolean;
+}
+
+export const SAVED_VIEW_VISIBILITY_METADATA: Readonly<
+  Record<SavedViewVisibility, SavedViewVisibilityMetadata>
+> = {
+  personal: {
+    label: "Personal",
+    description:
+      "Visible only to the view's owner — saved views with this visibility do not appear in the workspace-wide view list.",
+    visibleToOthers: false,
+  },
+  workspace_shared: {
+    label: "Workspace Shared",
+    description:
+      "Visible to every member of the owner's workspace — appears in the workspace-wide view list and is selectable by all members.",
+    visibleToOthers: true,
+  },
+};
+
+export function getSavedViewVisibilityMetadata(
+  visibility: SavedViewVisibility,
+): SavedViewVisibilityMetadata {
+  return SAVED_VIEW_VISIBILITY_METADATA[visibility];
+}
+
 /**
  * Pure predicate. Returns true iff `viewer` should be able to see
  * the view's definition. Does NOT speak to the data inside the
