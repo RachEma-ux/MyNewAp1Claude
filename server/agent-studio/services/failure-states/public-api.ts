@@ -19,6 +19,8 @@ export {
   buildFailureStateCategorySeverityMatrix,
   FAILURE_STATE_CATEGORY_METADATA,
   getFailureStateCategoryMetadata,
+  FAILURE_STATE_SEVERITY_METADATA,
+  getFailureStateSeverityMetadata,
   type FailureState,
   type FailureStateCategory,
   type FailureStateSeverity,
@@ -26,6 +28,7 @@ export {
   type FailureStateOccurrenceSummary,
   type FailureStateCategorySeverityMatrix,
   type FailureStateCategoryMetadata,
+  type FailureStateSeverityMetadata,
 } from "./contracts.js";
 
 export {

@@ -137,6 +137,49 @@ export const FAILURE_STATE_SEVERITIES = [
 export type FailureStateSeverity = (typeof FAILURE_STATE_SEVERITIES)[number];
 
 // ============================================================================
+// Per-severity operator-facing metadata (T-I.32)
+// ============================================================================
+
+export interface FailureStateSeverityMetadata {
+  /** Display label for operator dashboards. */
+  readonly label: string;
+  /** Short description of operator response expectation. */
+  readonly description: string;
+  /** Stable operator-action expectation: "monitor" / "investigate" /
+   *  "escalate". Drives UI urgency badges. */
+  readonly operatorAction: "monitor" | "investigate" | "escalate";
+}
+
+export const FAILURE_STATE_SEVERITY_METADATA: Readonly<
+  Record<FailureStateSeverity, FailureStateSeverityMetadata>
+> = {
+  info: {
+    label: "Info",
+    description:
+      "Non-actionable event of operator interest — degraded states, recovered conditions, throttle activations.",
+    operatorAction: "monitor",
+  },
+  warning: {
+    label: "Warning",
+    description:
+      "Recoverable failure that needs investigation if it recurs — drift detected, partial blockages, single-incident outages.",
+    operatorAction: "investigate",
+  },
+  critical: {
+    label: "Critical",
+    description:
+      "Non-recoverable failure requiring immediate operator action — backend unavailable, hard rejections, security breaches.",
+    operatorAction: "escalate",
+  },
+};
+
+export function getFailureStateSeverityMetadata(
+  severity: FailureStateSeverity,
+): FailureStateSeverityMetadata {
+  return FAILURE_STATE_SEVERITY_METADATA[severity];
+}
+
+// ============================================================================
 // Per-state metadata
 // ============================================================================
 
