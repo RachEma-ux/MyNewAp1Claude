@@ -155,20 +155,62 @@ export function CanvasOperatorPanel({ initialVaultId = 1 }: Props) {
                 Canvas not found.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div>
-                  <span className="font-medium">Nodes:</span>{" "}
-                  {snapshotQ.data.nodes.length}
+              <>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <span className="font-medium">Nodes:</span>{" "}
+                    {snapshotQ.data.nodes.length}
+                  </div>
+                  <div>
+                    <span className="font-medium">Edges:</span>{" "}
+                    {snapshotQ.data.edges.length}
+                  </div>
+                  <div>
+                    <span className="font-medium">Vault:</span>{" "}
+                    {snapshotQ.data.canvas.vaultId}
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Edges:</span>{" "}
-                  {snapshotQ.data.edges.length}
-                </div>
-                <div>
-                  <span className="font-medium">Vault:</span>{" "}
-                  {snapshotQ.data.canvas.vaultId}
-                </div>
-              </div>
+                {/* PR-V1-216: per-kind breakdown of the nodes. The
+                    nodes total tells operators how heavy the canvas
+                    is; the kind breakdown tells what TYPE of heavy.
+                    Closed taxonomy: note_ref / embedded_query /
+                    free_text / image_ref. */}
+                {snapshotQ.data.nodes.length > 0 ? (
+                  <p
+                    className="text-xs text-muted-foreground mt-1"
+                    data-testid="canvas-snapshot-kind-breakdown"
+                  >
+                    {(() => {
+                      const counts = {
+                        note_ref: 0,
+                        embedded_query: 0,
+                        free_text: 0,
+                        image_ref: 0,
+                      };
+                      for (const n of snapshotQ.data.nodes) {
+                        if (n.kind in counts) {
+                          counts[n.kind as keyof typeof counts] += 1;
+                        }
+                      }
+                      return (
+                        <>
+                          <span className="font-medium">By kind:</span>{" "}
+                          <span className="font-mono">{counts.note_ref}</span>{" "}
+                          note_ref /{" "}
+                          <span className="font-mono">
+                            {counts.embedded_query}
+                          </span>{" "}
+                          embedded_query /{" "}
+                          <span className="font-mono">{counts.free_text}</span>{" "}
+                          free_text /{" "}
+                          <span className="font-mono">{counts.image_ref}</span>{" "}
+                          image_ref
+                        </>
+                      );
+                    })()}
+                  </p>
+                ) : null}
+              </>
             )}
           </CardContent>
         </Card>
