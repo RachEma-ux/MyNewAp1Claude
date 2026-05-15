@@ -168,6 +168,7 @@ runtime catches up.
 | `scanner-metadata-coverage.test.ts` | `services/graph-quality/scanner-metadata` — operator introspection metadata symmetry with `QUALITY_SCANNER_REGISTRY` + `FINDING_CLASS_TO_PROPOSAL_KIND` | T-D.7 / #1044 |
 | `security-graph-severity-helpers.test.ts` | `services/security-graph/contracts` — severity rank + comparator + sort-desc + most-severe helpers | T-G.12 / #1045 |
 | `failure-state-summarize.test.ts` | `services/failure-states/contracts` — `summarizeFailureStateOccurrences` stable-shape aggregator (byKind / byCategory / bySeverity / byRecoverable) | T-I.23 / #1046 |
+| `recommendation-summarize.test.ts` | `services/recommendation/contracts` — `summarizeRecommendationResponse` (visible / redacted / fullyHidden + mean/min/max confidence on visible only) | T-G.13 / #1047 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

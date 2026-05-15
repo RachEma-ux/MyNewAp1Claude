@@ -11,11 +11,13 @@ export {
   isRecommendationKind,
   normalizeRecommendationLimit,
   normalizeRecommendationMinConfidence,
+  summarizeRecommendationResponse,
   type RecommendationKind,
   type RecommendationPermissionStatus,
   type RecommendationRequest,
   type RecommendationResult,
   type RecommendationResponse,
+  type RecommendationResponseSummary,
 } from "./contracts.js";
 
 export {
