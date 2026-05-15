@@ -310,14 +310,24 @@ export class AsdbVaultRepository implements VaultRepository {
     | { deleted: false; conflict: true; latestVersion: number }
     | { deleted: false; notFound: true }
   > {
-    const conn = getAsDb();
+    // V1+ MR-3 thirty-fifth batch (PR-V1-104): note→vault→workspace
+    // split-handle. The pre-existing SELECT-by-noteId is widened to
+    // also pull vault.workspaceId in the same round-trip via an
+    // innerJoin on agsVaults — no additional latency cost vs. the
+    // pre-migration single SELECT. The subsequent soft-delete UPDATE
+    // routes via getAsDbForWorkspace. Falls back to the bootstrap
+    // handle when workspaceId IS NULL.
+    const lookupConn = getAsDb();
+    if (!lookupConn) throw new Error("ASDB unavailable");
 
-    const [row] = await conn
+    const [row] = await lookupConn
       .select({
         id: agsVaultNotes.id,
         deletedAt: agsVaultNotes.deletedAt,
+        workspaceId: agsVaults.workspaceId,
       })
       .from(agsVaultNotes)
+      .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
       .where(eq(agsVaultNotes.id, input.noteId))
       .limit(1);
 
@@ -338,6 +348,12 @@ export class AsdbVaultRepository implements VaultRepository {
         };
       }
     }
+
+    const conn =
+      row.workspaceId != null
+        ? getAsDbForWorkspace(row.workspaceId)
+        : lookupConn;
+    if (!conn) throw new Error("ASDB unavailable");
 
     await conn
       .update(agsVaultNotes)
