@@ -38,6 +38,10 @@ export {
   scanForMissingProvenance,
   missingProvenanceScanner,
 } from "./scanners/missing-provenance-scanner.js";
+export {
+  scanForDanglingEdgeEndpoints,
+  danglingEdgeEndpointScanner,
+} from "./scanners/dangling-edge-endpoint-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -153,6 +157,7 @@ import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
 import { selfLoopScanner } from "./scanners/self-loop-scanner.js";
 import { missingProvenanceScanner } from "./scanners/missing-provenance-scanner.js";
+import { danglingEdgeEndpointScanner } from "./scanners/dangling-edge-endpoint-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -166,4 +171,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   staleNodeScanner,
   selfLoopScanner,
   missingProvenanceScanner,
+  danglingEdgeEndpointScanner,
 ];
