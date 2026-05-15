@@ -572,6 +572,19 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
             </p>
           ) : (
             <div className="overflow-x-auto">
+              {/* PR-V1-214: count label above the invocations log.
+                  Same pattern as publish executions count label
+                  (#964). Window cap = 50 by default. */}
+              <p
+                className="text-xs text-muted-foreground mb-1"
+                data-testid="extensions-recent-invocations-count-label"
+              >
+                Showing{" "}
+                <span className="font-mono">{recentQ.data.length}</span>{" "}
+                most-recent invocation
+                {recentQ.data.length === 1 ? "" : "s"}
+                {recentQ.data.length >= 50 ? " (capped at 50)" : ""}.
+              </p>
               <table
                 className="w-full text-sm border-collapse"
                 data-testid="extensions-recent-invocations-table"
