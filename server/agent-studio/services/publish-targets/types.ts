@@ -40,6 +40,57 @@ export function isPublishTargetType(s: unknown): s is PublishTargetType {
   );
 }
 
+// ============================================================================
+// Per-target-type operator-facing metadata (T-E.1)
+// ============================================================================
+
+export interface PublishTargetTypeMetadata {
+  /** Display label rendered in the publish-targets registry UI. */
+  readonly label: string;
+  /** Short operator-facing description of what publishing to this
+   *  target accomplishes. */
+  readonly description: string;
+  /** Whether this target writes to an internal-controlled destination
+   *  (true) or to a third-party / external system (false). Drives the
+   *  governance gate's external-data-flow policy. */
+  readonly internalDestination: boolean;
+  /** Whether the target type requires a provider-connection binding
+   *  (typically for credential-bearing external targets). */
+  readonly requiresProviderConnection: boolean;
+}
+
+export const PUBLISH_TARGET_TYPE_METADATA: Readonly<
+  Record<PublishTargetType, PublishTargetTypeMetadata>
+> = {
+  staging_env: {
+    label: "Staging Environment",
+    description:
+      "Publishes promoted notes to an internal staging environment for downstream regression / operator review. No external network egress.",
+    internalDestination: true,
+    requiresProviderConnection: false,
+  },
+  remote_vault: {
+    label: "Remote Vault",
+    description:
+      "Publishes promoted notes to a remote vault instance (e.g. peer Agent Studio deployment). Cross-instance but internally trusted.",
+    internalDestination: true,
+    requiresProviderConnection: true,
+  },
+  external_kb: {
+    label: "External Knowledge Base",
+    description:
+      "Publishes promoted notes to a third-party knowledge base (e.g. Notion / Confluence). External destination — governance applies data-flow policy.",
+    internalDestination: false,
+    requiresProviderConnection: true,
+  },
+};
+
+export function getPublishTargetTypeMetadata(
+  targetType: PublishTargetType,
+): PublishTargetTypeMetadata {
+  return PUBLISH_TARGET_TYPE_METADATA[targetType];
+}
+
 export const PUBLISH_EXECUTION_STATUSES = [
   "pending",
   "in_flight",

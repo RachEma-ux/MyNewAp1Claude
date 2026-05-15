@@ -218,6 +218,7 @@ runtime catches up.
 | `rac-source-type-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_TYPE_METADATA` (7-entry per-source-type label + description + retrievalMechanism {precompiled / vector / graph / external_api / structured} + requiresEmbeddings boolean) + `RAC_SOURCE_RETRIEVAL_MECHANISMS` 5-family taxonomy | T-A.8 / #1094 |
 | `rac-retrieval-health-status-metadata.test.ts` | `services/rac/ingestion/types` — `RAC_RETRIEVAL_HEALTH_STATUS_METADATA` (4-entry per-status label + description + attemptRetrieval + notifyOperator booleans); union→tuple promotion of `RacRetrievalHealthStatus` | T-A.9 / #1095 |
 | `rac-owner-module-metadata.test.ts` | `services/rac/sources/types` — `RAC_OWNER_MODULE_METADATA` (4-entry per-owner-module label + description + firstParty boolean for agentStudio/dataAnalysis/projectsSystem/external); union→tuple promotion of `RacOwnerModule` | T-A.10 / #1096 |
+| `publish-target-type-metadata.test.ts` | `services/publish-targets/types` — `PUBLISH_TARGET_TYPE_METADATA` (3-entry per-target-type label + description + internalDestination + requiresProviderConnection booleans for staging_env/remote_vault/external_kb) | T-E.1 / #1097 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
