@@ -24,6 +24,7 @@
 import {
   FAILURE_STATE_METADATA,
   type FailureState,
+  type FailureStateMetadata,
   type FailureStateSeverity,
 } from "./contracts.js";
 import {
@@ -76,6 +77,45 @@ export interface RecordFailureStateEventInput {
 }
 
 /**
+ * Canonical metadata stamps applied to every bridge emission. Public so
+ * callers who emit through a non-bridge path (e.g. a custom dispatcher
+ * with extra fields) can still produce the same operator-facing
+ * dashboard signal.
+ *
+ * The stamps are stable across versions: kind / category / severity /
+ * recoverable. Adding new fields to the stamp surface requires a
+ * coordinated dashboard-query update (see operator dashboard queries
+ * §7 in the audit doc).
+ */
+export interface CanonicalFailureStateAnnotations {
+  readonly failureStateKind: FailureState;
+  readonly failureStateCategory: FailureStateMetadata["category"];
+  readonly failureStateSeverity: FailureStateSeverity;
+  readonly failureStateRecoverable: boolean;
+}
+
+/**
+ * Returns the canonical annotation stamps the bridge applies for the
+ * given kind. The severity is derived from the closed taxonomy unless
+ * `severityOverride` is supplied — same per-emission semantics as
+ * `RecordFailureStateEventInput.severityOverride`.
+ *
+ * Pure function. Reads only from `FAILURE_STATE_METADATA`.
+ */
+export function getCanonicalFailureStateAnnotations(
+  kind: FailureState,
+  severityOverride?: FailureStateSeverity,
+): CanonicalFailureStateAnnotations {
+  const meta = FAILURE_STATE_METADATA[kind];
+  return {
+    failureStateKind: kind,
+    failureStateCategory: meta.category,
+    failureStateSeverity: severityOverride ?? meta.defaultSeverity,
+    failureStateRecoverable: meta.recoverable,
+  };
+}
+
+/**
  * Internal helper — applies the bridge encoding to one
  * `RecordFailureStateEventInput`, producing the underlying recorder's
  * input shape. Extracted so the singular + batch helpers share the
@@ -84,7 +124,10 @@ export interface RecordFailureStateEventInput {
 function encodeForRecorder(
   input: RecordFailureStateEventInput,
 ): RecordErrorEventInput {
-  const meta = FAILURE_STATE_METADATA[input.failureState];
+  const annotations = getCanonicalFailureStateAnnotations(
+    input.failureState,
+    input.severityOverride,
+  );
   return {
     sourceKind: input.sourceKind,
     sourceId: input.sourceId ?? null,
@@ -94,10 +137,7 @@ function encodeForRecorder(
     metadata: {
       ...(input.metadata ?? {}),
       // Canonical fields stamp LAST so callers can't shadow them.
-      failureStateKind: input.failureState,
-      failureStateCategory: meta.category,
-      failureStateSeverity: input.severityOverride ?? meta.defaultSeverity,
-      failureStateRecoverable: meta.recoverable,
+      ...annotations,
     },
   };
 }
