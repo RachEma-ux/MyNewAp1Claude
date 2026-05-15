@@ -20,6 +20,123 @@ export const AGS_LIFECYCLE_STATES = [
 ] as const;
 export type AgsLifecycleState = (typeof AGS_LIFECYCLE_STATES)[number];
 
+// ============================================================================
+// Per-lifecycle-state operator-facing metadata (T-S.1)
+// ============================================================================
+
+export interface AgsLifecycleStateMetadata {
+  /** Display label rendered in the agent-studio dashboard / state badge. */
+  readonly label: string;
+  /** Short operator-facing description of what the state represents. */
+  readonly description: string;
+  /** Closed-taxonomy classification:
+   *  - `in_development`: agent is being built (new/draft/in_design).
+   *  - `under_validation`: agent is being verified (simulated/tested/
+   *    review_required).
+   *  - `blocked`: agent has a hard issue preventing forward progress.
+   *  - `release_candidate`: agent is ready to publish.
+   *  - `active`: agent is published and runnable.
+   *  - `retired`: agent is deprecated or archived. */
+  readonly phase:
+    | "in_development"
+    | "under_validation"
+    | "blocked"
+    | "release_candidate"
+    | "active"
+    | "retired";
+  /** Whether the agent can be invoked at runtime (true) — only
+   *  `published` agents are invocable. */
+  readonly runnable: boolean;
+}
+
+export const AGS_LIFECYCLE_STATE_METADATA: Readonly<
+  Record<AgsLifecycleState, AgsLifecycleStateMetadata>
+> = {
+  new: {
+    label: "New",
+    description:
+      "Agent has been created but has no draft fields populated yet — initial empty-shell state.",
+    phase: "in_development",
+    runnable: false,
+  },
+  draft: {
+    label: "Draft",
+    description:
+      "Agent has been actively authored — drafts on agent fields exist, simulation may still be missing.",
+    phase: "in_development",
+    runnable: false,
+  },
+  in_design: {
+    label: "In Design",
+    description:
+      "Agent is being designed — system instructions, scope, and policy boundaries are taking shape.",
+    phase: "in_development",
+    runnable: false,
+  },
+  simulated: {
+    label: "Simulated",
+    description:
+      "Agent has been exercised in simulation mode — preliminary validation against simulation harness has passed.",
+    phase: "under_validation",
+    runnable: false,
+  },
+  tested: {
+    label: "Tested",
+    description:
+      "Agent has passed the formal test suite — regression / golden-question validation completed.",
+    phase: "under_validation",
+    runnable: false,
+  },
+  review_required: {
+    label: "Review Required",
+    description:
+      "Agent is waiting on human review — governance verdict pending or operator approval needed before publish.",
+    phase: "under_validation",
+    runnable: false,
+  },
+  blocked: {
+    label: "Blocked",
+    description:
+      "Agent has a hard issue preventing publish — governance rejected, dependencies missing, or breaking-change discovered.",
+    phase: "blocked",
+    runnable: false,
+  },
+  ready_to_publish: {
+    label: "Ready to Publish",
+    description:
+      "Agent has passed all gates and is ready for the operator to flip to `published`. Last manual approval gate.",
+    phase: "release_candidate",
+    runnable: false,
+  },
+  published: {
+    label: "Published",
+    description:
+      "Agent is live and runnable — runtime invocations are accepted; release-version tracking is active.",
+    phase: "active",
+    runnable: true,
+  },
+  deprecated: {
+    label: "Deprecated",
+    description:
+      "Agent has been replaced by a newer version or marked end-of-life — still runnable for legacy traffic but flagged for retirement.",
+    phase: "retired",
+    runnable: false,
+  },
+  archived: {
+    label: "Archived",
+    description:
+      "Agent is fully retired — runtime invocations refused. Configuration preserved for audit / rollback.",
+    phase: "retired",
+    runnable: false,
+  },
+};
+
+export function getAgsLifecycleStateMetadata(
+  state: AgsLifecycleState,
+): AgsLifecycleStateMetadata {
+  return AGS_LIFECYCLE_STATE_METADATA[state];
+}
+
 export const AGS_AGENT_CLASSES = [
   "assistant",
   "specialist",
