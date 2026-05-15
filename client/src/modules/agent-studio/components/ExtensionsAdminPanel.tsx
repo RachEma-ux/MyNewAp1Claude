@@ -12,10 +12,22 @@
  * its own data fetch, mounted by a slim wrapper page.
  */
 
+import { useState } from "react";
+
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SectionLabel } from "./ui";
+
+const EXTENSION_GOVERNANCE_STATUSES = [
+  "pending_approval",
+  "approved",
+  "rejected",
+  "disabled",
+  "revoked",
+] as const;
+type ExtensionGovernanceStatus =
+  (typeof EXTENSION_GOVERNANCE_STATUSES)[number];
 
 function fmtTs(ts: Date | string | null | undefined): string {
   if (!ts) return "—";
@@ -45,6 +57,31 @@ interface Props {
 }
 
 export function ExtensionsAdminPanel({ workspaceId }: Props) {
+  const utils = trpc.useUtils();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [actorUserId, setActorUserId] = useState<string>("");
+
+  function refreshList() {
+    void utils.agentStudio.extensions.list.invalidate({ workspaceId });
+  }
+  function onMutationSuccess() {
+    setMutationError(null);
+    refreshList();
+  }
+  function onMutationError(err: { message: string }) {
+    setMutationError(err.message);
+  }
+
+  const approveMutation = trpc.agentStudio.extensions.approve.useMutation({
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+  const setStatusMutation =
+    trpc.agentStudio.extensions.setStatus.useMutation({
+      onSuccess: onMutationSuccess,
+      onError: onMutationError,
+    });
+
   const listQ = trpc.agentStudio.extensions.list.useQuery(
     { workspaceId },
     { refetchOnWindowFocus: false },
@@ -57,6 +94,26 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
           <SectionLabel>
             Installed extensions (workspace {workspaceId})
           </SectionLabel>
+          <div className="flex items-center gap-2 text-sm">
+            <label
+              className="font-medium"
+              htmlFor="extensions-admin-actor-user-id"
+            >
+              Actor user ID:
+            </label>
+            <input
+              id="extensions-admin-actor-user-id"
+              type="number"
+              min={1}
+              className="w-24 border rounded px-2 py-1"
+              value={actorUserId}
+              onChange={(e) => setActorUserId(e.target.value)}
+              placeholder="for approve"
+            />
+            {mutationError ? (
+              <span className="text-destructive">{mutationError}</span>
+            ) : null}
+          </div>
           {listQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading extensions…
@@ -81,6 +138,7 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     <th className="py-1 pr-3">Lanes</th>
                     <th className="py-1 pr-3">Tools</th>
                     <th className="py-1 pr-3">Approved</th>
+                    <th className="py-1 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,6 +169,50 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                       </td>
                       <td className="py-1 pr-3">
                         {fmtTs(ext.approvedAt)}
+                      </td>
+                      <td className="py-1 pr-3 space-x-2">
+                        {ext.governanceStatus === "pending_approval" ? (
+                          <button
+                            type="button"
+                            className="text-xs underline"
+                            disabled={approveMutation.isPending}
+                            onClick={() => {
+                              const uid = Number.parseInt(actorUserId, 10);
+                              if (!Number.isFinite(uid) || uid <= 0) {
+                                setMutationError(
+                                  "approve requires a positive integer Actor user ID",
+                                );
+                                return;
+                              }
+                              approveMutation.mutate({
+                                extensionId: ext.id,
+                                approvedByUserId: uid,
+                              });
+                            }}
+                          >
+                            approve
+                          </button>
+                        ) : null}
+                        <select
+                          className="text-xs border rounded px-1 py-0.5"
+                          value={ext.governanceStatus}
+                          disabled={setStatusMutation.isPending}
+                          onChange={(e) => {
+                            const next =
+                              e.target.value as ExtensionGovernanceStatus;
+                            if (next === ext.governanceStatus) return;
+                            setStatusMutation.mutate({
+                              extensionId: ext.id,
+                              status: next,
+                            });
+                          }}
+                        >
+                          {EXTENSION_GOVERNANCE_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                     </tr>
                   ))}
