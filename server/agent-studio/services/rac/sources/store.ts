@@ -252,8 +252,19 @@ export async function createSource(input: CreateSourceInput): Promise<RacSource>
 }
 
 export async function getSource(sourceId: number): Promise<RacSource | null> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-sixth batch (PR-V1-136): Path-A discovering-
+  // helper read. SELECT-by-id with a pre-projection of workspaceId
+  // routes the subsequent full-row SELECT to the home region under
+  // Phase-2. Soft-fall-through when the row doesn't exist.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsRacSources.workspaceId })
+    .from(agsRacSources)
+    .where(eq(agsRacSources.id, sourceId))
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsRacSources)
@@ -265,8 +276,21 @@ export async function getSource(sourceId: number): Promise<RacSource | null> {
 export async function listSourcesForProfile(
   profileId: number,
 ): Promise<RacSource[]> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-sixth batch (PR-V1-136): Path-A discovering-
+  // helper read. agsRacProfiles.workspaceId is non-null; pull it
+  // from the parent profile row, then route the SELECT on
+  // agsRacSources to the home region under Phase-2.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsRacProfiles.workspaceId })
+    .from(agsRacProfiles)
+    .where(eq(agsRacProfiles.id, profileId))
+    .limit(1);
+  const db =
+    wsRows.length > 0
+      ? (getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsRacSources)
