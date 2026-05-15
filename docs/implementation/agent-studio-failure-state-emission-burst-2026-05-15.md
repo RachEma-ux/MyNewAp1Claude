@@ -1,8 +1,8 @@
 # Phase 22 emission burst — 2026-05-15 closure summary
 
-**Status:** 26-PR continuation closed @ main `dd9d878`. Phase 22 closed-taxonomy emission surface is **live with 11 / 25 closed kinds emitting**.
+**Status:** 27-PR continuation closed @ main `8712ad6` (this artifact itself is #1037, landing on top of #1036 = `dd9d878`). Phase 22 closed-taxonomy emission surface is **live with 11 / 25 closed kinds emitting**.
 
-This doc consolidates the 2026-05-15 emission burst (#1011 → #1036) into a single artifact so operators + future-Claude have one place to look. The audit doc (`agent-studio-phase-22-failure-state-emission-audit.md`) is the per-state map; this doc is the burst-level narrative.
+This doc consolidates the 2026-05-15 emission burst (#1011 → #1037) into a single artifact so operators + future-Claude have one place to look. The audit doc (`agent-studio-phase-22-failure-state-emission-audit.md`) is the per-state map; this doc is the burst-level narrative.
 
 ---
 
@@ -13,11 +13,11 @@ This doc consolidates the 2026-05-15 emission burst (#1011 → #1036) into a sin
 | Closed taxonomy kinds with live emitters | 0 | 11 of 25 (44%) |
 | Quality scanners (Phase 23 detection) | 9 | 10 |
 | CLAUDE.md hard rules locked by integrity mortgage | 13 | 30 |
-| Ancillary contract / validator tests indexed in Phase 21 §7 | 0 | 29 |
+| Ancillary contract / validator tests indexed in Phase 21 §7 | 0 | 30 |
 | Phase 22 documentation artifacts | 0 | 3 (audit + bridge + dashboard queries) |
 | Phase 28 catalog sections | 5 | 6 (added §6 emission shipment) |
 
-Main moved `1a90db57 → dd9d878` over 26 PRs in a single autonomous continuation.
+Main moved `1a90db57 → 8712ad6` over 27 PRs in a single autonomous continuation.
 
 ---
 
