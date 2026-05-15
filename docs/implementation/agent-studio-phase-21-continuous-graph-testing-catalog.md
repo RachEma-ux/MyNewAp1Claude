@@ -184,6 +184,7 @@ runtime catches up.
 | `security-graph-impact-path-helpers.test.ts` | `services/security-graph/contracts` — `getCanonicalImpactPathToStep` + `getCanonicalImpactSubPath` + `getCanonicalImpactDistance` (3 path-walk helpers complementing the existing from/next/previous suite) | T-G.19 / #1060 |
 | `security-graph-validation-summary.test.ts` | `services/security-graph/contracts` — `summarizeImpactPathValidationOutcomes` (ok/failed + 4-key stable-shape failedByReason rollup) | T-G.20 / #1061 |
 | `quality-finding-severity-helpers.test.ts` | `services/graph-quality/scanner-metadata` — qualitySeverityRank + compareQualitySeverity + sortQualityFindingsBySeverityDesc + getMostSevereQualityFinding (mirror of T-G.12 for the 4-key quality taxonomy) | T-D.9 / #1062 |
+| `failure-state-severity-helpers.test.ts` | `services/failure-states/contracts` — failureStateSeverityRank + compareFailureStateSeverity + sortFailureStateItemsBySeverityDesc + getMostSevereFailureStateItem (mirror of T-G.12/T-D.9 for the 3-key info/warning/critical taxonomy) | T-I.27 / #1063 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
