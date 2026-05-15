@@ -34,6 +34,10 @@ export {
   scanForSelfLoops,
   selfLoopScanner,
 } from "./scanners/self-loop-scanner.js";
+export {
+  scanForMissingProvenance,
+  missingProvenanceScanner,
+} from "./scanners/missing-provenance-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -148,6 +152,7 @@ import { orphanNodeScanner } from "./scanners/orphan-node-scanner.js";
 import { duplicateEntityScanner } from "./scanners/duplicate-entity-scanner.js";
 import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
 import { selfLoopScanner } from "./scanners/self-loop-scanner.js";
+import { missingProvenanceScanner } from "./scanners/missing-provenance-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -160,4 +165,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   duplicateEntityScanner,
   staleNodeScanner,
   selfLoopScanner,
+  missingProvenanceScanner,
 ];

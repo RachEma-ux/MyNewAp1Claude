@@ -75,6 +75,11 @@ export const FINDING_CLASS_TO_PROPOSAL_KIND: Readonly<Record<string, string>> =
     orphan_node: "link_or_archive_orphan_node",
     duplicate_entity: "merge_duplicate_entities",
     stale_node: "re_promote_with_source_version",
+    // self_loop intentionally absent — falls through to
+    // `review_self_loop` so the operator decides whether the loop
+    // is intentional (e.g. self-reference in code-graph IMPORTS) or
+    // a bad ingest (which is the only programmatically-fixable case).
+    missing_provenance: "backfill_or_delete_unprovenanced_node",
   };
 
 export function proposalKindForFinding(findingClass: string): string {
