@@ -32,6 +32,8 @@ export {
   getCanonicalFailureStateAnnotations,
   extractFailureStateAnnotations,
   annotateRowsWithFailureState,
+  partitionRowsByFailureState,
+  groupRowsByFailureStateKind,
   recordFailureStateEvent,
   recordFailureStateEvents,
   summarizeFailureStateEventList,

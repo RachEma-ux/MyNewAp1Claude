@@ -261,6 +261,60 @@ export function annotateRowsWithFailureState<T>(
 }
 
 /**
+ * Partitions a list of observability rows into two arrays:
+ * - `closed`: rows whose `errorClass` resolves to a closed-taxonomy
+ *   `FailureState` kind via `parseFailureStateFromErrorClass`
+ * - `freeForm`: every other row (legacy emitters, stale ingest, etc.)
+ *
+ * Operator dashboards rendering two tabs ("Closed taxonomy" / "Legacy
+ * free-form") bind to this directly without re-implementing the
+ * prefix-and-guard test.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function partitionRowsByFailureState<T>(
+  rows: ReadonlyArray<T>,
+  getErrorClass: (row: T) => string,
+): { readonly closed: readonly T[]; readonly freeForm: readonly T[] } {
+  const closed: T[] = [];
+  const freeForm: T[] = [];
+  for (const row of rows) {
+    if (parseFailureStateFromErrorClass(getErrorClass(row)) !== null) {
+      closed.push(row);
+    } else {
+      freeForm.push(row);
+    }
+  }
+  return { closed, freeForm };
+}
+
+/**
+ * Groups rows by their closed-taxonomy `FailureState` kind. Free-form
+ * rows are silently dropped (caller can use `partitionRowsByFailureState`
+ * first if both views are needed).
+ *
+ * Returns a `Map<FailureState, T[]>` — Map preserves insertion order
+ * by FIRST observed kind, which matches `Object.entries` semantics for
+ * downstream iteration.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function groupRowsByFailureStateKind<T>(
+  rows: ReadonlyArray<T>,
+  getErrorClass: (row: T) => string,
+): Map<FailureState, T[]> {
+  const groups = new Map<FailureState, T[]>();
+  for (const row of rows) {
+    const kind = parseFailureStateFromErrorClass(getErrorClass(row));
+    if (kind === null) continue;
+    const bucket = groups.get(kind);
+    if (bucket === undefined) groups.set(kind, [row]);
+    else bucket.push(row);
+  }
+  return groups;
+}
+
+/**
  * Aggregates a list of observability `ErrorEventRow` records into the
  * canonical failure-state operator summary. Free-form rows (rows
  * whose `errorClass` does not begin with `failure_state:` or whose
