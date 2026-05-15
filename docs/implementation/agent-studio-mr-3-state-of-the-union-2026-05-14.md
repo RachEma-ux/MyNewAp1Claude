@@ -1,10 +1,12 @@
 # MR-3 (Phase MR-1 Phase-1 Shim) — State of the Union
 
-**Date:** 2026-05-14 (rev 2: 2026-05-15)
-**Status:** **35 batches landed** (29 by 2026-05-14, +6 on 2026-05-15: vault repository mutations + extension invocation ledger); major asymmetries closed; remaining gaps named and deferred to V2 Phase-2 routing work.
+**Date:** 2026-05-14 (rev 2: 2026-05-15, rev 3: 2026-05-15)
+**Status:** **76 batches landed** (35 by rev 2, +41 in rev 3 — Path-B mutation arc + Path-X read promotion arc both substantively complete); major asymmetries closed across `repository.ts` (every mutation), Phase-0b child tables (Hooks/McpServers/Skills/Subagents/Plugins/PermissionRules), vault writes + reads, canvas writes + reads, ingestion + provenance + knowledge-unit reads, RAC reads, approval-gate read+write, bindings reads, extensions reads. Remaining `getAsDb()` callers are now predominantly intentional Cat C (cross-workspace observability / global registries / system health) or Cat B reads where row is local.
 **Predecessor:** `docs/implementation/agent-studio-mr-3-getasdb-inventory.md` (the *plan*; this doc is the *progress snapshot* keyed to that plan).
 
 **Rev 2 addendum (2026-05-15):** §1 extended with batches 30–35; §2 expanded with new "all mutations Cat A" files (`vault/repository-asdb.ts`); §3.1 trimmed (4 entries promoted Cat B→A: `removeAgentProviderBinding`, vault `addMember` / `createNote` / `updateNote` / `deleteNote`, extension `recordInvocation`); new §11 diagnoses the **schema-level workspace-scoping gap** that blocks approval-gate / repository.ts / tool-approvals-router from Phase-1 caller migration — agsAgents / agsAgentDrafts / agsRuntimeRuns predate workspace scoping at the schema level. Phase-2 unblock requires either (a) backfilling workspaceId to those tables, or (b) indirect resolver through agsAgentProviderBindings.workspaceId.
+
+**Rev 3 addendum (2026-05-15):** Path B primitive (§11 of rev 2) shipped at `services/region/draft-workspace-resolver.ts` and now has **22 consumers** across 14 files. New §12 documents the **17 sister resolvers** added to `repository.ts` (1 Path B + 1 helper × 16 other identifier-shape tables: agentId/draftId/bindingId/suiteId/caseId/testRunId/simulationRunId/publishRequestId/approvalStepId/simulationScenarioId/runtimeRunId/hookId/mcpServerId/skillId/subagentId/pluginId/permissionRuleId). New §13 documents the read-path Path-X promotion sub-arc (14 batches across cag/store, cag/events, rac/sources, rac/trace, canvas, ingestion, vault, bindings, extensions, approval-gate). Rev 3 sub-arc closure: every `repository.ts` mutation is now Path-B-routed (the §11 schema-level gap is closed at the runtime layer via Path B indirection).
 
 ---
 
@@ -229,5 +231,79 @@ The files blocked by the agent-tier gap:
 **Path B — Indirect resolver through `agsAgentProviderBindings.workspaceId`.** For approval/draft chains, add a helper `resolveWorkspaceIdForDraft(lookupDb, draftId)` that JOINs `agsAgentProviderBindings` (which DOES have workspaceId) on draftId. Per-function migration through the resolver. **Cost:** one helper + per-function migrations. **Benefit:** zero schema changes. **Drawback:** fragile when bindings are absent (legacy drafts pre-Phase-11) — those drafts have no resolvable workspaceId.
 
 **Path C — Add `workspaceId` resolver as a tRPC-context layer.** At the router boundary, resolve workspaceId from `ctx.workspaceId` (which the platform-level workspace gate already injects) and pass it down. Each procedure plumbs workspaceId through to the service. **Cost:** signature changes across every procedure. **Benefit:** uses existing ctx infrastructure. **Drawback:** large surface area for plumbing.
+
+---
+
+## 12. Path B sister resolvers — `repository.ts` mutation arc (rev 3)
+
+The Path B primitive `resolveWorkspaceIdForDraft(lookupDb, draftId)` (introduced in PR #857) is the foundation. To cover the full mutation surface of `repository.ts`, **17 sister resolvers** were added — each composes a single SELECT on top of the next-deeper resolver to map a different identifier shape to workspaceId:
+
+| Helper | Identifier | Chain shape | Used by | Introduced |
+|---|---|---|---|---|
+| `resolveAgentRoutedConn` | agentId | agentId → agsAgentDrafts → resolveWorkspaceIdForDraft | updateAgentLifecycleState, updateAgentCore, archiveAgent, createVersion, createPublishRequest, publishRelease, createSimulationRun | #865 (PR-V1-114) |
+| `resolveDraftRoutedConn` | draftId | direct Path B | updateDraft, attachToolBinding, replaceToolBindings, replaceKnowledgeBindings, replaceMemoryConfigs, replaceWorkflowGraph, updateRuntimeConfig, updateScheduleConfig (+ INSERT branches across child tables) | #864 (PR-V1-113) |
+| `resolveBindingRoutedConn` | bindingId | bindingId → agsDraftToolBindings.draftId → resolveDraftRoutedConn | updateToolBinding, removeToolBinding | #863 (PR-V1-112) |
+| `resolveSuiteRoutedConn` | suiteId | suiteId → agsTestSuites.agentId → resolveAgentRoutedConn | saveTestSuite (UPDATE), saveTestCase (INSERT), createTestRun | #868 (PR-V1-117) |
+| `resolveCaseRoutedConn` | caseId | caseId → agsTestCases.suiteId → resolveSuiteRoutedConn | saveTestCase (UPDATE), removeTestCase | #869 (PR-V1-118) |
+| `resolveTestRunRoutedConn` | runId | runId → agsTestRuns.agentId → resolveAgentRoutedConn | updateTestRun, recordTestResult | #870 (PR-V1-119) |
+| `resolveSimulationRunRoutedConn` | runId | runId → agsSimulationRuns.agentId → resolveAgentRoutedConn | appendSimulationStep, updateSimulationRun | #871 (PR-V1-120) |
+| `resolvePublishRequestRoutedConn` | publishRequestId | publishRequestId → agsPublishRequests.agentId → resolveAgentRoutedConn | updatePublishRequestState, createApprovalStep | #872 (PR-V1-121) |
+| `resolveApprovalStepRoutedConn` | stepId | stepId → agsApprovalSteps.publishRequestId → resolvePublishRequestRoutedConn (5-hop total) | decideApprovalStep | #872 (PR-V1-121) |
+| `resolveSimulationScenarioRoutedConn` | scenarioId | scenarioId → agsSimulationScenarios.agentId → resolveAgentRoutedConn | saveSimulationScenario (UPDATE) | #873 (PR-V1-122) |
+| `resolveRuntimeRunRoutedConn` | runId | runId → agsRuntimeRuns.agentId → resolveAgentRoutedConn | updateRuntimeRun + 5 append* (RunStep/ToolCall/MemoryEvent/PolicyEvent/HookExecution) + createPendingPermissionRequest | #874 (PR-V1-123) |
+| `resolveHookRoutedConn` | hookId | hookId → agsDraftHooks.draftId → resolveDraftRoutedConn | saveHook (UPDATE), removeHook | #875 (PR-V1-124) |
+| `resolveMcpServerRoutedConn` | serverId | serverId → agsDraftMcpServers.draftId → resolveDraftRoutedConn | saveMcpServer (UPDATE), removeMcpServer, updateMcpServerStatus, setMcpServerEnabled, updateMcpServerOAuth, recordMcpTransition | #876 (PR-V1-125), reused #881 (PR-V1-130) |
+| `resolveSkillRoutedConn` | skillId | skillId → agsDraftSkills.draftId → resolveDraftRoutedConn | removeSkill | #877 (PR-V1-126) |
+| `resolveSubagentRoutedConn` | subagentId | subagentId → agsDraftSubagents.draftId → resolveDraftRoutedConn | saveSubagent (UPDATE), removeSubagent | #878 (PR-V1-127) |
+| `resolvePluginRoutedConn` | pluginId | pluginId → agsDraftPlugins.draftId → resolveDraftRoutedConn | savePlugin (UPDATE), removePlugin | #879 (PR-V1-128) |
+| `resolvePermissionRuleRoutedConn` | ruleId | ruleId → agsDraftPermissionRules.draftId → resolveDraftRoutedConn | savePermissionRule (UPDATE), removePermissionRule | #879 (PR-V1-128) |
+
+**Invariant**: every helper is a single SELECT (3-table JOIN max for the deepest case `resolveApprovalStepRoutedConn`); each composes on top of the next-deeper resolver so the dependency graph is a strict DAG. Falls back to `lookupConn` (bootstrap handle) on any null in the chain — preserves pre-Phase-11 semantics for legacy drafts without bindings.
+
+With this resolver family in place, **every `repository.ts` mutation** routes via `getAsDbForWorkspace` under Phase-2 — closing the Rev 2 §11 schema gap at the runtime layer without requiring a schema-backfill migration.
+
+---
+
+## 13. Read-path Path-X promotion sub-arc (rev 3)
+
+After every mutation in agent-studio routed via Path A/B by rev 2 + the first half of rev 3, the secondary read-path arc began. Each batch promotes one or more SELECT-only consumers from Cat B-read to Cat A-read by adding a pre-projection SELECT on workspaceId (or chaining through Path B for draftId-scoped tables) and routing the actual data SELECT to the home region:
+
+| # | Batch | File / function(s) | Pattern |
+|---|---|---|---|
+| 1 | #884 (PR-V1-133) | `services/cag/store.ts::getLatestPack` + `listPacks` | Path B (dynamic import) |
+| 2 | #885 (PR-V1-134) | `services/cag/events.ts::listPackEvents` | Path B (dynamic import) |
+| 3 | #886 (PR-V1-135) | `services/rac/sources/store.ts::listProfilesForDraft` | Path B (dynamic import) |
+| 4 | #887 (PR-V1-136) | `services/rac/sources/store.ts::getSource` + `listSourcesForProfile` | Path A (pre-projection on own/parent row) |
+| 5 | #888 (PR-V1-137) | `services/rac/sources/store.ts::getProfile` + `getPolicyForProfile` | Path A (pre-projection on own/parent row) |
+| 6 | #889 (PR-V1-138) | `services/canvas/canvas-service.ts::getCanvasById` + `listCanvasesByVault` + `getCanvasSnapshot` + `listNoteReferencesForCanvas` | Reuses existing `resolveWorkspaceIdForCanvas` cross-table JOIN |
+| 7 | #890 (PR-V1-139) | `services/ingestion/ingestion-job-service.ts::getJob` + `services/ingestion/provenance-service.ts::getProvenance` | Path A (pre-projection on own row) |
+| 8 | #891 (PR-V1-140) | `services/vault/repository-asdb.ts::getNoteById` + `getNoteVersion` + `getLatestNoteVersion` | Notes × Vaults JOIN |
+| 9 | #892 (PR-V1-141) | `services/vault/repository-asdb.ts::listNotesInVault` | Pre-projection from agsVaults |
+| 10 | #893 (PR-V1-142) | `bindings.ts::getAgentProviderBinding` | Pre-projection on agsAgentProviderBindings.workspaceId |
+| 11 | #894 (PR-V1-143) | `services/extensions/manifest.ts::getExtensionById` | Pre-projection on agsExtensions.workspaceId |
+| 12 | #895 (PR-V1-144) | `services/rac/trace/store.ts::listContextBlocks` | Pre-projection on parent agsRacRuntimeTraces |
+| 13 | #896 (PR-V1-145) | `services/approval/approval-gate.ts::evaluateApprovalGate` | **Hoist** of pre-existing Path B resolver (was UPDATE-only #107) to cover SELECT + UPDATE share — single resolver call replaces the prior pair |
+| 14 | #897 (PR-V1-146) | `services/extensions/runtime.ts::loadExtensionById` | Mirrors #894 manifest version |
+
+**Pattern catalog:**
+- **Path A (own-row pre-projection)** — SELECT workspaceId FROM table WHERE id=X, then full SELECT on routed handle. Used where the read target's own table has `workspaceId`.
+- **Path A (parent-row pre-projection)** — SELECT workspaceId FROM parent_table WHERE id=parentId, then SELECT on child table. Used where the read target's table lacks workspaceId but a parent does (e.g. agsRacPolicies → agsRacProfiles, agsRacContextBlocks → agsRacRuntimeTraces).
+- **Path A (cross-table JOIN)** — `agsVaultNotes innerJoin agsVaults` walks note→vault→workspace in one round-trip. Reused via existing helpers (`resolveWorkspaceIdForCanvas`, the inline Notes × Vaults pattern across vault repo).
+- **Path B (dynamic import)** — `await import("./services/region/draft-workspace-resolver")` for draftId-scoped reads. Falls back to bootstrap when the draft has no binding.
+- **Hoist** — pre-existing Path B in the function gets moved to the top so the SELECT also routes on the same handle that was previously used only for the UPDATE.
+
+**Net invariant after rev 3**: every read in agent-studio that targets a workspace-scoped table now routes via `getAsDbForWorkspace` under Phase-2 — with the same bootstrap fallback semantics as the mutation arc.
+
+**Remaining `getAsDb()` callers** are now in one of these categories:
+- **Cat C cross-workspace observability**: `repository.ts::getHomeSummary` / `getReviewQueue` / `listScheduledAgents`, `services/graph/health-alert.ts::persistHealthAlertDecisions` / `listActiveAlerts`, `services/graph/projection/drift-cron.ts::persistDriftReport`, `services/export-catalog-lookups.ts::*` (cross-workspace catalog operations).
+- **Cat C global registries**: `services/publish-targets/executor.ts` (agsPublishTargets has no workspaceId), `services/region/region-service.ts` (agsRegions is the multi-region registry itself), all `agsCatalog*` mutations (catalog is workspace-agnostic by intent), all `agsMarketplace*` mutations.
+- **Cat C polymorphic tables**: `services/retention/lifecycle-active-link.ts`, `services/retention/lifecycle-holds-query.ts::listActiveHolds` (agsLifecycleHolds is polymorphic by `(entityType, entityId)` — no workspaceId column by design).
+- **Cat C boot-time wiring**: `boot.ts` (adapter instantiation with the bootstrap handle; the adapters internally route per-call).
+- **Cat C health probes**: `services/rac/ingestion/knowledge-unit-adapter.ts::health`, `services/rac/ingestion/local-pgvector-adapter.ts::probeHealth`.
+- **Cat C cross-workspace fan-out by intent**: `bindings.ts::listBindingsForAgent` (an agent's bindings may legitimately span workspaces under Phase-2 multi-region replication semantics — fan-out is a Phase-2 ADR decision, not a Phase-1 routing fix), `services/vault/repository-asdb.ts::listVaultsForUser` (user-scoped cross-vault).
+- **Cat B reads with marginal benefit**: `repository.ts::getLatestCatalogSyncEvent` (Phase 41 reconciliation read), various deep-router endpoints in `api/router.ts` (e.g. polymorphic retention eligibility branches).
+- **Discovering-helper bootstrap lookups**: ~30+ functions still call `getAsDb()` as the bootstrap handle for the pre-projection SELECT before routing to `getAsDbForWorkspace` — this is the intended Path-A pattern and is correct.
+
+The Phase-2 multi-region cutover (Phase MR-1) can proceed without further MR-3 work; the shim's `getAsDbForWorkspace` is wired everywhere it needs to be, and the legacy `getAsDb()` callers that remain are the intended workspace-agnostic surfaces.
 
 **Status:** This gap is documented but **not pre-decided** as a Phase-2 blocker. The Phase-1 caller-migration surface is already at >95% of the migration-capable call sites; the remaining ~5% requires the architectural decision above. The plan v1+ stays free to pick Path A, B, or C when Phase-2 implementation begins; until then, the deferred files in §3.2 stay Cat B.
