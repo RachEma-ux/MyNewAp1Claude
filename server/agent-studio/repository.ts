@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveMcpServerRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  serverId: number,
+) {
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): shared serverId→routed-
+  // conn helper. agsDraftMcpServers.draftId is a direct FK — single
+  // SELECT, then chain into resolveDraftRoutedConn. Falls back to
+  // lookupConn on any null. Thirteenth sister helper.
+  const serverRows = await lookupConn
+    .select({ draftId: agsDraftMcpServers.draftId })
+    .from(agsDraftMcpServers)
+    .where(eq(agsDraftMcpServers.id, serverId))
+    .limit(1);
+  const draftId = serverRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
 async function resolveHookRoutedConn(
   lookupConn: ReturnType<typeof db>,
   hookId: number,
@@ -2043,8 +2061,13 @@ export async function saveMcpServer(input: {
   url?: string | null;
   enabled?: boolean;
 }): Promise<typeof agsDraftMcpServers.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer.
+  // UPDATE branch routes via resolveMcpServerRoutedConn
+  // (serverId→draftId), INSERT branch routes via
+  // resolveDraftRoutedConn(input.draftId).
+  const lookupConn = db();
   if (input.serverId) {
+    const conn = await resolveMcpServerRoutedConn(lookupConn, input.serverId);
     const [updated] = await conn
       .update(agsDraftMcpServers)
       .set({
@@ -2062,6 +2085,7 @@ export async function saveMcpServer(input: {
     if (!updated) throw new Error(`MCP server ${input.serverId} not found`);
     return updated;
   }
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
   const [created] = await conn
     .insert(agsDraftMcpServers)
     .values({
@@ -2080,7 +2104,11 @@ export async function saveMcpServer(input: {
 }
 
 export async function removeMcpServer(serverId: number) {
-  await db().delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.id, serverId));
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer via
+  // resolveMcpServerRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveMcpServerRoutedConn(lookupConn, serverId);
+  await conn.delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.id, serverId));
 }
 
 /**
@@ -2106,7 +2134,11 @@ export async function updateMcpServerStatus(
     | "abandoned"
     | "disabled"
 ) {
-  await db()
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer via
+  // resolveMcpServerRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveMcpServerRoutedConn(lookupConn, serverId);
+  await conn
     .update(agsDraftMcpServers)
     .set({ status, updatedAt: new Date() })
     .where(eq(agsDraftMcpServers.id, serverId));
@@ -2123,7 +2155,11 @@ export async function setMcpServerEnabled(
   serverId: number,
   enabled: boolean
 ) {
-  await db()
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer via
+  // resolveMcpServerRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveMcpServerRoutedConn(lookupConn, serverId);
+  await conn
     .update(agsDraftMcpServers)
     .set({ enabled, updatedAt: new Date() })
     .where(eq(agsDraftMcpServers.id, serverId));
@@ -2219,7 +2255,11 @@ export async function updateMcpServerOAuth(
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.oauthConfig !== undefined) set.oauthConfig = patch.oauthConfig;
   if (patch.oauthState !== undefined) set.oauthState = patch.oauthState;
-  await db()
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer via
+  // resolveMcpServerRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveMcpServerRoutedConn(lookupConn, serverId);
+  await conn
     .update(agsDraftMcpServers)
     .set(set)
     .where(eq(agsDraftMcpServers.id, serverId));
@@ -2237,7 +2277,11 @@ export async function replaceMcpServers(
     enabled?: boolean;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-fifth batch (PR-V1-125): Path B consumer via
+  // resolveDraftRoutedConn. DELETE-all + bulk-INSERT share a single
+  // routed conn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn.delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.draftId, draftId));
   if (servers.length === 0) return;
   await conn.insert(agsDraftMcpServers).values(
