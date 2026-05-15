@@ -46,6 +46,7 @@ export {
   getWorkspaceRegionPin,
   listAllWorkspaceRegionPins,
   removeWorkspaceRegionPin,
+  setPinChangeHook,
   type WorkspaceRegionPinRecord,
   type SetWorkspaceRegionPinInput,
 } from "./workspace-region-pin-service.js";

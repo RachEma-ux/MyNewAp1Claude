@@ -48,6 +48,32 @@ export interface SetWorkspaceRegionPinInput {
   readonly notes?: string | null;
 }
 
+/**
+ * Late-bound hook fired after every pin write. The routing bridge
+ * (PR-V1-152) registers a callback that invalidates + re-warms the
+ * in-process cache so pin changes are visible without a restart.
+ *
+ * Default is null — single-region operators without the routing
+ * bridge installed see no effect. Tests register their own callbacks
+ * to assert the fire path.
+ */
+let _onPinChanged: (() => void) | null = null;
+
+export function setPinChangeHook(hook: (() => void) | null): void {
+  _onPinChanged = hook;
+}
+
+function firePinChanged(): void {
+  if (_onPinChanged) {
+    try {
+      _onPinChanged();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ags-workspace-region-pin] change hook threw — ${msg}`);
+    }
+  }
+}
+
 function rowToPin(r: Record<string, unknown>): WorkspaceRegionPinRecord {
   return {
     id: Number(r.id),
@@ -91,6 +117,7 @@ export async function setWorkspaceRegionPin(
       .where(eq(agsWorkspaceRegionPins.workspaceId, input.workspaceId))
       .returning();
     if (!updated) throw new Error("Failed to update workspace region pin");
+    firePinChanged();
     return rowToPin(updated as Record<string, unknown>);
   }
   const [inserted] = await db
@@ -103,6 +130,7 @@ export async function setWorkspaceRegionPin(
     })
     .returning();
   if (!inserted) throw new Error("Failed to insert workspace region pin");
+  firePinChanged();
   return rowToPin(inserted as Record<string, unknown>);
 }
 
@@ -155,5 +183,6 @@ export async function removeWorkspaceRegionPin(
   await db
     .delete(agsWorkspaceRegionPins)
     .where(eq(agsWorkspaceRegionPins.workspaceId, workspaceId));
+  firePinChanged();
   return true;
 }
