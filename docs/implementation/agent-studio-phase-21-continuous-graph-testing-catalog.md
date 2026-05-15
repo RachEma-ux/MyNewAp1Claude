@@ -125,3 +125,60 @@ Roadmap §"Phase 21 Acceptance Criteria":
 - Strict audit: `docs/implementation/agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`
 - Remaining plan: `docs/implementation/agent-studio-native-graph-workspace-remaining-execution-plan.md`
 - Hard rules: `CLAUDE.md` "Hard rules" section
+
+---
+
+## 7. Ancillary contract / validator coverage (added 2026-05-15)
+
+The 26 entries in §1 cover the **runtime** test catalog enumerated in the
+roadmap. Several follow-up slices added pure-function tests on the
+closed-taxonomy contracts that ship AHEAD of the runtime, plus
+structural lockstep tests for boot wire-ups, audit docs, and bridge
+wirings. Those tests are not roadmap-catalog entries but provide
+ancillary coverage so contracts can't silently drift before the
+runtime catches up.
+
+### 7.1 — Contract closed-taxonomy + validator surface tests
+
+| Test file | Contract module | PR |
+|---|---|---|
+| `graph-lens-registry.test.ts` | `services/graph-lens/registry` | T-F.1 / #989 |
+| `graph-lens-default-installer.test.ts` | `services/graph-lens/install-default-lenses` | T-F.2 / #992 |
+| `graph-lens-impact-analysis-contracts.test.ts` | `services/graph-lens/impact-analysis-contracts` | T-F.3 / #993 |
+| `graph-lens-runner-contract.test.ts` | `services/graph-lens/runner-contract` | T-F.5 / #997 |
+| `graph-lens-stub-runners.test.ts` | `services/graph-lens/stub-runners` | T-F.6 / #998 |
+| `graph-lens-install-default-stack.test.ts` | `services/graph-lens/install-default-lens-stack` | T-F.7 / #1005 |
+| `boot-step-3-35-lens-stack.test.ts` | `agent-studio/boot.ts` Step 3.35 | T-F.8 / #1006 |
+| `institutional-memory-contracts.test.ts` | `services/institutional-memory/contracts` | T-G.1 / #994 |
+| `institutional-memory-node-projector.test.ts` | `services/institutional-memory/project-node` | T-G.10 / #1010 |
+| `security-graph-contracts.test.ts` | `services/security-graph/contracts` | T-G.3 / #995 |
+| `security-graph-path-navigation.test.ts` | `services/security-graph/contracts` (helpers) | T-G.11 / #1011 |
+| `recommendation-contracts.test.ts` | `services/recommendation/contracts` | T-G.4 / #996 |
+| `recommendation-assemble-response.test.ts` | `services/recommendation/assemble-response` | T-G.8 / #1008 |
+| `code-intelligence-contracts.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` | T-G.2-contracts / #1003 |
+| `code-graph-batch-validator.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` (batch) | T-G.7 / #1007 |
+| `graph-algorithm-contracts.test.ts` | `services/graph-algorithm/contracts` | T-G.5 / #1004 |
+| `graph-algorithm-preflight.test.ts` | `services/graph-algorithm/contracts` (preflight) | T-G.9 / #1009 |
+| `failure-states-contracts.test.ts` | `services/failure-states/contracts` | T-I.3 / #1002 |
+
+### 7.2 — Phase 22 emission bridge + wiring lockstep tests
+
+| Test file | Surface tested | PR |
+|---|---|---|
+| `failure-state-observability-bridge.test.ts` | `recordFailureStateEvent` encode/decode + stubbed-db integration | T-I.5 / #1013 |
+| `phase-22-emission-audit-coverage.test.ts` | `docs/.../agent-studio-phase-22-failure-state-emission-audit.md` lockstep | T-I.4 / #1012 |
+| `health-alert-failure-state-wiring.test.ts` | `services/graph/health-alert.ts` wiring | T-I.5.A.1 / #1014 |
+| `drift-cron-failure-state-wiring.test.ts` | `services/graph/projection/drift-cron.ts` wiring | T-I.5.A.2 / #1015 |
+| `safety-filter-failure-state-wiring.test.ts` | `services/graph/retrieval/retrieval-router.ts` (safety-filter) | T-I.5.A.3 / #1016 |
+| `detect-tool-schema-changes.test.ts` | `services/mcp/detect-tool-schema-changes.ts` pure-function diff | T-I.5.A.4 / #1017 |
+| `text2cypher-failure-state-wiring.test.ts` | `services/graph/retrieval/retrieval-router.ts` (text2cypher) | T-I.5.A.5 / #1018 |
+| `cypher-template-failure-state-wiring.test.ts` | `services/graph/retrieval/retrieval-router.ts` (executeTemplateAudited) | T-I.5.A.6 / #1019 |
+| `failure-state-bridge-wiring-coverage.test.ts` | Bridge coverage guard — locks all 6 batch-A wirings in one table | T-I.6 / #1020 |
+
+### 7.3 — Catalog gap status update
+
+| Gap # | Status @ 2026-05-15 | Notes |
+|---|---|---|
+| 12 | Still open at runtime level | T-F contracts shipped (#993, #997-#998, #1005, #1006); concrete per-kind runners still stubs |
+| 18 | **Projection helper shipped @ #1010** | `projectInstitutionalMemoryNode("timeline_event", row)` can now project; runtime caller (lens-runner reading `ags_runtime_runs`) is the remaining work |
+| 3 + 8 | Still inlined | Cleanup-only; no behavioral gap |
