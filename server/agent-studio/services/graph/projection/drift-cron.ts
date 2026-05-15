@@ -56,6 +56,7 @@ import {
   type DriftReport,
   type SourceRowCount,
 } from "./drift-detector.js";
+import { recordFailureStateEvent } from "../../failure-states/observability-bridge.js";
 
 const SAMPLE_PER_TYPE_DEFAULT = 25;
 
@@ -190,6 +191,28 @@ const cron = makeRetentionCron<DriftCronInput, DriftCronResult>({
     const persist = input.persist ?? persistDriftReport;
     const report = await runScan(detectorInput);
     const persisted = await persist(report);
+    // T-I.5 batch A — bridge drift detection to the Phase 22 closed-
+    // taxonomy emission surface so operator dashboards can group
+    // `neo4j_projection_drift_detected` events alongside other failure
+    // states. Only emit when driftCount > 0 (zero-drift scans aren't
+    // a failure event); fire-and-forget — observability writes never
+    // propagate into the cron return path.
+    if (report.summary.driftCount > 0) {
+      void recordFailureStateEvent({
+        failureState: "neo4j_projection_drift_detected",
+        sourceKind: "projection-drift-cron",
+        sourceId: report.scope,
+        errorMessage: `Projection drift detected — ${report.summary.driftCount} event(s) across ${report.summary.totalScanned} scanned`,
+        metadata: {
+          scope: report.scope,
+          totalScanned: report.summary.totalScanned,
+          driftCount: report.summary.driftCount,
+          permissionLeakCount: report.summary.permissionLeakCount,
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
+    }
     return {
       scope: report.scope,
       scannedAt: report.scannedAt,
