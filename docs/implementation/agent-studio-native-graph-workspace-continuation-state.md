@@ -81,7 +81,19 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 | #779 PR-V1-28 | OL-6 (V2.0) | Offline cache full bootstrap composer (`offline-cache-full-bootstrap.ts`): single `bootstrapOfflineCache({ updateNote, createNote, deleteNote, beforeHydrate?, afterHydrate?, afterDrain?, eventTarget? })` call composes the locked 4-step chain — `registerDefaultOfflineDrainImpls` → `createOfflineDrainDispatcher` → `await hydrateOfflineQueueOnLoad` → `installOfflineDrainListener({ onDrain: dispatcher })` — and returns `{ hydratedCount, handle }`. Closes the OL-1→OL-6 chain at the service layer; the only remaining work for OL is the App.tsx/main.tsx call site with real tRPC mutations. 13-test suite | `4d9abb01` |
 | #780 PR-V1-29 | NV-1 (V1.0) | Server-side `vault.note.delete` procedure (closes contract gap surfaced during OL-5): `NoteDeleteInput` Zod (noteId + optional `expectedVersion`) + `VaultRepository.deleteNote` interface method + `VaultRepositoryStub` semantics + `AsdbVaultRepository` soft-delete impl (`UPDATE ags_vault_notes SET deletedAt = NOW()` with `deletedAt IS NULL` precondition) + `agentStudio.vault.deleteNote` tRPC mutation (NOT_FOUND on missing, alreadyDeleted:true on idempotent second call, conflict+latestVersion on optimistic-lock mismatch). 21-test suite | pending |
 
-**Next material work:** MR caller-migration sub-arc, concrete lane hooks (retrieve/assemble/compose), App.tsx/main.tsx call site invoking `bootstrapOfflineCache` with real tRPC closures (now possible after NV-1), y-protocols framing in transport (CRDT-γ-3). V1.0+V1.5+V2.0 α+β+γ + MR×19 + AS-1 + OL-4/5/6 + NV-1 all landed; offline-cache subsystem is **end-to-end composed** at the service layer AND `vault.note.delete` server endpoint exists.
+**2026-05-15 session — 54-PR admin-saturation burst (#930–#983):** unrendered-fields audit + aggregate-summary mini-arc + rate/age/distinct-count gauges arc shipped across extensions/region/publish-targets/graph-health/canvas-drain/approval-bus/graph-skill-usage/graph-agent-explain admin surfaces. Main @ `7d97d10c`. Full ledger in V1+ plan §6.1 (rows #930–#983) and tracker §7.
+
+**Next material work (post-2026-05-15):** Executing the remaining execution plan at `/sdcard/Download/agent-studio-native-graph-workspace-remaining-execution-plan.md` (and committed under `docs/implementation/` once T-A.1 is merged). Track sequence:
+- **T-A** — doc-drift reconciliation (this PR)
+- **T-C** — CLAUDE.md Non-Build List reconciliation
+- **T-B** — V1+ saturation finish-out (G3 evidence, MR caller tail, concrete lane hooks, OL bootstrap call site)
+- **T-D** — Phase 23 Graph Quality Agent + Semantic Enrichment + self-correction loop (12–18 PRs)
+- **T-E** — Phase 20.5 Code Graph Parser Spike (3–4 PRs)
+- **T-F** — Phase 24 Bases MVP + Lens registry + Impact Analysis (14–20 PRs)
+- **T-G** — Phase 25 Institutional/Code/Security/Recommendation graphs (18–25 PRs, gated on T-E)
+- **T-H** — V2 advanced + Aura migration (operator approval required)
+
+Previously listed "next material work" items (MR caller-migration sub-arc, concrete lane hooks, App.tsx/main.tsx OL bootstrap call site, y-protocols framing) now belong to T-B saturation finish-out.
 
 The historical (pre-strict-audit) recovery context follows.
 

@@ -165,6 +165,18 @@ PRs per each phase's "out of scope for the α slice" section.
 | MR-3 second batch — `vault/repository-asdb.ts::createVault` (V2.0) | #797 | pending |
 | MR-3 third batch — `ingestion/ingestion-job-service.ts::startJob` (V2.0) | #798 | `176befbb` |
 
+**V1+ admin-surface saturation burst — 2026-05-15 (54 PRs #930–#983):**
+
+The session-2026-05-15 burst ships operator-visibility saturation across the V1+ admin surfaces. Three sub-arcs:
+
+1. **Unrendered-fields audit (#930–#956)** — hard uninstall + cascade-delete invocations, invocation summaries, recent invocation logs, region workspace-location lookup, force-reconnect (approval-bus + region pubsub), credential binding ID column, signing indicator, lifecycle column with actor audit columns, settings drill-down, config drill-down, execution details drill-down, duration column, digest column, batches column with hitMaxBatches highlight, graph-health cron fields correctness fix + contract anchor, drift result fields, rewarm cron field correctness fix, per-workspace breakdown table, projection drift cron status card.
+
+2. **Aggregate-summary mini-arc (#957–#969)** — color-coded list-header summaries derived in-render from existing queries: workspace-aggregate health summary, extensions invocations aggregate, alerts severity aggregate, publish-targets enabled/disabled aggregate, workspaces-with-failures count, extensions count-label, publish-executions count-label, active-regions topology aggregate (primary count misconfig-aware highlight), canvas snapshot kind breakdown (closed `CANVAS_NODE_KINDS` taxonomy + contract anchor), extensions lane breakdown (closed `EXTENSION_CAPABILITY_LANES` taxonomy + contract anchor), region pins distribution by region key (sorted desc).
+
+3. **Rate / age / distinct-count gauges arc (#970–#983)** — publish-targets type breakdown (closed `PUBLISH_TARGET_TYPES`), publish-executions version column (renders unrendered `sourceVersionId`), never-published count (publish) + never-invoked count (extensions), settled success rate (publish + extensions + drain — same ≥99% emerald / ≥90% amber / else destructive heuristic), graph-health alert Age column (`fmtAge` helper with parameterized `now`) + oldest-alert summary, canvas note-references distinct count via Set, approval-bus malformed rate, graph-skill-usage distinct keys gauge, graph-agent explain slowest step + step-kind distribution.
+
+Main @ `7d97d10c` after #983. V1+ plan ledger updated at `agent-studio-native-graph-workspace-v1-v2-execution-plan.md` §6.1 with all 54 rows.
+
 Phase J-1-β wires the PR-V1-1 evaluator into the shared
 `makeRetentionCron` factory at `*/5 * * * *` (every 5 minutes) and
 adds boot Step 3.25 + admin tRPC `agentStudio.graphHealth.*`. No new
