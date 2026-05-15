@@ -72,8 +72,21 @@ export async function listPackEvents(
   agentDraftId: number,
   limit = 100,
 ): Promise<CagPackEvent[]> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-fourth batch (PR-V1-134): Path B read consumer.
+  // agsCagPackEvents.workspaceId is non-null (workspace-scoped); we
+  // resolve workspaceId via Path B and route the SELECT to the
+  // home region. Falls back to bootstrap when the draft has no
+  // binding (legacy / pre-Phase-11).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupDb, agentDraftId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
 
   const rows = await db
     .select()
