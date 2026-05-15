@@ -192,6 +192,7 @@ runtime catches up.
 | `lens-runner-registry-coverage.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensRunnerRegistry` (registeredKinds / missingKinds list / coveragePercent over the runtime runner registry) | T-F.12 / #1068 |
 | `finding-class-for-proposal-kind.test.ts` | `services/graph-quality/finding-to-proposal` — `findingClassForProposalKind` (inverse lookup of FINDING_CLASS_TO_PROPOSAL_KIND; null for review_* fallbacks or unknown kinds) | T-D.10 / #1069 |
 | `failure-state-row-collection-helpers.test.ts` | `services/failure-states/observability-bridge` — `partitionRowsByFailureState` + `groupRowsByFailureStateKind` (collection helpers over raw observability rows) | T-I.30 / #1070 |
+| `recommendation-kind-metadata.test.ts` | `services/recommendation/contracts` — `RECOMMENDATION_KIND_METADATA` (8-entry per-kind operator label + description; symmetry with RECOMMENDATION_KINDS) | T-G.23 / #1071 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

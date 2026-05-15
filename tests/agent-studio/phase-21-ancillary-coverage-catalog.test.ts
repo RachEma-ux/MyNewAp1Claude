@@ -79,6 +79,7 @@ const ANCILLARY_TESTS = [
   "lens-runner-registry-coverage.test.ts",
   "finding-class-for-proposal-kind.test.ts",
   "failure-state-row-collection-helpers.test.ts",
+  "recommendation-kind-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
