@@ -420,6 +420,36 @@ export function RegionAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Workspace pins</SectionLabel>
+          {/* PR-V1-209: pin-aggregate summary — same shape as the
+              publish/extensions/graph-health aggregates. Surfaces
+              replicated vs non-replicated split since the cache
+              status only shows the total pin count. */}
+          {pinsQ.data && pinsQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="region-pins-aggregate-summary"
+            >
+              {(() => {
+                let replicated = 0;
+                let nonReplicated = 0;
+                for (const p of pinsQ.data) {
+                  if (p.isReplicated) replicated += 1;
+                  else nonReplicated += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Pins:</span>{" "}
+                    <span className="font-mono">{pinsQ.data.length}</span>{" "}
+                    total —{" "}
+                    <span className="font-mono">{replicated}</span> replicated
+                    {" / "}
+                    <span className="font-mono">{nonReplicated}</span>{" "}
+                    non-replicated
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {pinsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading pins…</p>
           ) : pinsQ.error ? (
