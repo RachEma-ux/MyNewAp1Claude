@@ -134,8 +134,19 @@ export async function createCanvas(
 export async function getCanvasById(
   canvasId: number,
 ): Promise<CanvasRecord | null> {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 sixty-eighth batch (PR-V1-138): Path-A read consumer
+  // reuses the existing resolveWorkspaceIdForCanvas helper. The
+  // SELECT now routes to the home region under Phase-2 via
+  // getAsDbForWorkspace. Returns null when the canvas row doesn't
+  // exist (helper returns null → fall back to lookupDb, then the
+  // SELECT below returns empty rows).
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, canvasId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsCanvases)
@@ -147,8 +158,20 @@ export async function getCanvasById(
 export async function listCanvasesByVault(
   vaultId: number,
 ): Promise<ReadonlyArray<CanvasRecord>> {
-  const db = getAsDb();
-  if (!db) return [];
+  // V1+ MR-3 sixty-eighth batch (PR-V1-138): Path-A read consumer.
+  // vaultId → agsVaults.workspaceId in a single pre-projection
+  // SELECT, then route the SELECT on agsCanvases to the home region.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaults)
+    .where(eq(agsVaults.id, vaultId))
+    .limit(1);
+  const db =
+    wsRows.length > 0
+      ? (getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsCanvases)
@@ -260,10 +283,18 @@ export async function createCanvasEdge(
 export async function getCanvasSnapshot(
   canvasId: number,
 ): Promise<CanvasSnapshot> {
+  // V1+ MR-3 sixty-eighth batch (PR-V1-138): Path-A read consumer
+  // via resolveWorkspaceIdForCanvas. The nodes + edges SELECTs share
+  // a single routed conn so the snapshot is consistent under Phase-2.
   const canvas = await getCanvasById(canvasId);
   if (!canvas) throw new CanvasNotFoundError(canvasId);
-  const db = getAsDb();
-  if (!db) return { canvas, nodes: [], edges: [] };
+  const lookupDb = getAsDb();
+  if (!lookupDb) return { canvas, nodes: [], edges: [] };
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, canvasId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const nodeRows = await db
     .select()
     .from(agsCanvasNodes)
@@ -288,8 +319,15 @@ export async function getCanvasSnapshot(
 export async function listNoteReferencesForCanvas(
   canvasId: number,
 ): Promise<ReadonlyArray<{ nodeId: number; noteId: number }>> {
-  const db = getAsDb();
-  if (!db) return [];
+  // V1+ MR-3 sixty-eighth batch (PR-V1-138): Path-A read consumer
+  // via resolveWorkspaceIdForCanvas.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const workspaceId = await resolveWorkspaceIdForCanvas(lookupDb, canvasId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select({
       nodeId: agsCanvasNodes.id,
