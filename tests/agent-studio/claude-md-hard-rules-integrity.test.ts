@@ -23,6 +23,7 @@ describe("T-C.1 — CLAUDE.md hard-rules integrity", () => {
   const claudeMd = resolve(__dirname, "../../CLAUDE.md");
 
   const ETERNAL_HARD_RULES = [
+    // Original 9 (T-C.1 / #985):
     "All graph access goes through `GraphRepository`",
     "No `neo4j-driver` imports outside",
     "Postgres = source of truth; Neo4j CE = projected backend",
@@ -32,6 +33,30 @@ describe("T-C.1 — CLAUDE.md hard-rules integrity", () => {
     "Read-only Text2Cypher; mutations forbidden",
     "single tool execution chokepoint",
     "single model execution path",
+    // T-C.2 (#1033) — extended hard-rule coverage:
+    "OpenRouter remains the model execution path",
+    "Existing MCP dispatcher",
+    "Existing CAG Capability Packs",
+    "Existing approval/governance scaffolding",
+    "AGENTS.md is the authoritative repo operating policy",
+    "Extend existing Agent Studio. Do not greenfield-rebuild it",
+    "Agent Studio Universal KB / Universal Ingestion / RAC / RAG / CAG / MCP Tool-Use / Critical Approval retrofit",
+    // 8-class riskClass closed taxonomy (CAG D-TOOL-1):
+    "8-class `riskClass` taxonomy",
+    // RAC 8-mode list (smoke check for the mode enum):
+    "no_retrieval",
+    "cag_only",
+    "knowledge_retrieval",
+    "multimodal_hybrid_retrieval",
+    "tool_knowledge_retrieval",
+    "hybrid_cag_rag",
+    "hybrid_cag_rag_tool_knowledge",
+    // Sandbox routing:
+    "Sandbox routes `riskClass=\"code_execution\"`",
+    // pgvector deferred:
+    "Do not force `pgvector` migration in MVP",
+    // Single-region operational baseline:
+    "single-region remains the operational baseline",
   ];
 
   for (const rule of ETERNAL_HARD_RULES) {
