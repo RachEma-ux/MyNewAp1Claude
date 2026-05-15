@@ -55,6 +55,9 @@ export {
   type LaneHookOutcome,
 } from "./lane-hooks.js";
 
+// V1+ Phase 18 follow-up (2026-05-15, PR-V1-162): admin tRPC router.
+export { extensionsAdminRouter } from "./extensions-admin-router.js";
+
 // V1+ 18-γ-contracts: typed per-lane contract surface.
 export {
   CONTRACTED_EXTENSION_LANES,

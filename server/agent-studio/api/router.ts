@@ -77,6 +77,7 @@ import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
+import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
@@ -2920,6 +2921,11 @@ export const agentStudioRouter = router({
   // surface — listActiveRegions, registerRegion, listPins, getPin,
   // setPin, removePin, getCacheStatus, getRewarmCronStatus.
   region: regionAdminRouter,
+  // V1+ Phase 18 follow-up (2026-05-15, PR-V1-162): extensions admin
+  // surface — list, get, install, approve, setStatus. All
+  // mutations route through the existing manifest helpers that
+  // preserve the governance scaffolding contract.
+  extensions: extensionsAdminRouter,
   // V1+ 17-γ follow-up (2026-05-14): canvas projection events
   // drain scheduler observability — `getDrainStatus` reads the
   // module-singleton tick state (#810) so operators can verify
