@@ -150,5 +150,6 @@ The Phase 22 failure-state taxonomy (`FAILURE_STATES`, 25 closed kinds, #1002) r
 | Wire graph-agent budget exhaustion | #1023 | `graph_agent_answer_incomplete` (first batch-B wiring); fires for `max_iterations` / `wall_clock_budget` only |
 | Wire projection sync worker | #1025 | `projection_sync_failed` (second batch-B wiring); fires when apply step returns ≥1 error, including partial-success |
 | Wire quality-agent duplicate-entity scan | #1026 | `entity_resolution_conflict` (third batch-B wiring); fires per-agent-run when duplicate_entity scanner emits ≥1 finding |
+| Wire promotion lifecycle (submit + reject) | #1027 | `promotion_failed` (fourth batch-B wiring); fires on validation-rejected submit AND operator-initiated reject; `rejectionStage` metadata distinguishes the two paths |
 
-**9 of 25 closed kinds have live emitters today** (batch A: 6 + batch B: 3). The audit (#1012) names the remaining 16 with batch-B / detection-first / phase-gated tier assignments.
+**10 of 25 closed kinds have live emitters today** (batch A: 6 + batch B: 4). The audit (#1012) names the remaining 15 with batch-B / detection-first / phase-gated tier assignments.
