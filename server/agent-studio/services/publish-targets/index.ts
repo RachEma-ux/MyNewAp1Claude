@@ -103,16 +103,19 @@ export {
 // PR-V1-187: + setEnabled mutation.
 // PR-V1-188: + per-target execution summary aggregate.
 // PR-V1-189: + single-execution detail surface (with details JSON).
+// PR-V1-193: + single-target detail with config JSON.
 export {
   listPublishTargets,
   listRecentPublishExecutions,
   setPublishTargetEnabled,
   getPublishTargetExecutionSummaries,
   getPublishExecutionById,
+  getPublishTargetById,
   PublishTargetNotFoundForToggleError,
   type PublishTargetSummary,
   type PublishExecutionRow,
   type PublishTargetExecutionSummary,
   type PublishExecutionDetail,
+  type PublishTargetWithConfig,
 } from "./admin-queries.js";
 export { publishTargetsAdminRouter } from "./admin-router.js";

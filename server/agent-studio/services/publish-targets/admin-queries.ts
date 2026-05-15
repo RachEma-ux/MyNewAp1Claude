@@ -35,6 +35,18 @@ export interface PublishTargetSummary {
   readonly updatedAt: Date;
 }
 
+/**
+ * PR-V1-193: full registry row with `config` JSON. Same on-demand
+ * pattern as `getPublishExecutionById` (#940) — config can hold
+ * per-target operator metadata (signing key id, max payload size,
+ * dry-run flag) and isn't part of the registry list to keep the
+ * payload small. UI fetches when an operator clicks "view config"
+ * on a row.
+ */
+export interface PublishTargetWithConfig extends PublishTargetSummary {
+  readonly config: Record<string, unknown> | null;
+}
+
 export interface PublishExecutionRow {
   readonly id: number;
   readonly targetId: number;
@@ -163,6 +175,35 @@ export class PublishTargetNotFoundForToggleError extends Error {
     super(`Publish target ${targetId} not found`);
     this.name = "PublishTargetNotFoundForToggleError";
   }
+}
+
+/**
+ * PR-V1-193: fetch a single publish-target row including the
+ * `config` JSON blob. Returns null when not found.
+ */
+export async function getPublishTargetById(
+  targetId: number,
+): Promise<PublishTargetWithConfig | null> {
+  const db = getAsDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(agsPublishTargets)
+    .where(eq(agsPublishTargets.id, targetId))
+    .limit(1);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: Number(r.id),
+    targetKey: String(r.targetKey),
+    targetType: String(r.targetType),
+    endpoint: String(r.endpoint),
+    providerConnectionId: (r.providerConnectionId as number | null) ?? null,
+    enabled: Boolean(r.enabled),
+    createdAt: r.createdAt as Date,
+    updatedAt: r.updatedAt as Date,
+    config: (r.config as Record<string, unknown> | null) ?? null,
+  };
 }
 
 /**

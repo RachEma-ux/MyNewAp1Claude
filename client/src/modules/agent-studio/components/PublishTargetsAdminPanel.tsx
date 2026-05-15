@@ -63,6 +63,19 @@ export function PublishTargetsAdminPanel() {
       onError: (err) => setMutationError(err.message),
     });
 
+  // PR-V1-193: on-demand single-target config view. Same
+  // lazy-enabled pattern as the per-execution detail below.
+  const [expandedTargetId, setExpandedTargetId] = useState<number | null>(
+    null,
+  );
+  const targetDetailQ = trpc.agentStudio.publishTargets.getTargetById.useQuery(
+    { targetId: expandedTargetId ?? -1 },
+    {
+      enabled: expandedTargetId !== null,
+      refetchOnWindowFocus: false,
+    },
+  );
+
   // PR-V1-189: on-demand single-execution detail. UI tracks the
   // currently-expanded executionId; the query is lazy-enabled so
   // we don't pay the JSON-fetch cost unless the operator clicks.
@@ -174,7 +187,8 @@ export function PublishTargetsAdminPanel() {
                   {targetsQ.data.map((t) => {
                     const s = summaryByTargetId.get(t.id);
                     return (
-                    <tr key={t.id} className="border-t">
+                    <React.Fragment key={t.id}>
+                    <tr className="border-t">
                       <td className="py-1 pr-3 font-mono text-xs">
                         {t.targetKey}
                       </td>
@@ -209,7 +223,7 @@ export function PublishTargetsAdminPanel() {
                       <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
                         {fmtTs(t.updatedAt)}
                       </td>
-                      <td className="py-1 pr-3">
+                      <td className="py-1 pr-3 space-x-2">
                         <button
                           type="button"
                           className="text-xs underline"
@@ -224,8 +238,53 @@ export function PublishTargetsAdminPanel() {
                         >
                           {t.enabled ? "disable" : "enable"}
                         </button>
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          data-testid={`publish-target-config-toggle-${t.id}`}
+                          onClick={() =>
+                            setExpandedTargetId(
+                              expandedTargetId === t.id ? null : t.id,
+                            )
+                          }
+                        >
+                          {expandedTargetId === t.id
+                            ? "hide config"
+                            : "view config"}
+                        </button>
                       </td>
                     </tr>
+                    {expandedTargetId === t.id ? (
+                      <tr
+                        className="bg-muted/30"
+                        data-testid={`publish-target-config-row-${t.id}`}
+                      >
+                        <td colSpan={9} className="p-2">
+                          {targetDetailQ.isLoading ? (
+                            <p className="text-xs text-muted-foreground">
+                              Loading config…
+                            </p>
+                          ) : targetDetailQ.error ? (
+                            <p className="text-xs text-destructive">
+                              Failed to load: {targetDetailQ.error.message}
+                            </p>
+                          ) : !targetDetailQ.data ? (
+                            <p className="text-xs text-muted-foreground">
+                              Target not found.
+                            </p>
+                          ) : (
+                            <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                              {JSON.stringify(
+                                targetDetailQ.data.config ?? {},
+                                null,
+                                2,
+                              )}
+                            </pre>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
+                    </React.Fragment>
                     );
                   })}
                 </tbody>
