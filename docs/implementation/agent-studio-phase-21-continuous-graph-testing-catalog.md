@@ -187,6 +187,7 @@ runtime catches up.
 | `failure-state-severity-helpers.test.ts` | `services/failure-states/contracts` — failureStateSeverityRank + compareFailureStateSeverity + sortFailureStateItemsBySeverityDesc + getMostSevereFailureStateItem (mirror of T-G.12/T-D.9 for the 3-key info/warning/critical taxonomy) | T-I.27 / #1063 |
 | `failure-state-category-severity-matrix.test.ts` | `services/failure-states/contracts` — `buildFailureStateCategorySeverityMatrix` (2D category × severity heat-map matrix; stable-shape on both axes) | T-I.28 / #1064 |
 | `annotate-rows-with-failure-state.test.ts` | `services/failure-states/observability-bridge` — `annotateRowsWithFailureState` (batch wrapper around extractFailureStateAnnotations; preserves row reference; null for free-form) | T-I.29 / #1065 |
+| `code-graph-cardinality-summary.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `summarizeCodeGraphCardinality` (oneToOne / oneToMany / manyToMany counts over edge-type constraints) | T-G.21 / #1066 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
