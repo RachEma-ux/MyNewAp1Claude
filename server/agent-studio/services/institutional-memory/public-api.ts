@@ -8,8 +8,10 @@ export {
   isInstitutionalMemoryNodeType,
   listMappedInstitutionalMemoryNodeTypes,
   listUnmappedInstitutionalMemoryNodeTypes,
+  summarizeInstitutionalMemoryCoverage,
   type InstitutionalMemoryNodeType,
   type InstitutionalMemorySourceMapping,
+  type InstitutionalMemoryCoverageSummary,
 } from "./contracts.js";
 
 export {

@@ -199,3 +199,33 @@ export function listUnmappedInstitutionalMemoryNodeTypes(): ReadonlyArray<Instit
     (t) => INSTITUTIONAL_MEMORY_SOURCE_MAPPING[t].sourceTable === null,
   );
 }
+
+// ============================================================================
+// Coverage summary (T-G.14)
+// ============================================================================
+
+export interface InstitutionalMemoryCoverageSummary {
+  readonly total: number;
+  readonly mapped: number;
+  readonly unmapped: number;
+  /** Percentage in [0, 100], 1-decimal precision. */
+  readonly coveragePercent: number;
+}
+
+/**
+ * Returns a stable-shape summary of institutional-memory taxonomy
+ * coverage: how many node types have a real SoT mapping vs. are
+ * still placeholders. Operator dashboards bind to this for the "X of
+ * Y types projecting" health gauge.
+ *
+ * Pure function. Reads from the canonical
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING` only.
+ */
+export function summarizeInstitutionalMemoryCoverage(): InstitutionalMemoryCoverageSummary {
+  const total = INSTITUTIONAL_MEMORY_NODE_TYPES.length;
+  const mapped = listMappedInstitutionalMemoryNodeTypes().length;
+  const unmapped = total - mapped;
+  const coveragePercent =
+    total === 0 ? 0 : Math.round((mapped / total) * 1000) / 10;
+  return { total, mapped, unmapped, coveragePercent };
+}
