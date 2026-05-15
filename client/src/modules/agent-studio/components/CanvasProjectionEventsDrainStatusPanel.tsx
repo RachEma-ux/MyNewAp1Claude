@@ -111,6 +111,56 @@ export function CanvasProjectionEventsDrainStatusPanel() {
                 more work likely remains.
               </p>
             )}
+            {/* PR-V1-192: per-workspace breakdown. Surfaces which
+                workspace(s) failed when totalFailed > 0 so the
+                operator doesn't have to read SQL to find the
+                culprit. Always rendered when perWorkspace has rows;
+                workspaces with 0 processed + 0 failed are
+                de-emphasized via muted color. */}
+            {status.lastTickResult &&
+            status.lastTickResult.perWorkspace.length > 0 ? (
+              <div className="overflow-x-auto pt-1">
+                <table
+                  className="w-full text-xs border-collapse"
+                  data-testid="drain-per-workspace-table"
+                >
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-0.5 pr-3">Workspace</th>
+                      <th className="py-0.5 pr-3">Processed</th>
+                      <th className="py-0.5 pr-3">Failed</th>
+                      <th className="py-0.5 pr-3">Cursor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status.lastTickResult.perWorkspace.map((w) => {
+                      const idle = w.processed === 0 && w.failed === 0;
+                      return (
+                        <tr
+                          key={w.workspaceId}
+                          className={`border-t ${idle ? "text-muted-foreground" : ""}`}
+                        >
+                          <td className="py-0.5 pr-3 font-mono">
+                            {w.workspaceId}
+                          </td>
+                          <td className="py-0.5 pr-3 font-mono">
+                            {w.processed}
+                          </td>
+                          <td
+                            className={`py-0.5 pr-3 font-mono ${w.failed > 0 ? "text-destructive" : ""}`}
+                          >
+                            {w.failed}
+                          </td>
+                          <td className="py-0.5 pr-3 font-mono">
+                            {w.nextLastSeenId}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </div>
         )}
         {/* PR-V1-175: operator-triggered manual tick. */}
