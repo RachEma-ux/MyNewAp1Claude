@@ -134,3 +134,60 @@ export async function listRecentPublishExecutions(args: {
     createdAt: r.createdAt as Date,
   }));
 }
+
+/**
+ * PR-V1-187: operator-toggle for the `enabled` boolean on a
+ * publish target. Disabling a target is the standard
+ * incident-response action when an upstream system is unhealthy —
+ * `executePublish` already refuses to dispatch through a disabled
+ * target (`PublishTargetDisabledError`), so flipping this bit is
+ * sufficient to quiesce a target without touching the registry
+ * row itself.
+ *
+ * Returns the updated row (post-update SELECT shape, same as the
+ * registry list). Throws `PublishTargetNotFoundError` when no row
+ * matches.
+ */
+export class PublishTargetNotFoundForToggleError extends Error {
+  constructor(targetId: number) {
+    super(`Publish target ${targetId} not found`);
+    this.name = "PublishTargetNotFoundForToggleError";
+  }
+}
+
+export async function setPublishTargetEnabled(
+  targetId: number,
+  enabled: boolean,
+): Promise<PublishTargetSummary> {
+  const db = getAsDb();
+  if (!db) throw new PublishTargetNotFoundForToggleError(targetId);
+  const existing = await db
+    .select({ id: agsPublishTargets.id })
+    .from(agsPublishTargets)
+    .where(eq(agsPublishTargets.id, targetId))
+    .limit(1);
+  if (existing.length === 0) {
+    throw new PublishTargetNotFoundForToggleError(targetId);
+  }
+  await db
+    .update(agsPublishTargets)
+    .set({ enabled, updatedAt: new Date() })
+    .where(eq(agsPublishTargets.id, targetId));
+  const rows = await db
+    .select()
+    .from(agsPublishTargets)
+    .where(eq(agsPublishTargets.id, targetId))
+    .limit(1);
+  const r = rows[0];
+  if (!r) throw new PublishTargetNotFoundForToggleError(targetId);
+  return {
+    id: Number(r.id),
+    targetKey: String(r.targetKey),
+    targetType: String(r.targetType),
+    endpoint: String(r.endpoint),
+    providerConnectionId: (r.providerConnectionId as number | null) ?? null,
+    enabled: Boolean(r.enabled),
+    createdAt: r.createdAt as Date,
+    updatedAt: r.updatedAt as Date,
+  };
+}

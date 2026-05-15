@@ -100,9 +100,12 @@ export {
 } from "./install-default-governance-gate.js";
 
 // V1+ Phase 19 admin (PR-V1-186): operator-facing read-only surface.
+// PR-V1-187: + setEnabled mutation.
 export {
   listPublishTargets,
   listRecentPublishExecutions,
+  setPublishTargetEnabled,
+  PublishTargetNotFoundForToggleError,
   type PublishTargetSummary,
   type PublishExecutionRow,
 } from "./admin-queries.js";

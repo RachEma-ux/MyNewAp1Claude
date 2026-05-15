@@ -22,6 +22,7 @@ import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
   listPublishTargets,
   listRecentPublishExecutions,
+  setPublishTargetEnabled,
 } from "./admin-queries.js";
 import { PUBLISH_EXECUTION_STATUSES } from "./types.js";
 
@@ -52,5 +53,22 @@ export const publishTargetsAdminRouter = router({
         status: input.status,
         limit: input.limit,
       });
+    }),
+
+  /**
+   * PR-V1-187: operator-toggle for the `enabled` boolean. Disabled
+   * targets refuse dispatch via `PublishTargetDisabledError` in
+   * `executePublish`. Use this to quiesce a target during an
+   * upstream incident without touching the registry row.
+   */
+  setEnabled: adminProcedure
+    .input(
+      z.object({
+        targetId: z.number().int().positive(),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return setPublishTargetEnabled(input.targetId, input.enabled);
     }),
 });

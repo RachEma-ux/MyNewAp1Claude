@@ -41,12 +41,25 @@ function statusClass(status: string): string {
 }
 
 export function PublishTargetsAdminPanel() {
+  const utils = trpc.useUtils();
   const [targetFilter, setTargetFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const targetsQ =
     trpc.agentStudio.publishTargets.listTargets.useQuery(undefined, {
       refetchOnWindowFocus: false,
+    });
+
+  // PR-V1-187: enable/disable toggle. Disabling refuses dispatch
+  // via `PublishTargetDisabledError` in executePublish.
+  const setEnabledMutation =
+    trpc.agentStudio.publishTargets.setEnabled.useMutation({
+      onSuccess: () => {
+        setMutationError(null);
+        void utils.agentStudio.publishTargets.listTargets.invalidate();
+      },
+      onError: (err) => setMutationError(err.message),
     });
 
   const parsedTargetFilter = Number.parseInt(targetFilter, 10);
@@ -102,6 +115,7 @@ export function PublishTargetsAdminPanel() {
                     <th className="py-1 pr-3">Provider conn</th>
                     <th className="py-1 pr-3">Enabled</th>
                     <th className="py-1 pr-3">Updated</th>
+                    <th className="py-1 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -130,12 +144,36 @@ export function PublishTargetsAdminPanel() {
                       <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
                         {fmtTs(t.updatedAt)}
                       </td>
+                      <td className="py-1 pr-3">
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          data-testid={`publish-target-toggle-${t.id}`}
+                          disabled={setEnabledMutation.isPending}
+                          onClick={() =>
+                            setEnabledMutation.mutate({
+                              targetId: t.id,
+                              enabled: !t.enabled,
+                            })
+                          }
+                        >
+                          {t.enabled ? "disable" : "enable"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          {mutationError ? (
+            <p
+              className="text-sm text-destructive"
+              data-testid="publish-targets-mutation-error"
+            >
+              {mutationError}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
