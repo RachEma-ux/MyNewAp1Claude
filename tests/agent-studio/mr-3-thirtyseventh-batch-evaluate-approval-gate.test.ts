@@ -64,19 +64,24 @@ describe("MR-3 thirty-seventh batch — evaluateApprovalGate Path B consumer", (
   it("evaluateApprovalGate uses resolveWorkspaceIdForDraft from the Path B primitive", () => {
     const body = extractFunctionBody(src, "evaluateApprovalGate");
     expect(body.length).toBeGreaterThan(0);
-    // Use [\s\S]* to allow multi-line arg lists (the formatter wraps
-    // the args across newlines). Tolerate a trailing comma.
+    // PR-V1-145 (seventy-fifth batch) hoisted the resolver up to the
+    // top of the function and renamed the bootstrap handle to
+    // `lookupDb`. The resolver now takes lookupDb (formerly `db`).
     expect(
-      /resolveWorkspaceIdForDraft\s*\(\s*db\s*,\s*input\.agentDraftId\s*,?\s*\)/.test(
+      /resolveWorkspaceIdForDraft\s*\(\s*lookupDb\s*,\s*input\.agentDraftId\s*,?\s*\)/.test(
         body,
       ),
     ).toBe(true);
   });
 
-  it("evaluateApprovalGate routes the lastUsedAt UPDATE via getAsDbForWorkspace(workspaceId), fallback to db", () => {
+  it("evaluateApprovalGate routes through getAsDbForWorkspace(workspaceId) with bootstrap fallback", () => {
     const body = extractFunctionBody(src, "evaluateApprovalGate");
+    // PR-V1-145 (seventy-fifth batch) hoisted the routed handle to
+    // a top-of-function `db` variable: `db = workspaceId != null ?
+    // (getAsDbForWorkspace(workspaceId) ?? lookupDb) : lookupDb`.
+    // Both SELECT and the lastUsedAt UPDATE share this db.
     expect(
-      /workspaceId\s*!=\s*null\s*\?\s*getAsDbForWorkspace\s*\(\s*workspaceId\s*\)\s*:\s*db/.test(
+      /workspaceId\s*!=\s*null\s*\?\s*\(\s*getAsDbForWorkspace\s*\(\s*workspaceId\s*\)\s*\?\?\s*lookupDb\s*\)\s*:\s*lookupDb/.test(
         body,
       ),
     ).toBe(true);
