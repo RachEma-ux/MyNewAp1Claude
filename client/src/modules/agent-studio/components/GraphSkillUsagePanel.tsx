@@ -77,6 +77,16 @@ export default function GraphSkillUsagePanel() {
     () => rows.reduce((m, r) => Math.max(m, r.count), 0),
     [rows],
   );
+  // PR-V1-230: distinct-skill-keys gauge. The row list shows
+  // pack-version granularity; a workspace serving 12 calls from
+  // 3 distinct skill keys (and 9 different pack versions) has a
+  // very different shape from 12 calls from 12 distinct keys.
+  // Same Set-based pattern as canvas note-references distinct
+  // count (#978).
+  const distinctSkillKeys = useMemo(
+    () => new Set(rows.map((r) => r.skillKey)).size,
+    [rows],
+  );
 
   return (
     <Card>
@@ -124,6 +134,18 @@ export default function GraphSkillUsagePanel() {
               {totalCalls.toLocaleString()}
             </p>
           </div>
+          {rows.length > 0 ? (
+            <div className="text-right">
+              <SectionLabel>Distinct skill keys</SectionLabel>
+              <p
+                className="text-lg font-semibold tabular-nums"
+                data-testid="graph-skill-usage-distinct-keys"
+                title="Number of unique skill keys appearing in the rows above; a row count > distinct count means multiple pack versions of the same key served calls this window."
+              >
+                {distinctSkillKeys.toLocaleString()}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {usageQuery.isLoading ? (
