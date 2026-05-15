@@ -21,6 +21,7 @@ export {
   getFailureStateCategoryMetadata,
   FAILURE_STATE_SEVERITY_METADATA,
   getFailureStateSeverityMetadata,
+  getFailureStateLabel,
   type FailureState,
   type FailureStateCategory,
   type FailureStateSeverity,
