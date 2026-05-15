@@ -200,6 +200,54 @@ export type GraphLensGovernanceScope =
   (typeof GRAPH_LENS_GOVERNANCE_SCOPES)[number];
 
 // ============================================================================
+// Per-governance-scope operator-facing metadata (T-F.16)
+// ============================================================================
+
+export interface GraphLensGovernanceScopeMetadata {
+  /** Display label rendered in lens-browser permission overlays. */
+  readonly label: string;
+  /** Short description of who can see this scope. */
+  readonly description: string;
+  /** Closed taxonomy: how restrictive the scope is, ordered narrow→broad. */
+  readonly restrictiveness: "open" | "members_only" | "approvers_only" | "admin_only";
+}
+
+export const GRAPH_LENS_GOVERNANCE_SCOPE_METADATA: Readonly<
+  Record<GraphLensGovernanceScope, GraphLensGovernanceScopeMetadata>
+> = {
+  workspace_public: {
+    label: "Workspace Public",
+    description:
+      "Visible to anyone with workspace access — least restrictive. Suitable for shared lenses without sensitive content.",
+    restrictiveness: "open",
+  },
+  workspace_members: {
+    label: "Workspace Members",
+    description:
+      "Visible only to authenticated workspace members. Excludes guests and public viewers.",
+    restrictiveness: "members_only",
+  },
+  approver_only: {
+    label: "Approvers Only",
+    description:
+      "Visible only to members with approver role. For lenses operating on governance-sensitive content.",
+    restrictiveness: "approvers_only",
+  },
+  admin_only: {
+    label: "Admin Only",
+    description:
+      "Visible only to workspace admins. Most restrictive — for system-level / audit / debugging lenses.",
+    restrictiveness: "admin_only",
+  },
+};
+
+export function getGraphLensGovernanceScopeMetadata(
+  scope: GraphLensGovernanceScope,
+): GraphLensGovernanceScopeMetadata {
+  return GRAPH_LENS_GOVERNANCE_SCOPE_METADATA[scope];
+}
+
+// ============================================================================
 // Lens definition
 // ============================================================================
 

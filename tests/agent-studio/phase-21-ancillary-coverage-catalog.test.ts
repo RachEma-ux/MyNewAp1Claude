@@ -89,6 +89,7 @@ const ANCILLARY_TESTS = [
   "failure-state-severity-metadata.test.ts",
   "recommendation-permission-status-metadata.test.ts",
   "graph-lens-layout-metadata.test.ts",
+  "graph-lens-governance-scope-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
