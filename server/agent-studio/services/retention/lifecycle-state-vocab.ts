@@ -164,6 +164,97 @@ export function isApprovalStepTerminal(state: string): state is ApprovalStepStat
   return APPROVAL_STEP_TERMINAL_STATES.has(state as ApprovalStepState);
 }
 
+// ============================================================================
+// Per-approval-step-state operator-facing metadata (T-L.2)
+// ============================================================================
+
+export interface ApprovalStepStateMetadata {
+  /** Display label rendered in the approval queue / step list. */
+  readonly label: string;
+  /** Short operator-facing description of what the state means. */
+  readonly description: string;
+  /** Closed-taxonomy outcome classification:
+   *  - `awaiting`: step is awaiting an approver decision.
+   *  - `accepted`: terminal — approver approved.
+   *  - `declined`: terminal — approver explicitly rejected.
+   *  - `skipped`: terminal — step was bypassed (parallel rule
+   *    satisfied earlier, or policy override).
+   *  - `expired`: terminal — approver deadline passed without action.
+   *  - `cancelled`: terminal — system or operator cancelled.
+   *  - `obsolete`: terminal — superseded by a newer step. */
+  readonly outcome:
+    | "awaiting"
+    | "accepted"
+    | "declined"
+    | "skipped"
+    | "expired"
+    | "cancelled"
+    | "obsolete";
+  /** Whether this state is in the terminal set (mirrors the
+   *  APPROVAL_STEP_TERMINAL_STATES check). */
+  readonly terminal: boolean;
+}
+
+export const APPROVAL_STEP_STATE_METADATA: Readonly<
+  Record<ApprovalStepState, ApprovalStepStateMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Approval step is awaiting a decision — approvers see this row in their queue and have not yet acted.",
+    outcome: "awaiting",
+    terminal: false,
+  },
+  approved: {
+    label: "Approved",
+    description:
+      "Approver accepted the step — downstream rule evaluation considers this step satisfied.",
+    outcome: "accepted",
+    terminal: true,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Approver explicitly rejected the step — downstream rule evaluation marks this step as a hard failure.",
+    outcome: "declined",
+    terminal: true,
+  },
+  skipped: {
+    label: "Skipped",
+    description:
+      "Step was skipped — typically a parallel rule was satisfied earlier or a policy override bypassed this step.",
+    outcome: "skipped",
+    terminal: true,
+  },
+  expired: {
+    label: "Expired",
+    description:
+      "Approver deadline passed without action — step times out and the parent request fails-closed.",
+    outcome: "expired",
+    terminal: true,
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "Step was cancelled by the system or operator before any approver acted — terminal without explicit decision.",
+    outcome: "cancelled",
+    terminal: true,
+  },
+  superseded: {
+    label: "Superseded",
+    description:
+      "A newer step for the same approval flow took precedence — this row is terminal-obsolete.",
+    outcome: "obsolete",
+    terminal: true,
+  },
+};
+
+export function getApprovalStepStateMetadata(
+  state: ApprovalStepState,
+): ApprovalStepStateMetadata {
+  return APPROVAL_STEP_STATE_METADATA[state];
+}
+
 // ── ags_note_promotions ─────────────────────────────────────────────────────
 
 export const NOTE_PROMOTION_STATES = [
