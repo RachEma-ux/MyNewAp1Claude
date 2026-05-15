@@ -39,6 +39,7 @@ import {
   LayoutGrid,
   Radio,
   Send,
+  HeartPulse,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -92,7 +93,9 @@ export type AgentStudioView =
   // ── PR-V1-184: approval-bus admin ──
   | "approval-bus-admin"
   // ── PR-V1-186: publish-targets admin ──
-  | "publish-targets-admin";
+  | "publish-targets-admin"
+  // ── PR-V1-190: graph-health admin ──
+  | "graph-health-admin";
 
 interface SectionGroup {
   label: string;
@@ -187,6 +190,13 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Publish",
     items: [
       { key: "publish-targets-admin", label: "Publish Targets", icon: Send },
+    ],
+  },
+  // ── PR-V1-190: graph-health admin ──
+  {
+    label: "Graph Health",
+    items: [
+      { key: "graph-health-admin", label: "Alerts + Cron", icon: HeartPulse },
     ],
   },
 ];
