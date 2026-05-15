@@ -25,6 +25,7 @@ import type {
 } from "../repository/index.js";
 import { filterContextBlocks, type ContextBlockInput, type FilterResult } from "./safety-filter.js";
 import { validateCypherReadOnly } from "./text2cypher-validator.js";
+import { recordFailureStateEvent } from "../../failure-states/observability-bridge.js";
 import {
   selectTemplateForEligiblePacks,
   type EligibilityResult,
@@ -500,6 +501,33 @@ export class GraphRetrievalRouter {
 
     const filtered = filterContextBlocks(rawBlocks, input.runtime);
     const citations = filtered.blocks.map((b) => b.citation);
+
+    // T-I.5 batch A — bridge safety-filter pruning to the Phase 22
+    // closed-taxonomy emission surface. One event per retrieval call
+    // (NOT per blocked block) — per-block emission would be too noisy
+    // for the dashboard. Fire-and-forget; observability writes never
+    // propagate into the retrieval return value.
+    if (filtered.events.length > 0) {
+      const reasonCounts: Record<string, number> = {};
+      for (const e of filtered.events) {
+        reasonCounts[e.reason] = (reasonCounts[e.reason] ?? 0) + 1;
+      }
+      void recordFailureStateEvent({
+        failureState: "retrieval_safety_filter_blocked_content",
+        sourceKind: "retrieval-router",
+        sourceId: input.runtimeRunId ?? null,
+        errorMessage: `Safety filter pruned ${filtered.events.length} block(s)`,
+        metadata: {
+          blockedCount: filtered.events.length,
+          totalCandidates: rawBlocks.length,
+          reasonCounts,
+          mode: input.mode,
+          workspaceId: input.runtime.workspaceId,
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
+    }
 
     // Phase 12.5 §4 — fire the runtime-usage recorder when the request
     // produced output via a resolved Skill Pack. Errors from the
