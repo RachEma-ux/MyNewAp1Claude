@@ -198,6 +198,12 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     <th className="py-1 pr-3">Approved</th>
                     <th
                       className="py-1 pr-3"
+                      title="Actor user IDs: installed / approved / disabled"
+                    >
+                      Actors
+                    </th>
+                    <th
+                      className="py-1 pr-3"
                       title="Invocations: total / allowed / denied"
                     >
                       Invocations
@@ -236,6 +242,13 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                       </td>
                       <td className="py-1 pr-3">
                         {fmtTs(ext.approvedAt)}
+                      </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs whitespace-nowrap"
+                        data-testid={`extension-row-actors-${ext.id}`}
+                        title={`installed by user ${ext.installedByUserId ?? "—"} / approved by ${ext.approvedByUserId ?? "—"} / disabled by ${ext.disabledByUserId ?? "—"}`}
+                      >
+                        {`${ext.installedByUserId ?? "—"} / ${ext.approvedByUserId ?? "—"} / ${ext.disabledByUserId ?? "—"}`}
                       </td>
                       <td
                         className="py-1 pr-3 font-mono text-xs"
