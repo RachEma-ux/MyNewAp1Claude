@@ -194,3 +194,133 @@ export function listAllowedEdgeTypesFromSource(
     return c.sourceTypeKeys.length === 0 || c.sourceTypeKeys.includes(sourceTypeKey);
   });
 }
+
+/**
+ * Returns the closed-taxonomy edges that may terminate at the given
+ * target typeKey. Symmetric helper for endpoint-aware picker UIs.
+ */
+export function listAllowedEdgeTypesToTarget(
+  targetTypeKey: CodeGraphNodeType,
+): ReadonlyArray<CodeGraphEdgeType> {
+  return CODE_GRAPH_EDGE_TYPES.filter((edge) => {
+    const c = CODE_GRAPH_EDGE_CONSTRAINTS[edge];
+    return c.targetTypeKeys.length === 0 || c.targetTypeKeys.includes(targetTypeKey);
+  });
+}
+
+// ============================================================================
+// Reason-bearing batch validation
+// ============================================================================
+
+export type CodeGraphEdgeValidationReason =
+  | "unknown_source_type"
+  | "unknown_edge_type"
+  | "unknown_target_type"
+  | "source_type_not_allowed_for_edge"
+  | "target_type_not_allowed_for_edge";
+
+export type CodeGraphEdgeValidationOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: CodeGraphEdgeValidationReason };
+
+/**
+ * Validates a single edge triple and returns either `{ ok: true }`
+ * or `{ ok: false, reason }` so the emitter can log a structured
+ * failure (rather than throwing or returning a bare boolean). The
+ * reason enum is closed — extending it requires editing this module
+ * and adding test coverage.
+ *
+ * The inputs are `string` (not `CodeGraphNodeType` / `CodeGraphEdgeType`)
+ * because callers are typically parsers / projections that have
+ * untyped strings from upstream. The first three checks act as
+ * type guards.
+ */
+export function validateCodeGraphEdgeWithReason(
+  sourceTypeKey: string,
+  edgeTypeKey: string,
+  targetTypeKey: string,
+): CodeGraphEdgeValidationOutcome {
+  if (!isCodeGraphNodeType(sourceTypeKey)) {
+    return { ok: false, reason: "unknown_source_type" };
+  }
+  if (!isCodeGraphEdgeType(edgeTypeKey)) {
+    return { ok: false, reason: "unknown_edge_type" };
+  }
+  if (!isCodeGraphNodeType(targetTypeKey)) {
+    return { ok: false, reason: "unknown_target_type" };
+  }
+  const c = CODE_GRAPH_EDGE_CONSTRAINTS[edgeTypeKey];
+  const sourceOk =
+    c.sourceTypeKeys.length === 0 || c.sourceTypeKeys.includes(sourceTypeKey);
+  if (!sourceOk) {
+    return { ok: false, reason: "source_type_not_allowed_for_edge" };
+  }
+  const targetOk =
+    c.targetTypeKeys.length === 0 || c.targetTypeKeys.includes(targetTypeKey);
+  if (!targetOk) {
+    return { ok: false, reason: "target_type_not_allowed_for_edge" };
+  }
+  return { ok: true };
+}
+
+export interface CodeGraphEdgeBatchInput {
+  readonly sourceTypeKey: string;
+  readonly edgeTypeKey: string;
+  readonly targetTypeKey: string;
+  /** Stable id (caller-provided) so the rejection map can be joined
+   *  back to the caller's row identity. */
+  readonly edgeId: string;
+}
+
+export interface CodeGraphEdgeBatchResult {
+  readonly acceptedEdgeIds: ReadonlyArray<string>;
+  readonly rejected: ReadonlyArray<{
+    readonly edgeId: string;
+    readonly reason: CodeGraphEdgeValidationReason;
+  }>;
+  /** Count of rejections per reason — for emitter dashboards / logs. */
+  readonly rejectionsByReason: Readonly<
+    Record<CodeGraphEdgeValidationReason, number>
+  >;
+}
+
+/**
+ * Bulk-validates a batch of edges. The future emitter (T-E.2) calls
+ * this once per parser pass and writes only the accepted rows;
+ * `rejectionsByReason` becomes the structured failure counter for
+ * operator dashboards.
+ */
+export function validateCodeGraphEdgeBatch(
+  edges: ReadonlyArray<CodeGraphEdgeBatchInput>,
+): CodeGraphEdgeBatchResult {
+  const accepted: string[] = [];
+  const rejected: Array<{
+    edgeId: string;
+    reason: CodeGraphEdgeValidationReason;
+  }> = [];
+  const rejectionsByReason: Record<CodeGraphEdgeValidationReason, number> = {
+    unknown_source_type: 0,
+    unknown_edge_type: 0,
+    unknown_target_type: 0,
+    source_type_not_allowed_for_edge: 0,
+    target_type_not_allowed_for_edge: 0,
+  };
+  for (const e of edges) {
+    const outcome = validateCodeGraphEdgeWithReason(
+      e.sourceTypeKey,
+      e.edgeTypeKey,
+      e.targetTypeKey,
+    );
+    if (outcome.ok) {
+      accepted.push(e.edgeId);
+    } else {
+      rejected.push({ edgeId: e.edgeId, reason: outcome.reason });
+      rejectionsByReason[outcome.reason]++;
+    }
+  }
+  return {
+    acceptedEdgeIds: accepted,
+    rejected,
+    rejectionsByReason,
+  };
+}
