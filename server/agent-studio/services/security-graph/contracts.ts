@@ -156,6 +156,82 @@ export function getMostSevereItem<T>(
   return best;
 }
 
+// ============================================================================
+// Finding aggregation (T-G.15)
+// ============================================================================
+
+export interface SecurityFindingSummary {
+  readonly total: number;
+  readonly bySeverity: Readonly<Record<SecurityFindingSeverity, number>>;
+  /** Counts of items whose `pathStep` matches each canonical impact
+   *  path step. Items with `pathStep` set to a non-canonical value
+   *  are silently ignored. */
+  readonly byCanonicalPathStep: Readonly<
+    Record<SecurityGraphCanonicalPathStep, number>
+  >;
+  /** Most-severe finding in the input, or `undefined` for empty
+   *  input. Ties broken by first occurrence. */
+  readonly mostSevereIndex: number | null;
+}
+
+/**
+ * Aggregates a list of security findings into a stable-shape summary:
+ * counts by severity (always 5 keys at 0+), counts by canonical
+ * impact path step (always 7 keys at 0+), and the index of the
+ * most-severe finding.
+ *
+ * `getSeverity` and `getPathStep` are accessors so the helper isn't
+ * coupled to a specific row shape — the same aggregator works on
+ * raw scanner output, query-projected rows, or test fixtures.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeSecurityFindings<T>(
+  findings: ReadonlyArray<T>,
+  getSeverity: (item: T) => SecurityFindingSeverity,
+  getPathStep: (item: T) => string | undefined,
+): SecurityFindingSummary {
+  const bySeverity: Record<string, number> = {};
+  for (const s of SECURITY_FINDING_SEVERITIES) bySeverity[s] = 0;
+
+  const byCanonicalPathStep: Record<string, number> = {};
+  for (const p of SECURITY_GRAPH_CANONICAL_IMPACT_PATH) {
+    byCanonicalPathStep[p] = 0;
+  }
+
+  let mostSevereIndex: number | null = null;
+  let mostSevereRank = -1;
+  for (let i = 0; i < findings.length; i++) {
+    const item = findings[i];
+    const sev = getSeverity(item);
+    bySeverity[sev] += 1;
+    const step = getPathStep(item);
+    if (
+      step !== undefined &&
+      (SECURITY_GRAPH_CANONICAL_IMPACT_PATH as readonly string[]).includes(
+        step,
+      )
+    ) {
+      byCanonicalPathStep[step] += 1;
+    }
+    const rank = severityRank(sev);
+    if (rank > mostSevereRank) {
+      mostSevereRank = rank;
+      mostSevereIndex = i;
+    }
+  }
+  return {
+    total: findings.length,
+    bySeverity: bySeverity as Readonly<
+      Record<SecurityFindingSeverity, number>
+    >,
+    byCanonicalPathStep: byCanonicalPathStep as Readonly<
+      Record<SecurityGraphCanonicalPathStep, number>
+    >,
+    mostSevereIndex,
+  };
+}
+
 /**
  * Map a numeric CVSS score (0..10) to its coarse severity bucket.
  * Boundary semantics match the NVD published cuts:

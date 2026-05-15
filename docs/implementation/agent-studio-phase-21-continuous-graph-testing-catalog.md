@@ -170,6 +170,7 @@ runtime catches up.
 | `failure-state-summarize.test.ts` | `services/failure-states/contracts` — `summarizeFailureStateOccurrences` stable-shape aggregator (byKind / byCategory / bySeverity / byRecoverable) | T-I.23 / #1046 |
 | `recommendation-summarize.test.ts` | `services/recommendation/contracts` — `summarizeRecommendationResponse` (visible / redacted / fullyHidden + mean/min/max confidence on visible only) | T-G.13 / #1047 |
 | `institutional-memory-coverage-summary.test.ts` | `services/institutional-memory/contracts` — `summarizeInstitutionalMemoryCoverage` (mapped/unmapped/coveragePercent for the 13-type taxonomy) | T-G.14 / #1048 |
+| `security-graph-finding-summary.test.ts` | `services/security-graph/contracts` — `summarizeSecurityFindings` (bySeverity / byCanonicalPathStep / mostSevereIndex) | T-G.15 / #1049 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
