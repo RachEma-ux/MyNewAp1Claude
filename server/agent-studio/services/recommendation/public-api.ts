@@ -14,6 +14,8 @@ export {
   summarizeRecommendationResponse,
   RECOMMENDATION_KIND_METADATA,
   getRecommendationKindMetadata,
+  RECOMMENDATION_PERMISSION_STATUS_METADATA,
+  getRecommendationPermissionStatusMetadata,
   type RecommendationKind,
   type RecommendationPermissionStatus,
   type RecommendationRequest,
@@ -21,6 +23,7 @@ export {
   type RecommendationResponse,
   type RecommendationResponseSummary,
   type RecommendationKindMetadata,
+  type RecommendationPermissionStatusMetadata,
 } from "./contracts.js";
 
 export {

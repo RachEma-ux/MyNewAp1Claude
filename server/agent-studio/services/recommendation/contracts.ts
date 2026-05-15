@@ -75,6 +75,52 @@ export type RecommendationPermissionStatus =
   (typeof RECOMMENDATION_PERMISSION_STATUSES)[number];
 
 // ============================================================================
+// Per-permission-status operator-facing metadata (T-G.27)
+// ============================================================================
+
+export interface RecommendationPermissionStatusMetadata {
+  /** Display label for operator dashboards / lens overlays. */
+  readonly label: string;
+  /** Short description of what the operator sees for this status. */
+  readonly description: string;
+  /** Whether the candidate is rendered at all (visible/redacted=yes,
+   *  hidden=no). */
+  readonly rendered: boolean;
+}
+
+export const RECOMMENDATION_PERMISSION_STATUS_METADATA: Readonly<
+  Record<
+    RecommendationPermissionStatus,
+    RecommendationPermissionStatusMetadata
+  >
+> = {
+  visible: {
+    label: "Visible",
+    description:
+      "Viewer can see the full content. The recommendation is surfaced with reason / path / citations.",
+    rendered: true,
+  },
+  redacted: {
+    label: "Redacted",
+    description:
+      "Viewer cannot see the content but the candidate's existence is surfaced with a generic 'Hidden by permission' label.",
+    rendered: true,
+  },
+  hidden: {
+    label: "Hidden",
+    description:
+      "Fully filtered out — neither content nor existence is exposed. Excluded from the response entirely.",
+    rendered: false,
+  },
+};
+
+export function getRecommendationPermissionStatusMetadata(
+  status: RecommendationPermissionStatus,
+): RecommendationPermissionStatusMetadata {
+  return RECOMMENDATION_PERMISSION_STATUS_METADATA[status];
+}
+
+// ============================================================================
 // Per-kind operator-facing metadata (T-G.23)
 // ============================================================================
 
