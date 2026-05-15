@@ -24,9 +24,13 @@ export {
   getCanonicalImpactSubPath,
   getCanonicalImpactDistance,
   validateImpactPathSequence,
+  summarizeImpactPathValidationOutcomes,
+  IMPACT_PATH_VALIDATION_REASON_KEYS,
   type SecurityGraphNodeType,
   type SecurityGraphCanonicalPathStep,
   type SecurityFindingSeverity,
   type SecurityFindingSummary,
   type CanonicalImpactPathValidationOutcome,
+  type ImpactPathValidationReason,
+  type ImpactPathValidationBatchSummary,
 } from "./contracts.js";

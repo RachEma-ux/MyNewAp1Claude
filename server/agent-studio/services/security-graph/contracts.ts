@@ -445,6 +445,65 @@ export type CanonicalImpactPathValidationOutcome =
  * Used by impact-analysis query templates to assert the lens-UI's
  * step picker emitted a well-formed traversal.
  */
+// ============================================================================
+// Batch impact-path validation summary (T-G.20)
+// ============================================================================
+
+const IMPACT_PATH_VALIDATION_REASONS = [
+  "empty_sequence",
+  "unknown_step",
+  "sequence_not_strictly_advancing",
+  "sequence_skips_steps",
+] as const;
+
+export type ImpactPathValidationReason =
+  (typeof IMPACT_PATH_VALIDATION_REASONS)[number];
+
+export interface ImpactPathValidationBatchSummary {
+  readonly total: number;
+  readonly ok: number;
+  readonly failed: number;
+  /** Counts per closed-reason taxonomy. Stable-shape — every reason
+   *  key present at 0+. */
+  readonly failedByReason: Readonly<
+    Record<ImpactPathValidationReason, number>
+  >;
+}
+
+/**
+ * Aggregates a batch of `CanonicalImpactPathValidationOutcome` results
+ * into a stable-shape summary. Operator-facing "X of Y sequences
+ * valid; failures keyed by reason" gauge.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeImpactPathValidationOutcomes(
+  outcomes: ReadonlyArray<CanonicalImpactPathValidationOutcome>,
+): ImpactPathValidationBatchSummary {
+  const failedByReason: Record<string, number> = {};
+  for (const r of IMPACT_PATH_VALIDATION_REASONS) failedByReason[r] = 0;
+  let ok = 0;
+  let failed = 0;
+  for (const o of outcomes) {
+    if (o.ok) ok += 1;
+    else {
+      failed += 1;
+      failedByReason[o.reason] += 1;
+    }
+  }
+  return {
+    total: outcomes.length,
+    ok,
+    failed,
+    failedByReason: failedByReason as Readonly<
+      Record<ImpactPathValidationReason, number>
+    >,
+  };
+}
+
+export const IMPACT_PATH_VALIDATION_REASON_KEYS =
+  IMPACT_PATH_VALIDATION_REASONS;
+
 export function validateImpactPathSequence(
   steps: ReadonlyArray<string>,
 ): CanonicalImpactPathValidationOutcome {
