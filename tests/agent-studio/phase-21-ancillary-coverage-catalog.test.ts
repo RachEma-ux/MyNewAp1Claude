@@ -91,6 +91,7 @@ const ANCILLARY_TESTS = [
   "graph-lens-layout-metadata.test.ts",
   "graph-lens-governance-scope-metadata.test.ts",
   "graph-algorithm-backend-support-metadata.test.ts",
+  "quality-scanner-category-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
