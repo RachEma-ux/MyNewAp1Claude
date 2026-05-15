@@ -2253,7 +2253,12 @@ export async function recordMcpTransition(
   eventType: string,
   reason?: string | null
 ) {
-  const conn = db();
+  // V1+ MR-3 sixtieth batch (PR-V1-130): Path B consumer via
+  // resolveMcpServerRoutedConn (serverId→draftId→workspaceId).
+  // The INSERT + trim DELETE share a single routed conn —
+  // preserves atomicity (no cross-region writes within one fn).
+  const lookupConn = db();
+  const conn = await resolveMcpServerRoutedConn(lookupConn, serverId);
   await conn.insert(agsMcpTransitions).values({
     serverId,
     fromKind,
