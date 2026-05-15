@@ -499,6 +499,26 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveRuntimeRunRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  runId: number,
+) {
+  // V1+ MR-3 fifty-third batch (PR-V1-123): shared runtimeRunId→
+  // routed-conn helper. agsRuntimeRuns.agentId is a direct FK —
+  // single SELECT, then chain into resolveAgentRoutedConn. Falls
+  // back to lookupConn on any null. Shared by 6 child-event
+  // mutations (run-step, tool-call, memory-event, policy-event,
+  // hook-execution + the parent updateRuntimeRun).
+  const runRows = await lookupConn
+    .select({ agentId: agsRuntimeRuns.agentId })
+    .from(agsRuntimeRuns)
+    .where(eq(agsRuntimeRuns.id, runId))
+    .limit(1);
+  const agentId = runRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
 async function resolveSimulationScenarioRoutedConn(
   lookupConn: ReturnType<typeof db>,
   scenarioId: number,
@@ -1607,7 +1627,14 @@ export async function updateRuntimeRun(
   runId: number,
   patch: Partial<typeof agsRuntimeRuns.$inferInsert>
 ) {
-  await db().update(agsRuntimeRuns).set(patch).where(eq(agsRuntimeRuns.id, runId));
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, runId);
+  await conn
+    .update(agsRuntimeRuns)
+    .set(patch)
+    .where(eq(agsRuntimeRuns.id, runId));
 }
 
 export async function appendRuntimeRun(input: {
@@ -1622,7 +1649,14 @@ export async function appendRuntimeRun(input: {
   summary?: string;
   durationMs?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draft→workspaceId). Entry-
+  // point INSERT — siblings (appendRuntimeRunStep, ToolCall,
+  // MemoryEvent, PolicyEvent, HookExecution) use the runId-scoped
+  // resolveRuntimeRunRoutedConn helper.
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
+  const [created] = await conn
     .insert(agsRuntimeRuns)
     .values({
       agentId: input.agentId,
@@ -1651,7 +1685,11 @@ export async function appendRuntimeRunStep(input: {
   verdict?: string;
   durationMs?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsRuntimeRunSteps)
     .values({
       runId: input.runId,
@@ -1674,7 +1712,11 @@ export async function appendRuntimeToolCall(input: {
   verdict?: string;
   durationMs?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsRuntimeToolCalls)
     .values({
       runId: input.runId,
@@ -1694,7 +1736,11 @@ export async function appendRuntimeMemoryEvent(input: {
   operation: string;
   payload?: Record<string, unknown>;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsRuntimeMemoryEvents)
     .values({
       runId: input.runId,
@@ -1713,7 +1759,11 @@ export async function appendRuntimePolicyEvent(input: {
   reason?: string;
   payload?: Record<string, unknown>;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsRuntimePolicyEvents)
     .values({
       runId: input.runId,
@@ -1741,7 +1791,11 @@ export async function appendRuntimeHookExecution(input: {
   timedOut: boolean;
   error?: string | null;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-third batch (PR-V1-123): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runId);
+  const [created] = await conn
     .insert(agsRuntimeHookExecutions)
     .values({
       runId: input.runId,
