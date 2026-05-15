@@ -78,3 +78,9 @@ export {
   type MaybeInstallStubLensRunnersOptions,
   type MaybeInstallStubLensRunnersResult,
 } from "./stub-runners.js";
+
+export {
+  maybeInstallDefaultLensStack,
+  type MaybeInstallDefaultLensStackOptions,
+  type MaybeInstallDefaultLensStackResult,
+} from "./install-default-lens-stack.js";
