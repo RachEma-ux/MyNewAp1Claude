@@ -205,6 +205,7 @@ runtime catches up.
 | `graph-lens-governance-scope-metadata.test.ts` | `services/graph-lens/contracts` — `GRAPH_LENS_GOVERNANCE_SCOPE_METADATA` (4-entry per-scope label + description + restrictiveness {open/members_only/approvers_only/admin_only}) | T-F.16 / #1081 |
 | `graph-algorithm-backend-support-metadata.test.ts` | `services/graph-algorithm/contracts` — `GRAPH_ALGORITHM_BACKEND_SUPPORT_METADATA` (4-entry per-level label + description + runsOnCe boolean for neo4j_ce_native/neo4j_ce_via_apoc/gds_required/approximation_required) | T-G.28 / #1082 |
 | `quality-scanner-category-metadata.test.ts` | `services/graph-quality/scanner-metadata` — `QUALITY_SCANNER_CATEGORY_METADATA` (5-entry per-category label + description for provenance/structure/freshness/deduplication/topology); promotes the previously union-only `QualityScannerCategory` to a tuple-derived export | T-D.11 / #1083 |
+| `security-finding-severity-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_FINDING_SEVERITY_METADATA` (5-entry per-severity label + description + cvssRange + operatorAction {informational/monitor/schedule_patch/patch_soon/patch_now}) | T-G.29 / #1084 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
