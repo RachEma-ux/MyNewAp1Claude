@@ -195,6 +195,7 @@ runtime catches up.
 | `recommendation-kind-metadata.test.ts` | `services/recommendation/contracts` — `RECOMMENDATION_KIND_METADATA` (8-entry per-kind operator label + description; symmetry with RECOMMENDATION_KINDS) | T-G.23 / #1071 |
 | `graph-lens-kind-metadata.test.ts` | `services/graph-lens/contracts` — `GRAPH_LENS_KIND_METADATA` (8-entry per-kind operator label + description for the lens-kind taxonomy) | T-F.13 / #1072 |
 | `security-graph-node-type-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_GRAPH_NODE_TYPE_METADATA` (10-entry per-type operator label + description for the cve/finding/component/package/service/environment/owner/customer_exposure/policy/control taxonomy) | T-G.24 / #1073 |
+| `code-graph-node-type-metadata.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `CODE_GRAPH_NODE_TYPE_METADATA` (12-entry per-type operator label + description for the repository/package/file/class/function/method/api_endpoint/service/db_table/frontend_component/config_file/test_file taxonomy) | T-G.25 / #1074 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

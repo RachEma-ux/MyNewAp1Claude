@@ -326,6 +326,88 @@ export function validateCodeGraphEdgeBatch(
 }
 
 // ============================================================================
+// Per-node-type operator-facing metadata (T-G.25)
+// ============================================================================
+
+export interface CodeGraphNodeTypeMetadata {
+  /** Display label for operator UI tabs / lens overlays. */
+  readonly label: string;
+  /** Short description of what this node type represents. */
+  readonly description: string;
+}
+
+export const CODE_GRAPH_NODE_TYPE_METADATA: Readonly<
+  Record<CodeGraphNodeType, CodeGraphNodeTypeMetadata>
+> = {
+  repository: {
+    label: "Repository",
+    description:
+      "A top-level source code repository (git origin, monorepo root, or similar).",
+  },
+  package: {
+    label: "Package",
+    description:
+      "A dependency artifact (npm / pip / OS package) imported by the repository's code.",
+  },
+  file: {
+    label: "File",
+    description:
+      "A source file within the repository — module / unit of import.",
+  },
+  class: {
+    label: "Class",
+    description:
+      "A class / struct / interface declared in a source file.",
+  },
+  function: {
+    label: "Function",
+    description:
+      "A top-level function declared in a source file.",
+  },
+  method: {
+    label: "Method",
+    description:
+      "A method declared on a class. Distinct from `function` for object-oriented analysis.",
+  },
+  api_endpoint: {
+    label: "API Endpoint",
+    description:
+      "An HTTP / RPC / gRPC endpoint exposed by the service for external callers.",
+  },
+  service: {
+    label: "Service",
+    description:
+      "A deployable service unit composed of repositories, packages, and endpoints.",
+  },
+  db_table: {
+    label: "DB Table",
+    description:
+      "A database table read from / written to by service code.",
+  },
+  frontend_component: {
+    label: "Frontend Component",
+    description:
+      "A UI component (React / Vue / etc) rendered by the frontend.",
+  },
+  config_file: {
+    label: "Config File",
+    description:
+      "A configuration file (env / yaml / json) that shapes runtime behavior.",
+  },
+  test_file: {
+    label: "Test File",
+    description:
+      "A test source file — exercises functions / classes / endpoints.",
+  },
+};
+
+export function getCodeGraphNodeTypeMetadata(
+  type: CodeGraphNodeType,
+): CodeGraphNodeTypeMetadata {
+  return CODE_GRAPH_NODE_TYPE_METADATA[type];
+}
+
+// ============================================================================
 // Edge cardinality summary (T-G.21)
 // ============================================================================
 
