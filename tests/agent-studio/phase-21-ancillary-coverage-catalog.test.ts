@@ -102,6 +102,7 @@ const ANCILLARY_TESTS = [
   "quality-proposal-kind-metadata.test.ts",
   "graphrag-retrieval-method-metadata.test.ts",
   "rac-planner-mode-metadata.test.ts",
+  "rac-source-type-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

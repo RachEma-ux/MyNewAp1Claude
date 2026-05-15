@@ -215,6 +215,7 @@ runtime catches up.
 | `quality-proposal-kind-metadata.test.ts` | `services/graph-quality/finding-to-proposal` — `QUALITY_PROPOSAL_KIND_METADATA` (10-entry per-proposal label + description + automationClass {one_click_safe / review_required / investigation_only} + mutatesGraph boolean); promotes proposal kinds to a closed taxonomy with `isQualityProposalKind` guard | T-D.12 / #1091 |
 | `graphrag-retrieval-method-metadata.test.ts` | `services/rac/planner-mode` — `GRAPHRAG_RETRIEVAL_METHOD_METADATA` (5-entry per-method label + description + costClass {low/medium/high} + invokesLlm boolean for local/global/traversal/text2cypher/algorithm) | T-A.6 / #1092 |
 | `rac-planner-mode-metadata.test.ts` | `services/rac/planner-mode` — `RAC_PLANNER_MODE_METADATA` (15-entry per-mode label + description + family + reserved boolean) + `RAC_PLANNER_MODE_FAMILIES` 6-family taxonomy (no_retrieval / cag_only / knowledge_retrieval / hybrid_cag / graphrag_pure / graphrag_hybrid) | T-A.7 / #1093 |
+| `rac-source-type-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_TYPE_METADATA` (7-entry per-source-type label + description + retrievalMechanism {precompiled / vector / graph / external_api / structured} + requiresEmbeddings boolean) + `RAC_SOURCE_RETRIEVAL_MECHANISMS` 5-family taxonomy | T-A.8 / #1094 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
