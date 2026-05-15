@@ -118,6 +118,39 @@ export function ApprovalBusAdminPanel() {
               </div>
             </div>
           ) : null}
+          {/* PR-V1-229: malformed-rate gauge. messagesReceived shows
+              throughput; malformedReceived shows broken-payload
+              count, but operators care about the ratio. A single
+              malformed in 10k is noise; 100 in 1k is a real
+              broadcast-shape bug. Suppress the line when
+              messagesReceived === 0 (no data yet). Destructive when
+              > 1% — same threshold used for retry-attempts elsewhere
+              in the workspace-observability surface. */}
+          {status && status.messagesReceived > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="approval-bus-malformed-rate"
+            >
+              {(() => {
+                const rate =
+                  Math.round(
+                    (status.malformedReceived / status.messagesReceived) *
+                      1000,
+                  ) / 10;
+                return (
+                  <>
+                    <span className="font-medium">malformed rate:</span>{" "}
+                    <span
+                      className={`font-mono ${rate > 1 ? "text-destructive" : ""}`}
+                      title="malformedReceived / messagesReceived — surfaces broadcast-shape bugs vs noise"
+                    >
+                      {rate}%
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-2">
             <Button
               type="button"
