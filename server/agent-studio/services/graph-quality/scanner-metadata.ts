@@ -175,6 +175,62 @@ export interface QualityFindingListSummary {
  *
  * Pure function. Does NOT mutate the input.
  */
+/**
+ * Numeric rank for a quality finding severity (0 = low, 3 = critical).
+ * Higher rank = more severe. Use for comparator-style sorting.
+ */
+export function qualitySeverityRank(severity: QualityFindingSeverity): number {
+  return QUALITY_FINDING_SEVERITIES.indexOf(severity);
+}
+
+/**
+ * Array.sort-style comparator. Negative when `a` LESS severe than `b`,
+ * positive when MORE severe, 0 when equal. Use directly for ascending,
+ * wrap in `(a, b) => -compareQualitySeverity(a, b)` for descending.
+ */
+export function compareQualitySeverity(
+  a: QualityFindingSeverity,
+  b: QualityFindingSeverity,
+): number {
+  return qualitySeverityRank(a) - qualitySeverityRank(b);
+}
+
+/**
+ * Returns a new array sorted by quality-finding severity DESCENDING
+ * (critical first). Stable for ties (first-occurrence wins). Does NOT
+ * mutate the input.
+ */
+export function sortQualityFindingsBySeverityDesc<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => QualityFindingSeverity,
+): readonly T[] {
+  return [...items].sort(
+    (a, b) => -compareQualitySeverity(getSeverity(a), getSeverity(b)),
+  );
+}
+
+/**
+ * Returns the most-severe quality finding, or `undefined` for an empty
+ * array. Ties broken by first occurrence in input order. Does NOT
+ * mutate the input.
+ */
+export function getMostSevereQualityFinding<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => QualityFindingSeverity,
+): T | undefined {
+  if (items.length === 0) return undefined;
+  let best = items[0];
+  let bestRank = qualitySeverityRank(getSeverity(best));
+  for (let i = 1; i < items.length; i++) {
+    const r = qualitySeverityRank(getSeverity(items[i]));
+    if (r > bestRank) {
+      best = items[i];
+      bestRank = r;
+    }
+  }
+  return best;
+}
+
 export function summarizeQualityFindings<T>(
   findings: ReadonlyArray<T>,
   getScanKind: (item: T) => string,

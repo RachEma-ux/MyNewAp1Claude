@@ -70,6 +70,7 @@ const ANCILLARY_TESTS = [
   "recommendation-candidate-list-summary.test.ts",
   "security-graph-impact-path-helpers.test.ts",
   "security-graph-validation-summary.test.ts",
+  "quality-finding-severity-helpers.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
