@@ -123,6 +123,7 @@ const ANCILLARY_TESTS = [
   "graph-health-alert-key-metadata.test.ts",
   "realtime-doc-frame-type-metadata.test.ts",
   "canvas-projection-event-row-kind-metadata.test.ts",
+  "runtime-config-block-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
