@@ -44,6 +44,8 @@ const SHIPPED_PRS = [
   "#1035",
   "#1036",
   "#1037",
+  "#1038",
+  "#1039",
 ];
 
 describe("Phase 22 emission burst summary lockstep", () => {
@@ -74,7 +76,16 @@ describe("Phase 22 emission burst summary lockstep", () => {
     expect(summary).toContain("#1034");
   });
 
-  it("references the main commit SHA `8712ad6` (this artifact's own merge SHA)", () => {
-    expect(summary).toContain("8712ad6");
+  it("references the final closure SHA `089ef2e` (post acceptance #30 closure)", () => {
+    expect(summary).toContain("089ef2e");
+  });
+
+  it("notes Phase 28 acceptance #30 substantially-closed at #1039", () => {
+    expect(summary).toContain("acceptance #30");
+    expect(summary).toContain("#1039");
+  });
+
+  it("acknowledges the 3-step self-update history (#1037 / #1038 / #1040)", () => {
+    expect(summary).toContain("3 self-update slices");
   });
 });
