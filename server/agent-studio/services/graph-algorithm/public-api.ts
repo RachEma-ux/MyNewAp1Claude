@@ -7,8 +7,11 @@ export {
   GRAPH_ALGORITHM_BACKEND_SUPPORT,
   GRAPH_ALGORITHM_METADATA,
   GraphAlgorithmMaxNodesOutOfRangeError,
+  GraphAlgorithmMaxIterationsOutOfRangeError,
   isGraphAlgorithmKind,
   normalizeAlgorithmMaxNodes,
+  normalizeAlgorithmMaxIterations,
+  preflightAlgorithmRequest,
   listAlgorithmsTriggeringAuraUpgrade,
   listAlgorithmsAvailableOnCe,
   type GraphAlgorithmKind,
@@ -17,4 +20,6 @@ export {
   type GraphAlgorithmRequest,
   type GraphAlgorithmResult,
   type GraphAlgorithmResultRow,
+  type GraphAlgorithmPreflightDecision,
+  type GraphAlgorithmPreflightOutcome,
 } from "./contracts.js";
