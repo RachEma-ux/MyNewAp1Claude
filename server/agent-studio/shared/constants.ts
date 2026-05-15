@@ -626,6 +626,62 @@ export function getAgsRunStatusMetadata(
 export const AGS_TEST_VERDICTS = ["pass", "fail", "skipped", "error"] as const;
 export type AgsTestVerdict = (typeof AGS_TEST_VERDICTS)[number];
 
+// ============================================================================
+// Per-test-verdict operator-facing metadata (T-S.9)
+// ============================================================================
+
+export interface AgsTestVerdictMetadata {
+  /** Display label rendered in test result rows. */
+  readonly label: string;
+  /** Short operator-facing description of the verdict. */
+  readonly description: string;
+  /** Whether this verdict counts as a passing run for aggregate
+   *  "X/Y pass" metrics (true for `pass` only). */
+  readonly countedAsPass: boolean;
+  /** Whether this verdict indicates the test actually executed
+   *  (true for pass/fail/error; false for skipped). */
+  readonly executed: boolean;
+}
+
+export const AGS_TEST_VERDICT_METADATA: Readonly<
+  Record<AgsTestVerdict, AgsTestVerdictMetadata>
+> = {
+  pass: {
+    label: "Pass",
+    description:
+      "Test executed and produced the expected result — assertion satisfied.",
+    countedAsPass: true,
+    executed: true,
+  },
+  fail: {
+    label: "Fail",
+    description:
+      "Test executed but produced an unexpected result — assertion failed; the test author or production code needs investigation.",
+    countedAsPass: false,
+    executed: true,
+  },
+  skipped: {
+    label: "Skipped",
+    description:
+      "Test did not execute — gated by environment / feature flag / `.skip` marker. Not a pass, not a failure.",
+    countedAsPass: false,
+    executed: false,
+  },
+  error: {
+    label: "Error",
+    description:
+      "Test infrastructure threw before the assertion ran — fixture failure, setup error, or harness bug. Distinct from a normal fail.",
+    countedAsPass: false,
+    executed: true,
+  },
+};
+
+export function getAgsTestVerdictMetadata(
+  verdict: AgsTestVerdict,
+): AgsTestVerdictMetadata {
+  return AGS_TEST_VERDICT_METADATA[verdict];
+}
+
 /** Required fields for an agent to reach the "Ready to Publish" state. */
 export const AGS_REQUIRED_PUBLISH_FIELDS = [
   "name",
