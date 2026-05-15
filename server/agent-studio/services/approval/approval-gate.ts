@@ -247,8 +247,25 @@ export interface EvaluateApprovalGateResult {
 export async function evaluateApprovalGate(
   input: EvaluateApprovalGateInput,
 ): Promise<EvaluateApprovalGateResult> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 seventy-fifth batch (PR-V1-145): Path B read consumer.
+  // The pre-existing lastUsedAt UPDATE (#107) was migrated; the
+  // SELECT-by-(agentDraftId, hash) still ran on bootstrap. Pull the
+  // Path B resolver up so the SELECT also routes to the home region.
+  // The resolved db is reused for the stale-row UPDATE below — no
+  // extra round-trip vs. the prior Path-B-on-UPDATE-only shape.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(
+    lookupDb,
+    input.agentDraftId,
+  );
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
 
   const hash = hashProposedToolCall(input.proposedToolCall);
   const now = input.now ?? new Date();
@@ -295,24 +312,8 @@ export async function evaluateApprovalGate(
       !lastUsed ||
       now.getTime() - new Date(lastUsed).getTime() >= LAST_USED_STALENESS_MS;
     if (isStale) {
-      // V1+ MR-3 thirty-seventh batch (PR-V1-107): Path B consumer.
-      // Resolve workspaceId via the agsAgentProviderBindings escape
-      // hatch (the approval row carries agentDraftId; the agent-tier
-      // tables don't have workspaceId, but bindings do). If the
-      // draft has no binding (legacy / binding-pending), fall back
-      // to the bootstrap handle — preserves pre-migration semantics
-      // for unbound drafts.
-      const { resolveWorkspaceIdForDraft } = await import(
-        "../region/draft-workspace-resolver"
-      );
-      const workspaceId = await resolveWorkspaceIdForDraft(
-        db,
-        input.agentDraftId,
-      );
-      const updateDb =
-        workspaceId != null ? getAsDbForWorkspace(workspaceId) : db;
-      if (!updateDb) throw new Error("ASDB unavailable");
-      await updateDb
+      // Path B routed via hoisted `db` (PR-V1-107 + PR-V1-145).
+      await db
         .update(agsPendingPermissionRequests)
         .set({ lastUsedAt: now })
         .where(eq(agsPendingPermissionRequests.id, row.id));
