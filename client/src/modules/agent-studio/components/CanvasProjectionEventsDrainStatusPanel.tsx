@@ -114,6 +114,43 @@ export function CanvasProjectionEventsDrainStatusPanel() {
                 })()}
               </p>
             )}
+            {/* PR-V1-228: tick success rate. Symmetric with publish
+                executions (#974) and extensions invocations (#975).
+                totalProcessed + totalFailed are settled-at-drain-time
+                so no pending denominator is needed. Render-gated on
+                a positive total (don't show "0% success" for an
+                idle tick). Same ≥99 emerald / ≥90 amber / else
+                destructive heuristic. */}
+            {status.lastTickResult != null &&
+            status.lastTickResult.totalProcessed +
+              status.lastTickResult.totalFailed >
+              0 ? (
+              <p data-testid="drain-tick-success-rate">
+                {(() => {
+                  const processed = status.lastTickResult.totalProcessed;
+                  const failed = status.lastTickResult.totalFailed;
+                  const total = processed + failed;
+                  const rate = Math.round((processed / total) * 1000) / 10;
+                  const rateClass =
+                    rate >= 99
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : rate >= 90
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-destructive";
+                  return (
+                    <>
+                      <span className="font-medium">Tick success rate:</span>{" "}
+                      <span
+                        className={`font-mono ${rateClass}`}
+                        title="totalProcessed / (totalProcessed + totalFailed) — settled at drain time, no pending denominator"
+                      >
+                        {rate}%
+                      </span>
+                    </>
+                  );
+                })()}
+              </p>
+            ) : null}
             {status.lastTickError != null && (
               <p
                 className="text-destructive"
