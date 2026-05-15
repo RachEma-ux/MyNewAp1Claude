@@ -235,6 +235,49 @@ export function GraphHealthAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Open alerts</SectionLabel>
+          {/* PR-V1-208: open-alerts severity breakdown line above
+              the table — same pattern as the publish + extensions
+              aggregates (#957/#958). critical > 0 → text-destructive,
+              warning > 0 → amber, info → muted. */}
+          {openQ.data && openQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="graph-health-alerts-aggregate-summary"
+            >
+              {(() => {
+                let critical = 0;
+                let warning = 0;
+                let info = 0;
+                for (const a of openQ.data) {
+                  if (a.severity === "critical") critical += 1;
+                  else if (a.severity === "warning") warning += 1;
+                  else if (a.severity === "info") info += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Open alerts:</span>{" "}
+                    <span className="font-mono">{openQ.data.length}</span>{" "}
+                    total —{" "}
+                    <span
+                      className={critical > 0 ? "text-destructive" : ""}
+                    >
+                      <span className="font-mono">{critical}</span> critical
+                    </span>
+                    {" / "}
+                    <span
+                      className={
+                        warning > 0 ? "text-amber-600 dark:text-amber-400" : ""
+                      }
+                    >
+                      <span className="font-mono">{warning}</span> warning
+                    </span>
+                    {" / "}
+                    <span className="font-mono">{info}</span> info
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {openQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading open alerts…
