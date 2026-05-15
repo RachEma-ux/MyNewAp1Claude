@@ -100,6 +100,7 @@ const ANCILLARY_TESTS = [
   "impact-path-validation-reason-metadata.test.ts",
   "failure-state-label.test.ts",
   "quality-proposal-kind-metadata.test.ts",
+  "graphrag-retrieval-method-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

@@ -213,6 +213,7 @@ runtime catches up.
 | `impact-path-validation-reason-metadata.test.ts` | `services/security-graph/contracts` — `IMPACT_PATH_VALIDATION_REASON_METADATA` (4-entry per-reason label + description + remediation + classification {caller_input_error / structural_violation}) | T-G.34 / #1089 |
 | `failure-state-label.test.ts` | `services/failure-states/contracts` — per-state `label` field added to `FAILURE_STATE_METADATA` for all 25 closed-taxonomy states + `getFailureStateLabel` accessor | T-I.33 / #1090 |
 | `quality-proposal-kind-metadata.test.ts` | `services/graph-quality/finding-to-proposal` — `QUALITY_PROPOSAL_KIND_METADATA` (10-entry per-proposal label + description + automationClass {one_click_safe / review_required / investigation_only} + mutatesGraph boolean); promotes proposal kinds to a closed taxonomy with `isQualityProposalKind` guard | T-D.12 / #1091 |
+| `graphrag-retrieval-method-metadata.test.ts` | `services/rac/planner-mode` — `GRAPHRAG_RETRIEVAL_METHOD_METADATA` (5-entry per-method label + description + costClass {low/medium/high} + invokesLlm boolean for local/global/traversal/text2cypher/algorithm) | T-A.6 / #1092 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
