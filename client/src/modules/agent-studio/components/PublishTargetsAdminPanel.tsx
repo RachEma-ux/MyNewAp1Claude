@@ -170,6 +170,39 @@ export function PublishTargetsAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Publish targets (registry)</SectionLabel>
+          {/* PR-V1-211: enabled/disabled aggregate above the registry
+              table — sixth in the aggregate-summary mini-arc
+              (#957-#961). disabled > 0 → text-destructive so
+              operators see quiesced targets at a glance. */}
+          {targetsQ.data && targetsQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="publish-targets-list-aggregate-summary"
+            >
+              {(() => {
+                let enabled = 0;
+                let disabled = 0;
+                for (const t of targetsQ.data) {
+                  if (t.enabled) enabled += 1;
+                  else disabled += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Targets:</span>{" "}
+                    <span className="font-mono">{targetsQ.data.length}</span>{" "}
+                    total —{" "}
+                    <span className="font-mono">{enabled}</span> enabled
+                    {" / "}
+                    <span
+                      className={disabled > 0 ? "text-destructive" : ""}
+                    >
+                      <span className="font-mono">{disabled}</span> disabled
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {targetsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading targets…
