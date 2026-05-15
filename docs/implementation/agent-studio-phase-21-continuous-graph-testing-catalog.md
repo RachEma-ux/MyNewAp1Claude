@@ -221,6 +221,7 @@ runtime catches up.
 | `publish-target-type-metadata.test.ts` | `services/publish-targets/types` — `PUBLISH_TARGET_TYPE_METADATA` (3-entry per-target-type label + description + internalDestination + requiresProviderConnection booleans for staging_env/remote_vault/external_kb) | T-E.1 / #1097 |
 | `publish-execution-status-metadata.test.ts` | `services/publish-targets/types` — `PUBLISH_EXECUTION_STATUS_METADATA` (4-entry per-status label + description + terminal + successful booleans for pending/in_flight/succeeded/failed) | T-E.2 / #1098 |
 | `publish-governance-decision-metadata.test.ts` | `services/publish-targets/types` — `GOVERNANCE_DECISION_METADATA` (3-entry per-decision label + description + executorBranch {runs_pusher / stages_ledger_only / blocks_pusher} + requiresHumanApproval boolean for approved/pending/rejected) | T-E.3 / #1099 |
+| `agentic-planner-action-kind-metadata.test.ts` | `services/graph-agent/agentic-planner-contract` — `AGENTIC_PLANNER_ACTION_KIND_METADATA` (3-entry per-action-kind label + description + terminatesLoop + producesAnswer booleans for retrieve/answer/stop) | T-G.35 / #1100 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
