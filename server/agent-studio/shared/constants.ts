@@ -749,6 +749,77 @@ export const AGS_PERMISSION_MODES = [
 ] as const;
 export type AgsPermissionMode = (typeof AGS_PERMISSION_MODES)[number];
 
+// ============================================================================
+// Per-permission-mode operator-facing metadata (T-S.11)
+// ============================================================================
+
+export interface AgsPermissionModeMetadata {
+  /** Display label rendered in the permission mode picker. */
+  readonly label: string;
+  /** Short operator-facing description of what the mode does. */
+  readonly description: string;
+  /** Whether tool invocation may proceed (true) — only `plan` blocks
+   *  tool execution entirely. */
+  readonly allowsToolExecution: boolean;
+  /** Whether the mode prompts the user on dangerous operations (true
+   *  for `default` only). */
+  readonly promptsOnDangerous: boolean;
+  /** Whether this mode requires explicit `allowDangerouslySkipPermissions`
+   *  to be set (true for `bypassPermissions` only). */
+  readonly requiresBypassFlag: boolean;
+}
+
+export const AGS_PERMISSION_MODE_METADATA: Readonly<
+  Record<AgsPermissionMode, AgsPermissionModeMetadata>
+> = {
+  default: {
+    label: "Default",
+    description:
+      "Standard permission flow — prompts the user on dangerous tool operations and uses pre-approved rules for safe ones.",
+    allowsToolExecution: true,
+    promptsOnDangerous: true,
+    requiresBypassFlag: false,
+  },
+  acceptEdits: {
+    label: "Accept Edits",
+    description:
+      "Auto-accept file edit operations without prompting — useful for trusted automation paths.",
+    allowsToolExecution: true,
+    promptsOnDangerous: false,
+    requiresBypassFlag: false,
+  },
+  bypassPermissions: {
+    label: "Bypass Permissions",
+    description:
+      "Skip all permission checks — only allowed when `allowDangerouslySkipPermissions` is set. Used for fully-trusted sandboxes.",
+    allowsToolExecution: true,
+    promptsOnDangerous: false,
+    requiresBypassFlag: true,
+  },
+  plan: {
+    label: "Plan",
+    description:
+      "Planning mode — agent produces a plan but does not execute any tools. Used for review-before-execute workflows.",
+    allowsToolExecution: false,
+    promptsOnDangerous: false,
+    requiresBypassFlag: false,
+  },
+  dontAsk: {
+    label: "Don't Ask",
+    description:
+      "Strictest mode — deny any tool invocation that isn't pre-approved by an explicit rule. Never prompt the user.",
+    allowsToolExecution: true,
+    promptsOnDangerous: false,
+    requiresBypassFlag: false,
+  },
+};
+
+export function getAgsPermissionModeMetadata(
+  mode: AgsPermissionMode,
+): AgsPermissionModeMetadata {
+  return AGS_PERMISSION_MODE_METADATA[mode];
+}
+
 /** Permission rule behavior — applied when a tool invocation matches the rule pattern. */
 export const AGS_PERMISSION_BEHAVIORS = ["allow", "deny", "ask"] as const;
 export type AgsPermissionBehavior = (typeof AGS_PERMISSION_BEHAVIORS)[number];
