@@ -42,6 +42,10 @@ export {
   scanForDanglingEdgeEndpoints,
   danglingEdgeEndpointScanner,
 } from "./scanners/dangling-edge-endpoint-scanner.js";
+export {
+  scanForParallelEdges,
+  parallelEdgesScanner,
+} from "./scanners/parallel-edges-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -158,6 +162,7 @@ import { staleNodeScanner } from "./scanners/stale-node-scanner.js";
 import { selfLoopScanner } from "./scanners/self-loop-scanner.js";
 import { missingProvenanceScanner } from "./scanners/missing-provenance-scanner.js";
 import { danglingEdgeEndpointScanner } from "./scanners/dangling-edge-endpoint-scanner.js";
+import { parallelEdgesScanner } from "./scanners/parallel-edges-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -172,4 +177,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   selfLoopScanner,
   missingProvenanceScanner,
   danglingEdgeEndpointScanner,
+  parallelEdgesScanner,
 ];
