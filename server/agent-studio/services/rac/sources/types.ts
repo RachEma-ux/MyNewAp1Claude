@@ -40,6 +40,94 @@ export const RAC_SOURCE_TYPES = [
 
 export type RacSourceType = (typeof RAC_SOURCE_TYPES)[number];
 
+// ============================================================================
+// Per-source-type operator-facing metadata (T-A.8)
+// ============================================================================
+
+export const RAC_SOURCE_RETRIEVAL_MECHANISMS = [
+  "precompiled",
+  "vector",
+  "graph",
+  "external_api",
+  "structured",
+] as const;
+
+export type RacSourceRetrievalMechanism =
+  (typeof RAC_SOURCE_RETRIEVAL_MECHANISMS)[number];
+
+export interface RacSourceTypeMetadata {
+  /** Display label rendered in the source picker / source-registry UI. */
+  readonly label: string;
+  /** Short operator-facing description of the source type. */
+  readonly description: string;
+  /** Closed-taxonomy retrieval mechanism — drives the planner's
+   *  budget logic and which executor branch handles the source. */
+  readonly retrievalMechanism: RacSourceRetrievalMechanism;
+  /** Whether the source requires per-workspace embedding configuration
+   *  (D-EMB-1: only vector / knowledge_unit need embedding bindings). */
+  readonly requiresEmbeddings: boolean;
+}
+
+export const RAC_SOURCE_TYPE_METADATA: Readonly<
+  Record<RacSourceType, RacSourceTypeMetadata>
+> = {
+  cag_pack: {
+    label: "CAG Pack",
+    description:
+      "Compiled, versioned CAG context block. Resolved by the CAG resolver, not the RAC retrieval pipeline.",
+    retrievalMechanism: "precompiled",
+    requiresEmbeddings: false,
+  },
+  document_collection: {
+    label: "Document Collection",
+    description:
+      "Governed set of documents ingested into the KB. Retrieved via text search + chunk lookup.",
+    retrievalMechanism: "structured",
+    requiresEmbeddings: false,
+  },
+  vector_index: {
+    label: "Vector Index",
+    description:
+      "Embedding-based similarity index over governed chunks. Used for semantic retrieval.",
+    retrievalMechanism: "vector",
+    requiresEmbeddings: true,
+  },
+  graph_index: {
+    label: "Graph Index",
+    description:
+      "GraphRAG index over the native graph workspace — supports local/global/traversal/text2cypher/algorithm methods.",
+    retrievalMechanism: "graph",
+    requiresEmbeddings: false,
+  },
+  external_connector: {
+    label: "External Connector",
+    description:
+      "Third-party retrieval API mounted through the connector framework — outputs are governed but the index lives outside.",
+    retrievalMechanism: "external_api",
+    requiresEmbeddings: false,
+  },
+  knowledge_unit: {
+    label: "Knowledge Unit",
+    description:
+      "NormalizedKnowledgeUnit retrieval (Retrofit P4 / D-NKU-1). Embedding-backed retrieval over the KB knowledge-unit layer.",
+    retrievalMechanism: "vector",
+    requiresEmbeddings: true,
+  },
+  tool_knowledge: {
+    label: "Tool Knowledge",
+    description:
+      "MCP tool-knowledge mirror (Retrofit P7 / D-NKU-6) — what tools have been used in this workspace and to what effect.",
+    retrievalMechanism: "structured",
+    requiresEmbeddings: false,
+  },
+};
+
+export function getRacSourceTypeMetadata(
+  sourceType: RacSourceType,
+): RacSourceTypeMetadata {
+  return RAC_SOURCE_TYPE_METADATA[sourceType];
+}
+
 /** Owner module that registered the source. */
 export type RacOwnerModule =
   | "agentStudio"
