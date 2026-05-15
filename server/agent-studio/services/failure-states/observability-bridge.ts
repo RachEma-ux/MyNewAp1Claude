@@ -23,8 +23,10 @@
 
 import {
   FAILURE_STATE_METADATA,
+  summarizeFailureStateOccurrences,
   type FailureState,
   type FailureStateMetadata,
+  type FailureStateOccurrenceSummary,
   type FailureStateSeverity,
 } from "./contracts.js";
 import {
@@ -172,4 +174,77 @@ export async function recordFailureStateEvents(
 ): Promise<readonly ErrorEventRow[]> {
   if (inputs.length === 0) return [];
   return recordErrorEvents(inputs.map(encodeForRecorder), options);
+}
+
+// ============================================================================
+// Event list aggregation (T-I.25)
+// ============================================================================
+
+export interface FailureStateEventListSummary {
+  /** Total event rows in the input (regardless of whether they carry
+   *  a closed-taxonomy `errorClass`). */
+  readonly totalEvents: number;
+  /** Subset that carries a `failure_state:<kind>` errorClass and
+   *  resolved to a known kind. */
+  readonly closedTaxonomyEvents: number;
+  /** Events whose `errorClass` is free-form (not bridge-emitted). */
+  readonly freeFormEvents: number;
+  /** Per-failure-state kind breakdown (same shape as
+   *  summarizeFailureStateOccurrences). Stable-shape on every closed
+   *  taxonomy axis. */
+  readonly occurrenceSummary: FailureStateOccurrenceSummary;
+  /** Distinct `sourceKind` values across all events — useful for
+   *  "how many emitters are firing right now" gauge. */
+  readonly distinctSourceKinds: number;
+  /** Oldest `createdAt` in the input (null for empty input). */
+  readonly oldestAt: Date | null;
+  /** Newest `createdAt` in the input (null for empty input). */
+  readonly newestAt: Date | null;
+}
+
+/**
+ * Aggregates a list of observability `ErrorEventRow` records into the
+ * canonical failure-state operator summary. Free-form rows (rows
+ * whose `errorClass` does not begin with `failure_state:` or whose
+ * kind isn't in the closed taxonomy) are counted separately so the
+ * operator dashboard can show "of N total events, K are closed-
+ * taxonomy and L are still using free-form errorClass."
+ *
+ * Stable-shape on the closed-taxonomy axes; Date fields are null on
+ * empty input (rather than `new Date(0)` or NaN).
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeFailureStateEventList(
+  events: ReadonlyArray<
+    Pick<ErrorEventRow, "errorClass" | "sourceKind" | "createdAt">
+  >,
+): FailureStateEventListSummary {
+  const closedTaxonomyKinds: string[] = [];
+  let closedTaxonomyEvents = 0;
+  let freeFormEvents = 0;
+  const sourceKindSet = new Set<string>();
+  let oldestAt: Date | null = null;
+  let newestAt: Date | null = null;
+  for (const e of events) {
+    const kind = parseFailureStateFromErrorClass(e.errorClass);
+    if (kind !== null) {
+      closedTaxonomyEvents += 1;
+      closedTaxonomyKinds.push(kind);
+    } else {
+      freeFormEvents += 1;
+    }
+    sourceKindSet.add(e.sourceKind);
+    if (oldestAt === null || e.createdAt < oldestAt) oldestAt = e.createdAt;
+    if (newestAt === null || e.createdAt > newestAt) newestAt = e.createdAt;
+  }
+  return {
+    totalEvents: events.length,
+    closedTaxonomyEvents,
+    freeFormEvents,
+    occurrenceSummary: summarizeFailureStateOccurrences(closedTaxonomyKinds),
+    distinctSourceKinds: sourceKindSet.size,
+    oldestAt,
+    newestAt,
+  };
 }

@@ -26,6 +26,8 @@ export {
   getCanonicalFailureStateAnnotations,
   recordFailureStateEvent,
   recordFailureStateEvents,
+  summarizeFailureStateEventList,
   type RecordFailureStateEventInput,
   type CanonicalFailureStateAnnotations,
+  type FailureStateEventListSummary,
 } from "./observability-bridge.js";
