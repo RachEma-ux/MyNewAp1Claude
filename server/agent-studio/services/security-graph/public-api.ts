@@ -11,7 +11,13 @@ export {
   isSecurityGraphNodeType,
   isSecurityFindingSeverity,
   cvssScoreToSeverity,
+  isCanonicalImpactStep,
+  getNextCanonicalImpactStep,
+  getPreviousCanonicalImpactStep,
+  getCanonicalImpactPathFromStep,
+  validateImpactPathSequence,
   type SecurityGraphNodeType,
   type SecurityGraphCanonicalPathStep,
   type SecurityFindingSeverity,
+  type CanonicalImpactPathValidationOutcome,
 } from "./contracts.js";

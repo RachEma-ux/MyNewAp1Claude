@@ -145,3 +145,138 @@ export const SECURITY_FINDINGS_VIEW_PERMISSION_KEY = "security_findings_view";
  * `requiresPermission` flag on every security-lens query.
  */
 export const SECURITY_GRAPH_DEFAULT_PERMISSION_SCOPE = "approver_only" as const;
+
+// ============================================================================
+// Canonical impact-path navigation
+// ============================================================================
+
+/** Type guard for canonical-path steps. */
+export function isCanonicalImpactStep(
+  s: unknown,
+): s is SecurityGraphCanonicalPathStep {
+  return (
+    typeof s === "string" &&
+    (SECURITY_GRAPH_CANONICAL_IMPACT_PATH as readonly string[]).includes(s)
+  );
+}
+
+/**
+ * Returns the next step in the canonical impact path, or `null` when
+ * `currentStep` is the terminal step (`customer_exposure`).
+ *
+ * Throws when `currentStep` is not a recognized canonical-path step —
+ * callers must use `isCanonicalImpactStep` first if the input is
+ * untrusted.
+ */
+export function getNextCanonicalImpactStep(
+  currentStep: SecurityGraphCanonicalPathStep,
+): SecurityGraphCanonicalPathStep | null {
+  const idx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(currentStep);
+  if (idx === -1) {
+    throw new Error(
+      `Unknown canonical impact step: ${String(currentStep)}`,
+    );
+  }
+  if (idx === SECURITY_GRAPH_CANONICAL_IMPACT_PATH.length - 1) {
+    return null;
+  }
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH[idx + 1];
+}
+
+/**
+ * Returns the previous step in the canonical impact path, or `null`
+ * when `currentStep` is the origin step (`cve`).
+ */
+export function getPreviousCanonicalImpactStep(
+  currentStep: SecurityGraphCanonicalPathStep,
+): SecurityGraphCanonicalPathStep | null {
+  const idx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(currentStep);
+  if (idx === -1) {
+    throw new Error(
+      `Unknown canonical impact step: ${String(currentStep)}`,
+    );
+  }
+  if (idx === 0) return null;
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH[idx - 1];
+}
+
+/**
+ * Returns the slice of the canonical path FROM `startStep` to the
+ * terminal step (inclusive on both ends). Useful for lens UI
+ * "remaining steps" indicators.
+ */
+export function getCanonicalImpactPathFromStep(
+  startStep: SecurityGraphCanonicalPathStep,
+): ReadonlyArray<SecurityGraphCanonicalPathStep> {
+  const idx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(startStep);
+  if (idx === -1) {
+    throw new Error(
+      `Unknown canonical impact step: ${String(startStep)}`,
+    );
+  }
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH.slice(idx);
+}
+
+/** Validation outcome for {@link validateImpactPathSequence}. */
+export type CanonicalImpactPathValidationOutcome =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "empty_sequence"
+        | "unknown_step"
+        | "sequence_not_strictly_advancing"
+        | "sequence_skips_steps";
+      readonly stepIndex?: number;
+    };
+
+/**
+ * Validates that a sequence of node-type-keys is a strictly advancing
+ * walk through the canonical impact path (no jumps, no reversals, no
+ * unknown steps). The walk does NOT have to start at the origin or
+ * reach the terminal — partial canonical walks are valid.
+ *
+ * Examples (valid):
+ *   - ["cve", "package", "component"]
+ *   - ["service", "environment", "owner", "customer_exposure"]
+ *
+ * Examples (invalid):
+ *   - ["cve", "component"]  → skips "package"
+ *   - ["cve", "package", "cve"]  → not strictly advancing
+ *   - ["cve", "user"]  → "user" is not in the canonical path
+ *
+ * Used by impact-analysis query templates to assert the lens-UI's
+ * step picker emitted a well-formed traversal.
+ */
+export function validateImpactPathSequence(
+  steps: ReadonlyArray<string>,
+): CanonicalImpactPathValidationOutcome {
+  if (steps.length === 0) {
+    return { ok: false, reason: "empty_sequence" };
+  }
+  let prevIdx = -1;
+  for (let i = 0; i < steps.length; i++) {
+    const idx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(
+      steps[i] as SecurityGraphCanonicalPathStep,
+    );
+    if (idx === -1) {
+      return { ok: false, reason: "unknown_step", stepIndex: i };
+    }
+    if (i === 0) {
+      prevIdx = idx;
+      continue;
+    }
+    if (idx <= prevIdx) {
+      return {
+        ok: false,
+        reason: "sequence_not_strictly_advancing",
+        stepIndex: i,
+      };
+    }
+    if (idx !== prevIdx + 1) {
+      return { ok: false, reason: "sequence_skips_steps", stepIndex: i };
+    }
+    prevIdx = idx;
+  }
+  return { ok: true };
+}
