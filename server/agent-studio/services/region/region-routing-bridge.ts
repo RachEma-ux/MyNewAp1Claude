@@ -43,6 +43,7 @@
 
 import { configureRegionRouter } from "../../db/connection.js";
 import { getDbForRegion } from "./connection-helper.js";
+import { setRegionChangeHook } from "./region-service.js";
 import {
   getCachedRegionForWorkspace,
   invalidateRegionRoutingCache,
@@ -58,10 +59,24 @@ import { setPinChangeHook } from "./workspace-region-pin-service.js";
  *      resolver.
  *   2. The pin-change hook (workspace-region-pin-service.ts) — fires
  *      after every pin write. Invalidates + asynchronously re-warms
- *      the cache so pin changes are visible without a restart.
+ *      the cache.
+ *   3. The region-change hook (region-service.ts) — fires after every
+ *      region-registry write. Same invalidate + re-warm semantics so
+ *      a newly registered region propagates to already-pinned
+ *      workspaces without a restart.
  *
  * Idempotent.
  */
+function reloadCacheAfterChange(label: string): void {
+  invalidateRegionRoutingCache();
+  void warmRegionRoutingCache().catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[ags-region-routing-bridge] re-warm after ${label} failed — ${msg}`,
+    );
+  });
+}
+
 export function installRegionRouter(): void {
   configureRegionRouter({
     resolve: (workspaceId) => {
@@ -71,23 +86,17 @@ export function installRegionRouter(): void {
       return db ?? null;
     },
   });
-  setPinChangeHook(() => {
-    invalidateRegionRoutingCache();
-    void warmRegionRoutingCache().catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[ags-region-routing-bridge] re-warm after pin change failed — ${msg}`,
-      );
-    });
-  });
+  setPinChangeHook(() => reloadCacheAfterChange("pin change"));
+  setRegionChangeHook(() => reloadCacheAfterChange("region change"));
 }
 
 /**
  * Uninstall the bridge — returns the shim to Phase-1
- * delegate-to-`getAsDb` behavior. Removes the pin-change hook too,
- * so pin writes no longer touch the (cold) cache.
+ * delegate-to-`getAsDb` behavior. Clears all three slots so pin /
+ * region writes no longer touch the (cold) cache.
  */
 export function uninstallRegionRouter(): void {
   configureRegionRouter(null);
   setPinChangeHook(null);
+  setRegionChangeHook(null);
 }
