@@ -206,6 +206,156 @@ export function methodToReservedMode(
 
 export type RacPlannerMode = (typeof RAC_PLANNER_MODES)[number];
 
+// ============================================================================
+// Per-planner-mode operator-facing metadata (T-A.7)
+// ============================================================================
+
+/**
+ * Closed-taxonomy mode-family classification. Maps every
+ * `RAC_PLANNER_MODES` entry into one of six families operators
+ * actually pick from in the planner UI's family-level picker.
+ */
+export const RAC_PLANNER_MODE_FAMILIES = [
+  "no_retrieval",
+  "cag_only",
+  "knowledge_retrieval",
+  "hybrid_cag",
+  "graphrag_pure",
+  "graphrag_hybrid",
+] as const;
+
+export type RacPlannerModeFamily = (typeof RAC_PLANNER_MODE_FAMILIES)[number];
+
+export interface RacPlannerModeMetadata {
+  /** Display label rendered in the operator UI's planner-mode picker. */
+  readonly label: string;
+  /** Short operator-facing description of what the planner does in
+   *  this mode. */
+  readonly description: string;
+  /** Closed-taxonomy family — drives the picker grouping. */
+  readonly family: RacPlannerModeFamily;
+  /** True when this mode is reserved (declared but never emitted by
+   *  the current `derivePlannerMode`). Reserved modes still appear in
+   *  the picker as "Coming Soon" — operators do not select them. */
+  readonly reserved: boolean;
+}
+
+export const RAC_PLANNER_MODE_METADATA: Readonly<
+  Record<RacPlannerMode, RacPlannerModeMetadata>
+> = {
+  no_retrieval: {
+    label: "No Retrieval",
+    description:
+      "Plain prompt path — no CAG, no RAG, no tools. Used for short answers and unscoped queries.",
+    family: "no_retrieval",
+    reserved: false,
+  },
+  cag_only: {
+    label: "CAG Only",
+    description:
+      "Compiled CAG context only — no retrieval at runtime. Fast and deterministic.",
+    family: "cag_only",
+    reserved: false,
+  },
+  knowledge_retrieval: {
+    label: "Knowledge Retrieval",
+    description:
+      "RAG over the governed knowledge base — text + vector retrieval, no tools.",
+    family: "knowledge_retrieval",
+    reserved: false,
+  },
+  multimodal_hybrid_retrieval: {
+    label: "Multimodal Hybrid Retrieval",
+    description:
+      "RAG across text + image / OCR sources — extends knowledge_retrieval to multimodal artifacts.",
+    family: "knowledge_retrieval",
+    reserved: false,
+  },
+  tool_knowledge_retrieval: {
+    label: "Tool Knowledge Retrieval",
+    description:
+      "RAG over tool-knowledge promotions — surfaces what tools have been used and to what effect.",
+    family: "knowledge_retrieval",
+    reserved: false,
+  },
+  hybrid_cag_rag: {
+    label: "Hybrid CAG + RAG",
+    description:
+      "Compiled CAG context plus runtime RAG retrieval. The most common operator-picked mode.",
+    family: "hybrid_cag",
+    reserved: false,
+  },
+  hybrid_cag_tool_knowledge: {
+    label: "Hybrid CAG + Tool Knowledge",
+    description:
+      "Compiled CAG context plus runtime tool-knowledge retrieval. Used for operations-heavy queries.",
+    family: "hybrid_cag",
+    reserved: false,
+  },
+  hybrid_cag_rag_tool_knowledge: {
+    label: "Hybrid CAG + RAG + Tool Knowledge",
+    description:
+      "Full stack: compiled CAG, RAG, and tool-knowledge retrieval. The kitchen-sink mode for hardest queries.",
+    family: "hybrid_cag",
+    reserved: false,
+  },
+  graphrag_local: {
+    label: "GraphRAG Local (Reserved)",
+    description:
+      "Per-document chunk-based GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_pure",
+    reserved: true,
+  },
+  graphrag_global: {
+    label: "GraphRAG Global (Reserved)",
+    description:
+      "Cross-document graph-level GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_pure",
+    reserved: true,
+  },
+  graphrag_traversal: {
+    label: "GraphRAG Traversal (Reserved)",
+    description:
+      "Typed-edge graph walk GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_pure",
+    reserved: true,
+  },
+  graphrag_text2cypher: {
+    label: "GraphRAG Text2Cypher (Reserved)",
+    description:
+      "LLM-generated read-only Cypher GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_pure",
+    reserved: true,
+  },
+  graphrag_algorithm: {
+    label: "GraphRAG Algorithm (Reserved)",
+    description:
+      "Graph-algorithm-output GraphRAG retrieval (centrality / community / similarity). Phase 12 reserved — not yet emitted.",
+    family: "graphrag_pure",
+    reserved: true,
+  },
+  hybrid_cag_graphrag: {
+    label: "Hybrid CAG + GraphRAG (Reserved)",
+    description:
+      "Compiled CAG plus GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_hybrid",
+    reserved: true,
+  },
+  hybrid_rac_graphrag: {
+    label: "Hybrid RAC + GraphRAG (Reserved)",
+    description:
+      "Full RAC stack plus GraphRAG retrieval. Phase 12 reserved — not yet emitted by derivePlannerMode.",
+    family: "graphrag_hybrid",
+    reserved: true,
+  },
+};
+
+export function getRacPlannerModeMetadata(
+  mode: RacPlannerMode,
+): RacPlannerModeMetadata {
+  return RAC_PLANNER_MODE_METADATA[mode];
+}
+
 /** Source-type families used to bucket runnable plan items. */
 const KNOWLEDGE_TYPES: ReadonlySet<string> = new Set([
   "document_collection",
