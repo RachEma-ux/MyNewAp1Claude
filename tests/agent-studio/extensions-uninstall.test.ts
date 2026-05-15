@@ -46,6 +46,29 @@ describe("PR-V1-179 — extensions uninstall (hard delete)", () => {
     expect(/return\s+true\s*;/.test(body)).toBe(true);
   });
 
+  it("PR-V1-180: uninstallExtension cascade-deletes agsExtensionInvocations BEFORE the parent row", () => {
+    const src = readFileSync(manifest, "utf8");
+    // Import added.
+    expect(src).toContain("agsExtensionInvocations");
+    const body = src.slice(
+      src.indexOf("export async function uninstallExtension"),
+      src.indexOf("export async function listExtensionsByWorkspace"),
+    );
+    // The cascade delete on agsExtensionInvocations must appear and
+    // must precede the parent delete on agsExtensions (otherwise the
+    // FK from invocations.extensionId blocks the parent delete).
+    const invIdx = body.indexOf("db\n    .delete(agsExtensionInvocations)");
+    const parentIdx = body.indexOf("db.delete(agsExtensions)");
+    expect(invIdx).toBeGreaterThan(-1);
+    expect(parentIdx).toBeGreaterThan(-1);
+    expect(invIdx).toBeLessThan(parentIdx);
+    expect(
+      /eq\(\s*agsExtensionInvocations\.extensionId\s*,\s*extensionId\s*\)/.test(
+        body,
+      ),
+    ).toBe(true);
+  });
+
   it("barrel re-exports uninstallExtension", () => {
     const src = readFileSync(barrel, "utf8");
     expect(src).toContain("uninstallExtension");
