@@ -135,6 +135,53 @@ export const GRAPH_LENS_LAYOUTS = [
 export type GraphLensLayout = (typeof GRAPH_LENS_LAYOUTS)[number];
 
 // ============================================================================
+// Per-layout operator-facing metadata (T-F.15)
+// ============================================================================
+
+export interface GraphLensLayoutMetadata {
+  /** Display label rendered in lens-browser layout pickers. */
+  readonly label: string;
+  /** Short description of what this layout is good for. */
+  readonly description: string;
+}
+
+export const GRAPH_LENS_LAYOUT_METADATA: Readonly<
+  Record<GraphLensLayout, GraphLensLayoutMetadata>
+> = {
+  force_directed: {
+    label: "Force-Directed",
+    description:
+      "Physics-based spring layout — best for general exploratory views of mid-size graphs.",
+  },
+  tree: {
+    label: "Tree",
+    description:
+      "Hierarchical top-down or radial tree — best for one-to-many relationships (declares, imports).",
+  },
+  matrix: {
+    label: "Matrix",
+    description:
+      "Adjacency matrix — best for dense many-to-many graphs where edge crossings would obscure the structure.",
+  },
+  timeline: {
+    label: "Timeline",
+    description:
+      "Time-anchored horizontal layout — best for runtime runs, decisions, and ordered events.",
+  },
+  dependency_path: {
+    label: "Dependency Path",
+    description:
+      "Linear path layout — best for traceability views (CVE → package → component → service).",
+  },
+};
+
+export function getGraphLensLayoutMetadata(
+  layout: GraphLensLayout,
+): GraphLensLayoutMetadata {
+  return GRAPH_LENS_LAYOUT_METADATA[layout];
+}
+
+// ============================================================================
 // Governance scope
 // ============================================================================
 
