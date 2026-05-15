@@ -53,6 +53,14 @@ interface SubscriberState {
   reconnectMs: number;
   stopped: boolean;
   timer: NodeJS.Timeout | null;
+  /** PR-V1-168: observability counters, symmetric with the region
+   *  pubsub status (PR-V1-167). */
+  connectedAt: Date | null;
+  lastMessageAt: Date | null;
+  lastApprovalRequestId: number | null;
+  messagesReceived: number;
+  malformedReceived: number;
+  reconnectAttempts: number;
 }
 
 const _subscriber: SubscriberState = {
@@ -61,6 +69,12 @@ const _subscriber: SubscriberState = {
   reconnectMs: 10_000,
   stopped: false,
   timer: null,
+  connectedAt: null,
+  lastMessageAt: null,
+  lastApprovalRequestId: null,
+  messagesReceived: 0,
+  malformedReceived: 0,
+  reconnectAttempts: 0,
 };
 
 interface ApprovalDecidedPayload {
@@ -149,11 +163,15 @@ export function subscribeApprovalDecidedEvents(
       if (msg.channel !== CHANNEL) return;
       const event = payloadToEvent(msg.payload ?? "");
       if (!event) {
+        _subscriber.malformedReceived += 1;
         console.warn(
           `[ags-approval-bus-pubsub] malformed payload: ${(msg.payload ?? "").slice(0, 200)}`,
         );
         return;
       }
+      _subscriber.lastMessageAt = new Date();
+      _subscriber.lastApprovalRequestId = event.approvalRequestId;
+      _subscriber.messagesReceived += 1;
       try {
         _subscriber.handler?.(event);
       } catch (err) {
@@ -164,6 +182,7 @@ export function subscribeApprovalDecidedEvents(
     client.on("error", (err) => {
       const m = err instanceof Error ? err.message : String(err);
       console.warn(`[ags-approval-bus-pubsub] client error: ${m}`);
+      _subscriber.connectedAt = null;
       scheduleReconnect();
     });
     void (async () => {
@@ -174,6 +193,7 @@ export function subscribeApprovalDecidedEvents(
           `[ags-approval-bus-pubsub] LISTEN ${CHANNEL} established`,
         );
         _subscriber.reconnectMs = 10_000;
+        _subscriber.connectedAt = new Date();
       } catch (err) {
         const m = err instanceof Error ? err.message : String(err);
         console.warn(`[ags-approval-bus-pubsub] connect failed: ${m}`);
@@ -185,6 +205,7 @@ export function subscribeApprovalDecidedEvents(
   function scheduleReconnect(): void {
     if (_subscriber.stopped) return;
     if (_subscriber.timer) return;
+    _subscriber.reconnectAttempts += 1;
     const delay = Math.min(_subscriber.reconnectMs, 60_000);
     _subscriber.reconnectMs = Math.min(_subscriber.reconnectMs + 10_000, 60_000);
     _subscriber.timer = setTimeout(() => {
@@ -218,6 +239,38 @@ export function unsubscribeApprovalDecidedEvents(): void {
     _subscriber.client = null;
   }
   _subscriber.handler = null;
+  _subscriber.connectedAt = null;
+  // Lifetime counters preserved across unsubscribe — operators can
+  // still see what happened on this process up to the stop.
+}
+
+/**
+ * PR-V1-168: operator observability surface — symmetric with
+ * `getRegionCachePubsubStatus` (PR-V1-167). Surfaces the LISTEN
+ * connection state + last approval-decided event + lifetime
+ * counters so operators can confirm cross-process delivery is
+ * actually happening.
+ */
+export interface ApprovalBusPubsubStatus {
+  readonly subscribed: boolean;
+  readonly connectedAt: Date | null;
+  readonly lastMessageAt: Date | null;
+  readonly lastApprovalRequestId: number | null;
+  readonly messagesReceived: number;
+  readonly malformedReceived: number;
+  readonly reconnectAttempts: number;
+}
+
+export function getApprovalBusPubsubStatus(): ApprovalBusPubsubStatus {
+  return {
+    subscribed: _subscriber.handler !== null,
+    connectedAt: _subscriber.connectedAt,
+    lastMessageAt: _subscriber.lastMessageAt,
+    lastApprovalRequestId: _subscriber.lastApprovalRequestId,
+    messagesReceived: _subscriber.messagesReceived,
+    malformedReceived: _subscriber.malformedReceived,
+    reconnectAttempts: _subscriber.reconnectAttempts,
+  };
 }
 
 /**

@@ -78,6 +78,7 @@ import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
+import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
@@ -2926,6 +2927,10 @@ export const agentStudioRouter = router({
   // mutations route through the existing manifest helpers that
   // preserve the governance scaffolding contract.
   extensions: extensionsAdminRouter,
+  // D-RESUME-5 follow-up (2026-05-15, PR-V1-168): approval event bus
+  // pubsub observability. Single getPubsubStatus procedure today;
+  // namespace exists so future approval-bus admin lands here.
+  approvalBus: approvalBusAdminRouter,
   // V1+ 17-γ follow-up (2026-05-14): canvas projection events
   // drain scheduler observability — `getDrainStatus` reads the
   // module-singleton tick state (#810) so operators can verify
