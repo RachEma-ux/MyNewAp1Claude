@@ -403,6 +403,12 @@ export function PublishTargetsAdminPanel() {
                     >
                       Duration
                     </th>
+                    <th
+                      className="py-1 pr-3"
+                      title="First 12 chars of payload digest — used by executePublish for idempotency"
+                    >
+                      Digest
+                    </th>
                     <th className="py-1 pr-3">Upstream</th>
                     <th className="py-1 pr-3">Error</th>
                     <th className="py-1 pr-3">Details</th>
@@ -438,6 +444,15 @@ export function PublishTargetsAdminPanel() {
                             {fmtDuration(r.startedAt, r.completedAt)}
                           </td>
                           <td
+                            className="py-1 pr-3 font-mono text-xs"
+                            data-testid={`publish-execution-digest-${r.id}`}
+                            title={r.payloadDigest ?? undefined}
+                          >
+                            {r.payloadDigest
+                              ? r.payloadDigest.slice(0, 12)
+                              : "—"}
+                          </td>
+                          <td
                             className="py-1 pr-3 font-mono text-xs truncate max-w-[24ch]"
                             title={r.upstreamArtifactId ?? undefined}
                           >
@@ -469,7 +484,7 @@ export function PublishTargetsAdminPanel() {
                             className="bg-muted/30"
                             data-testid={`publish-execution-details-row-${r.id}`}
                           >
-                            <td colSpan={9} className="p-2">
+                            <td colSpan={10} className="p-2">
                               {detailQ.isLoading ? (
                                 <p className="text-xs text-muted-foreground">
                                   Loading details…
