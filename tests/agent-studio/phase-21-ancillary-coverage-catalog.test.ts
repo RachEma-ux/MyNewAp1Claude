@@ -127,6 +127,7 @@ const ANCILLARY_TESTS = [
   "browse-sort-key-metadata.test.ts",
   "security-impact-path-step-metadata.test.ts",
   "ags-lifecycle-state-metadata.test.ts",
+  "ags-agent-class-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

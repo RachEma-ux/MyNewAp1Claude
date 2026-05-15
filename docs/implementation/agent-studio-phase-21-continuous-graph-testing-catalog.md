@@ -240,6 +240,7 @@ runtime catches up.
 | `browse-sort-key-metadata.test.ts` | `services/vault/attachment-library` — `BROWSE_SORT_KEY_METADATA` (2-entry per-sort-key label + description + sortColumn {createdAt / byteSize} + ascending boolean for created_at_desc/size_desc) | T-V.3 / #1116 |
 | `security-impact-path-step-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_GRAPH_CANONICAL_IMPACT_PATH_STEP_METADATA` (7-entry per-step stepIndex + label + narrative + isOrigin + isTerminal booleans for cve/package/component/service/environment/owner/customer_exposure) | T-G.36 / #1117 |
 | `ags-lifecycle-state-metadata.test.ts` | `shared/constants` — `AGS_LIFECYCLE_STATE_METADATA` (11-entry per-state label + description + phase {in_development / under_validation / blocked / release_candidate / active / retired} + runnable boolean) | T-S.1 / #1118 |
+| `ags-agent-class-metadata.test.ts` | `shared/constants` — `AGS_AGENT_CLASS_METADATA` (6-entry per-class label + description + invokesOtherAgents + recommendedAutonomyFloor for assistant/specialist/orchestrator/automation/researcher/auditor) | T-S.2 / #1119 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
