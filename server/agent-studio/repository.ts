@@ -208,8 +208,37 @@ export async function createAgent(input: {
   return { agent, draft };
 }
 
+async function resolveAgentRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  agentId: number,
+) {
+  // V1+ MR-3 forty-fourth batch (PR-V1-114): shared agentId→routed-
+  // conn helper. Reads the agent's current draft (or, if none is
+  // current, any draft) via agsAgentDrafts.agentId, then chains into
+  // resolveDraftRoutedConn's underlying Path-B step. Falls back to
+  // lookupConn when the agent has no drafts or no binding exists.
+  const draftRows = await lookupConn
+    .select({ id: agsAgentDrafts.id })
+    .from(agsAgentDrafts)
+    .where(eq(agsAgentDrafts.agentId, agentId))
+    .limit(1);
+  const draftId = draftRows[0]?.id;
+  if (draftId == null) return lookupConn;
+  const { resolveWorkspaceIdForDraft } = await import(
+    "./services/region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupConn, draftId);
+  if (workspaceId == null) return lookupConn;
+  const { getAsDbForWorkspace } = await import("./db/connection");
+  return getAsDbForWorkspace(workspaceId) ?? lookupConn;
+}
+
 export async function updateAgentLifecycleState(agentId: number, state: string) {
-  await db()
+  // V1+ MR-3 forty-fourth batch (PR-V1-114): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, agentId);
+  await conn
     .update(agsAgents)
     .set({ lifecycleState: state, updatedAt: new Date() })
     .where(eq(agsAgents.id, agentId));
@@ -240,11 +269,19 @@ export async function updateAgentCore(
   if (patch.agentClass !== undefined) set.agentClass = patch.agentClass;
   if (patch.visibility !== undefined) set.visibility = patch.visibility;
   if (patch.ownerId !== undefined) set.ownerId = patch.ownerId;
-  await db().update(agsAgents).set(set).where(eq(agsAgents.id, agentId));
+  // V1+ MR-3 forty-fourth batch (PR-V1-114): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, agentId);
+  await conn.update(agsAgents).set(set).where(eq(agsAgents.id, agentId));
 }
 
 export async function archiveAgent(agentId: number) {
-  await db()
+  // V1+ MR-3 forty-fourth batch (PR-V1-114): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, agentId);
+  await conn
     .update(agsAgents)
     .set({
       lifecycleState: "archived",
