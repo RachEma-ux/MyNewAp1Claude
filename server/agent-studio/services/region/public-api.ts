@@ -105,11 +105,14 @@ export {
 } from "./cross-region-trpc-middleware.js";
 
 // V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-160): cross-process pubsub.
+// PR-V1-185: + force-reconnect symmetric with approval-bus.
 export {
   notifyRegionCacheInvalidation,
   subscribeRegionCacheInvalidations,
   unsubscribeRegionCacheInvalidations,
   maybeSubscribeRegionCachePubsub,
   getRegionCachePubsubStatus,
+  forceReconnectRegionCachePubsubSubscriber,
   type RegionCachePubsubStatus,
+  type ForceReconnectRegionCachePubsubResult,
 } from "./region-cache-pubsub.js";

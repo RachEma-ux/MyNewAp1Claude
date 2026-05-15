@@ -26,7 +26,10 @@
 import { z } from "zod";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
-import { getRegionCachePubsubStatus } from "./region-cache-pubsub.js";
+import {
+  getRegionCachePubsubStatus,
+  forceReconnectRegionCachePubsubSubscriber,
+} from "./region-cache-pubsub.js";
 import { getRegionCacheRewarmCronStatus } from "./region-cache-rewarm-cron.js";
 import {
   warmRegionRoutingCache,
@@ -201,4 +204,15 @@ export const regionAdminRouter = router({
     .query(async ({ input }) => {
       return resolveWorkspaceRegionLookup(input.workspaceId);
     }),
+
+  /**
+   * PR-V1-185: force-reconnect the region-cache pubsub subscriber.
+   * Symmetric with the approval-bus force-reconnect (#935). Use
+   * when status shows `subscribed=true && connectedAt=null` and
+   * the operator wants the next LISTEN attempt now without waiting
+   * for the next backoff tick.
+   */
+  forceReconnectPubsub: adminProcedure.mutation(async () => {
+    return forceReconnectRegionCachePubsubSubscriber();
+  }),
 });
