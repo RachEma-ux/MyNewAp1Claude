@@ -260,6 +260,48 @@ export function GraphHealthAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Open alerts</SectionLabel>
+          {/* PR-V1-226: oldest open alert summary using the fmtAge
+              helper added in #976. Surfaces "how stale is the
+              longest-open alert?" — a 7-day-old warning is a
+              languishing-signal independent of severity. Render
+              gated on openQ.data.length > 0 so a quiet workspace
+              doesn't show a stale "—" line. */}
+          {openQ.data && openQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="graph-health-oldest-alert-summary"
+            >
+              {(() => {
+                let oldest = openQ.data[0];
+                for (const a of openQ.data) {
+                  const aMs = new Date(a.raisedAt).getTime();
+                  const oldestMs = new Date(oldest.raisedAt).getTime();
+                  if (
+                    Number.isFinite(aMs) &&
+                    Number.isFinite(oldestMs) &&
+                    aMs < oldestMs
+                  ) {
+                    oldest = a;
+                  }
+                }
+                return (
+                  <>
+                    <span className="font-medium">Oldest open:</span>{" "}
+                    <span className="font-mono">{oldest.alertKey}</span>{" "}
+                    (<span
+                      className={severityClass(oldest.severity)}
+                    >
+                      {oldest.severity}
+                    </span>
+                    ){" "}
+                    — raised{" "}
+                    <span className="font-mono">{fmtAge(oldest.raisedAt)}</span>{" "}
+                    ago
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {/* PR-V1-208: open-alerts severity breakdown line above
               the table — same pattern as the publish + extensions
               aggregates (#957/#958). critical > 0 → text-destructive,
