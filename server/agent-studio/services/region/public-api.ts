@@ -23,6 +23,7 @@ export {
   listActiveRegions,
   getPrimaryRegion,
   requireActiveRegion,
+  setRegionChangeHook,
 } from "./region-service.js";
 
 export {

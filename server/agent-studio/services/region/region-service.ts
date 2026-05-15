@@ -36,6 +36,32 @@ export class AsdbUnavailableError extends Error {
   }
 }
 
+/**
+ * Late-bound hook fired after every region-registry write. Symmetric
+ * with the pin-change hook (PR-V1-152); the routing bridge registers
+ * a callback that invalidates + re-warms the in-process cache.
+ *
+ * Region writes are rarer than pin writes (operator onboarding only),
+ * but a new region must still propagate to the cache for already-pinned
+ * workspaces to start routing.
+ */
+let _onRegionChanged: (() => void) | null = null;
+
+export function setRegionChangeHook(hook: (() => void) | null): void {
+  _onRegionChanged = hook;
+}
+
+function fireRegionChanged(): void {
+  if (_onRegionChanged) {
+    try {
+      _onRegionChanged();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ags-region-service] change hook threw — ${msg}`);
+    }
+  }
+}
+
 function rowToRegion(r: Record<string, unknown>): RegionRecord {
   return {
     id: Number(r.id),
@@ -70,6 +96,7 @@ export async function registerRegion(
     })
     .returning();
   if (!inserted) throw new Error("Failed to insert region");
+  fireRegionChanged();
   return rowToRegion(inserted as Record<string, unknown>);
 }
 
