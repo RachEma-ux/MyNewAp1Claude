@@ -28,6 +28,7 @@ import { z } from "zod";
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import { getRegionCachePubsubStatus } from "./region-cache-pubsub.js";
 import { getRegionCacheRewarmCronStatus } from "./region-cache-rewarm-cron.js";
+import { warmRegionRoutingCache } from "./workspace-region-cache.js";
 import {
   listActiveRegions,
   registerRegion,
@@ -162,5 +163,24 @@ export const regionAdminRouter = router({
    */
   getPubsubStatus: adminProcedure.query(async () => {
     return getRegionCachePubsubStatus();
+  }),
+
+  /**
+   * PR-V1-176: operator-triggered manual cache re-warm. Mirrors the
+   * `forceTick` shape on the canvas drain (#925). Useful for (a)
+   * verifying that newly-registered regions / pins are visible
+   * without waiting for the 10-min `region-cache-rewarm-cron`
+   * (#906), (b) catching the rare case where in-process hooks fired
+   * but a race left the cache stale. Returns the warm summary so
+   * the operator UI can render counts immediately.
+   */
+  forceRewarm: adminProcedure.mutation(async () => {
+    const summary = await warmRegionRoutingCache();
+    return {
+      activeRegionCount: summary.activeRegionCount,
+      pinCount: summary.pinCount,
+      primaryRegionKey: summary.primaryRegionKey,
+      lastWarmedAt: summary.lastWarmedAt,
+    };
   }),
 });

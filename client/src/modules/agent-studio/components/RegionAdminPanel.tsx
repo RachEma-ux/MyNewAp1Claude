@@ -63,6 +63,18 @@ export function RegionAdminPanel() {
     },
     onError: (err) => setMutationError(err.message),
   });
+  const [rewarmFeedback, setRewarmFeedback] = useState<string | null>(null);
+  const forceRewarmMutation = trpc.agentStudio.region.forceRewarm.useMutation({
+    onSuccess: (data) => {
+      setRewarmFeedback(
+        `Re-warmed: ${data.activeRegionCount} active regions / ${data.pinCount} pins / primary=${data.primaryRegionKey ?? "(none)"}.`,
+      );
+      void utils.agentStudio.region.getCacheStatus.invalidate();
+      void utils.agentStudio.region.listActiveRegions.invalidate();
+      void utils.agentStudio.region.listPins.invalidate();
+    },
+    onError: (err) => setRewarmFeedback(`Re-warm failed: ${err.message}`),
+  });
 
   const cacheQ = trpc.agentStudio.region.getCacheStatus.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -121,6 +133,25 @@ export function RegionAdminPanel() {
               </div>
             </div>
           )}
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="text-sm underline"
+              disabled={forceRewarmMutation.isPending}
+              onClick={() => forceRewarmMutation.mutate()}
+              data-testid="region-cache-force-rewarm-button"
+            >
+              {forceRewarmMutation.isPending ? "Re-warming…" : "Force re-warm now"}
+            </button>
+            {rewarmFeedback ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="region-cache-force-rewarm-feedback"
+              >
+                {rewarmFeedback}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
