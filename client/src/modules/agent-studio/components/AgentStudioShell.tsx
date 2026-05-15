@@ -80,6 +80,9 @@ const ExtensionsAdminPage = lazy(
   () => import("../pages/ExtensionsAdminPage"),
 );
 // V1+ Phase 17 closure (PR-V1-171): canvas operator browser page.
+const ApprovalBusAdminPage = lazy(
+  () => import("../pages/ApprovalBusAdminPage"),
+);
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -210,6 +213,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── V1+ Phase 17 closure (PR-V1-171): canvas operator (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-operator")) {
     return { ...empty, view: "canvas-operator" as any, homeMode: null };
+  }
+  // ── PR-V1-184: approval-bus admin (no agent context) ──
+  if (path.startsWith("/agent-studio/approval-bus-admin")) {
+    return { ...empty, view: "approval-bus-admin" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -381,6 +388,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/canvas-operator");
       return;
     }
+    // PR-V1-184: approval-bus admin sidebar entry.
+    if ((key as string) === "approval-bus-admin") {
+      navigate("/agent-studio/approval-bus-admin");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -461,6 +473,9 @@ export default function AgentStudioShell() {
         // ── V1+ Phase 17 closure (PR-V1-171): canvas operator browser ──
         case "canvas-operator" as any:
           return <CanvasOperatorPage />;
+        // ── PR-V1-184: approval-bus admin ──
+        case "approval-bus-admin" as any:
+          return <ApprovalBusAdminPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }

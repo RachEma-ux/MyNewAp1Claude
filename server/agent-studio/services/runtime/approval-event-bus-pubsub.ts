@@ -287,6 +287,51 @@ export function maybeSubscribeApprovalBusPubsub(
 }
 
 /**
+ * PR-V1-184: operator-triggered force-reconnect. Used when the
+ * status surface (PR-V1-168) shows `subscribed=true` but
+ * `connectedAt=null` — the LISTEN failed at boot or the backoff is
+ * stuck at the 60s cap and the operator wants the next attempt now.
+ *
+ * Preserves the existing handler. Cancels any pending reconnect
+ * timer, ends the current client (if any), resets the backoff
+ * cadence back to 10s so subsequent failures don't start at the
+ * stale cap, and triggers a fresh connect.
+ *
+ * Returns `{ reconnected, reason?, reconnectAttempts }`. Idempotent:
+ * if no handler is registered (subscriber was never started), it's
+ * a no-op with `reason="not-subscribed"`.
+ */
+export interface ForceReconnectApprovalBusResult {
+  readonly reconnected: boolean;
+  readonly reason?: string;
+  readonly reconnectAttempts: number;
+}
+
+export function forceReconnectApprovalBusSubscriber(): ForceReconnectApprovalBusResult {
+  if (_subscriber.handler === null) {
+    return {
+      reconnected: false,
+      reason: "not-subscribed",
+      reconnectAttempts: _subscriber.reconnectAttempts,
+    };
+  }
+  if (_subscriber.timer) {
+    clearTimeout(_subscriber.timer);
+    _subscriber.timer = null;
+  }
+  // Re-subscribing preserves the handler intent (subscribe replaces
+  // the prior handler with the same reference) while taking the full
+  // disconnect → reconnect path, which resets the backoff cadence
+  // and forces a fresh `pg.Client` LISTEN session.
+  const handler = _subscriber.handler;
+  subscribeApprovalDecidedEvents(handler);
+  return {
+    reconnected: true,
+    reconnectAttempts: _subscriber.reconnectAttempts,
+  };
+}
+
+/**
  * Test seam — payload round-trip exposed so unit tests can verify
  * the format without touching the network layer.
  */

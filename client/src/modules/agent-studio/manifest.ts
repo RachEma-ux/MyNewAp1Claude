@@ -67,6 +67,7 @@ export const agentStudioClientManifest: ClientModuleManifest = {
     "/agent-studio/canvas-operator",
     "/agent-studio/region-admin",
     "/agent-studio/extensions-admin",
+    "/agent-studio/approval-bus-admin",
     "/agent-studio/:agentId",
     "/agent-studio/:agentId/:section",
     "/agent-studio/:agentId/runs/:runId",

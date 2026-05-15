@@ -37,6 +37,7 @@ import {
   Folder,
   Globe,
   LayoutGrid,
+  Radio,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -86,7 +87,9 @@ export type AgentStudioView =
   // ── V1+ Phase 18 follow-up (PR-V1-163): extensions admin ──
   | "extensions-admin"
   // ── V1+ Phase 17 closure (PR-V1-171): canvas operator browser ──
-  | "canvas-operator";
+  | "canvas-operator"
+  // ── PR-V1-184: approval-bus admin ──
+  | "approval-bus-admin";
 
 interface SectionGroup {
   label: string;
@@ -167,6 +170,13 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Multi-region",
     items: [
       { key: "region-admin", label: "Region Admin", icon: Globe },
+    ],
+  },
+  // ── PR-V1-184: approval-bus admin ──
+  {
+    label: "Approval bus",
+    items: [
+      { key: "approval-bus-admin", label: "Pubsub Status", icon: Radio },
     ],
   },
 ];

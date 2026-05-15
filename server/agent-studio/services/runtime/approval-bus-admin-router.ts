@@ -15,7 +15,10 @@
  */
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
-import { getApprovalBusPubsubStatus } from "./approval-event-bus-pubsub.js";
+import {
+  forceReconnectApprovalBusSubscriber,
+  getApprovalBusPubsubStatus,
+} from "./approval-event-bus-pubsub.js";
 
 export const approvalBusAdminRouter = router({
   /**
@@ -31,5 +34,17 @@ export const approvalBusAdminRouter = router({
    */
   getPubsubStatus: adminProcedure.query(async () => {
     return getApprovalBusPubsubStatus();
+  }),
+
+  /**
+   * PR-V1-184: operator-triggered force-reconnect. Use when status
+   * shows `subscribed=true` but `connectedAt=null` (LISTEN failed
+   * at boot, or the backoff is stuck at the 60s cap). Resets the
+   * cadence + ends the current client + re-subscribes with the
+   * existing handler. No-op when nothing has subscribed yet
+   * (returns `{ reconnected: false, reason: "not-subscribed" }`).
+   */
+  forceReconnect: adminProcedure.mutation(async () => {
+    return forceReconnectApprovalBusSubscriber();
   }),
 });
