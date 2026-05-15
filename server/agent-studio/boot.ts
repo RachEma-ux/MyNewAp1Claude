@@ -752,7 +752,7 @@ export async function bootAgentStudio(): Promise<void> {
     const result = await maybeInstallRegionRouting();
     if (result.installed) {
       console.log(
-        `[ags-region-routing] installed — activeRegions=${result.activeRegionCount} pins=${result.pinCount} primary=${result.primaryRegionKey ?? "(none)"}`,
+        `[ags-region-routing] installed — activeRegions=${result.activeRegionCount} pins=${result.pinCount} primary=${result.primaryRegionKey ?? "(none)"} pubsub=${result.pubsubSubscribed ? "on" : "off"}`,
       );
     } else {
       console.log(
