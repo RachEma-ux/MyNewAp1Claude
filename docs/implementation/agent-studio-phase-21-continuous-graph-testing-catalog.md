@@ -235,6 +235,7 @@ runtime catches up.
 | `extension-capability-check-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_CAPABILITY_CHECK_METADATA` (4-entry per-check label + description + proceeds + denialReason {null / manifest_mismatch / governance_revoked / operator_disabled}) | T-X.3 / #1111 |
 | `graph-health-alert-key-metadata.test.ts` | `services/graph/health-alert` — `GRAPH_HEALTH_ALERT_KEY_METADATA` (3-entry per-key label + description + defaultSeverity + recoverable boolean for graph_health_latency_high/graph_health_degraded/graph_health_unavailable) | T-H.1 / #1112 |
 | `realtime-doc-frame-type-metadata.test.ts` | `services/vault/realtime-doc-framing` — `REALTIME_DOC_FRAME_TYPE_METADATA` (3-entry per-frame-type label + description + recognized + wireCodepoint for sync/awareness/unknown) | T-B.2 / #1113 |
+| `canvas-projection-event-row-kind-metadata.test.ts` | `services/canvas/projection-events-drain-row-projector` — `CANVAS_PROJECTION_EVENT_ROW_KIND_METADATA` (2-entry per-kind label + description + referencesCurrentNote + isLinkAdd booleans for note_reference_changed/note_reference_removed) | T-C.2 / #1114 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

@@ -41,6 +41,54 @@ export const CANVAS_PROJECTION_EVENT_ROW_KINDS = [
 export type CanvasProjectionEventRowKind =
   (typeof CANVAS_PROJECTION_EVENT_ROW_KINDS)[number];
 
+// ============================================================================
+// Per-row-kind operator-facing metadata (T-C.2)
+// ============================================================================
+
+export interface CanvasProjectionEventRowKindMetadata {
+  /** Display label rendered in canvas trace logs / event drill-downs. */
+  readonly label: string;
+  /** Short operator-facing description of what the event represents. */
+  readonly description: string;
+  /** Whether the row's `referencedNoteId` column refers to the
+   *  CURRENT linked note (true) vs. the PRIOR note being unlinked
+   *  (false). Used by the projection-events forwarder to decide
+   *  which canvas-node-id to mutate. */
+  readonly referencesCurrentNote: boolean;
+  /** Whether this row represents an add/update edge (true) or a
+   *  removal edge (false). Operator dashboards group by edge
+   *  direction. */
+  readonly isLinkAdd: boolean;
+}
+
+export const CANVAS_PROJECTION_EVENT_ROW_KIND_METADATA: Readonly<
+  Record<
+    CanvasProjectionEventRowKind,
+    CanvasProjectionEventRowKindMetadata
+  >
+> = {
+  note_reference_changed: {
+    label: "Note Reference Changed",
+    description:
+      "Canvas node's referenced note pointer was added or updated. `referencedNoteId` holds the new (current) note id.",
+    referencesCurrentNote: true,
+    isLinkAdd: true,
+  },
+  note_reference_removed: {
+    label: "Note Reference Removed",
+    description:
+      "Canvas node's referenced note pointer was removed. `referencedNoteId` holds the prior note id for audit/rollback.",
+    referencesCurrentNote: false,
+    isLinkAdd: false,
+  },
+};
+
+export function getCanvasProjectionEventRowKindMetadata(
+  kind: CanvasProjectionEventRowKind,
+): CanvasProjectionEventRowKindMetadata {
+  return CANVAS_PROJECTION_EVENT_ROW_KIND_METADATA[kind];
+}
+
 /**
  * Project a drained `ags_canvas_projection_events` row back to the
  * original `CanvasProjectionEvent` shape.
