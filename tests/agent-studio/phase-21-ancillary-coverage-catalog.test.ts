@@ -51,6 +51,7 @@ const ANCILLARY_TESTS = [
   "phase-21-gap-18-timeline-event-projection.test.ts",
   "phase-22-burst-summary-coverage.test.ts",
   "phase-23-runbook-coverage.test.ts",
+  "roadmap-phase-22-acceptance-coverage.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
