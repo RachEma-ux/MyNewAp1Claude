@@ -17,12 +17,15 @@ export {
   sortBySeverityDesc as sortFailureStateItemsBySeverityDesc,
   getMostSevereFailureStateItem,
   buildFailureStateCategorySeverityMatrix,
+  FAILURE_STATE_CATEGORY_METADATA,
+  getFailureStateCategoryMetadata,
   type FailureState,
   type FailureStateCategory,
   type FailureStateSeverity,
   type FailureStateMetadata,
   type FailureStateOccurrenceSummary,
   type FailureStateCategorySeverityMatrix,
+  type FailureStateCategoryMetadata,
 } from "./contracts.js";
 
 export {

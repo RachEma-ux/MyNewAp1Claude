@@ -198,6 +198,7 @@ runtime catches up.
 | `code-graph-node-type-metadata.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `CODE_GRAPH_NODE_TYPE_METADATA` (12-entry per-type operator label + description for the repository/package/file/class/function/method/api_endpoint/service/db_table/frontend_component/config_file/test_file taxonomy) | T-G.25 / #1074 |
 | `institutional-memory-node-type-metadata.test.ts` | `services/institutional-memory/contracts` — `INSTITUTIONAL_MEMORY_NODE_TYPE_METADATA` (13-entry per-type operator label + description for the person/team/project/system/service/decision/policy/workflow/document/outcome/responsibility/timeline_event/governance_record taxonomy) | T-G.26 / #1075 |
 | `impact-analysis-kind-metadata.test.ts` | `services/graph-lens/impact-analysis-contracts` — `IMPACT_ANALYSIS_KIND_METADATA` (7-entry per-kind operator label + description for the knowledge/runtime/code/security/governance/tool/workflow impact taxonomy) | T-F.14 / #1076 |
+| `failure-state-category-metadata.test.ts` | `services/failure-states/contracts` — `FAILURE_STATE_CATEGORY_METADATA` (5-entry per-category operator label + description for the infrastructure/governance/retrieval/agent/runtime taxonomy) | T-I.31 / #1077 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
