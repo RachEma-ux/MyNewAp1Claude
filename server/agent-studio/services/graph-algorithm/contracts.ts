@@ -67,6 +67,58 @@ export type GraphAlgorithmBackendSupport =
   (typeof GRAPH_ALGORITHM_BACKEND_SUPPORT)[number];
 
 // ============================================================================
+// Per-backend-support operator-facing metadata (T-G.28)
+// ============================================================================
+
+export interface GraphAlgorithmBackendSupportMetadata {
+  /** Display label for operator dashboards / algorithm pickers. */
+  readonly label: string;
+  /** Short description of the backend requirement. */
+  readonly description: string;
+  /** Whether this support level runs on the current CE deployment
+   *  without a Phase 27 Aura upgrade. */
+  readonly runsOnCe: boolean;
+}
+
+export const GRAPH_ALGORITHM_BACKEND_SUPPORT_METADATA: Readonly<
+  Record<
+    GraphAlgorithmBackendSupport,
+    GraphAlgorithmBackendSupportMetadata
+  >
+> = {
+  neo4j_ce_native: {
+    label: "Neo4j CE (Native)",
+    description:
+      "Implementable in plain Cypher on Neo4j Community Edition. No plugin, no GDS, no upgrade required.",
+    runsOnCe: true,
+  },
+  neo4j_ce_via_apoc: {
+    label: "Neo4j CE (APOC)",
+    description:
+      "Requires the APOC plugin on Neo4j Community Edition. CE-compatible but needs operator action to install APOC.",
+    runsOnCe: true,
+  },
+  gds_required: {
+    label: "GDS Required",
+    description:
+      "Needs the Neo4j Graph Data Science library — gated by Phase 27 Aura upgrade. Not available on stock CE.",
+    runsOnCe: false,
+  },
+  approximation_required: {
+    label: "Approximation Required",
+    description:
+      "Exact algorithm exceeds CE compute budget. A best-effort approximation runs in app code; full accuracy needs Aura.",
+    runsOnCe: false,
+  },
+};
+
+export function getGraphAlgorithmBackendSupportMetadata(
+  level: GraphAlgorithmBackendSupport,
+): GraphAlgorithmBackendSupportMetadata {
+  return GRAPH_ALGORITHM_BACKEND_SUPPORT_METADATA[level];
+}
+
+// ============================================================================
 // Per-algorithm metadata
 // ============================================================================
 
