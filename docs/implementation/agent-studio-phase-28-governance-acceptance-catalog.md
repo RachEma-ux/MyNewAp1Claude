@@ -41,7 +41,7 @@ This document mirrors `agent-studio-phase-21-continuous-graph-testing-catalog.md
 | 27 | Golden question suite runs | ✅ Met (PR-AT-1 closure) | n/a |
 | 28 | Performance benchmarks are reported | ⚠️ Partial — workflow_dispatch ready; baseline evidence is operator-action (strict-audit item 1 PARTIALLY) | n/a (operator) |
 | 29 | Neo4j Enterprise/Aura upgrade path is documented | ✅ Met (Phase 27 ADR + runbook) | n/a |
-| 30 | Documentation complete | ⚠️ Partial — Phase 21 catalog (#999) + this Phase 28 catalog close two big gaps; Phase 22-23 user-facing docs still light | T-I.4 (future) |
+| 30 | Documentation complete | ⚠️ Partial — Phase 21 catalog (#999) + this Phase 28 catalog (#1000) close two big gaps; **Phase 22 emission audit shipped @ #1012** (closes a third); Phase 23 user-facing docs still light | T-I.4 (#1012 partial closure) |
 
 **Summary: 27/30 ✅, 3 partial — all with named closure paths.**
 
@@ -112,7 +112,9 @@ The roadmap enumerates performance gates but doesn't pin a single SLO table. Thi
 |---|---|---|
 | T-D.3 (existing remaining-plan) | Semantic Enrichment Agent runtime | Acceptance #16, CI Blocker #26 |
 | T-I.3 (new — this doc proposes) | Soft-CI SLO gates | Performance SLO catalog enforcement |
-| T-I.4 (new — this doc proposes) | Phase 22/23 user-facing docs | Acceptance #30 completion |
+| ~~T-I.4 (new)~~ → **shipped @ #1012** | Phase 22 emission audit | Acceptance #30 (partial — Phase 22 half) |
+| T-I.4.b (proposed) | Phase 23 user-facing docs (quality-agent runbook) | Acceptance #30 (final) |
+| T-I.5 (in flight) | Failure-state emission bridge + per-emitter wirings | Acceptance #26 reinforcement; observability for kinds the audit named |
 
 ---
 
@@ -120,6 +122,29 @@ The roadmap enumerates performance gates but doesn't pin a single SLO table. Thi
 
 - Roadmap: `docs/implementation/agent-studio-native-graph-workspace-roadmap.md` §Phase 28
 - Phase 21 catalog: `docs/implementation/agent-studio-phase-21-continuous-graph-testing-catalog.md`
+- Phase 22 emission audit: `docs/implementation/agent-studio-phase-22-failure-state-emission-audit.md` (T-I.4 / #1012)
 - Strict audit: `docs/implementation/agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`
 - Remaining plan: `docs/implementation/agent-studio-native-graph-workspace-remaining-execution-plan.md`
 - CLAUDE.md hard rules + integrity mortgage (#985)
+
+---
+
+## 6. Phase 22 closed-taxonomy emission shipment (added 2026-05-15)
+
+The Phase 22 failure-state taxonomy (`FAILURE_STATES`, 25 closed kinds, #1002) reached live multi-emitter status:
+
+| Shipment | PR | Notes |
+|---|---|---|
+| Closed taxonomy contract | #1002 | 25 kinds + 5 categories + 3 severities + recoverable metadata |
+| Emission audit (this doc references) | #1012 | Per-state map vs existing emitters; T-I.5 batch ordering |
+| `recordFailureStateEvent` bridge | #1013 | `failure_state:<kind>` prefix; canonical metadata stamps LAST; severityOverride for SLO escalation |
+| Wire health-alert scanner | #1014 | `neo4j_unavailable` + `neo4j_degraded` + latency-high (collapsed) |
+| Wire projection drift cron | #1015 | `neo4j_projection_drift_detected` |
+| Wire safety-filter | #1016 | `retrieval_safety_filter_blocked_content` (per-call, not per-block) |
+| Wire MCP auto-sync | #1017 | `tool_schema_changed` (pure-function schema diff) |
+| Wire text2cypher rejections | #1018 | `text2cypher_rejected` (closed reason enum) |
+| Wire cypher template execution failures | #1019 | `cypher_query_template_failed` (no PII — `parameterKeys` only) |
+| Bridge wiring coverage guard | #1020 | Lockstep on all 6 batch-A wirings |
+| Phase 21 §7 ancillary coverage catalog | #1021 | Lockstep on 27 ancillary contract / validator / wiring tests |
+
+**6 of 25 closed kinds have live emitters today.** The audit (#1012) names the remaining 19 with batch-B / detection-first / phase-gated tier assignments.
