@@ -164,6 +164,7 @@ runtime catches up.
 | `phase-21-gap-18-timeline-event-projection.test.ts` | Cross-cutting — locks gap #18 projection-helper readiness claim | T-I.15 / #1036 |
 | `phase-22-burst-summary-coverage.test.ts` | Cross-cutting — locks the 2026-05-15 emission burst summary doc against drift | T-I.16 / #1037 |
 | `phase-23-runbook-coverage.test.ts` | Cross-cutting — locks the Phase 23 quality-agent operator runbook (every registered scanKind + lifecycle) | T-I.18 / #1039 |
+| `roadmap-phase-22-acceptance-coverage.test.ts` | Cross-cutting — locks the roadmap doc's Phase 22 acceptance checklist against actual shipped LIVE emissions | T-I.20 / #1041 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

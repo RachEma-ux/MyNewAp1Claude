@@ -2075,16 +2075,22 @@ For any hidden node:
 
 **Data Model:** `ags_workspace_background_jobs`, `ags_workspace_user_notifications`, `ags_workspace_error_events`, `ags_graph_agent_user_feedback`, `ags_graph_backend_health_events`, `ags_graph_projection_drift_events`.
 
-**Acceptance Criteria:**
-- [ ] Graph timeout state is visible.
-- [ ] Neo4j degraded state is visible.
-- [ ] Projection sync failure is visible.
-- [ ] Partial graph loading works.
-- [ ] Promotion validation errors are visible.
-- [ ] Conflict resolution UI works.
-- [ ] Background job status is visible.
-- [ ] Stale graph/search indicators exist.
-- [ ] Graph Agent explanation panel works.
+**Acceptance Criteria** (post 2026-05-15 emission burst — see `agent-studio-failure-state-emission-burst-2026-05-15.md`):
+- [ ] Graph timeout state is visible. (partial — `neo4j_query_timeout` deferred; `graph_query_timeout` deferred)
+- [x] Neo4j degraded state is visible. (`neo4j_degraded` + `neo4j_unavailable` LIVE @ #1014)
+- [x] Projection sync failure is visible. (`projection_sync_failed` LIVE @ #1025; `neo4j_projection_drift_detected` LIVE @ #1015)
+- [ ] Partial graph loading works. (operator UI feature; out of failure-state scope)
+- [x] Promotion validation errors are visible. (`promotion_failed` LIVE @ #1027 — distinguishes validation-reject vs operator-reject via `rejectionStage` metadata)
+- [ ] Conflict resolution UI works. (`note_conflict` detection-first deferred — no concurrent-edit emit point in current vault repo)
+- [x] Background job status is visible. (legacy `errorClass: "BackgroundJobFailed"` since #517-era; closed-taxonomy sibling-emit deferred due to count-pin blocker — see audit kind #25)
+- [ ] Stale graph/search indicators exist. (`neo4j_projection_stale` / `search_index_stale` / `query_cache_stale` — detection-first deferred)
+- [x] Graph Agent explanation panel works. (`graph_agent_answer_incomplete` LIVE @ #1023 — budget-exhaustion signal; clean convergence excluded per closed-taxonomy contract)
+
+**Implementation artifacts:**
+- Closed taxonomy: `services/failure-states/contracts.ts` (#1002 — 25 closed kinds)
+- Emission bridge: `services/failure-states/observability-bridge.ts` (#1013 — `recordFailureStateEvent` + #1029 plural)
+- Per-state audit + dashboard SQL: `docs/implementation/agent-studio-phase-22-failure-state-emission-audit.md`
+- Burst summary: `docs/implementation/agent-studio-failure-state-emission-burst-2026-05-15.md`
 
 ### Phase 23 — Graph Quality Agent and Semantic Self-Correction Loop
 
