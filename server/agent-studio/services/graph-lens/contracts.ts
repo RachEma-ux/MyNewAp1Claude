@@ -54,6 +54,68 @@ export function isGraphLensKind(s: unknown): s is GraphLensKind {
 }
 
 // ============================================================================
+// Per-kind operator-facing metadata (T-F.13)
+// ============================================================================
+
+export interface GraphLensKindMetadata {
+  /** Display label rendered in operator-side lens browsers. */
+  readonly label: string;
+  /** Short description for hover tooltips / help text. */
+  readonly description: string;
+}
+
+export const GRAPH_LENS_KIND_METADATA: Readonly<
+  Record<GraphLensKind, GraphLensKindMetadata>
+> = {
+  rag: {
+    label: "RAG",
+    description:
+      "Retrieval-Augmented Generation surface — what knowledge sources answer this question.",
+  },
+  rac: {
+    label: "RAC",
+    description:
+      "Retrieval + Assembly + Compilation — the runtime context assembly view.",
+  },
+  cag: {
+    label: "CAG",
+    description:
+      "Capability Packs — compiled context blocks and their provenance.",
+  },
+  graph_skill: {
+    label: "Graph Skills",
+    description:
+      "Reusable graph traversal skill packs and their usage history.",
+  },
+  mcp: {
+    label: "MCP Tools",
+    description:
+      "MCP tool dispatch graph — which tools call which, with risk class overlay.",
+  },
+  governance: {
+    label: "Governance",
+    description:
+      "Approval, permission, and policy graph — who can do what, and what's been approved.",
+  },
+  runtime: {
+    label: "Runtime",
+    description:
+      "Live agent runtime runs and their state transitions.",
+  },
+  institutional_memory: {
+    label: "Institutional Memory",
+    description:
+      "People / teams / decisions / policies — the organizational graph.",
+  },
+};
+
+export function getGraphLensKindMetadata(
+  kind: GraphLensKind,
+): GraphLensKindMetadata {
+  return GRAPH_LENS_KIND_METADATA[kind];
+}
+
+// ============================================================================
 // Lens layout taxonomy
 // ============================================================================
 
