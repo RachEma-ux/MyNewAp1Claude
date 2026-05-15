@@ -365,7 +365,21 @@ export async function attachToolBinding(input: {
   rateLimit?: Record<string, unknown>;
   auditRequired?: boolean;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 forty-first batch (PR-V1-111): Path B consumer.
+  // The INSERT routes via getAsDbForWorkspace(workspaceId) resolved
+  // through Path B from input.draftId. Falls back to bootstrap when
+  // the draft has no binding (legacy pre-Phase-11 or binding-pending).
+  const lookupConn = db();
+  const { resolveWorkspaceIdForDraft } = await import(
+    "./services/region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupConn, input.draftId);
+  const { getAsDbForWorkspace } = await import("./db/connection");
+  const conn =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupConn)
+      : lookupConn;
+  const [created] = await conn
     .insert(agsDraftToolBindings)
     .values({
       draftId: input.draftId,
