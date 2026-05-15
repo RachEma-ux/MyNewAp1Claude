@@ -67,6 +67,72 @@ export const GRAPHRAG_RETRIEVAL_METHODS = [
 ] as const;
 export type GraphragRetrievalMethod = (typeof GRAPHRAG_RETRIEVAL_METHODS)[number];
 
+// ============================================================================
+// Per-retrieval-method operator-facing metadata (T-A.6)
+// ============================================================================
+
+export interface GraphragRetrievalMethodMetadata {
+  /** Display label rendered in the operator UI's source picker. */
+  readonly label: string;
+  /** Short operator-facing description of what the method does. */
+  readonly description: string;
+  /** Closed-taxonomy cost classification informing the planner's
+   *  budget logic:
+   *  - `low`: chunk-bounded vector reads, single-hop traversals.
+   *  - `medium`: multi-hop traversals, community summaries.
+   *  - `high`: full-graph algorithms, text2cypher with LLM call. */
+  readonly costClass: "low" | "medium" | "high";
+  /** Whether this method invokes an LLM as part of retrieval (drives
+   *  the rate-limit / model-routing planner branch). */
+  readonly invokesLlm: boolean;
+}
+
+export const GRAPHRAG_RETRIEVAL_METHOD_METADATA: Readonly<
+  Record<GraphragRetrievalMethod, GraphragRetrievalMethodMetadata>
+> = {
+  local: {
+    label: "Local",
+    description:
+      "Per-document chunk-based retrieval scoped to a single graph community or anchor entity.",
+    costClass: "low",
+    invokesLlm: false,
+  },
+  global: {
+    label: "Global",
+    description:
+      "Cross-document graph-level retrieval that combines community summaries before answering.",
+    costClass: "medium",
+    invokesLlm: false,
+  },
+  traversal: {
+    label: "Traversal",
+    description:
+      "Explicit graph walk along typed edges from one or more anchor nodes — operator picks edge filters.",
+    costClass: "medium",
+    invokesLlm: false,
+  },
+  text2cypher: {
+    label: "Text2Cypher",
+    description:
+      "LLM-generated read-only Cypher query against the graph — gated by guardrails and approval.",
+    costClass: "high",
+    invokesLlm: true,
+  },
+  algorithm: {
+    label: "Algorithm",
+    description:
+      "Graph algorithm output (centrality / community / similarity) — typically pre-computed and served from cache.",
+    costClass: "high",
+    invokesLlm: false,
+  },
+};
+
+export function getGraphragRetrievalMethodMetadata(
+  method: GraphragRetrievalMethod,
+): GraphragRetrievalMethodMetadata {
+  return GRAPHRAG_RETRIEVAL_METHOD_METADATA[method];
+}
+
 /**
  * Extract the GraphRAG retrieval method from a plan item's underlying
  * source, returning `null` if the source is not a `graph_index` or the
