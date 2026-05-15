@@ -118,6 +118,7 @@ const ANCILLARY_TESTS = [
   "approval-step-state-metadata.test.ts",
   "note-promotion-state-metadata.test.ts",
   "extension-governance-status-metadata.test.ts",
+  "extension-capability-lane-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

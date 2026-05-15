@@ -125,6 +125,66 @@ export function isExtensionCapabilityLane(
   );
 }
 
+// ============================================================================
+// Per-capability-lane operator-facing metadata (T-X.2)
+// ============================================================================
+
+export interface ExtensionCapabilityLaneMetadata {
+  /** Display label rendered in the extension manifest UI / capability
+   *  picker. */
+  readonly label: string;
+  /** Short operator-facing description of what the lane does in the
+   *  RACT pipeline. */
+  readonly description: string;
+  /** Whether this lane invokes MCP tools (true) vs. produces / mutates
+   *  in-memory state (false). Only the `tool` lane invokes tools — the
+   *  others mutate retrieval / assembly / composition results. */
+  readonly invokesTools: boolean;
+  /** Stable RACT pipeline order index — used to determine the
+   *  invocation order when an extension declares multiple lanes
+   *  (retrieve = 1 → assemble = 2 → compose = 3 → tool = 4). */
+  readonly pipelineOrder: 1 | 2 | 3 | 4;
+}
+
+export const EXTENSION_CAPABILITY_LANE_METADATA: Readonly<
+  Record<ExtensionCapabilityLane, ExtensionCapabilityLaneMetadata>
+> = {
+  retrieve: {
+    label: "Retrieve",
+    description:
+      "Hooks the RAC retrieval phase — extension can inject additional retrieval sources or annotate retrieval results.",
+    invokesTools: false,
+    pipelineOrder: 1,
+  },
+  assemble: {
+    label: "Assemble",
+    description:
+      "Hooks the RAC assembly phase — extension can reshape the assembled prompt / context block before model invocation.",
+    invokesTools: false,
+    pipelineOrder: 2,
+  },
+  compose: {
+    label: "Compose",
+    description:
+      "Hooks the RAC composition phase — extension can post-process the model's response (citation rewrites, redactions, formatters).",
+    invokesTools: false,
+    pipelineOrder: 3,
+  },
+  tool: {
+    label: "Tool",
+    description:
+      "Declares MCP tool invocations — capability-pinned dispatch routes named tools to the extension's handler.",
+    invokesTools: true,
+    pipelineOrder: 4,
+  },
+};
+
+export function getExtensionCapabilityLaneMetadata(
+  lane: ExtensionCapabilityLane,
+): ExtensionCapabilityLaneMetadata {
+  return EXTENSION_CAPABILITY_LANE_METADATA[lane];
+}
+
 export const EXTENSION_CAPABILITY_CHECKS = [
   "allowed",
   "denied_undeclared",
