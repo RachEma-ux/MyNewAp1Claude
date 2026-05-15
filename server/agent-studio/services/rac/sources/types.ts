@@ -128,12 +128,69 @@ export function getRacSourceTypeMetadata(
   return RAC_SOURCE_TYPE_METADATA[sourceType];
 }
 
-/** Owner module that registered the source. */
-export type RacOwnerModule =
-  | "agentStudio"
-  | "dataAnalysis"
-  | "projectsSystem"
-  | "external";
+/**
+ * Owner module that registered the source. Promoted from a union to a
+ * tuple-derived constant at T-A.10 so it.each-style lockstep tests can
+ * enumerate every value.
+ */
+export const RAC_OWNER_MODULES = [
+  "agentStudio",
+  "dataAnalysis",
+  "projectsSystem",
+  "external",
+] as const;
+
+export type RacOwnerModule = (typeof RAC_OWNER_MODULES)[number];
+
+// ============================================================================
+// Per-owner-module operator-facing metadata (T-A.10)
+// ============================================================================
+
+export interface RacOwnerModuleMetadata {
+  /** Display label rendered in the source registry UI. */
+  readonly label: string;
+  /** Short operator-facing description of who owns sources from this
+   *  module. */
+  readonly description: string;
+  /** Whether sources owned by this module are first-party Agent Studio
+   *  domain (true) or live outside Agent Studio's mutation scope (false). */
+  readonly firstParty: boolean;
+}
+
+export const RAC_OWNER_MODULE_METADATA: Readonly<
+  Record<RacOwnerModule, RacOwnerModuleMetadata>
+> = {
+  agentStudio: {
+    label: "Agent Studio",
+    description:
+      "First-party Agent Studio sources — CAG packs, knowledge units, tool knowledge mirrors. Owned by the workspace's Agent Studio module.",
+    firstParty: true,
+  },
+  dataAnalysis: {
+    label: "Data Analysis",
+    description:
+      "Sources registered by the Data Analysis subsystem — typically GraphRAG indexes mounted via `dataAnalysis.graphRag.*` tRPC.",
+    firstParty: false,
+  },
+  projectsSystem: {
+    label: "Projects System",
+    description:
+      "Sources registered by the Projects System — project-scoped document collections and per-project knowledge bases.",
+    firstParty: false,
+  },
+  external: {
+    label: "External",
+    description:
+      "Third-party retrieval sources mounted through the connector framework. Outputs flow through governance but the underlying index lives outside Agent Studio.",
+    firstParty: false,
+  },
+};
+
+export function getRacOwnerModuleMetadata(
+  ownerModule: RacOwnerModule,
+): RacOwnerModuleMetadata {
+  return RAC_OWNER_MODULE_METADATA[ownerModule];
+}
 
 // ── Profile ────────────────────────────────────────────────────────
 

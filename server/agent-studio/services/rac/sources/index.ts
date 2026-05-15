@@ -21,7 +21,14 @@ export type {
   UpsertWorkspaceEmbeddingDefaultInput,
 } from "./types";
 
-export { RAC_SOURCE_TYPES, EmbeddingDefaultRequiredError } from "./types";
+export {
+  RAC_SOURCE_TYPES,
+  RAC_OWNER_MODULES,
+  RAC_OWNER_MODULE_METADATA,
+  getRacOwnerModuleMetadata,
+  EmbeddingDefaultRequiredError,
+} from "./types";
+export type { RacOwnerModuleMetadata } from "./types";
 
 export {
   createProfile,
