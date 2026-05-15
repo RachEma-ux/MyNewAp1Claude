@@ -63,15 +63,19 @@ export function resetAsDb() {
  * service-layer call sites that need to be multi-region-ready
  * WITHOUT becoming region-aware today.
  *
- * Phase 1 (this PR): `workspaceId` is observed but unused; the shim
- * delegates to `getAsDb()`. Single-region operational baseline is
- * preserved bit-for-bit — see
- * `docs/implementation/agent-studio-mr-3-getasdb-inventory.md`.
+ * Phase 1 (PR #757): `workspaceId` is observed but unused; the shim
+ * delegates to `getAsDb()`. Single-region operational baseline
+ * preserved bit-for-bit.
  *
- * Phase 2 (follow-up): once the workspace→region lookup table is
- * wired, this shim consults the region helper and routes accordingly.
- * Single-region deployments still get the existing behavior; multi-
- * region deployments route the workspace's writes to its home region.
+ * Phase 2 (PR-V1-150, this PR): once a region router is configured
+ * via `configureRegionRouter()`, the shim consults the router and
+ * returns a region-routed pool. Until the router is configured (or
+ * single-region deployments that never call configure), behavior is
+ * unchanged — falls back to `getAsDb()`.
+ *
+ * Late-binding via `configureRegionRouter` avoids a circular import
+ * between `db/connection.ts` and `services/region/*` (which itself
+ * imports `getAsDb` for the bootstrap handle).
  *
  * Returns null on connection failure (same contract as `getAsDb`).
  *
@@ -80,16 +84,38 @@ export function resetAsDb() {
  *   requires the caller to pass `{ availableRegions, workspaceRegionKey }`
  *   pre-resolved. Wiring that at every call site is a heavyweight
  *   coupling change. The shim takes only `workspaceId` and performs
- *   the lookup internally (Phase 2). Callers don't become region-aware.
+ *   the lookup internally. Callers don't become region-aware.
  */
+
+type AsDbInstance = NonNullable<ReturnType<typeof getAsDb>>;
+
+interface RegionRouter {
+  /** Resolve workspaceId to a region-routed Drizzle instance, or
+   *  null when the workspace has no pin / the cache is cold / the
+   *  pin names an inactive region. Callers fall back to bootstrap. */
+  readonly resolve: (workspaceId: number) => AsDbInstance | null;
+}
+
+let _regionRouter: RegionRouter | null = null;
+
+/**
+ * Wire a region router into the shim. Called once during boot by
+ * the region-service module after the routing cache is warmed.
+ *
+ * Calling this with `null` removes the router (returns the shim to
+ * Phase-1 delegate-to-`getAsDb` behavior). Useful for tests + for
+ * operator-initiated "multi-region off" rollback scenarios.
+ */
+export function configureRegionRouter(router: RegionRouter | null): void {
+  _regionRouter = router;
+}
+
 export function getAsDbForWorkspace(
   workspaceId: number | null | undefined,
 ): ReturnType<typeof getAsDb> {
-  // Phase 1 — observe + delegate. Future phase consults the region
-  // helper. We accept `workspaceId` as nullable because some callers
-  // (e.g. createVault with optional workspaceId on the input schema)
-  // can't always supply one. Phase 2 will treat null/undefined as
-  // "use the default region" rather than throwing.
-  void workspaceId;
+  if (workspaceId == null) return getAsDb();
+  if (!_regionRouter) return getAsDb();
+  const routed = _regionRouter.resolve(workspaceId);
+  if (routed) return routed;
   return getAsDb();
 }
