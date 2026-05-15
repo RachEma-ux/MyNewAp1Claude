@@ -208,6 +208,10 @@ export {
   getScannerMetadata,
   listScannerMetadata,
   summarizeQualityFindings,
+  qualitySeverityRank,
+  compareQualitySeverity,
+  sortQualityFindingsBySeverityDesc,
+  getMostSevereQualityFinding,
 } from "./scanner-metadata.js";
 export type {
   QualityScannerCategory,
