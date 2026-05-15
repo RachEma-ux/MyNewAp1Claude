@@ -45,6 +45,13 @@ export function GraphHealthAdminPanel() {
   const openQ = trpc.agentStudio.graphHealth.listOpen.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
+  // PR-V1-191: pair the alert cron with the projection drift cron
+  // since operators check both at the same time. Same `{ lastRunAt,
+  // lastResult, lastError }` shape; rendered with the same card.
+  const driftCronQ =
+    trpc.agentStudio.graphProjection.getDriftCronStatus.useQuery(undefined, {
+      refetchOnWindowFocus: false,
+    });
 
   return (
     <div className="space-y-4">
@@ -102,6 +109,45 @@ export function GraphHealthAdminPanel() {
                   </div>
                 </>
               ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Projection drift cron status</SectionLabel>
+          {driftCronQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading drift cron status…
+            </p>
+          ) : driftCronQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load drift cron: {driftCronQ.error.message}
+            </p>
+          ) : driftCronQ.data == null ? (
+            <p className="text-sm text-muted-foreground">
+              No drift cron status.
+            </p>
+          ) : (
+            <div
+              className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm"
+              data-testid="graph-projection-drift-cron-grid"
+            >
+              <div>
+                <span className="font-medium">lastRunAt:</span>{" "}
+                <span className="font-mono">
+                  {fmtTs(driftCronQ.data.lastRunAt)}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">lastError:</span>{" "}
+                <span
+                  className={`font-mono ${driftCronQ.data.lastError ? "text-destructive" : ""}`}
+                >
+                  {driftCronQ.data.lastError?.message ?? "—"}
+                </span>
+              </div>
             </div>
           )}
         </CardContent>
