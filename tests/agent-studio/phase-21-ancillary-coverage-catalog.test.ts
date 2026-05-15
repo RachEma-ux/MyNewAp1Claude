@@ -112,6 +112,7 @@ const ANCILLARY_TESTS = [
   "saved-view-visibility-metadata.test.ts",
   "realtime-doc-deny-reason-metadata.test.ts",
   "export-eligibility-gate-metadata.test.ts",
+  "canvas-node-kind-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

@@ -28,6 +28,64 @@ export function isCanvasNodeKind(s: unknown): s is CanvasNodeKind {
   );
 }
 
+// ============================================================================
+// Per-node-kind operator-facing metadata (T-C.1)
+// ============================================================================
+
+export interface CanvasNodeKindMetadata {
+  /** Display label rendered in the canvas node picker / toolbar. */
+  readonly label: string;
+  /** Short operator-facing description of what the node represents. */
+  readonly description: string;
+  /** Whether this node kind holds a reference to a governed-content
+   *  primitive (note, query, image) that lives outside the canvas vs.
+   *  free-form inline content. References inherit permissions /
+   *  freshness from the referenced primitive. */
+  readonly isReference: boolean;
+  /** Whether this node kind embeds a live retrieval / query result
+   *  that re-evaluates on canvas open (true) vs. static content (false). */
+  readonly evaluatesAtRender: boolean;
+}
+
+export const CANVAS_NODE_KIND_METADATA: Readonly<
+  Record<CanvasNodeKind, CanvasNodeKindMetadata>
+> = {
+  note_ref: {
+    label: "Note Reference",
+    description:
+      "References a governed note. The canvas renders the note's current title/excerpt; permissions and freshness flow from the referenced note.",
+    isReference: true,
+    evaluatesAtRender: false,
+  },
+  embedded_query: {
+    label: "Embedded Query",
+    description:
+      "References a saved query that re-evaluates each time the canvas renders — surfaces live result rows in the canvas layout.",
+    isReference: true,
+    evaluatesAtRender: true,
+  },
+  free_text: {
+    label: "Free Text",
+    description:
+      "Inline text content authored directly on the canvas — not a reference to a governed primitive; lives only in the canvas's own node table.",
+    isReference: false,
+    evaluatesAtRender: false,
+  },
+  image_ref: {
+    label: "Image Reference",
+    description:
+      "References a governed image attachment. The canvas renders the image; permissions flow from the referenced attachment.",
+    isReference: true,
+    evaluatesAtRender: false,
+  },
+};
+
+export function getCanvasNodeKindMetadata(
+  kind: CanvasNodeKind,
+): CanvasNodeKindMetadata {
+  return CANVAS_NODE_KIND_METADATA[kind];
+}
+
 export interface CanvasRecord {
   readonly id: number;
   readonly vaultId: number;
