@@ -32,6 +32,8 @@ export {
   IMPACT_PATH_VALIDATION_REASON_KEYS,
   IMPACT_PATH_VALIDATION_REASON_METADATA,
   getImpactPathValidationReasonMetadata,
+  SECURITY_GRAPH_CANONICAL_IMPACT_PATH_STEP_METADATA,
+  getSecurityGraphCanonicalPathStepMetadata,
   type SecurityGraphNodeType,
   type SecurityGraphCanonicalPathStep,
   type SecurityFindingSeverity,
@@ -42,4 +44,5 @@ export {
   type SecurityGraphNodeTypeMetadata,
   type SecurityFindingSeverityMetadata,
   type ImpactPathValidationReasonMetadata,
+  type SecurityGraphCanonicalPathStepMetadata,
 } from "./contracts.js";
