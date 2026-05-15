@@ -396,18 +396,57 @@ export async function attachToolBinding(input: {
   return created;
 }
 
+async function resolveToolBindingDraftId(
+  conn: ReturnType<typeof db>,
+  bindingId: number,
+): Promise<number | null> {
+  // V1+ MR-3 forty-second batch (PR-V1-112): tool-binding → draftId
+  // resolver. agsDraftToolBindings carries draftId; we read it so
+  // Path B's resolver can derive workspaceId.
+  const rows = await conn
+    .select({ draftId: agsDraftToolBindings.draftId })
+    .from(agsDraftToolBindings)
+    .where(eq(agsDraftToolBindings.id, bindingId))
+    .limit(1);
+  return rows[0]?.draftId ?? null;
+}
+
+async function resolveBindingRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  bindingId: number,
+) {
+  const draftId = await resolveToolBindingDraftId(lookupConn, bindingId);
+  if (draftId == null) return lookupConn;
+  const { resolveWorkspaceIdForDraft } = await import(
+    "./services/region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupConn, draftId);
+  if (workspaceId == null) return lookupConn;
+  const { getAsDbForWorkspace } = await import("./db/connection");
+  return getAsDbForWorkspace(workspaceId) ?? lookupConn;
+}
+
 export async function updateToolBinding(
   bindingId: number,
   patch: Partial<typeof agsDraftToolBindings.$inferInsert>
 ) {
-  await db()
+  // V1+ MR-3 forty-second batch (PR-V1-112): Path B consumer via
+  // tool-binding → draftId resolver. Falls back to bootstrap when
+  // the binding row is missing OR the draft has no provider binding.
+  const lookupConn = db();
+  const conn = await resolveBindingRoutedConn(lookupConn, bindingId);
+  await conn
     .update(agsDraftToolBindings)
     .set(patch)
     .where(eq(agsDraftToolBindings.id, bindingId));
 }
 
 export async function removeToolBinding(bindingId: number) {
-  await db().delete(agsDraftToolBindings).where(eq(agsDraftToolBindings.id, bindingId));
+  // V1+ MR-3 forty-second batch (PR-V1-112): same Path B chain as
+  // updateToolBinding above.
+  const lookupConn = db();
+  const conn = await resolveBindingRoutedConn(lookupConn, bindingId);
+  await conn.delete(agsDraftToolBindings).where(eq(agsDraftToolBindings.id, bindingId));
 }
 
 export async function getToolBindingById(bindingId: number) {
