@@ -12,6 +12,7 @@ export type {
   RacRetrievalChunk,
   RacRetrievalHealth,
   RacRetrievalHealthStatus,
+  RacRetrievalHealthStatusMetadata,
   RacIndexValidationResult,
   RacIngestionPreview,
 } from "./types";
@@ -20,6 +21,9 @@ export {
   RacBackendUnavailableError,
   EmbeddingDimMismatchError,
   EmbeddingProviderUnavailableError,
+  RAC_RETRIEVAL_HEALTH_STATUSES,
+  RAC_RETRIEVAL_HEALTH_STATUS_METADATA,
+  getRacRetrievalHealthStatusMetadata,
 } from "./types";
 
 export { graphragAdapter } from "./graphrag-adapter";
