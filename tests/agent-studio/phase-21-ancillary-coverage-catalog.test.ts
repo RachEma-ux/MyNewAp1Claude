@@ -78,6 +78,7 @@ const ANCILLARY_TESTS = [
   "institutional-memory-projection-summary.test.ts",
   "lens-runner-registry-coverage.test.ts",
   "finding-class-for-proposal-kind.test.ts",
+  "failure-state-row-collection-helpers.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

@@ -191,6 +191,7 @@ runtime catches up.
 | `institutional-memory-projection-summary.test.ts` | `services/institutional-memory/project-node` — `summarizeInstitutionalMemoryProjectionResult` (projected/skipped + 4-key stable-shape reason axis + projectedPercent) + new exported `INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS` constant | T-G.22 / #1067 |
 | `lens-runner-registry-coverage.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensRunnerRegistry` (registeredKinds / missingKinds list / coveragePercent over the runtime runner registry) | T-F.12 / #1068 |
 | `finding-class-for-proposal-kind.test.ts` | `services/graph-quality/finding-to-proposal` — `findingClassForProposalKind` (inverse lookup of FINDING_CLASS_TO_PROPOSAL_KIND; null for review_* fallbacks or unknown kinds) | T-D.10 / #1069 |
+| `failure-state-row-collection-helpers.test.ts` | `services/failure-states/observability-bridge` — `partitionRowsByFailureState` + `groupRowsByFailureStateKind` (collection helpers over raw observability rows) | T-I.30 / #1070 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
