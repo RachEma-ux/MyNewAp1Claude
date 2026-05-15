@@ -44,6 +44,76 @@ export const INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS = [
 export type InstitutionalMemoryProjectionSkipReason =
   (typeof INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS)[number];
 
+// ============================================================================
+// Per-skip-reason operator-facing metadata (T-G.32)
+// ============================================================================
+
+export interface InstitutionalMemoryProjectionSkipReasonMetadata {
+  /** Display label for operator dashboards / projection-skip drill-downs. */
+  readonly label: string;
+  /** Short description of what the skip indicates. */
+  readonly description: string;
+  /** Closed-taxonomy classification:
+   *  - `taxonomy_gap`: the institutional-memory node type isn't mapped to a
+   *    SoT table yet (extend `INSTITUTIONAL_MEMORY_SOURCE_MAPPING`).
+   *  - `source_row_defect`: the SoT row is missing or malformed
+   *    (data-quality investigation).
+   *  - `source_schema_drift`: the SoT row's id column changed shape (id
+   *    became an object/array, suggesting an upstream schema change). */
+  readonly classification:
+    | "taxonomy_gap"
+    | "source_row_defect"
+    | "source_schema_drift";
+  /** Operator-facing remediation hint. */
+  readonly remediation: string;
+}
+
+export const INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASON_METADATA: Readonly<
+  Record<
+    InstitutionalMemoryProjectionSkipReason,
+    InstitutionalMemoryProjectionSkipReasonMetadata
+  >
+> = {
+  node_type_not_mapped_to_source_table: {
+    label: "Node Type Unmapped",
+    description:
+      "The institutional-memory node type has no source-of-truth table mapped in INSTITUTIONAL_MEMORY_SOURCE_MAPPING — projection has nothing to read from.",
+    classification: "taxonomy_gap",
+    remediation:
+      "Extend INSTITUTIONAL_MEMORY_SOURCE_MAPPING to bind this node type to a SoT table + idColumn + labelColumn.",
+  },
+  row_missing_id_column: {
+    label: "Missing ID Column",
+    description:
+      "The SoT row is missing its configured id column value (undefined/null) — likely a half-built insert or a schema mismatch.",
+    classification: "source_row_defect",
+    remediation:
+      "Investigate the source table — either the row was partially-inserted or the idColumn mapping is wrong for this table.",
+  },
+  row_missing_label_column: {
+    label: "Missing Label Column",
+    description:
+      "The SoT row is missing its configured label column value (undefined/null) — usually a half-built insert.",
+    classification: "source_row_defect",
+    remediation:
+      "Backfill the missing label column value or update INSTITUTIONAL_MEMORY_SOURCE_MAPPING.labelColumn to point at a column that's always populated.",
+  },
+  row_id_not_stringifiable: {
+    label: "ID Not Stringifiable",
+    description:
+      "The SoT row's id column value is an object or array — likely a schema drift event where the column shape changed.",
+    classification: "source_schema_drift",
+    remediation:
+      "Investigate the source table's id column — it should be number/bigint/string/uuid. If the column changed shape, update the mapping or restore the original column.",
+  },
+};
+
+export function getInstitutionalMemoryProjectionSkipReasonMetadata(
+  reason: InstitutionalMemoryProjectionSkipReason,
+): InstitutionalMemoryProjectionSkipReasonMetadata {
+  return INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASON_METADATA[reason];
+}
+
 /**
  * Returns the projected node OR `null` if the row cannot be projected.
  * Use `projectInstitutionalMemoryNodeWithReason` for diagnostics.
