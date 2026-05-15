@@ -90,6 +90,28 @@ export function CanvasProjectionEventsDrainStatusPanel() {
                 {status.lastTickResult.totalFailed > 0
                   ? ` (${status.lastTickResult.totalFailed} failed)`
                   : ""}
+                {/* PR-V1-212: surface the distinct-workspace failure
+                    count alongside the total — total tells "how many
+                    events broke", workspaces-with-failures tells "how
+                    many tenants are blocked". Different signal. */}
+                {(() => {
+                  if (!status.lastTickResult) return null;
+                  const workspacesWithFailures =
+                    status.lastTickResult.perWorkspace.filter(
+                      (w) => w.failed > 0,
+                    ).length;
+                  if (workspacesWithFailures === 0) return null;
+                  return (
+                    <span
+                      className="text-destructive"
+                      data-testid="drain-workspaces-with-failures"
+                    >
+                      {" "}
+                      across {workspacesWithFailures} workspace
+                      {workspacesWithFailures === 1 ? "" : "s"}
+                    </span>
+                  );
+                })()}
               </p>
             )}
             {status.lastTickError != null && (
