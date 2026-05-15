@@ -378,6 +378,46 @@ export function getMostSevereFailureStateItem<T>(
 }
 
 // ============================================================================
+// Category × Severity matrix (T-I.28)
+// ============================================================================
+
+export type FailureStateCategorySeverityMatrix = Readonly<
+  Record<
+    FailureStateCategory,
+    Readonly<Record<FailureStateSeverity, number>>
+  >
+>;
+
+/**
+ * Builds a 2D matrix keyed by category × severity from a list of
+ * failure-state occurrence kinds. Stable-shape: every category row
+ * exists, every severity column exists, zero-valued cells included.
+ *
+ * Useful for operator dashboards rendering a category-by-severity
+ * heat-map. Pure function; no DB / dispatcher / openrouter.
+ *
+ * Unknown kinds in input are silently ignored (consistent with
+ * summarizeFailureStateOccurrences).
+ */
+export function buildFailureStateCategorySeverityMatrix(
+  occurrences: ReadonlyArray<string>,
+): FailureStateCategorySeverityMatrix {
+  const matrix: Record<string, Record<string, number>> = {};
+  for (const cat of FAILURE_STATE_CATEGORIES) {
+    matrix[cat] = {};
+    for (const sev of FAILURE_STATE_SEVERITIES) {
+      matrix[cat][sev] = 0;
+    }
+  }
+  for (const kind of occurrences) {
+    if (!isFailureState(kind)) continue;
+    const meta = FAILURE_STATE_METADATA[kind];
+    matrix[meta.category][meta.defaultSeverity] += 1;
+  }
+  return matrix as FailureStateCategorySeverityMatrix;
+}
+
+// ============================================================================
 // Aggregation helper (T-I.23)
 // ============================================================================
 
