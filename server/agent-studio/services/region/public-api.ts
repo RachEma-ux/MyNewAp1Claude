@@ -39,3 +39,13 @@ export {
   type RegionConnectionOptions,
   type GetDbForWorkspaceInput,
 } from "./connection-helper.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-148): workspace → region pin.
+export {
+  setWorkspaceRegionPin,
+  getWorkspaceRegionPin,
+  listAllWorkspaceRegionPins,
+  removeWorkspaceRegionPin,
+  type WorkspaceRegionPinRecord,
+  type SetWorkspaceRegionPinInput,
+} from "./workspace-region-pin-service.js";
