@@ -321,3 +321,74 @@ export function listOperatorActionRequiredFailureStates(): ReadonlyArray<Failure
     (s) => FAILURE_STATE_METADATA[s].recoverable === false,
   );
 }
+
+// ============================================================================
+// Aggregation helper (T-I.23)
+// ============================================================================
+
+export interface FailureStateOccurrenceSummary {
+  readonly total: number;
+  readonly byKind: Readonly<Record<FailureState, number>>;
+  readonly byCategory: Readonly<Record<FailureStateCategory, number>>;
+  readonly bySeverity: Readonly<Record<FailureStateSeverity, number>>;
+  readonly byRecoverable: Readonly<{
+    readonly recoverable: number;
+    readonly operatorActionRequired: number;
+  }>;
+}
+
+/**
+ * Aggregates a list of observed failure-state occurrences (each
+ * occurrence identified by its closed-taxonomy kind) into a stable-
+ * shape summary with every closed-taxonomy axis keyed at zero or
+ * higher.
+ *
+ * Stable-shape semantics: every `FailureState`, every
+ * `FailureStateCategory`, every `FailureStateSeverity` appears as a
+ * key in the returned record even when the count is 0. This lets
+ * operator dashboards bind to a fixed set of columns without
+ * defensive `??` reads, and it surfaces "category X is silent right
+ * now" as a 0 rather than a missing row.
+ *
+ * Unknown kinds in the input are silently ignored (no throw) — the
+ * bridge encodes via the closed-taxonomy guard at write-time, so
+ * unknown values here imply a stale-string read from a non-bridge
+ * emitter and shouldn't blow up the summary.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeFailureStateOccurrences(
+  occurrences: ReadonlyArray<string>,
+): FailureStateOccurrenceSummary {
+  const byKind: Record<string, number> = {};
+  for (const kind of FAILURE_STATES) byKind[kind] = 0;
+
+  const byCategory: Record<string, number> = {};
+  for (const cat of FAILURE_STATE_CATEGORIES) byCategory[cat] = 0;
+
+  const bySeverity: Record<string, number> = {};
+  for (const sev of FAILURE_STATE_SEVERITIES) bySeverity[sev] = 0;
+
+  let recoverable = 0;
+  let operatorActionRequired = 0;
+  let total = 0;
+
+  for (const kind of occurrences) {
+    if (!isFailureState(kind)) continue;
+    const meta = FAILURE_STATE_METADATA[kind];
+    byKind[kind] += 1;
+    byCategory[meta.category] += 1;
+    bySeverity[meta.defaultSeverity] += 1;
+    if (meta.recoverable) recoverable += 1;
+    else operatorActionRequired += 1;
+    total += 1;
+  }
+
+  return {
+    total,
+    byKind: byKind as Readonly<Record<FailureState, number>>,
+    byCategory: byCategory as Readonly<Record<FailureStateCategory, number>>,
+    bySeverity: bySeverity as Readonly<Record<FailureStateSeverity, number>>,
+    byRecoverable: { recoverable, operatorActionRequired },
+  };
+}

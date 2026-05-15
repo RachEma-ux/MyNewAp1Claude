@@ -167,6 +167,7 @@ runtime catches up.
 | `roadmap-phase-22-acceptance-coverage.test.ts` | Cross-cutting — locks the roadmap doc's Phase 22 acceptance checklist against actual shipped LIVE emissions | T-I.20 / #1041 |
 | `scanner-metadata-coverage.test.ts` | `services/graph-quality/scanner-metadata` — operator introspection metadata symmetry with `QUALITY_SCANNER_REGISTRY` + `FINDING_CLASS_TO_PROPOSAL_KIND` | T-D.7 / #1044 |
 | `security-graph-severity-helpers.test.ts` | `services/security-graph/contracts` — severity rank + comparator + sort-desc + most-severe helpers | T-G.12 / #1045 |
+| `failure-state-summarize.test.ts` | `services/failure-states/contracts` — `summarizeFailureStateOccurrences` stable-shape aggregator (byKind / byCategory / bySeverity / byRecoverable) | T-I.23 / #1046 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
