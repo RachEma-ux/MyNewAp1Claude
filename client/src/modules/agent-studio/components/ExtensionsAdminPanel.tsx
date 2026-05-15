@@ -429,6 +429,48 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Recent invocations</SectionLabel>
+          {/* PR-V1-207: workspace-aggregate invocation health summary
+              above the filter row — symmetric with the publish
+              executions aggregate (#957). Sums the per-extension
+              workspaceInvocationSummaries data. denied > 0 →
+              text-destructive so an operator sees capability-check
+              failures at a glance. */}
+          {summariesQ.data && summariesQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="extensions-invocations-aggregate-summary"
+            >
+              {(() => {
+                let total = 0;
+                let allowed = 0;
+                let denied = 0;
+                for (const s of summariesQ.data) {
+                  total += s.totalInvocations;
+                  allowed += s.allowedCount;
+                  denied += s.deniedCount;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Workspace totals:</span>{" "}
+                    <span className="font-mono">{total}</span> invocations —{" "}
+                    <span
+                      className={
+                        allowed > 0 ? "text-emerald-600 dark:text-emerald-400" : ""
+                      }
+                    >
+                      <span className="font-mono">{allowed}</span> allowed
+                    </span>
+                    {" / "}
+                    <span
+                      className={denied > 0 ? "text-destructive" : ""}
+                    >
+                      <span className="font-mono">{denied}</span> denied
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-2 text-sm">
             <label
               className="font-medium"
