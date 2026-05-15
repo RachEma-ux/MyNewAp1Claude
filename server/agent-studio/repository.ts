@@ -739,7 +739,12 @@ export async function createVersion(input: {
   governanceVerdict?: string;
   createdBy?: number;
 }) {
-  const conn = db();
+  // V1+ MR-3 forty-fifth batch (PR-V1-115): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId). The SELECT
+  // (max version number) and the INSERT share a single routed conn
+  // — preserves atomicity (no cross-region writes within one fn).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
   const existing = await conn
     .select({ max: sql<number>`coalesce(max(${agsAgentVersions.versionNumber}), 0)` })
     .from(agsAgentVersions)
@@ -771,7 +776,11 @@ export async function createPublishRequest(input: {
   preflight: Record<string, unknown>;
   requestedBy?: number;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 forty-fifth batch (PR-V1-115): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
+  const [created] = await conn
     .insert(agsPublishRequests)
     .values({
       agentId: input.agentId,
