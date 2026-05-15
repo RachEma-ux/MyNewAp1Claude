@@ -284,7 +284,13 @@ export async function updateDraft(
   agentId: number,
   patch: Partial<typeof agsAgentDrafts.$inferInsert>
 ) {
-  const conn = db();
+  // V1+ MR-3 fortieth batch (PR-V1-110): Path B consumer.
+  // `getCurrentDraft` already returns a draft row with `id` — we use
+  // that draftId to resolve workspaceId via Path B's resolver. The
+  // UPDATE then routes via getAsDbForWorkspace. Falls back to the
+  // bootstrap handle when the draft has no binding (legacy / pre-
+  // Phase-11).
+  const lookupConn = db();
   const draft = await getCurrentDraft(agentId);
   if (!draft) throw new Error(`No current draft for agent ${agentId}`);
   // Phase 27.2A — strip raw provider keys before persistence (LK-01).
@@ -322,6 +328,15 @@ export async function updateDraft(
       safePatch = { ...safePatch, ...stamped } as typeof patch;
     }
   }
+  const { resolveWorkspaceIdForDraft } = await import(
+    "./services/region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupConn, draft.id);
+  const { getAsDbForWorkspace } = await import("./db/connection");
+  const conn =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupConn)
+      : lookupConn;
   await conn
     .update(agsAgentDrafts)
     .set({ ...safePatch, updatedAt: new Date() })
