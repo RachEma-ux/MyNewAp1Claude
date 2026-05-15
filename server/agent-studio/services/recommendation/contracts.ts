@@ -75,6 +75,69 @@ export type RecommendationPermissionStatus =
   (typeof RECOMMENDATION_PERMISSION_STATUSES)[number];
 
 // ============================================================================
+// Per-kind operator-facing metadata (T-G.23)
+// ============================================================================
+
+export interface RecommendationKindMetadata {
+  /** Display label rendered in the operator UI's lens tabs / pickers. */
+  readonly label: string;
+  /** Short description rendered on hover / in the lens-runner's help
+   *  text. Operator-facing, no jargon. */
+  readonly description: string;
+}
+
+export const RECOMMENDATION_KIND_METADATA: Readonly<
+  Record<RecommendationKind, RecommendationKindMetadata>
+> = {
+  relevant_notes: {
+    label: "Relevant Notes",
+    description:
+      "Notes anchored to the same topic / entity as the current context.",
+  },
+  relevant_cag_blocks: {
+    label: "Relevant CAG Blocks",
+    description:
+      "Compiled CAG blocks whose semantics match the current context.",
+  },
+  relevant_graph_skill_packs: {
+    label: "Relevant Skill Packs",
+    description:
+      "Graph skill packs that historically apply to similar contexts.",
+  },
+  relevant_tools: {
+    label: "Relevant Tools",
+    description:
+      "MCP tools whose schemas indicate suitability for the current context.",
+  },
+  relevant_policies: {
+    label: "Relevant Policies",
+    description:
+      "Governance policies that bind operations in the current context.",
+  },
+  relevant_workflows: {
+    label: "Relevant Workflows",
+    description:
+      "Automation workflows that match the current context's trigger shape.",
+  },
+  relevant_experts: {
+    label: "Relevant Experts",
+    description:
+      "People (per institutional memory) with prior involvement in the current context.",
+  },
+  next_actions: {
+    label: "Next Actions",
+    description:
+      "Suggested next actions based on the current context's lifecycle stage.",
+  },
+};
+
+export function getRecommendationKindMetadata(
+  kind: RecommendationKind,
+): RecommendationKindMetadata {
+  return RECOMMENDATION_KIND_METADATA[kind];
+}
+
+// ============================================================================
 // Request shape
 // ============================================================================
 

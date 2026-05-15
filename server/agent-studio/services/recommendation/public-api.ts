@@ -12,12 +12,15 @@ export {
   normalizeRecommendationLimit,
   normalizeRecommendationMinConfidence,
   summarizeRecommendationResponse,
+  RECOMMENDATION_KIND_METADATA,
+  getRecommendationKindMetadata,
   type RecommendationKind,
   type RecommendationPermissionStatus,
   type RecommendationRequest,
   type RecommendationResult,
   type RecommendationResponse,
   type RecommendationResponseSummary,
+  type RecommendationKindMetadata,
 } from "./contracts.js";
 
 export {
