@@ -194,6 +194,33 @@ export default function GraphAgentExplainPanel({ initialRunId }: Props = {}) {
                     {explanation.steps.length}
                   </span>
                 </span>
+                {/* PR-V1-231: slowest-step gauge. Total duration is
+                    shown; "which step ate the most time" is the
+                    immediate operator follow-up for perf
+                    investigations. Computed in-render over the
+                    existing steps array — no new RPC. Render-gated
+                    on steps.length > 0. Skipped when every step has
+                    null durationMs (engine ran without timing
+                    adapter). */}
+                {(() => {
+                  if (explanation.steps.length === 0) return null;
+                  let slowest = explanation.steps[0];
+                  for (const s of explanation.steps) {
+                    const sMs = s.durationMs ?? -1;
+                    const cMs = slowest.durationMs ?? -1;
+                    if (sMs > cMs) slowest = s;
+                  }
+                  if (slowest.durationMs == null) return null;
+                  return (
+                    <span data-testid="graph-agent-explain-slowest-step">
+                      Slowest:{" "}
+                      <span className="text-foreground/80 tabular-nums">
+                        #{slowest.stepIndex} {slowest.stepKind}{" "}
+                        ({formatDuration(slowest.durationMs)})
+                      </span>
+                    </span>
+                  );
+                })()}
               </div>
               {explanation.errorMessage && (
                 <p className="text-[10px] text-red-300 mt-1 break-words">
