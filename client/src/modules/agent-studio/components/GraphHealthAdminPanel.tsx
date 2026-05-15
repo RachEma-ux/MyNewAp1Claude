@@ -24,6 +24,31 @@ function fmtTs(ts: Date | string | null | undefined): string {
   return d.toISOString().replace("T", " ").replace(/\..+$/, "Z");
 }
 
+/**
+ * PR-V1-225: render alert age as a coarse-grained operator-friendly
+ * duration. "<1m" / "Xm" / "Xh Ym" / "Xd Yh". `now` is parameterized
+ * so tests don't depend on Date.now().
+ */
+function fmtAge(
+  raisedAt: Date | string | null | undefined,
+  now: number = Date.now(),
+): string {
+  if (!raisedAt) return "—";
+  const d = typeof raisedAt === "string" ? new Date(raisedAt) : raisedAt;
+  if (Number.isNaN(d.getTime())) return "—";
+  const ms = now - d.getTime();
+  if (ms < 0) return "—";
+  const totalMinutes = Math.floor(ms / 60_000);
+  if (totalMinutes < 1) return "<1m";
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 24) return `${hours}h ${minutes}m`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
+}
+
 function severityClass(severity: string): string {
   switch (severity) {
     case "critical":
@@ -299,6 +324,12 @@ export function GraphHealthAdminPanel() {
                 <thead>
                   <tr className="text-left text-muted-foreground">
                     <th className="py-1 pr-3">Raised</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Time since raisedAt — coarse-grained (m/h/d). Languishing-alert signal."
+                    >
+                      Age
+                    </th>
                     <th className="py-1 pr-3">Key</th>
                     <th className="py-1 pr-3">Severity</th>
                     <th className="py-1 pr-3">Observed</th>
@@ -310,6 +341,12 @@ export function GraphHealthAdminPanel() {
                     <tr key={a.id} className="border-t">
                       <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
                         {fmtTs(a.raisedAt)}
+                      </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs whitespace-nowrap"
+                        data-testid={`graph-health-alert-age-${a.id}`}
+                      >
+                        {fmtAge(a.raisedAt)}
                       </td>
                       <td className="py-1 pr-3 font-mono text-xs">
                         {a.alertKey}
