@@ -34,7 +34,9 @@ export {
   listGraphLenses,
   listGraphLensesByKind,
   getGraphLensRegistrySize,
+  summarizeGraphLensRegistry,
   __resetGraphLensRegistryForTests,
+  type GraphLensRegistrySummary,
 } from "./registry.js";
 
 export {
