@@ -174,3 +174,58 @@ export function listLensRunnerKinds(): ReadonlyArray<GraphLensKind> {
 export function __resetLensRunnerRegistryForTests(): void {
   runnersByKind.clear();
 }
+
+// ============================================================================
+// Snapshot aggregation (T-F.11)
+// ============================================================================
+
+export interface LensSnapshotSummary {
+  readonly totalNodes: number;
+  readonly visibleNodes: number;
+  readonly hiddenNodes: number;
+  readonly totalEdges: number;
+  readonly visibleEdges: number;
+  readonly hiddenEdges: number;
+  /** Per-typeKey counts (sparse — typeKeys are not closed at this
+   *  level since each lens-kind defines its own taxonomy). */
+  readonly nodesByTypeKey: Readonly<Record<string, number>>;
+  readonly edgesByTypeKey: Readonly<Record<string, number>>;
+  /** Passthrough of snapshot.truncated. */
+  readonly truncated: boolean;
+}
+
+/**
+ * Aggregates a `LensSnapshot` into a stable-shape summary suitable
+ * for operator dashboards. Counts for visibility + per-typeKey
+ * histograms (sparse — different lens kinds use different node-type
+ * taxonomies, so the histogram is keyed by observed types).
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeLensSnapshot(
+  snapshot: LensSnapshot,
+): LensSnapshotSummary {
+  let visibleNodes = 0;
+  const nodesByTypeKey: Record<string, number> = {};
+  for (const n of snapshot.nodes) {
+    if (n.visible) visibleNodes += 1;
+    nodesByTypeKey[n.typeKey] = (nodesByTypeKey[n.typeKey] ?? 0) + 1;
+  }
+  let visibleEdges = 0;
+  const edgesByTypeKey: Record<string, number> = {};
+  for (const e of snapshot.edges) {
+    if (e.visible) visibleEdges += 1;
+    edgesByTypeKey[e.typeKey] = (edgesByTypeKey[e.typeKey] ?? 0) + 1;
+  }
+  return {
+    totalNodes: snapshot.nodes.length,
+    visibleNodes,
+    hiddenNodes: snapshot.nodes.length - visibleNodes,
+    totalEdges: snapshot.edges.length,
+    visibleEdges,
+    hiddenEdges: snapshot.edges.length - visibleEdges,
+    nodesByTypeKey,
+    edgesByTypeKey,
+    truncated: snapshot.truncated,
+  };
+}

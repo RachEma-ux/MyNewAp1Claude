@@ -66,6 +66,7 @@ export {
   getLensRunner,
   runLens,
   listLensRunnerKinds,
+  summarizeLensSnapshot,
   __resetLensRunnerRegistryForTests,
   LensRunnerAlreadyRegisteredForKindError,
   LensRunnerNotRegisteredForKindError,
@@ -74,6 +75,7 @@ export {
   type LensSnapshot,
   type LensSnapshotNode,
   type LensSnapshotEdge,
+  type LensSnapshotSummary,
 } from "./runner-contract.js";
 
 export {

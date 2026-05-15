@@ -63,6 +63,7 @@ const ANCILLARY_TESTS = [
   "graph-lens-registry-summary.test.ts",
   "canonical-failure-state-annotations.test.ts",
   "impact-analysis-result-summary.test.ts",
+  "lens-snapshot-summary.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

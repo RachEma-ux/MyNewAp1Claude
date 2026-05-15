@@ -176,6 +176,7 @@ runtime catches up.
 | `graph-lens-registry-summary.test.ts` | `services/graph-lens/registry` — `summarizeGraphLensRegistry` (byKind / byLayout / byGovernanceScope) | T-F.9 / #1052 |
 | `canonical-failure-state-annotations.test.ts` | `services/failure-states/observability-bridge` — `getCanonicalFailureStateAnnotations` (extracted stamp helper for non-bridge callers) | T-I.24 / #1053 |
 | `impact-analysis-result-summary.test.ts` | `services/graph-lens/impact-analysis-contracts` — `summarizeImpactAnalysisResult` (visible/hidden node + edge counts + depth histogram + maxObservedDepth + truncated passthrough) | T-F.10 / #1054 |
+| `lens-snapshot-summary.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensSnapshot` (visible/hidden node + edge counts + per-typeKey histograms + truncated passthrough) | T-F.11 / #1055 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
