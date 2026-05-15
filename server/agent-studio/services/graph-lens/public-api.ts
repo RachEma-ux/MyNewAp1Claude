@@ -43,3 +43,16 @@ export {
   type MaybeInstallDefaultGraphLensesOptions,
   type MaybeInstallDefaultGraphLensesResult,
 } from "./install-default-lenses.js";
+
+export {
+  IMPACT_ANALYSIS_KINDS,
+  isImpactAnalysisKind,
+  DEFAULT_IMPACT_MAX_DEPTH,
+  ABSOLUTE_IMPACT_MAX_DEPTH,
+  normalizeImpactMaxDepth,
+  type ImpactAnalysisKind,
+  type ImpactAnalysisRequest,
+  type ImpactAnalysisNode,
+  type ImpactAnalysisEdge,
+  type ImpactAnalysisResult,
+} from "./impact-analysis-contracts.js";
