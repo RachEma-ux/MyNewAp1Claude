@@ -71,3 +71,10 @@ export {
   type LensSnapshotNode,
   type LensSnapshotEdge,
 } from "./runner-contract.js";
+
+export {
+  createStubLensRunnerForKind,
+  maybeInstallStubLensRunners,
+  type MaybeInstallStubLensRunnersOptions,
+  type MaybeInstallStubLensRunnersResult,
+} from "./stub-runners.js";
