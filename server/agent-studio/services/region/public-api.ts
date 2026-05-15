@@ -88,3 +88,10 @@ export {
 
 // V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-156): admin tRPC router.
 export { regionAdminRouter } from "./region-admin-router.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-158): cross-region guard.
+export {
+  guardCrossRegionAccess,
+  getProcessRegionKey,
+  type CrossRegionGuardContext,
+} from "./cross-region-guard.js";
