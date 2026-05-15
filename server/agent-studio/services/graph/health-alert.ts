@@ -68,6 +68,55 @@ export const GRAPH_HEALTH_ALERT_KEYS = [
 export type GraphHealthAlertKey = (typeof GRAPH_HEALTH_ALERT_KEYS)[number];
 
 // ============================================================================
+// Per-alert-key operator-facing metadata (T-H.1)
+// ============================================================================
+
+export interface GraphHealthAlertKeyMetadata {
+  /** Display label rendered in operator dashboards. */
+  readonly label: string;
+  /** Short operator-facing description of what triggered the alert. */
+  readonly description: string;
+  /** Default severity emitted when this alert fires. */
+  readonly defaultSeverity: AlertSeverity;
+  /** Whether this alert fires for a recoverable degradation (true) vs.
+   *  a hard failure (false). The runbook section that matches the
+   *  alert key reads this to decide auto-recovery vs. operator-page. */
+  readonly recoverable: boolean;
+}
+
+export const GRAPH_HEALTH_ALERT_KEY_METADATA: Readonly<
+  Record<GraphHealthAlertKey, GraphHealthAlertKeyMetadata>
+> = {
+  graph_health_latency_high: {
+    label: "Latency High",
+    description:
+      "Neo4j CE p95 latency above the warn threshold — queries still complete but slower than SLO. Sustained windows drive the Phase 27 Aura upgrade trigger.",
+    defaultSeverity: "warning",
+    recoverable: true,
+  },
+  graph_health_degraded: {
+    label: "Degraded",
+    description:
+      "Neo4j CE responses include partial-result flags or sporadic timeouts — health remains responsive but quality drops.",
+    defaultSeverity: "warning",
+    recoverable: true,
+  },
+  graph_health_unavailable: {
+    label: "Unavailable",
+    description:
+      "Neo4j CE health check failed entirely — graph queries fall back to cached snapshots and flag stale.",
+    defaultSeverity: "critical",
+    recoverable: false,
+  },
+};
+
+export function getGraphHealthAlertKeyMetadata(
+  key: GraphHealthAlertKey,
+): GraphHealthAlertKeyMetadata {
+  return GRAPH_HEALTH_ALERT_KEY_METADATA[key];
+}
+
+// ============================================================================
 // Threshold contract
 // ============================================================================
 
