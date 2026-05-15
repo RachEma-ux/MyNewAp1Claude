@@ -382,12 +382,76 @@ export function normalizeAlgorithmMaxIterations(
 // ============================================================================
 
 /** Closed-taxonomy outcome the lens UI + dispatcher use to decide
- *  whether to invoke the algorithm or surface an upgrade banner. */
+ *  whether to invoke the algorithm or surface an upgrade banner.
+ *  Promoted from a union to a tuple-derived constant at T-G.33 so
+ *  it.each-style lockstep tests can enumerate every value. */
+export const GRAPH_ALGORITHM_PREFLIGHT_DECISIONS = [
+  "runnable_on_ce_native",
+  "runnable_on_ce_via_apoc",
+  "runnable_via_approximation",
+  "requires_aura_upgrade",
+] as const;
+
 export type GraphAlgorithmPreflightDecision =
-  | "runnable_on_ce_native"
-  | "runnable_on_ce_via_apoc"
-  | "runnable_via_approximation"
-  | "requires_aura_upgrade";
+  (typeof GRAPH_ALGORITHM_PREFLIGHT_DECISIONS)[number];
+
+// ============================================================================
+// Per-preflight-decision operator-facing metadata (T-G.33)
+// ============================================================================
+
+export interface GraphAlgorithmPreflightDecisionMetadata {
+  /** Display label for operator dashboards / preflight banners. */
+  readonly label: string;
+  /** Short description of what this decision means for the operator. */
+  readonly description: string;
+  /** Whether the algorithm will actually invoke (true) or be blocked
+   *  pending operator action / upgrade (false). */
+  readonly runnable: boolean;
+  /** Whether the UI should surface an upgrade banner. */
+  readonly showUpgradeBanner: boolean;
+}
+
+export const GRAPH_ALGORITHM_PREFLIGHT_DECISION_METADATA: Readonly<
+  Record<
+    GraphAlgorithmPreflightDecision,
+    GraphAlgorithmPreflightDecisionMetadata
+  >
+> = {
+  runnable_on_ce_native: {
+    label: "Runnable (CE Native)",
+    description:
+      "Implementable in plain Cypher on Neo4j Community Edition — invokes without upgrade or plugin.",
+    runnable: true,
+    showUpgradeBanner: false,
+  },
+  runnable_on_ce_via_apoc: {
+    label: "Runnable (CE + APOC)",
+    description:
+      "Runs on Community Edition with the APOC plugin installed. Operator must ensure APOC is enabled on the deployment.",
+    runnable: true,
+    showUpgradeBanner: false,
+  },
+  runnable_via_approximation: {
+    label: "Runnable (Approximation)",
+    description:
+      "Exact algorithm exceeds CE compute budget — a best-effort approximation runs in app code. Accuracy improves with Aura upgrade.",
+    runnable: true,
+    showUpgradeBanner: true,
+  },
+  requires_aura_upgrade: {
+    label: "Requires Aura Upgrade",
+    description:
+      "Algorithm needs the Neo4j Graph Data Science library, gated by the Phase 27 Aura upgrade. Blocked until upgrade completes.",
+    runnable: false,
+    showUpgradeBanner: true,
+  },
+};
+
+export function getGraphAlgorithmPreflightDecisionMetadata(
+  decision: GraphAlgorithmPreflightDecision,
+): GraphAlgorithmPreflightDecisionMetadata {
+  return GRAPH_ALGORITHM_PREFLIGHT_DECISION_METADATA[decision];
+}
 
 export interface GraphAlgorithmPreflightOutcome {
   readonly decision: GraphAlgorithmPreflightDecision;
