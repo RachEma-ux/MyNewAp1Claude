@@ -64,6 +64,22 @@ export function RegionAdminPanel() {
     onError: (err) => setMutationError(err.message),
   });
   const [rewarmFeedback, setRewarmFeedback] = useState<string | null>(null);
+  const [pubsubReconnectFeedback, setPubsubReconnectFeedback] = useState<
+    string | null
+  >(null);
+  const forceReconnectPubsubMutation =
+    trpc.agentStudio.region.forceReconnectPubsub.useMutation({
+      onSuccess: (data) => {
+        setPubsubReconnectFeedback(
+          data.reconnected
+            ? `Reconnect kicked (attempts=${data.reconnectAttempts}).`
+            : `No-op — ${data.reason ?? "unknown"} (attempts=${data.reconnectAttempts}).`,
+        );
+        void utils.agentStudio.region.getPubsubStatus.invalidate();
+      },
+      onError: (err) =>
+        setPubsubReconnectFeedback(`Reconnect failed: ${err.message}`),
+    });
   const forceRewarmMutation = trpc.agentStudio.region.forceRewarm.useMutation({
     onSuccess: (data) => {
       setRewarmFeedback(
@@ -227,6 +243,28 @@ export function RegionAdminPanel() {
               </div>
             </div>
           )}
+          {/* PR-V1-185: force-reconnect symmetric with approval-bus. */}
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              data-testid="region-pubsub-force-reconnect-button"
+              disabled={forceReconnectPubsubMutation.isPending}
+              onClick={() => forceReconnectPubsubMutation.mutate()}
+            >
+              {forceReconnectPubsubMutation.isPending
+                ? "Reconnecting…"
+                : "Force reconnect now"}
+            </Button>
+            {pubsubReconnectFeedback ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="region-pubsub-force-reconnect-feedback"
+              >
+                {pubsubReconnectFeedback}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

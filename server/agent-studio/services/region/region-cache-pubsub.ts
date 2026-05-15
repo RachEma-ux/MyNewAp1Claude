@@ -260,3 +260,38 @@ export function getRegionCachePubsubStatus(): RegionCachePubsubStatus {
     reconnectAttempts: _subscriber.reconnectAttempts,
   };
 }
+
+/**
+ * PR-V1-185: operator-triggered force-reconnect — symmetric with
+ * `forceReconnectApprovalBusSubscriber` (PR-V1-184). Used when
+ * status shows `subscribed=true` but `connectedAt=null` (LISTEN
+ * failed at boot, or the backoff is stuck at 60s) and the operator
+ * wants the next attempt now. Preserves the handler, cancels the
+ * pending reconnect timer, ends the current client, and re-
+ * subscribes. No-op when nothing has subscribed yet.
+ */
+export interface ForceReconnectRegionCachePubsubResult {
+  readonly reconnected: boolean;
+  readonly reason?: string;
+  readonly reconnectAttempts: number;
+}
+
+export function forceReconnectRegionCachePubsubSubscriber(): ForceReconnectRegionCachePubsubResult {
+  if (_subscriber.handler === null) {
+    return {
+      reconnected: false,
+      reason: "not-subscribed",
+      reconnectAttempts: _subscriber.reconnectAttempts,
+    };
+  }
+  if (_subscriber.timer) {
+    clearTimeout(_subscriber.timer);
+    _subscriber.timer = null;
+  }
+  const handler = _subscriber.handler;
+  subscribeRegionCacheInvalidations(handler);
+  return {
+    reconnected: true,
+    reconnectAttempts: _subscriber.reconnectAttempts,
+  };
+}
