@@ -46,6 +46,12 @@ export {
   scanForParallelEdges,
   parallelEdgesScanner,
 } from "./scanners/parallel-edges-scanner.js";
+export {
+  scanForExcessiveFanout,
+  excessiveFanoutScanner,
+  DEFAULT_EXCESSIVE_FANOUT_THRESHOLD,
+  type ScanForExcessiveFanoutOptions,
+} from "./scanners/excessive-fanout-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -163,6 +169,7 @@ import { selfLoopScanner } from "./scanners/self-loop-scanner.js";
 import { missingProvenanceScanner } from "./scanners/missing-provenance-scanner.js";
 import { danglingEdgeEndpointScanner } from "./scanners/dangling-edge-endpoint-scanner.js";
 import { parallelEdgesScanner } from "./scanners/parallel-edges-scanner.js";
+import { excessiveFanoutScanner } from "./scanners/excessive-fanout-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -178,4 +185,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   missingProvenanceScanner,
   danglingEdgeEndpointScanner,
   parallelEdgesScanner,
+  excessiveFanoutScanner,
 ];
