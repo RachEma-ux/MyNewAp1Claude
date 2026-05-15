@@ -948,7 +948,13 @@ export async function publishRelease(input: {
   releaseNotes?: string;
   publishedBy?: number;
 }) {
-  const conn = db();
+  // V1+ MR-3 forty-sixth batch (PR-V1-116): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId). The
+  // INSERT into agsAgentReleases AND the UPDATE on agsAgents share a
+  // single routed conn — preserves atomicity (no cross-region
+  // writes within one fn).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
   const now = new Date();
   const [created] = await conn
     .insert(agsAgentReleases)
@@ -1037,7 +1043,11 @@ export async function createSimulationRun(input: {
   triggeredBy?: number;
   toggles: Record<string, unknown>;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 forty-sixth batch (PR-V1-116): Path B consumer via
+  // resolveAgentRoutedConn (agentId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
+  const [created] = await conn
     .insert(agsSimulationRuns)
     .values({
       agentId: input.agentId,
