@@ -326,6 +326,50 @@ export function validateCodeGraphEdgeBatch(
 }
 
 // ============================================================================
+// Edge cardinality summary (T-G.21)
+// ============================================================================
+
+export interface CodeGraphCardinalitySummary {
+  readonly oneToOne: number;
+  readonly oneToMany: number;
+  readonly manyToMany: number;
+  /** Total edge types covered (should equal CODE_GRAPH_EDGE_TYPES.length). */
+  readonly total: number;
+}
+
+/**
+ * Returns a rollup of edge types by their declared cardinality. The
+ * lens UI's default-layout picker uses this to weight layout choices
+ * — many many-to-many edges → matrix layout; many one-to-many → tree.
+ *
+ * Pure function. Reads only from CODE_GRAPH_EDGE_CONSTRAINTS.
+ */
+export function summarizeCodeGraphCardinality(): CodeGraphCardinalitySummary {
+  let oneToOne = 0;
+  let oneToMany = 0;
+  let manyToMany = 0;
+  for (const t of CODE_GRAPH_EDGE_TYPES) {
+    switch (CODE_GRAPH_EDGE_CONSTRAINTS[t].cardinality) {
+      case "one_to_one":
+        oneToOne += 1;
+        break;
+      case "one_to_many":
+        oneToMany += 1;
+        break;
+      case "many_to_many":
+        manyToMany += 1;
+        break;
+    }
+  }
+  return {
+    oneToOne,
+    oneToMany,
+    manyToMany,
+    total: CODE_GRAPH_EDGE_TYPES.length,
+  };
+}
+
+// ============================================================================
 // Code-graph aggregation (T-G.16)
 // ============================================================================
 
