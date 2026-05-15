@@ -297,8 +297,22 @@ export async function getTraceForMessage(
 export async function listContextBlocks(
   traceId: number,
 ): Promise<AgsRacContextBlock[]> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 seventy-fourth batch (PR-V1-144): Path-A read consumer.
+  // agsRacContextBlocks has no workspaceId directly; the parent
+  // agsRacRuntimeTraces row carries it. Pre-projection SELECT pulls
+  // workspaceId from the parent trace, then the SELECT on
+  // agsRacContextBlocks routes to the home region.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsRacRuntimeTraces.workspaceId })
+    .from(agsRacRuntimeTraces)
+    .where(eq(agsRacRuntimeTraces.id, traceId))
+    .limit(1);
+  const db =
+    wsRows.length > 0
+      ? (getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsRacContextBlocks)
