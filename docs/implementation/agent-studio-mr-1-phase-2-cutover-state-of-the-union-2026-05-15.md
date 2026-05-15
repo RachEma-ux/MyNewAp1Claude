@@ -1,7 +1,7 @@
 # Agent Studio Phase MR-1 Phase-2 Cutover — State of the Union
 
-**Date:** 2026-05-15
-**Status:** **Operationally complete.** All caller migration (MR-3) is done at the shim layer; the shim's Phase-2 routing stack is built end-to-end; the cutover is env-flag-gated and the cache-coherency loop is closed.
+**Date:** 2026-05-15 (rev 2: 2026-05-15 — extended with §8 post-SOU follow-ups)
+**Status:** **Operationally complete + 5 of 6 SOU §5 follow-ups closed.** All caller migration (MR-3) is done at the shim layer; the shim's Phase-2 routing stack is built end-to-end; the cutover is env-flag-gated; the cache-coherency loop is closed both in-process and cross-process; operator tRPC + React admin surfaces exist; cross-region access denial primitive + middleware factory exist.
 **Predecessor:** `docs/implementation/agent-studio-mr-3-state-of-the-union-2026-05-14.md` (rev 3) — substantive close-out of the MR-3 caller migration.
 
 ---
@@ -154,6 +154,51 @@ Now that both arcs are operationally complete:
 
 The two arcs compose end-to-end. Single-region deployments are
 unaffected; multi-region deployments are now a config-only change.
+
+---
+
+## 8. Rev 2 — Post-SOU follow-ups (2026-05-15)
+
+The SOU §5 deferred list named 5 follow-up items. Rev 2 closes 5 of 6
+in one continuous burst (#906–#911). The remaining item
+("Cross-region replication catch-up") is a multi-quarter
+infrastructure investment and is correctly deferred to Phase 2.5/3 of
+the multi-region ADR.
+
+| PR | Item | What |
+|---|---|---|
+| #906 (PR-V1-155) | Periodic re-warm cron | `services/region/region-cache-rewarm-cron.ts` wraps `warmRegionRoutingCache` via `makeRetentionCron`. Default cadence `*/10 * * * *`. Boot Step 3.33 starts it. Catches drift if a hook closure threw + bridges any cross-process gap. |
+| #907 (PR-V1-156) | Admin tRPC router | `services/region/region-admin-router.ts` mounted at `agentStudio.region.*` with 8 admin-only procedures: listActiveRegions, registerRegion, listPins, getPin, setPin, removePin, getCacheStatus, getRewarmCronStatus. All inputs Zod-validated; mutations fire the invalidation hooks. |
+| #908 (PR-V1-157) | Admin React page | `pages/RegionAdminPage.tsx` + `components/RegionAdminPanel.tsx` reachable at `/agent-studio/region-admin`. Four panels: cache status, cron status, active regions, workspace pins. Postgres URIs credential-masked before display. Read-only; CLI / tRPC remain the supported write path. |
+| #909 (PR-V1-158) | Cross-region access guard primitive | `services/region/cross-region-guard.ts::guardCrossRegionAccess(workspaceId, ctx?)`. Throws `CrossRegionAccessDeniedError` when pin doesn't match process region + not replicated. Process region read from `AGS_PROCESS_REGION_KEY` env. Permissive defaults. |
+| #910 (PR-V1-159) | Cross-region tRPC middleware factory | `services/region/cross-region-trpc-middleware.ts::createCrossRegionMiddleware<TInput>(extractWorkspaceId, options?)`. Wraps the guard; throws `TRPCError({ code: "FORBIDDEN" })` on deny. Per-procedure opt-in. |
+| #911 (PR-V1-160) | Multi-process cache invalidation | `services/region/region-cache-pubsub.ts` — Postgres LISTEN/NOTIFY on channel `ags_region_routing_invalidate`. NOTIFY fires from `reloadCacheAfterChange`; subscriber spawned at boot when `AGS_REGION_PUBSUB=on`. Linear-backoff reconnect. Reusable pattern for any future cross-process bus. |
+
+### Carry-forward to a future arc
+
+**Cross-region replication catch-up** (Phase 2.5 / 3 of original ADR)
+remains the one significant deferred item. This isn't a single slice
+— it's logical replication between Postgres clusters in different
+regions, Neo4j projection rebuild per region, replication-aware
+promotion semantics. The scaffolding to enable it is now in place:
+the cache coherency loop will surface inconsistencies during
+replication catch-up; the admin surfaces let operators inspect the
+state; the cross-region guard denies unauthorized reads. The actual
+replication mechanism is a separate engineering arc.
+
+### Operational summary after rev 2
+
+| Capability | Single-region default | Multi-region opt-in |
+|---|---|---|
+| Caller routing | `getAsDbForWorkspace` → bootstrap `getAsDb()` | `getAsDbForWorkspace` → routed pool via cache |
+| Cache coherency | n/a (no cache) | In-process hooks (#903 / #904) + cross-process NOTIFY (#911) |
+| Re-warm | n/a | Boot warm + 10-min cron (#906) + NOTIFY-triggered |
+| Operator visibility | n/a | `agentStudio.region.*` (#907) + `/region-admin` page (#908) |
+| Cross-region read deny | n/a | `guardCrossRegionAccess` primitive (#909) + `createCrossRegionMiddleware` (#910) |
+| Env flags | All unset | `AGS_REGION_ROUTING=on` + optionally `AGS_REGION_PUBSUB=on` + `AGS_PROCESS_REGION_KEY=<key>` |
+
+Single-region operational baseline is preserved across all 14 PRs:
+unset flags = behavior identical to pre-cutover.
 
 ---
 
