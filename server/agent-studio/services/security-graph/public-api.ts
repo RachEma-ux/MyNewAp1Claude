@@ -11,6 +11,8 @@ export {
   isSecurityGraphNodeType,
   getSecurityGraphNodeTypeMetadata,
   SECURITY_GRAPH_NODE_TYPE_METADATA,
+  SECURITY_FINDING_SEVERITY_METADATA,
+  getSecurityFindingSeverityMetadata,
   isSecurityFindingSeverity,
   cvssScoreToSeverity,
   severityRank,
@@ -36,4 +38,5 @@ export {
   type ImpactPathValidationReason,
   type ImpactPathValidationBatchSummary,
   type SecurityGraphNodeTypeMetadata,
+  type SecurityFindingSeverityMetadata,
 } from "./contracts.js";

@@ -161,6 +161,73 @@ export const SECURITY_FINDING_SEVERITIES = [
 export type SecurityFindingSeverity =
   (typeof SECURITY_FINDING_SEVERITIES)[number];
 
+// ============================================================================
+// Per-severity operator-facing metadata (T-G.29)
+// ============================================================================
+
+export interface SecurityFindingSeverityMetadata {
+  /** Display label for operator dashboards. */
+  readonly label: string;
+  /** Short description of the severity meaning. */
+  readonly description: string;
+  /** Inclusive CVSS score range (NVD coarse cuts) — null for
+   *  `informational` which spans only the explicit 0.0 case. */
+  readonly cvssRange: readonly [number, number] | null;
+  /** Operator-action expectation. */
+  readonly operatorAction:
+    | "informational"
+    | "monitor"
+    | "schedule_patch"
+    | "patch_soon"
+    | "patch_now";
+}
+
+export const SECURITY_FINDING_SEVERITY_METADATA: Readonly<
+  Record<SecurityFindingSeverity, SecurityFindingSeverityMetadata>
+> = {
+  informational: {
+    label: "Informational",
+    description:
+      "CVSS 0.0 — security observation without a measurable severity. Surfaced for context, not action.",
+    cvssRange: null,
+    operatorAction: "informational",
+  },
+  low: {
+    label: "Low",
+    description:
+      "CVSS 0.1–3.9 — minor exposure. Patch within the next routine cycle; no urgency.",
+    cvssRange: [0.1, 3.9],
+    operatorAction: "monitor",
+  },
+  medium: {
+    label: "Medium",
+    description:
+      "CVSS 4.0–6.9 — meaningful exposure. Patch within the next scheduled window.",
+    cvssRange: [4.0, 6.9],
+    operatorAction: "schedule_patch",
+  },
+  high: {
+    label: "High",
+    description:
+      "CVSS 7.0–8.9 — significant exposure. Patch out-of-band within days.",
+    cvssRange: [7.0, 8.9],
+    operatorAction: "patch_soon",
+  },
+  critical: {
+    label: "Critical",
+    description:
+      "CVSS 9.0–10.0 — severe exposure. Patch immediately, escalate to on-call.",
+    cvssRange: [9.0, 10.0],
+    operatorAction: "patch_now",
+  },
+};
+
+export function getSecurityFindingSeverityMetadata(
+  severity: SecurityFindingSeverity,
+): SecurityFindingSeverityMetadata {
+  return SECURITY_FINDING_SEVERITY_METADATA[severity];
+}
+
 export function isSecurityFindingSeverity(
   s: unknown,
 ): s is SecurityFindingSeverity {
