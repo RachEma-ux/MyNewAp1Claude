@@ -370,6 +370,23 @@ export class GraphRetrievalRouter {
         // prevents the discriminated-union narrowing from kicking in,
         // so we use `in` to surface `reason` safely.
         const reason = "reason" in validation ? validation.reason : "unknown";
+        // T-I.5 batch A — bridge text2cypher rejections to the Phase 22
+        // closed-taxonomy emission surface. Each rejected attempt is a
+        // distinct emission (validation runs per-query, not per-batch).
+        // Fire-and-forget; observability writes never propagate.
+        void recordFailureStateEvent({
+          failureState: "text2cypher_rejected",
+          sourceKind: "retrieval-router.text2cypher",
+          sourceId: input.runtimeRunId ?? null,
+          errorMessage: `Text2Cypher rejected: ${reason}`,
+          metadata: {
+            reason,
+            workspaceId: input.runtime.workspaceId,
+            cypherSnippet: input.generatedCypher.slice(0, 200),
+          },
+        }).catch(() => {
+          // Fail-soft.
+        });
         return this.emptyResult(input.mode, startedAt, `text2cypher_${reason}`);
       }
     }
