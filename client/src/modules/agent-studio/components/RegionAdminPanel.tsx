@@ -183,20 +183,63 @@ export function RegionAdminPanel() {
           ) : cronQ.data == null ? (
             <p className="text-sm text-muted-foreground">No cron status.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <span className="font-medium">Cron expression:</span>{" "}
-                {cronQ.data.cronExpr ?? "(default)"}
-              </div>
+            <div
+              className="grid grid-cols-2 gap-2 text-sm"
+              data-testid="region-rewarm-cron-grid"
+            >
+              {/* PR-V1-202: `cronExpr` was referenced but does NOT
+                  exist on `RetentionCronStatus`; the cell silently
+                  rendered "(default)" via the ?? fallback. The
+                  retention-cron status type has only 3 fields:
+                  lastRunAt + lastResult + lastError. Surface the
+                  actual `lastResult` aggregate which has the
+                  re-warm summary (activeRegionCount / pinCount /
+                  primaryRegionKey / warmedAt). */}
               <div>
                 <span className="font-medium">Last run:</span>{" "}
                 {fmtTs(cronQ.data.lastRunAt)}
               </div>
-              {cronQ.data.lastError ? (
-                <div className="col-span-2 text-destructive">
-                  <span className="font-medium">Last error:</span>{" "}
-                  {cronQ.data.lastError}
-                </div>
+              <div>
+                <span className="font-medium">Last error:</span>{" "}
+                <span
+                  className={`font-mono ${cronQ.data.lastError ? "text-destructive" : ""}`}
+                >
+                  {cronQ.data.lastError ?? "—"}
+                </span>
+              </div>
+              {cronQ.data.lastResult ? (
+                <>
+                  <div>
+                    <span className="font-medium">scope:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.scope}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">warmedAt:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.warmedAt}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">activeRegionCount:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.activeRegionCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">pinCount:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.pinCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">primaryRegionKey:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.primaryRegionKey ?? "(none)"}
+                    </span>
+                  </div>
+                </>
               ) : null}
             </div>
           )}
