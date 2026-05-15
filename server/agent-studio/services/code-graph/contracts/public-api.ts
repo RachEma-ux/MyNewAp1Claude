@@ -16,7 +16,9 @@ export {
   summarizeCodeGraph,
   summarizeCodeGraphCardinality,
   CODE_GRAPH_NODE_TYPE_METADATA,
+  CODE_GRAPH_EDGE_TYPE_METADATA,
   getCodeGraphNodeTypeMetadata,
+  getCodeGraphEdgeTypeMetadata,
   type CodeGraphNodeType,
   type CodeGraphEdgeType,
   type CodeGraphEdgeConstraint,
@@ -27,4 +29,5 @@ export {
   type CodeGraphSummary,
   type CodeGraphCardinalitySummary,
   type CodeGraphNodeTypeMetadata,
+  type CodeGraphEdgeTypeMetadata,
 } from "./code-intelligence-contracts.js";
