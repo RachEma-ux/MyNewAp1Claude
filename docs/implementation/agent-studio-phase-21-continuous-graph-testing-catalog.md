@@ -174,6 +174,7 @@ runtime catches up.
 | `code-graph-summarize.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `summarizeCodeGraph` (nodesByType / edgesByType / unknown counts) | T-G.16 / #1050 |
 | `graph-algorithm-coverage.test.ts` | `services/graph-algorithm/contracts` — `summarizeGraphAlgorithmCoverage` (byBackendSupport / availableOnCe / triggersAuraUpgrade / cePercent) | T-G.17 / #1051 |
 | `graph-lens-registry-summary.test.ts` | `services/graph-lens/registry` — `summarizeGraphLensRegistry` (byKind / byLayout / byGovernanceScope) | T-F.9 / #1052 |
+| `canonical-failure-state-annotations.test.ts` | `services/failure-states/observability-bridge` — `getCanonicalFailureStateAnnotations` (extracted stamp helper for non-bridge callers) | T-I.24 / #1053 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

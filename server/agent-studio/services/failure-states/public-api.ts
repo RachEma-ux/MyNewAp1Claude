@@ -23,7 +23,9 @@ export {
   FAILURE_STATE_ERROR_CLASS_PREFIX,
   failureStateErrorClass,
   parseFailureStateFromErrorClass,
+  getCanonicalFailureStateAnnotations,
   recordFailureStateEvent,
   recordFailureStateEvents,
   type RecordFailureStateEventInput,
+  type CanonicalFailureStateAnnotations,
 } from "./observability-bridge.js";
