@@ -240,6 +240,46 @@ export function PublishTargetsAdminPanel() {
               })()}
             </p>
           ) : null}
+          {/* PR-V1-221: never-published count using the existing
+              executionSummaries join. A registered target that has
+              never received an execution is either misconfigured,
+              quiesced, or recently added — operators can spot the
+              gap at registry level instead of scanning rows. Amber
+              when > 0 to flag investigation without screaming
+              destructive-red (a target with no history isn't
+              broken — just unused). */}
+          {targetsQ.data &&
+          targetsQ.data.length > 0 &&
+          summariesQ.data ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="publish-targets-never-published-count"
+            >
+              {(() => {
+                let neverPublished = 0;
+                for (const t of targetsQ.data) {
+                  const s = summaryByTargetId.get(t.id);
+                  if (!s || s.totalExecutions === 0) neverPublished += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Never published:</span>{" "}
+                    <span
+                      className={
+                        neverPublished > 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : ""
+                      }
+                    >
+                      <span className="font-mono">{neverPublished}</span>{" "}
+                      of{" "}
+                      <span className="font-mono">{targetsQ.data.length}</span>
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {targetsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading targets…
