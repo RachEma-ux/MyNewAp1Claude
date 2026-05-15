@@ -17,3 +17,12 @@ export {
   type RecommendationResult,
   type RecommendationResponse,
 } from "./contracts.js";
+
+export {
+  assembleRecommendationResponse,
+  REDACTED_RECOMMENDATION_REASON,
+  REDACTED_RECOMMENDATION_NODE_TYPE_KEY,
+  REDACTED_RECOMMENDATION_NODE_ID,
+  type RecommendationCandidate,
+  type AssembleRecommendationResponseOptions,
+} from "./assemble-response.js";
