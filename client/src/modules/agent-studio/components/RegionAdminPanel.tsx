@@ -496,6 +496,42 @@ export function RegionAdminPanel() {
               })()}
             </p>
           ) : null}
+          {/* PR-V1-218: pin distribution by region key. Multi-region
+              deployments care about how pins are spread across the
+              active regions; an unbalanced map can signal a
+              missed-rebalance or a misconfigured pin. Sorted by
+              count desc so the heaviest region shows first. */}
+          {pinsQ.data && pinsQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="region-pins-by-region-aggregate"
+            >
+              {(() => {
+                const byRegion = new Map<string, number>();
+                for (const p of pinsQ.data) {
+                  byRegion.set(
+                    p.regionKey,
+                    (byRegion.get(p.regionKey) ?? 0) + 1,
+                  );
+                }
+                const sorted = Array.from(byRegion.entries()).sort(
+                  (a, b) => b[1] - a[1],
+                );
+                return (
+                  <>
+                    <span className="font-medium">By region:</span>{" "}
+                    {sorted.map(([rk, n], i) => (
+                      <React.Fragment key={rk}>
+                        {i > 0 ? " / " : ""}
+                        <span className="font-mono">{n}</span>{" "}
+                        <span className="font-mono">{rk}</span>
+                      </React.Fragment>
+                    ))}
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {pinsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading pins…</p>
           ) : pinsQ.error ? (
