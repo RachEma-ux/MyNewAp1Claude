@@ -36,3 +36,10 @@ export {
   getGraphLensRegistrySize,
   __resetGraphLensRegistryForTests,
 } from "./registry.js";
+
+export {
+  DEFAULT_GRAPH_LENS_DEFINITIONS,
+  maybeInstallDefaultGraphLenses,
+  type MaybeInstallDefaultGraphLensesOptions,
+  type MaybeInstallDefaultGraphLensesResult,
+} from "./install-default-lenses.js";
