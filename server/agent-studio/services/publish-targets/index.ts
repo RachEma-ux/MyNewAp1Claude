@@ -98,3 +98,12 @@ export {
   type MaybeInstallDefaultGovernanceGateOptions,
   type MaybeInstallDefaultGovernanceGateResult,
 } from "./install-default-governance-gate.js";
+
+// V1+ Phase 19 admin (PR-V1-186): operator-facing read-only surface.
+export {
+  listPublishTargets,
+  listRecentPublishExecutions,
+  type PublishTargetSummary,
+  type PublishExecutionRow,
+} from "./admin-queries.js";
+export { publishTargetsAdminRouter } from "./admin-router.js";
