@@ -230,6 +230,62 @@ export function isGovernanceDecision(s: unknown): s is GovernanceDecision {
   );
 }
 
+// ============================================================================
+// Per-governance-decision operator-facing metadata (T-E.3)
+// ============================================================================
+
+export interface GovernanceDecisionMetadata {
+  /** Display label rendered in the publish ledger / approval queue. */
+  readonly label: string;
+  /** Short operator-facing description of what this decision means. */
+  readonly description: string;
+  /** Closed-taxonomy outcome the executor branches on:
+   *  - `runs_pusher`: pusher invocation proceeds.
+   *  - `stages_ledger_only`: ledger row written, pusher held back
+   *    pending re-invocation.
+   *  - `blocks_pusher`: pusher never runs; ledger row written with
+   *    explicit rejection reason. */
+  readonly executorBranch:
+    | "runs_pusher"
+    | "stages_ledger_only"
+    | "blocks_pusher";
+  /** Whether the decision requires a human approver to reach this
+   *  state (true) or is reached automatically by policy (false). */
+  readonly requiresHumanApproval: boolean;
+}
+
+export const GOVERNANCE_DECISION_METADATA: Readonly<
+  Record<GovernanceDecision, GovernanceDecisionMetadata>
+> = {
+  approved: {
+    label: "Approved",
+    description:
+      "Governance approved the publish — executor runs the registered pusher and writes the success/failure ledger row.",
+    executorBranch: "runs_pusher",
+    requiresHumanApproval: true,
+  },
+  pending: {
+    label: "Pending Approval",
+    description:
+      "Governance has not yet decided — executor stages a pending ledger row; caller re-invokes after approval lands.",
+    executorBranch: "stages_ledger_only",
+    requiresHumanApproval: false,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Governance rejected the publish — executor writes a failed ledger row with reason `governance_rejected` and never invokes the pusher.",
+    executorBranch: "blocks_pusher",
+    requiresHumanApproval: true,
+  },
+};
+
+export function getGovernanceDecisionMetadata(
+  decision: GovernanceDecision,
+): GovernanceDecisionMetadata {
+  return GOVERNANCE_DECISION_METADATA[decision];
+}
+
 /**
  * Optional governance gate. When omitted, the executor proceeds as
  * if the gate returned `"approved"` (backward compatible with the
