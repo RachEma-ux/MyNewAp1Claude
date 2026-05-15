@@ -87,8 +87,20 @@ export async function completeJob(input: CompleteJobInput): Promise<void> {
 }
 
 export async function getJob(jobId: number) {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 sixty-ninth batch (PR-V1-139): Path-A read consumer.
+  // agsIngestionJobs.workspaceId is non-null; pre-projection SELECT
+  // pulls it up, then the full-row SELECT routes via
+  // getAsDbForWorkspace under Phase-2. Returns null when the row
+  // doesn't exist.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsIngestionJobs.workspaceId })
+    .from(agsIngestionJobs)
+    .where(eq(agsIngestionJobs.id, jobId))
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsIngestionJobs)

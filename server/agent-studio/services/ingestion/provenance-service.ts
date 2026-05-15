@@ -51,8 +51,19 @@ export async function recordProvenance(
 export async function getProvenance(
   provenanceId: number,
 ): Promise<typeof agsProvenanceRecords.$inferSelect | null> {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 sixty-ninth batch (PR-V1-139): Path-A read consumer.
+  // agsProvenanceRecords.workspaceId is non-null; pre-projection
+  // pulls it up, then the full-row SELECT routes via
+  // getAsDbForWorkspace under Phase-2.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsProvenanceRecords.workspaceId })
+    .from(agsProvenanceRecords)
+    .where(eq(agsProvenanceRecords.id, provenanceId))
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsProvenanceRecords)
