@@ -43,12 +43,24 @@
 
 import { configureRegionRouter } from "../../db/connection.js";
 import { getDbForRegion } from "./connection-helper.js";
-import { getCachedRegionForWorkspace } from "./workspace-region-cache.js";
+import {
+  getCachedRegionForWorkspace,
+  invalidateRegionRoutingCache,
+  warmRegionRoutingCache,
+} from "./workspace-region-cache.js";
+import { setPinChangeHook } from "./workspace-region-pin-service.js";
 
 /**
- * Install the bridge. The shim's region-router slot is filled with
- * a closure that combines the cache lookup with the per-region pool
- * resolver. Idempotent.
+ * Install the bridge. Fills three late-bound slots:
+ *
+ *   1. The shim's region-router slot (db/connection.ts) — a closure
+ *      that combines the cache lookup with the per-region pool
+ *      resolver.
+ *   2. The pin-change hook (workspace-region-pin-service.ts) — fires
+ *      after every pin write. Invalidates + asynchronously re-warms
+ *      the cache so pin changes are visible without a restart.
+ *
+ * Idempotent.
  */
 export function installRegionRouter(): void {
   configureRegionRouter({
@@ -59,13 +71,23 @@ export function installRegionRouter(): void {
       return db ?? null;
     },
   });
+  setPinChangeHook(() => {
+    invalidateRegionRoutingCache();
+    void warmRegionRoutingCache().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[ags-region-routing-bridge] re-warm after pin change failed — ${msg}`,
+      );
+    });
+  });
 }
 
 /**
  * Uninstall the bridge — returns the shim to Phase-1
- * delegate-to-`getAsDb` behavior. Used by tests and by the operator
- * "multi-region off" rollback toggle.
+ * delegate-to-`getAsDb` behavior. Removes the pin-change hook too,
+ * so pin writes no longer touch the (cold) cache.
  */
 export function uninstallRegionRouter(): void {
   configureRegionRouter(null);
+  setPinChangeHook(null);
 }
