@@ -320,6 +320,52 @@ export function RegionAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Active regions</SectionLabel>
+          {/* PR-V1-215: active-regions aggregate summary — captures
+              the topology shape at a glance. Operators care about:
+              total count, whether a primary exists (= 1 in healthy
+              single-primary deployments, but operators occasionally
+              hit 0-or-multiple misconfigurations and need to spot
+              it), and Neo4j coverage (some regions may run
+              Postgres-only). */}
+          {regionsQ.data && regionsQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="region-active-aggregate-summary"
+            >
+              {(() => {
+                const total = regionsQ.data.length;
+                const primaryCount = regionsQ.data.filter(
+                  (r) => r.isPrimary,
+                ).length;
+                const neo4jCount = regionsQ.data.filter(
+                  (r) => r.neo4jUri,
+                ).length;
+                return (
+                  <>
+                    <span className="font-medium">Regions:</span>{" "}
+                    <span className="font-mono">{total}</span> total —{" "}
+                    <span
+                      className={
+                        primaryCount === 1
+                          ? ""
+                          : primaryCount === 0
+                            ? "text-destructive"
+                            : "text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      <span className="font-mono">{primaryCount}</span>{" "}
+                      primary
+                    </span>
+                    {" / "}
+                    <span className="font-mono">{neo4jCount}</span> with
+                    neo4j /{" "}
+                    <span className="font-mono">{total - neo4jCount}</span>{" "}
+                    pg-only
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {regionsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading regions…</p>
           ) : regionsQ.error ? (
