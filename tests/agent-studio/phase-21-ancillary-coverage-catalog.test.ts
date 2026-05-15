@@ -115,6 +115,7 @@ const ANCILLARY_TESTS = [
   "canvas-node-kind-metadata.test.ts",
   "attachment-mime-class-metadata.test.ts",
   "publish-request-state-metadata.test.ts",
+  "approval-step-state-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
