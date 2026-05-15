@@ -80,6 +80,7 @@ export const FINDING_CLASS_TO_PROPOSAL_KIND: Readonly<Record<string, string>> =
     // is intentional (e.g. self-reference in code-graph IMPORTS) or
     // a bad ingest (which is the only programmatically-fixable case).
     missing_provenance: "backfill_or_delete_unprovenanced_node",
+    dangling_edge_endpoint: "backfill_node_or_delete_dangling_edge",
   };
 
 export function proposalKindForFinding(findingClass: string): string {
