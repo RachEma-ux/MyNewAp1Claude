@@ -47,6 +47,7 @@ const ANCILLARY_TESTS = [
   "text2cypher-failure-state-wiring.test.ts",
   "cypher-template-failure-state-wiring.test.ts",
   "failure-state-bridge-wiring-coverage.test.ts",
+  "graph-quality-missing-source-version-scanner.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
