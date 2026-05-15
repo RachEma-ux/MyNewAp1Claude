@@ -161,6 +161,7 @@ runtime catches up.
 | `graph-algorithm-preflight.test.ts` | `services/graph-algorithm/contracts` (preflight) | T-G.9 / #1009 |
 | `failure-states-contracts.test.ts` | `services/failure-states/contracts` | T-I.3 / #1002 |
 | `graph-quality-missing-source-version-scanner.test.ts` | `services/graph-quality/scanners/missing-source-version-scanner` | T-D.6 / #1031 |
+| `phase-21-gap-18-timeline-event-projection.test.ts` | Cross-cutting — locks gap #18 projection-helper readiness claim | T-I.15 / #1036 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
