@@ -499,6 +499,42 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolvePluginRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  pluginId: number,
+) {
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): shared pluginId→
+  // routed-conn helper. agsDraftPlugins.draftId is a direct FK —
+  // single SELECT, chain into resolveDraftRoutedConn. Sixteenth
+  // sister helper.
+  const pluginRows = await lookupConn
+    .select({ draftId: agsDraftPlugins.draftId })
+    .from(agsDraftPlugins)
+    .where(eq(agsDraftPlugins.id, pluginId))
+    .limit(1);
+  const draftId = pluginRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
+async function resolvePermissionRuleRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  ruleId: number,
+) {
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): shared ruleId→routed-
+  // conn helper. agsDraftPermissionRules.draftId is a direct FK —
+  // single SELECT, chain into resolveDraftRoutedConn. Seventeenth
+  // sister helper.
+  const ruleRows = await lookupConn
+    .select({ draftId: agsDraftPermissionRules.draftId })
+    .from(agsDraftPermissionRules)
+    .where(eq(agsDraftPermissionRules.id, ruleId))
+    .limit(1);
+  const draftId = ruleRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
 async function resolveSubagentRoutedConn(
   lookupConn: ReturnType<typeof db>,
   subagentId: number,
@@ -2579,8 +2615,10 @@ export async function savePlugin(input: {
   path: string;
   enabled?: boolean;
 }): Promise<typeof agsDraftPlugins.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer.
+  const lookupConn = db();
   if (input.pluginId) {
+    const conn = await resolvePluginRoutedConn(lookupConn, input.pluginId);
     const [updated] = await conn
       .update(agsDraftPlugins)
       .set({
@@ -2593,6 +2631,7 @@ export async function savePlugin(input: {
     if (!updated) throw new Error(`Plugin ${input.pluginId} not found`);
     return updated;
   }
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
   const [created] = await conn
     .insert(agsDraftPlugins)
     .values({
@@ -2606,7 +2645,11 @@ export async function savePlugin(input: {
 }
 
 export async function removePlugin(pluginId: number) {
-  await db().delete(agsDraftPlugins).where(eq(agsDraftPlugins.id, pluginId));
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer via
+  // resolvePluginRoutedConn.
+  const lookupConn = db();
+  const conn = await resolvePluginRoutedConn(lookupConn, pluginId);
+  await conn.delete(agsDraftPlugins).where(eq(agsDraftPlugins.id, pluginId));
 }
 
 export async function replacePlugins(
@@ -2617,7 +2660,10 @@ export async function replacePlugins(
     enabled?: boolean;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer via
+  // resolveDraftRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn.delete(agsDraftPlugins).where(eq(agsDraftPlugins.draftId, draftId));
   if (plugins.length === 0) return;
   await conn.insert(agsDraftPlugins).values(
@@ -2649,8 +2695,10 @@ export async function savePermissionRule(input: {
   contentPattern?: string | null;
   description?: string | null;
 }): Promise<typeof agsDraftPermissionRules.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer.
+  const lookupConn = db();
   if (input.ruleId) {
+    const conn = await resolvePermissionRuleRoutedConn(lookupConn, input.ruleId);
     const [updated] = await conn
       .update(agsDraftPermissionRules)
       .set({
@@ -2665,6 +2713,7 @@ export async function savePermissionRule(input: {
     if (!updated) throw new Error(`Permission rule ${input.ruleId} not found`);
     return updated;
   }
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
   const [created] = await conn
     .insert(agsDraftPermissionRules)
     .values({
@@ -2681,7 +2730,11 @@ export async function savePermissionRule(input: {
 }
 
 export async function removePermissionRule(ruleId: number) {
-  await db()
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer via
+  // resolvePermissionRuleRoutedConn.
+  const lookupConn = db();
+  const conn = await resolvePermissionRuleRoutedConn(lookupConn, ruleId);
+  await conn
     .delete(agsDraftPermissionRules)
     .where(eq(agsDraftPermissionRules.id, ruleId));
 }
@@ -2696,7 +2749,10 @@ export async function replacePermissionRules(
     description?: string | null;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-eighth batch (PR-V1-128): Path B consumer via
+  // resolveDraftRoutedConn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn
     .delete(agsDraftPermissionRules)
     .where(eq(agsDraftPermissionRules.draftId, draftId));
