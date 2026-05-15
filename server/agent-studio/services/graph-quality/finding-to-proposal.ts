@@ -94,6 +94,30 @@ export function proposalKindForFinding(findingClass: string): string {
 }
 
 /**
+ * Inverse lookup — given a `proposalKind`, returns the `findingClass`
+ * that produces it, or `null` when the kind isn't in the mapping
+ * table (covers both `review_*` fallbacks and arbitrary proposal
+ * kinds set by hand).
+ *
+ * Useful for operator "show me which scanner produced this proposal"
+ * dashboards. Returns the FIRST matching findingClass — the mapping
+ * is currently 1:1 by design, but the helper doesn't assert
+ * uniqueness so future many-to-one mappings remain safe.
+ *
+ * Pure function. Reads only from `FINDING_CLASS_TO_PROPOSAL_KIND`.
+ */
+export function findingClassForProposalKind(
+  proposalKind: string,
+): string | null {
+  for (const [klass, kind] of Object.entries(
+    FINDING_CLASS_TO_PROPOSAL_KIND,
+  )) {
+    if (kind === proposalKind) return klass;
+  }
+  return null;
+}
+
+/**
  * Maps severity → confidence the proposal records. Used as a default
  * when the operator hasn't tuned the confidence by hand. Higher
  * severity = the scanner is more sure something is wrong, which

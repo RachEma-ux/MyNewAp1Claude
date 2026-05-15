@@ -190,6 +190,7 @@ runtime catches up.
 | `code-graph-cardinality-summary.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `summarizeCodeGraphCardinality` (oneToOne / oneToMany / manyToMany counts over edge-type constraints) | T-G.21 / #1066 |
 | `institutional-memory-projection-summary.test.ts` | `services/institutional-memory/project-node` — `summarizeInstitutionalMemoryProjectionResult` (projected/skipped + 4-key stable-shape reason axis + projectedPercent) + new exported `INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS` constant | T-G.22 / #1067 |
 | `lens-runner-registry-coverage.test.ts` | `services/graph-lens/runner-contract` — `summarizeLensRunnerRegistry` (registeredKinds / missingKinds list / coveragePercent over the runtime runner registry) | T-F.12 / #1068 |
+| `finding-class-for-proposal-kind.test.ts` | `services/graph-quality/finding-to-proposal` — `findingClassForProposalKind` (inverse lookup of FINDING_CLASS_TO_PROPOSAL_KIND; null for review_* fallbacks or unknown kinds) | T-D.10 / #1069 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

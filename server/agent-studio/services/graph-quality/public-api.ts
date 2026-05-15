@@ -66,6 +66,7 @@ export {
 export {
   convertFindingToProposal,
   proposalKindForFinding,
+  findingClassForProposalKind,
   severityToConfidence,
   FINDING_CLASS_TO_PROPOSAL_KIND,
   AsdbUnavailableError as FindingConversionAsdbUnavailableError,
