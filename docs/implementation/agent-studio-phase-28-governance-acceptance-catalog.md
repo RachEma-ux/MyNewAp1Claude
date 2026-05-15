@@ -41,7 +41,7 @@ This document mirrors `agent-studio-phase-21-continuous-graph-testing-catalog.md
 | 27 | Golden question suite runs | ✅ Met (PR-AT-1 closure) | n/a |
 | 28 | Performance benchmarks are reported | ⚠️ Partial — workflow_dispatch ready; baseline evidence is operator-action (strict-audit item 1 PARTIALLY) | n/a (operator) |
 | 29 | Neo4j Enterprise/Aura upgrade path is documented | ✅ Met (Phase 27 ADR + runbook) | n/a |
-| 30 | Documentation complete | ⚠️ Partial — Phase 21 catalog (#999) + this Phase 28 catalog (#1000) close two big gaps; **Phase 22 emission audit shipped @ #1012** (closes a third); Phase 23 user-facing docs still light | T-I.4 (#1012 partial closure) |
+| 30 | Documentation complete | ⚠️ Partial → **substantially closed** — Phase 21 catalog (#999) + this Phase 28 catalog (#1000) + Phase 22 emission audit (#1012) + Phase 22 burst summary (#1037) + **Phase 23 quality-agent operator runbook @ #1039** all live. Remaining: per-scanner severity rationale doc (small, future). | Closed @ #1039 |
 
 **Summary: 27/30 ✅, 3 partial — all with named closure paths.**
 
