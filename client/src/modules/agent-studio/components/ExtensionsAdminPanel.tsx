@@ -575,7 +575,13 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
               executions aggregate (#957). Sums the per-extension
               workspaceInvocationSummaries data. denied > 0 →
               text-destructive so an operator sees capability-check
-              failures at a glance. */}
+              failures at a glance.
+              PR-V1-224: appended an allow-rate metric symmetric with
+              publish-executions success-rate (#974). Every invocation
+              is settled (capabilityCheck is allowed-or-not at write
+              time) so the rate is simply allowed / total with no
+              pending denominator. Same color tier heuristic — ≥99
+              emerald / ≥90 amber / else destructive. */}
           {summariesQ.data && summariesQ.data.length > 0 ? (
             <p
               className="text-xs text-muted-foreground"
@@ -590,6 +596,17 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                   allowed += s.allowedCount;
                   denied += s.deniedCount;
                 }
+                const rate = total > 0
+                  ? Math.round((allowed / total) * 1000) / 10
+                  : null;
+                const rateClass =
+                  rate === null
+                    ? ""
+                    : rate >= 99
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : rate >= 90
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-destructive";
                 return (
                   <>
                     <span className="font-medium">Workspace totals:</span>{" "}
@@ -607,6 +624,18 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     >
                       <span className="font-mono">{denied}</span> denied
                     </span>
+                    {rate !== null ? (
+                      <>
+                        {" — "}
+                        <span
+                          className={rateClass}
+                          data-testid="extensions-invocations-allow-rate"
+                          title="allowed / total — every invocation is settled at capability-check time, so no pending denominator is needed"
+                        >
+                          <span className="font-mono">{rate}%</span> allow rate
+                        </span>
+                      </>
+                    ) : null}
                   </>
                 );
               })()}
