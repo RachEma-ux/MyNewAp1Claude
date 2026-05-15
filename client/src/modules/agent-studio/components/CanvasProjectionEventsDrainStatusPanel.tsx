@@ -129,6 +129,12 @@ export function CanvasProjectionEventsDrainStatusPanel() {
                       <th className="py-0.5 pr-3">Workspace</th>
                       <th className="py-0.5 pr-3">Processed</th>
                       <th className="py-0.5 pr-3">Failed</th>
+                      <th
+                        className="py-0.5 pr-3"
+                        title="Batches run this tick; ! suffix when the per-tick batch ceiling was hit"
+                      >
+                        Batches
+                      </th>
                       <th className="py-0.5 pr-3">Cursor</th>
                     </tr>
                   </thead>
@@ -150,6 +156,18 @@ export function CanvasProjectionEventsDrainStatusPanel() {
                             className={`py-0.5 pr-3 font-mono ${w.failed > 0 ? "text-destructive" : ""}`}
                           >
                             {w.failed}
+                          </td>
+                          <td
+                            className={`py-0.5 pr-3 font-mono ${w.hitMaxBatches ? "text-amber-600" : ""}`}
+                            data-testid={`drain-per-workspace-batches-${w.workspaceId}`}
+                            title={
+                              w.hitMaxBatches
+                                ? "Hit per-tick batch ceiling — more work likely remains for this workspace."
+                                : undefined
+                            }
+                          >
+                            {w.batchesRun}
+                            {w.hitMaxBatches ? "!" : ""}
                           </td>
                           <td className="py-0.5 pr-3 font-mono">
                             {w.nextLastSeenId}
