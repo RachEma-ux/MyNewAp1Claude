@@ -14,6 +14,7 @@ export {
   preflightAlgorithmRequest,
   listAlgorithmsTriggeringAuraUpgrade,
   listAlgorithmsAvailableOnCe,
+  summarizeGraphAlgorithmCoverage,
   type GraphAlgorithmKind,
   type GraphAlgorithmBackendSupport,
   type GraphAlgorithmMetadata,
@@ -22,4 +23,5 @@ export {
   type GraphAlgorithmResultRow,
   type GraphAlgorithmPreflightDecision,
   type GraphAlgorithmPreflightOutcome,
+  type GraphAlgorithmCoverageSummary,
 } from "./contracts.js";
