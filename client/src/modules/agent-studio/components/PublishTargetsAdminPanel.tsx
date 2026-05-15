@@ -1,0 +1,260 @@
+/**
+ * Publish-targets admin panel — PR-V1-186.
+ *
+ * Operator surface for the publish-targets registry + recent
+ * executions ledger. Read-only first slice — mutations land in a
+ * follow-up.
+ */
+
+import { useState } from "react";
+
+import { trpc } from "@/lib/trpc";
+import { Card, CardContent } from "@/components/ui/card";
+
+import { SectionLabel } from "./ui";
+
+const PUBLISH_EXECUTION_STATUSES = [
+  "pending",
+  "succeeded",
+  "failed",
+] as const;
+type PublishExecutionStatus = (typeof PUBLISH_EXECUTION_STATUSES)[number];
+
+function fmtTs(ts: Date | string | null | undefined): string {
+  if (!ts) return "—";
+  const d = typeof ts === "string" ? new Date(ts) : ts;
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toISOString().replace("T", " ").replace(/\..+$/, "Z");
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case "succeeded":
+      return "text-emerald-600 dark:text-emerald-400";
+    case "pending":
+      return "text-amber-600 dark:text-amber-400";
+    case "failed":
+      return "text-destructive";
+    default:
+      return "";
+  }
+}
+
+export function PublishTargetsAdminPanel() {
+  const [targetFilter, setTargetFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
+  const targetsQ =
+    trpc.agentStudio.publishTargets.listTargets.useQuery(undefined, {
+      refetchOnWindowFocus: false,
+    });
+
+  const parsedTargetFilter = Number.parseInt(targetFilter, 10);
+  const recentQ =
+    trpc.agentStudio.publishTargets.listRecentExecutions.useQuery(
+      {
+        targetId:
+          targetFilter === "" || !Number.isFinite(parsedTargetFilter)
+            ? undefined
+            : parsedTargetFilter,
+        status:
+          statusFilter === ""
+            ? undefined
+            : (statusFilter as PublishExecutionStatus),
+        limit: 50,
+      },
+      { refetchOnWindowFocus: false },
+    );
+
+  const targetKeyById = new Map<number, string>();
+  if (targetsQ.data) {
+    for (const t of targetsQ.data) targetKeyById.set(t.id, t.targetKey);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Publish targets (registry)</SectionLabel>
+          {targetsQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading targets…
+            </p>
+          ) : targetsQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load targets: {targetsQ.error.message}
+            </p>
+          ) : !targetsQ.data || targetsQ.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No publish targets registered.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table
+                className="w-full text-sm border-collapse"
+                data-testid="publish-targets-table"
+              >
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 pr-3">Key</th>
+                    <th className="py-1 pr-3">Type</th>
+                    <th className="py-1 pr-3">Endpoint</th>
+                    <th className="py-1 pr-3">Provider conn</th>
+                    <th className="py-1 pr-3">Enabled</th>
+                    <th className="py-1 pr-3">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {targetsQ.data.map((t) => (
+                    <tr key={t.id} className="border-t">
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {t.targetKey}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {t.targetType}
+                      </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs truncate max-w-[40ch]"
+                        title={t.endpoint}
+                      >
+                        {t.endpoint}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {t.providerConnectionId ?? "—"}
+                      </td>
+                      <td
+                        className={`py-1 pr-3 ${t.enabled ? "" : "text-destructive"}`}
+                      >
+                        {t.enabled ? "yes" : "no"}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                        {fmtTs(t.updatedAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Recent executions</SectionLabel>
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <label
+                className="font-medium"
+                htmlFor="publish-targets-filter-target"
+              >
+                Target:
+              </label>
+              <select
+                id="publish-targets-filter-target"
+                className="text-xs border rounded px-1 py-0.5"
+                value={targetFilter}
+                onChange={(e) => setTargetFilter(e.target.value)}
+              >
+                <option value="">(all)</option>
+                {(targetsQ.data ?? []).map((t) => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.targetKey}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label
+                className="font-medium"
+                htmlFor="publish-targets-filter-status"
+              >
+                Status:
+              </label>
+              <select
+                id="publish-targets-filter-status"
+                className="text-xs border rounded px-1 py-0.5"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">(any)</option>
+                {PUBLISH_EXECUTION_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {recentQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading executions…
+            </p>
+          ) : recentQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load executions: {recentQ.error.message}
+            </p>
+          ) : !recentQ.data || recentQ.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No executions match the current filter.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table
+                className="w-full text-sm border-collapse"
+                data-testid="publish-targets-executions-table"
+              >
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 pr-3">Created</th>
+                    <th className="py-1 pr-3">Target</th>
+                    <th className="py-1 pr-3">Promotion</th>
+                    <th className="py-1 pr-3">Attempt</th>
+                    <th className="py-1 pr-3">Status</th>
+                    <th className="py-1 pr-3">Upstream</th>
+                    <th className="py-1 pr-3">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentQ.data.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                        {fmtTs(r.createdAt)}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {targetKeyById.get(r.targetId) ?? `#${r.targetId}`}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {r.sourcePromotionId}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs">
+                        {r.attempt}
+                      </td>
+                      <td
+                        className={`py-1 pr-3 font-mono text-xs ${statusClass(r.status)}`}
+                      >
+                        {r.status}
+                      </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs truncate max-w-[24ch]"
+                        title={r.upstreamArtifactId ?? undefined}
+                      >
+                        {r.upstreamArtifactId ?? "—"}
+                      </td>
+                      <td
+                        className="py-1 pr-3 text-xs truncate max-w-[40ch]"
+                        title={r.errorMessage ?? undefined}
+                      >
+                        {r.errorMessage ?? ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

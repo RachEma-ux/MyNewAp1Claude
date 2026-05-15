@@ -83,6 +83,9 @@ const ExtensionsAdminPage = lazy(
 const ApprovalBusAdminPage = lazy(
   () => import("../pages/ApprovalBusAdminPage"),
 );
+const PublishTargetsAdminPage = lazy(
+  () => import("../pages/PublishTargetsAdminPage"),
+);
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -217,6 +220,14 @@ function parseRoute(path: string): ParsedRoute {
   // ── PR-V1-184: approval-bus admin (no agent context) ──
   if (path.startsWith("/agent-studio/approval-bus-admin")) {
     return { ...empty, view: "approval-bus-admin" as any, homeMode: null };
+  }
+  // ── PR-V1-186: publish-targets admin (no agent context) ──
+  if (path.startsWith("/agent-studio/publish-targets-admin")) {
+    return {
+      ...empty,
+      view: "publish-targets-admin" as any,
+      homeMode: null,
+    };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -393,6 +404,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/approval-bus-admin");
       return;
     }
+    // PR-V1-186: publish-targets admin sidebar entry.
+    if ((key as string) === "publish-targets-admin") {
+      navigate("/agent-studio/publish-targets-admin");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -476,6 +492,9 @@ export default function AgentStudioShell() {
         // ── PR-V1-184: approval-bus admin ──
         case "approval-bus-admin" as any:
           return <ApprovalBusAdminPage />;
+        // ── PR-V1-186: publish-targets admin ──
+        case "publish-targets-admin" as any:
+          return <PublishTargetsAdminPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }

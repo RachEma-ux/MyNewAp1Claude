@@ -79,6 +79,7 @@ import { graphHealthRouter } from "../services/graph/health-router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
 import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-router";
+import { publishTargetsAdminRouter } from "../services/publish-targets/admin-router";
 import { canvasRouter } from "../services/canvas/canvas-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
@@ -2932,6 +2933,10 @@ export const agentStudioRouter = router({
   // pubsub observability. Single getPubsubStatus procedure today;
   // namespace exists so future approval-bus admin lands here.
   approvalBus: approvalBusAdminRouter,
+  // V1+ Phase 19 admin (PR-V1-186): read-only publish-targets
+  // registry + executions ledger. Operator-facing observability for
+  // the sync/publish subsystem (#749 et al.).
+  publishTargets: publishTargetsAdminRouter,
   // V1+ Phase 17 closure (2026-05-15, PR-V1-170): canvas tRPC surface.
   // First external consumer of canvas-service — exposes the CRUD ops
   // shipped through #752 / #844-#845 / #920 so the React UI can finally
