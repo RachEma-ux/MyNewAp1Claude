@@ -69,6 +69,78 @@ export function isAttachmentMimeClass(
   );
 }
 
+// ============================================================================
+// Per-mime-class operator-facing metadata (T-V.2)
+// ============================================================================
+
+export interface AttachmentMimeClassMetadata {
+  /** Display label rendered in the attachment library's filter tabs. */
+  readonly label: string;
+  /** Short operator-facing description of what file types this class
+   *  covers. */
+  readonly description: string;
+  /** Whether this class supports inline rendering in the attachment
+   *  library preview pane (true) vs. download-only (false). */
+  readonly previewable: boolean;
+  /** Whether this class is media (image / video / audio) vs.
+   *  document-shaped content vs. opaque blob. Drives the library's
+   *  three-tab UX (Media / Documents / Other). */
+  readonly displayBucket: "media" | "documents" | "other";
+}
+
+export const ATTACHMENT_MIME_CLASS_METADATA: Readonly<
+  Record<AttachmentMimeClass, AttachmentMimeClassMetadata>
+> = {
+  image: {
+    label: "Image",
+    description:
+      "Raster and vector images (PNG, JPEG, GIF, SVG, WebP, etc). Rendered inline in the preview pane.",
+    previewable: true,
+    displayBucket: "media",
+  },
+  video: {
+    label: "Video",
+    description:
+      "Video files (MP4, WebM, OGV, MOV, etc). Rendered as an inline video element in the preview pane.",
+    previewable: true,
+    displayBucket: "media",
+  },
+  audio: {
+    label: "Audio",
+    description:
+      "Audio files (MP3, WAV, OGG, FLAC, etc). Rendered as an inline audio element in the preview pane.",
+    previewable: true,
+    displayBucket: "media",
+  },
+  document: {
+    label: "Document",
+    description:
+      "Documents (PDF, Word, Excel, PowerPoint, plain text, JSON, RTF, etc). PDF previews inline; other types show metadata.",
+    previewable: true,
+    displayBucket: "documents",
+  },
+  archive: {
+    label: "Archive",
+    description:
+      "Archive bundles (ZIP, 7Z, TAR, RAR, GZIP, etc). Cannot be previewed — operator downloads and opens externally.",
+    previewable: false,
+    displayBucket: "other",
+  },
+  other: {
+    label: "Other",
+    description:
+      "Files that don't match any known mime-class pattern. Treated as opaque blobs — download-only.",
+    previewable: false,
+    displayBucket: "other",
+  },
+};
+
+export function getAttachmentMimeClassMetadata(
+  mimeClass: AttachmentMimeClass,
+): AttachmentMimeClassMetadata {
+  return ATTACHMENT_MIME_CLASS_METADATA[mimeClass];
+}
+
 const DOCUMENT_PATTERN =
   /^application\/(pdf|msword|vnd\.openxmlformats-officedocument\.|vnd\.ms-|rtf|x-rtf)|^application\/json$|^text\//i;
 const ARCHIVE_PATTERN =
