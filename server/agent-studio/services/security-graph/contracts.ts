@@ -99,6 +99,64 @@ export function isSecurityFindingSeverity(
 }
 
 /**
+ * Numeric rank for a severity (0 = informational, 4 = critical). Higher
+ * rank = more severe. Use for comparator-style sorting.
+ */
+export function severityRank(severity: SecurityFindingSeverity): number {
+  return SECURITY_FINDING_SEVERITIES.indexOf(severity);
+}
+
+/**
+ * Comparator returning Array.sort-style ordering: negative when `a` is
+ * LESS severe than `b`, positive when MORE severe, 0 when equal. Use
+ * directly with `Array.sort(compareSecuritySeverity)` for ascending
+ * order, or wrap in `(a, b) => -compareSecuritySeverity(a, b)` for
+ * descending.
+ */
+export function compareSecuritySeverity(
+  a: SecurityFindingSeverity,
+  b: SecurityFindingSeverity,
+): number {
+  return severityRank(a) - severityRank(b);
+}
+
+/**
+ * Returns a new array of items sorted by their severity DESCENDING
+ * (critical first). Stable with respect to input order for ties. Does
+ * NOT mutate the input.
+ */
+export function sortBySeverityDesc<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => SecurityFindingSeverity,
+): readonly T[] {
+  return [...items].sort(
+    (a, b) => -compareSecuritySeverity(getSeverity(a), getSeverity(b)),
+  );
+}
+
+/**
+ * Returns the most-severe item in the input, or `undefined` for an
+ * empty array. Ties broken by first occurrence in input order. Does
+ * NOT mutate the input.
+ */
+export function getMostSevereItem<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => SecurityFindingSeverity,
+): T | undefined {
+  if (items.length === 0) return undefined;
+  let best = items[0];
+  let bestRank = severityRank(getSeverity(best));
+  for (let i = 1; i < items.length; i++) {
+    const itemRank = severityRank(getSeverity(items[i]));
+    if (itemRank > bestRank) {
+      best = items[i];
+      bestRank = itemRank;
+    }
+  }
+  return best;
+}
+
+/**
  * Map a numeric CVSS score (0..10) to its coarse severity bucket.
  * Boundary semantics match the NVD published cuts:
  *   - 0.0          → informational
