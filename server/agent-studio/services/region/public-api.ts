@@ -66,3 +66,9 @@ export {
   installRegionRouter,
   uninstallRegionRouter,
 } from "./region-routing-bridge.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-151): boot wiring helper.
+export {
+  maybeInstallRegionRouting,
+  type InstallRegionRoutingResult,
+} from "./install-region-routing.js";
