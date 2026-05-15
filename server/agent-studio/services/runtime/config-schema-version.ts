@@ -56,6 +56,90 @@ export const RUNTIME_CONFIG_BLOCK_NAMES = [
 
 export type RuntimeConfigBlockName = (typeof RUNTIME_CONFIG_BLOCK_NAMES)[number];
 
+// ============================================================================
+// Per-config-block operator-facing metadata (T-R.1)
+// ============================================================================
+
+export interface RuntimeConfigBlockMetadata {
+  /** Display label rendered in the agent-draft config editor's tabs. */
+  readonly label: string;
+  /** Short operator-facing description of what the block configures. */
+  readonly description: string;
+  /** Closed-taxonomy domain classification — drives the editor's
+   *  side-bar grouping. */
+  readonly domain:
+    | "agent_behavior"
+    | "knowledge_access"
+    | "tool_orchestration"
+    | "governance"
+    | "scheduling_and_status";
+}
+
+export const RUNTIME_CONFIG_BLOCK_METADATA: Readonly<
+  Record<RuntimeConfigBlockName, RuntimeConfigBlockMetadata>
+> = {
+  memoryConfig: {
+    label: "Memory",
+    description:
+      "Agent memory subsystem configuration — long-term memory retention, short-term context window sizing, summarization strategy.",
+    domain: "agent_behavior",
+  },
+  knowledgeConfig: {
+    label: "Knowledge",
+    description:
+      "Knowledge-access configuration — which KB sources the agent can read, retrieval modes, freshness/permission gates.",
+    domain: "knowledge_access",
+  },
+  workflowConfig: {
+    label: "Workflow",
+    description:
+      "Tool orchestration + workflow steps — which tools the agent can invoke, MCP dispatch parameters, sandbox policies.",
+    domain: "tool_orchestration",
+  },
+  governancePolicy: {
+    label: "Governance Policy",
+    description:
+      "Per-agent governance overrides — risk-class allowances, approval routing thresholds, redaction/citation rules.",
+    domain: "governance",
+  },
+  runtimeConfig: {
+    label: "Runtime",
+    description:
+      "Agent runtime tunables — timeout budgets, iteration caps, retry/backoff strategy, response shaping.",
+    domain: "agent_behavior",
+  },
+  simulationDefaults: {
+    label: "Simulation Defaults",
+    description:
+      "Default inputs/parameters when running the agent in simulation mode — used by the simulation harness, not runtime.",
+    domain: "agent_behavior",
+  },
+  providerConfig: {
+    label: "Provider Binding",
+    description:
+      "Provider + model bindings — which LLM connection the agent uses, fallbacks, embedding bindings (D-EMB-1).",
+    domain: "tool_orchestration",
+  },
+  scheduleConfig: {
+    label: "Schedule",
+    description:
+      "Per-agent scheduling configuration — cron, autonomous loop triggers, run windows.",
+    domain: "scheduling_and_status",
+  },
+  statusLineConfig: {
+    label: "Status Line",
+    description:
+      "Status-line rendering preferences for the agent's runtime UI — operator-facing summary of agent state.",
+    domain: "scheduling_and_status",
+  },
+};
+
+export function getRuntimeConfigBlockMetadata(
+  block: RuntimeConfigBlockName,
+): RuntimeConfigBlockMetadata {
+  return RUNTIME_CONFIG_BLOCK_METADATA[block];
+}
+
 export type ValidateConfigSchemaResult =
   | { ok: true }
   | {
