@@ -26,6 +26,7 @@
 import { z } from "zod";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
+import { getRegionCachePubsubStatus } from "./region-cache-pubsub.js";
 import { getRegionCacheRewarmCronStatus } from "./region-cache-rewarm-cron.js";
 import {
   listActiveRegions,
@@ -149,5 +150,17 @@ export const regionAdminRouter = router({
    */
   getRewarmCronStatus: adminProcedure.query(async () => {
     return getRegionCacheRewarmCronStatus();
+  }),
+
+  /**
+   * Cross-process pubsub status (PR-V1-167). Surfaces whether the
+   * LISTEN subscriber is up, when the last cross-process
+   * notification arrived, lifetime message count, and reconnect
+   * attempt count. Useful for verifying multi-process pubsub is
+   * actually wired (a `connectedAt` of null after boot means
+   * LISTEN never succeeded).
+   */
+  getPubsubStatus: adminProcedure.query(async () => {
+    return getRegionCachePubsubStatus();
   }),
 });
