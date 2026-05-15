@@ -205,6 +205,15 @@ export class GraphAlgorithmMaxNodesOutOfRangeError extends Error {
   }
 }
 
+export class GraphAlgorithmMaxIterationsOutOfRangeError extends Error {
+  constructor(value: number, kind: GraphAlgorithmKind) {
+    super(
+      `maxIterations=${value} is invalid for algorithm "${kind}" (must be >= 1).`,
+    );
+    this.name = "GraphAlgorithmMaxIterationsOutOfRangeError";
+  }
+}
+
 export function normalizeAlgorithmMaxNodes(
   kind: GraphAlgorithmKind,
   input: number | undefined,
@@ -217,6 +226,84 @@ export function normalizeAlgorithmMaxNodes(
   // Clamp at default (operators with bigger needs register their
   // own algorithm runner with raised defaults).
   return Math.min(Math.floor(input), meta.defaultMaxNodes);
+}
+
+export function normalizeAlgorithmMaxIterations(
+  kind: GraphAlgorithmKind,
+  input: number | undefined,
+): number {
+  const meta = GRAPH_ALGORITHM_METADATA[kind];
+  if (input === undefined) return meta.defaultMaxIterations;
+  if (!Number.isFinite(input) || input < 1) {
+    throw new GraphAlgorithmMaxIterationsOutOfRangeError(input, kind);
+  }
+  return Math.min(Math.floor(input), meta.defaultMaxIterations);
+}
+
+// ============================================================================
+// Pre-flight: request → runtime decision (runnable / requires_upgrade / gated)
+// ============================================================================
+
+/** Closed-taxonomy outcome the lens UI + dispatcher use to decide
+ *  whether to invoke the algorithm or surface an upgrade banner. */
+export type GraphAlgorithmPreflightDecision =
+  | "runnable_on_ce_native"
+  | "runnable_on_ce_via_apoc"
+  | "runnable_via_approximation"
+  | "requires_aura_upgrade";
+
+export interface GraphAlgorithmPreflightOutcome {
+  readonly decision: GraphAlgorithmPreflightDecision;
+  /** Resolved (defaults-filled, clamped) bound for `maxNodes`. */
+  readonly resolvedMaxNodes: number;
+  /** Resolved bound for `maxIterations`. */
+  readonly resolvedMaxIterations: number;
+  /** True when `decision === "requires_aura_upgrade"`. */
+  readonly auraUpgradeRequired: boolean;
+}
+
+/**
+ * Pure request validator. Normalizes bounds + maps backend-support to
+ * a runtime decision. Throws on out-of-range inputs (same semantics as
+ * the individual normalizers).
+ *
+ * The future runtime invokes this BEFORE dispatching to the actual
+ * graph backend so the lens UI gets a stable preflight result without
+ * needing to read the backend-support taxonomy itself.
+ */
+export function preflightAlgorithmRequest(
+  request: GraphAlgorithmRequest,
+): GraphAlgorithmPreflightOutcome {
+  const meta = GRAPH_ALGORITHM_METADATA[request.kind];
+  const resolvedMaxNodes = normalizeAlgorithmMaxNodes(
+    request.kind,
+    request.maxNodes,
+  );
+  const resolvedMaxIterations = normalizeAlgorithmMaxIterations(
+    request.kind,
+    request.maxIterations,
+  );
+  let decision: GraphAlgorithmPreflightDecision;
+  switch (meta.backendSupport) {
+    case "neo4j_ce_native":
+      decision = "runnable_on_ce_native";
+      break;
+    case "neo4j_ce_via_apoc":
+      decision = "runnable_on_ce_via_apoc";
+      break;
+    case "approximation_required":
+      decision = "runnable_via_approximation";
+      break;
+    case "gds_required":
+      decision = "requires_aura_upgrade";
+      break;
+  }
+  return {
+    decision,
+    resolvedMaxNodes,
+    resolvedMaxIterations,
+    auraUpgradeRequired: decision === "requires_aura_upgrade",
+  };
 }
 
 /**
