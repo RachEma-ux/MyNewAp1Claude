@@ -152,8 +152,23 @@ export async function createPack(input: CreatePackInput): Promise<CreatePackResu
  * Return the most recent pack (by packVersion DESC) for a draft, or null.
  */
 export async function getLatestPack(agentDraftId: number): Promise<CagCapabilityPack | null> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-third batch (PR-V1-133): Path B read consumer.
+  // The read still works correctly under Phase-1 (single-region) by
+  // virtue of the shim delegate, but Phase-2 requires reads of
+  // workspace-scoped tables to also route to the right region.
+  // resolveWorkspaceIdForDraft uses agsAgentProviderBindings as the
+  // workspace lookup; falls back to bootstrap when the draft has no
+  // binding (legacy / pre-Phase-11).
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupDb, agentDraftId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
 
   const rows = await db
     .select()
@@ -169,8 +184,19 @@ export async function getLatestPack(agentDraftId: number): Promise<CagCapability
  * Return all packs for a draft, newest first. Includes archived/stale.
  */
 export async function listPacks(agentDraftId: number): Promise<CagCapabilityPack[]> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-third batch (PR-V1-133): Path B read consumer.
+  // Same shape as getLatestPack — single Path B resolver call up
+  // front so the read targets the right region under Phase-2.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupDb, agentDraftId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
 
   const rows = await db
     .select()
