@@ -81,6 +81,11 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
       onSuccess: onMutationSuccess,
       onError: onMutationError,
     });
+  const uninstallMutation =
+    trpc.agentStudio.extensions.uninstall.useMutation({
+      onSuccess: onMutationSuccess,
+      onError: onMutationError,
+    });
 
   const listQ = trpc.agentStudio.extensions.list.useQuery(
     { workspaceId },
@@ -213,6 +218,23 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          className="text-xs underline text-destructive"
+                          disabled={uninstallMutation.isPending}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Hard uninstall extension ${ext.extensionKey} (id=${ext.id})? This deletes the row; audit history is preserved separately. To keep the row for audit, use setStatus=revoked instead.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            uninstallMutation.mutate({ extensionId: ext.id });
+                          }}
+                        >
+                          uninstall
+                        </button>
                       </td>
                     </tr>
                   ))}

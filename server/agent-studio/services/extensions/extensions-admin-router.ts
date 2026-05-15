@@ -35,6 +35,7 @@ import {
   installExtension,
   listExtensionsByWorkspace,
   setExtensionStatus,
+  uninstallExtension,
 } from "./manifest.js";
 
 const ExtensionManifestSchema = z.object({
@@ -137,5 +138,18 @@ export const extensionsAdminRouter = router({
     .input(SetStatusInputSchema)
     .mutation(async ({ input }) => {
       return setExtensionStatus(input.extensionId, input.status);
+    }),
+
+  /**
+   * PR-V1-179: hard uninstall. Operator-only mutation that deletes
+   * the extension row entirely. Distinct from
+   * `setStatus(extensionId, "revoked")` which preserves the row
+   * for audit. Idempotent — returns `{ removed: false }` when no
+   * row matched.
+   */
+  uninstall: adminProcedure
+    .input(GetInputSchema)
+    .mutation(async ({ input }) => {
+      return { removed: await uninstallExtension(input.extensionId) };
     }),
 });

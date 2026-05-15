@@ -36,6 +36,7 @@ export {
   installExtension,
   approveExtension,
   setExtensionStatus,
+  uninstallExtension,
   getExtensionById,
   listExtensionsByWorkspace,
 } from "./manifest.js";
