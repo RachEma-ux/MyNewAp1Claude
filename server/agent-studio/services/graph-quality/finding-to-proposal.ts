@@ -84,6 +84,7 @@ export const FINDING_CLASS_TO_PROPOSAL_KIND: Readonly<Record<string, string>> =
     parallel_edges: "deduplicate_parallel_edges",
     excessive_fanout: "review_super_node_for_entity_resolution",
     isolated_subgraph: "review_isolated_subgraph_for_stale_or_orphan",
+    missing_source_version: "backfill_source_version_or_reproject_node",
   };
 
 export function proposalKindForFinding(findingClass: string): string {
