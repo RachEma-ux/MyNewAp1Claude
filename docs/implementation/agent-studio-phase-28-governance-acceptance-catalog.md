@@ -151,5 +151,7 @@ The Phase 22 failure-state taxonomy (`FAILURE_STATES`, 25 closed kinds, #1002) r
 | Wire projection sync worker | #1025 | `projection_sync_failed` (second batch-B wiring); fires when apply step returns ≥1 error, including partial-success |
 | Wire quality-agent duplicate-entity scan | #1026 | `entity_resolution_conflict` (third batch-B wiring); fires per-agent-run when duplicate_entity scanner emits ≥1 finding |
 | Wire promotion lifecycle (submit + reject) | #1027 | `promotion_failed` (fourth batch-B wiring); fires on validation-rejected submit AND operator-initiated reject; `rejectionStage` metadata distinguishes the two paths |
+| Bridge bulk-emission helper | #1029 | `recordFailureStateEvents` plural; shared `encodeForRecorder` between singular + plural; empty-batch short-circuit; per-input severityOverride preserved |
+| Wire permission-denied references (dedicated emit) | #1030 | `runtime_reference_hidden_by_permission` (fifth batch-B wiring); SIBLING to existing `retrieval_safety_filter_blocked_content` for the permission-denied subset; metadata includes both `permissionDeniedCount` and `blockedCount` |
 
-**10 of 25 closed kinds have live emitters today** (batch A: 6 + batch B: 4). The audit (#1012) names the remaining 15 with batch-B / detection-first / phase-gated tier assignments.
+**11 of 25 closed kinds have live emitters today** (batch A: 6 + batch B: 5). The audit (#1012) names the remaining 14 with batch-B / detection-first / phase-gated tier assignments.

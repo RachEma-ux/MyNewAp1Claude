@@ -3,7 +3,7 @@
 **Date:** 2026-05-15 (refreshed after batch-A + first 4 batch-B wirings landed)
 **Status:** Audit + active emission tracking. Maps the 25 closed-taxonomy failure states (#1002) onto existing emitters in `server/agent-studio/services/**`, so the future wiring slices have a fixed scope.
 
-**Live emission status:** **10 of 25 closed kinds have live emitters** (6 batch-A + 4 batch-B). Remaining 15: 9 batch-B candidates (existing detection or DB state) + 5 detection-first (no detection yet) + 1 phase-gated.
+**Live emission status:** **11 of 25 closed kinds have live emitters** (6 batch-A + 5 batch-B). Remaining 14: 8 batch-B candidates (existing detection or DB state) + 5 detection-first (no detection yet) + 1 phase-gated.
 
 This document is the bridge between two artifacts:
 - **Closed-taxonomy contract** (`services/failure-states/contracts.ts`, #1002) — the 25 named failure states + categories + severity + recoverable metadata.
@@ -17,13 +17,13 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **10** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #15, #18, #19, #20, #21) |
+| 🟢 LIVE via closed-taxonomy bridge | **11** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written but not closed-taxonomy-encoded (kind #25 — locked by 20+ test assertions; deferred) |
 | 🟡 Detection state exists in DB but no observability surface | 3 | A status column / audit table carries the state; emission deferred (kinds #2, #7, #10) |
 | ❌ No detection yet — phase-gated | 10 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #6, #11, #12, #13, #14, #16, #17, #22, #23) plus partial-detection kind #12 captured indirectly today |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 10/25 closed kinds (40%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / `projection_sync_failed` follow-ups close.
+**Live coverage: 11/25 closed kinds (44%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / additional follow-ups close.
 
 ---
 
@@ -44,7 +44,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 9 | `projection_sync_failed` | infrastructure | 🟢 **LIVE @ #1025 (T-I.5.B.2)** | Sync worker `status === "failed"` (includes partial-success) | `services/graph/projection/sync-worker.ts` |
 | 10 | `graph_query_timeout` | retrieval | 🟡 | GraphRAG router timeout configured; no per-query event | Adapter in `services/rac/retrieval-executor.ts` (deferred) |
 | 11 | `backlink_refresh_failed` | runtime | ❌ | No backlink refresh module exists yet | Phase-gated on backlink runtime addition |
-| 12 | `runtime_reference_hidden_by_permission` | governance | 🟡 | Permission post-filter redacts (captured indirectly via #1016 `reasonCounts.permission_denied`) | Could ship dedicated emission; today partially captured by safety-filter wiring |
+| 12 | `runtime_reference_hidden_by_permission` | governance | 🟢 **LIVE @ #1030 (T-I.5.B.5)** | Permission-denied subset of safety-filter events emits dedicated kind (sibling to #1016's aggregated emit) | `services/graph/retrieval/retrieval-router.ts` |
 | 13 | `cag_reference_invalidated` | governance | ❌ | CAG invalidation runtime does not exist; only a docblock comment | Phase-gated on CAG invalidation runtime |
 | 14 | `graph_skill_reference_invalidated` | governance | ❌ | Skill-pack invalidation runtime does not exist | Phase-gated on skill-pack invalidation runtime |
 | 15 | `tool_schema_changed` | governance | 🟢 **LIVE @ #1017 (T-I.5.A.4)** | MCP auto-sync diff (pure-function `detectToolSchemaChanges`) | `services/mcp/auto-sync.ts` |
