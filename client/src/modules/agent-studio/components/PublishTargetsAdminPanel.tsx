@@ -328,6 +328,56 @@ export function PublishTargetsAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Recent executions</SectionLabel>
+          {/* PR-V1-206: workspace-aggregate health summary above the
+              recent log. Sums the per-target executionSummaries data
+              so operators see at-a-glance whether anything is wrong
+              without scrolling through the table. */}
+          {summariesQ.data && summariesQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="publish-executions-aggregate-summary"
+            >
+              {(() => {
+                let total = 0;
+                let succeeded = 0;
+                let pending = 0;
+                let failed = 0;
+                for (const s of summariesQ.data) {
+                  total += s.totalExecutions;
+                  succeeded += s.succeededCount;
+                  pending += s.pendingCount;
+                  failed += s.failedCount;
+                }
+                return (
+                  <>
+                    <span className="font-medium">Workspace totals:</span>{" "}
+                    <span className="font-mono">{total}</span> executions —{" "}
+                    <span
+                      className={
+                        succeeded > 0 ? "text-emerald-600 dark:text-emerald-400" : ""
+                      }
+                    >
+                      <span className="font-mono">{succeeded}</span> succeeded
+                    </span>
+                    {" / "}
+                    <span
+                      className={
+                        pending > 0 ? "text-amber-600 dark:text-amber-400" : ""
+                      }
+                    >
+                      <span className="font-mono">{pending}</span> pending
+                    </span>
+                    {" / "}
+                    <span
+                      className={failed > 0 ? "text-destructive" : ""}
+                    >
+                      <span className="font-mono">{failed}</span> failed
+                    </span>
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-3 text-sm">
             <div className="flex items-center gap-2">
               <label
