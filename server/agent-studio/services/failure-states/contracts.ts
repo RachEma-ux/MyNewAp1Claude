@@ -323,6 +323,61 @@ export function listOperatorActionRequiredFailureStates(): ReadonlyArray<Failure
 }
 
 // ============================================================================
+// Severity ordering helpers (T-I.27)
+// ============================================================================
+
+/** 0..2 monotone over the closed 3-key taxonomy (info / warning /
+ *  critical). Higher rank = more severe. */
+export function failureStateSeverityRank(
+  severity: FailureStateSeverity,
+): number {
+  return FAILURE_STATE_SEVERITIES.indexOf(severity);
+}
+
+/** Array.sort-style comparator over failure-state severities. */
+export function compareFailureStateSeverity(
+  a: FailureStateSeverity,
+  b: FailureStateSeverity,
+): number {
+  return failureStateSeverityRank(a) - failureStateSeverityRank(b);
+}
+
+/**
+ * Returns a new array of items sorted by severity DESCENDING (critical
+ * first). Stable for ties (first-occurrence wins). Does NOT mutate.
+ */
+export function sortBySeverityDesc<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => FailureStateSeverity,
+): readonly T[] {
+  return [...items].sort(
+    (a, b) =>
+      -compareFailureStateSeverity(getSeverity(a), getSeverity(b)),
+  );
+}
+
+/**
+ * Returns the most-severe failure-state item, or undefined for empty
+ * input. Ties broken by first occurrence in input order.
+ */
+export function getMostSevereFailureStateItem<T>(
+  items: ReadonlyArray<T>,
+  getSeverity: (item: T) => FailureStateSeverity,
+): T | undefined {
+  if (items.length === 0) return undefined;
+  let best = items[0];
+  let bestRank = failureStateSeverityRank(getSeverity(best));
+  for (let i = 1; i < items.length; i++) {
+    const r = failureStateSeverityRank(getSeverity(items[i]));
+    if (r > bestRank) {
+      best = items[i];
+      bestRank = r;
+    }
+  }
+  return best;
+}
+
+// ============================================================================
 // Aggregation helper (T-I.23)
 // ============================================================================
 
