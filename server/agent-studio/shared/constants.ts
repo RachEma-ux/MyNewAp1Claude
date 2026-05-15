@@ -495,6 +495,62 @@ export function getAgsMemoryTypeMetadata(
 export const AGS_VISIBILITIES = ["private", "team", "org", "public"] as const;
 export type AgsVisibility = (typeof AGS_VISIBILITIES)[number];
 
+// ============================================================================
+// Per-visibility operator-facing metadata (T-S.7)
+// ============================================================================
+
+export interface AgsVisibilityMetadata {
+  /** Display label rendered in the visibility picker / badge. */
+  readonly label: string;
+  /** Short operator-facing description of who can see this scope. */
+  readonly description: string;
+  /** Stable rank 0-3 for visibility-comparison (0=most restrictive
+   *  / 3=least restrictive). */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether content at this visibility is accessible to users
+   *  outside the owning organization (true for `public` only). */
+  readonly external: boolean;
+}
+
+export const AGS_VISIBILITY_METADATA: Readonly<
+  Record<AgsVisibility, AgsVisibilityMetadata>
+> = {
+  private: {
+    label: "Private",
+    description:
+      "Only the owner can see this — restricted to the single user who created it.",
+    rank: 0,
+    external: false,
+  },
+  team: {
+    label: "Team",
+    description:
+      "Visible to the owner's team — workspace-scoped members beyond just the creator.",
+    rank: 1,
+    external: false,
+  },
+  org: {
+    label: "Organization",
+    description:
+      "Visible to everyone in the owning organization — broader than team but still gated by org membership.",
+    rank: 2,
+    external: false,
+  },
+  public: {
+    label: "Public",
+    description:
+      "Visible to anyone — external users / unauthenticated traffic can access. Strongest governance checks apply.",
+    rank: 3,
+    external: true,
+  },
+};
+
+export function getAgsVisibilityMetadata(
+  visibility: AgsVisibility,
+): AgsVisibilityMetadata {
+  return AGS_VISIBILITY_METADATA[visibility];
+}
+
 export const AGS_RUN_STATUSES = [
   "queued",
   "running",

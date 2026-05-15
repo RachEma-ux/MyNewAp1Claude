@@ -245,6 +245,7 @@ runtime catches up.
 | `ags-environment-metadata.test.ts` | `shared/constants` — `AGS_ENVIRONMENT_METADATA` (4-entry per-env label + description + rank 0-3 + customerFacing + persistent booleans for draft/sandbox/staging/production) | T-S.4 / #1121 |
 | `ags-governance-verdict-metadata.test.ts` | `shared/constants` — `AGS_GOVERNANCE_VERDICT_METADATA` (3-entry per-verdict label + description + allowsPromotion + requiresOperatorAttention booleans for pass/warning/blocked) | T-S.5 / #1122 |
 | `ags-memory-type-metadata.test.ts` | `shared/constants` — `AGS_MEMORY_TYPE_METADATA` (5-entry per-type label + description + persistsAcrossSessions + scope {single_agent / cross_agent} for session/persistent/episodic/preference/shared) | T-S.6 / #1123 |
+| `ags-visibility-metadata.test.ts` | `shared/constants` — `AGS_VISIBILITY_METADATA` (4-entry per-visibility label + description + rank 0-3 + external boolean for private/team/org/public) | T-S.7 / #1124 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
