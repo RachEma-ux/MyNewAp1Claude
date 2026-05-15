@@ -56,3 +56,18 @@ export {
   type ImpactAnalysisEdge,
   type ImpactAnalysisResult,
 } from "./impact-analysis-contracts.js";
+
+export {
+  registerLensRunner,
+  getLensRunner,
+  runLens,
+  listLensRunnerKinds,
+  __resetLensRunnerRegistryForTests,
+  LensRunnerAlreadyRegisteredForKindError,
+  LensRunnerNotRegisteredForKindError,
+  type LensRunnerFn,
+  type LensRunnerViewerContext,
+  type LensSnapshot,
+  type LensSnapshotNode,
+  type LensSnapshotEdge,
+} from "./runner-contract.js";
