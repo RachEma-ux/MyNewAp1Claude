@@ -302,6 +302,71 @@ export const AGS_ENVIRONMENTS = [
 ] as const;
 export type AgsEnvironment = (typeof AGS_ENVIRONMENTS)[number];
 
+// ============================================================================
+// Per-environment operator-facing metadata (T-S.4)
+// ============================================================================
+
+export interface AgsEnvironmentMetadata {
+  /** Display label rendered in the environment picker / banner. */
+  readonly label: string;
+  /** Short operator-facing description of the environment. */
+  readonly description: string;
+  /** Stable rank 0-3 for promotion-order comparison. 0=draft (least
+   *  promoted), 3=production (most promoted). */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether real users / customers interact with this environment
+   *  (true for production only). Governance treats this as a hard
+   *  promotion gate. */
+  readonly customerFacing: boolean;
+  /** Whether mutations in this environment are persistent (true for
+   *  staging + production) vs. ephemeral (draft + sandbox can be
+   *  reset). */
+  readonly persistent: boolean;
+}
+
+export const AGS_ENVIRONMENT_METADATA: Readonly<
+  Record<AgsEnvironment, AgsEnvironmentMetadata>
+> = {
+  draft: {
+    label: "Draft",
+    description:
+      "Pre-promotion authoring environment — every change is local to the operator's draft scope. Resets freely.",
+    rank: 0,
+    customerFacing: false,
+    persistent: false,
+  },
+  sandbox: {
+    label: "Sandbox",
+    description:
+      "Isolated test environment for trying agent configurations against synthetic data. Resettable on demand.",
+    rank: 1,
+    customerFacing: false,
+    persistent: false,
+  },
+  staging: {
+    label: "Staging",
+    description:
+      "Pre-production environment mirroring production data and infrastructure — final integration testing before promotion.",
+    rank: 2,
+    customerFacing: false,
+    persistent: true,
+  },
+  production: {
+    label: "Production",
+    description:
+      "Live customer-facing environment — every mutation affects real users. Governance gates are strictest here.",
+    rank: 3,
+    customerFacing: true,
+    persistent: true,
+  },
+};
+
+export function getAgsEnvironmentMetadata(
+  env: AgsEnvironment,
+): AgsEnvironmentMetadata {
+  return AGS_ENVIRONMENT_METADATA[env];
+}
+
 export const AGS_GOVERNANCE_VERDICTS = ["pass", "warning", "blocked"] as const;
 export type AgsGovernanceVerdict = (typeof AGS_GOVERNANCE_VERDICTS)[number];
 
