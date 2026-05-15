@@ -133,6 +133,7 @@ const ANCILLARY_TESTS = [
   "ags-governance-verdict-metadata.test.ts",
   "ags-memory-type-metadata.test.ts",
   "ags-visibility-metadata.test.ts",
+  "ags-run-status-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
