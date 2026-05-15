@@ -7,7 +7,7 @@
  * to the MCP dispatcher from extension code).
  */
 
-import { and, eq, inArray, max, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, max, sql } from "drizzle-orm";
 
 import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
@@ -289,6 +289,81 @@ export async function getInvocationSummariesByWorkspace(
         lastInvokedAt: null,
       },
   );
+}
+
+/**
+ * PR-V1-182: workspace-scoped recent invocation log.
+ *
+ * Returns the N most recent rows from `ags_extension_invocations`
+ * for extensions belonging to `workspaceId`, sorted by
+ * `invokedAt DESC`. Used by `ExtensionsAdminPanel` to render an
+ * operator-facing recent-activity feed below the table so the
+ * "denied" / "succeeded=false" cases are visible without writing
+ * SQL by hand.
+ *
+ * Optional `extensionId` filter when an operator wants only one
+ * extension's recent activity. Default `limit = 50`, clamped to
+ * `[1, 500]`.
+ */
+export interface ExtensionInvocationLogRow {
+  readonly id: number;
+  readonly extensionId: number;
+  readonly lane: string;
+  readonly invokedToolName: string | null;
+  readonly capabilityCheck: string;
+  readonly succeeded: boolean | null;
+  readonly errorMessage: string | null;
+  readonly invokedAt: Date;
+}
+
+export async function listRecentInvocationsByWorkspace(args: {
+  workspaceId: number;
+  extensionId?: number;
+  limit?: number;
+}): Promise<ReadonlyArray<ExtensionInvocationLogRow>> {
+  const db = getAsDbForWorkspace(args.workspaceId);
+  if (!db) return [];
+  const limit = Math.max(1, Math.min(500, args.limit ?? 50));
+  const extensionRows = await db
+    .select({ id: agsExtensions.id })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.workspaceId, args.workspaceId));
+  if (extensionRows.length === 0) return [];
+  const workspaceExtensionIds = extensionRows.map((r) => Number(r.id));
+  const filters = [
+    inArray(agsExtensionInvocations.extensionId, workspaceExtensionIds),
+  ];
+  if (args.extensionId !== undefined) {
+    // Restrict to a single extension. The intersection with
+    // workspaceExtensionIds also keeps cross-workspace ids from
+    // leaking through the operator panel.
+    filters.push(eq(agsExtensionInvocations.extensionId, args.extensionId));
+  }
+  const rows = await db
+    .select({
+      id: agsExtensionInvocations.id,
+      extensionId: agsExtensionInvocations.extensionId,
+      lane: agsExtensionInvocations.lane,
+      invokedToolName: agsExtensionInvocations.invokedToolName,
+      capabilityCheck: agsExtensionInvocations.capabilityCheck,
+      succeeded: agsExtensionInvocations.succeeded,
+      errorMessage: agsExtensionInvocations.errorMessage,
+      invokedAt: agsExtensionInvocations.invokedAt,
+    })
+    .from(agsExtensionInvocations)
+    .where(filters.length === 1 ? filters[0] : and(...filters))
+    .orderBy(desc(agsExtensionInvocations.invokedAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    id: Number(r.id),
+    extensionId: Number(r.extensionId),
+    lane: String(r.lane),
+    invokedToolName: (r.invokedToolName as string | null) ?? null,
+    capabilityCheck: String(r.capabilityCheck),
+    succeeded: (r.succeeded as boolean | null) ?? null,
+    errorMessage: (r.errorMessage as string | null) ?? null,
+    invokedAt: r.invokedAt as Date,
+  }));
 }
 
 export async function listExtensionsByWorkspace(

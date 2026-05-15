@@ -35,6 +35,7 @@ import {
   getInvocationSummariesByWorkspace,
   installExtension,
   listExtensionsByWorkspace,
+  listRecentInvocationsByWorkspace,
   setExtensionStatus,
   uninstallExtension,
 } from "./manifest.js";
@@ -166,5 +167,27 @@ export const extensionsAdminRouter = router({
     .input(z.object({ workspaceId: z.number().int().positive() }))
     .query(async ({ input }) => {
       return getInvocationSummariesByWorkspace(input.workspaceId);
+    }),
+
+  /**
+   * PR-V1-182: workspace-scoped recent invocation log (operator
+   * activity feed). Workspace-bounded by service-level filter so
+   * cross-workspace ids can't leak even when an operator passes a
+   * stray `extensionId`. Default limit 50, capped at 500.
+   */
+  recentInvocations: adminProcedure
+    .input(
+      z.object({
+        workspaceId: z.number().int().positive(),
+        extensionId: z.number().int().positive().optional(),
+        limit: z.number().int().positive().max(500).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return listRecentInvocationsByWorkspace({
+        workspaceId: input.workspaceId,
+        extensionId: input.extensionId,
+        limit: input.limit,
+      });
     }),
 });
