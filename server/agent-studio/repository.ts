@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveSimulationScenarioRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  scenarioId: number,
+) {
+  // V1+ MR-3 fifty-second batch (PR-V1-122): shared scenarioId→
+  // routed-conn helper. agsSimulationScenarios.agentId is a direct
+  // FK — single SELECT, then chain into resolveAgentRoutedConn.
+  // Falls back to lookupConn on any null.
+  const scenarioRows = await lookupConn
+    .select({ agentId: agsSimulationScenarios.agentId })
+    .from(agsSimulationScenarios)
+    .where(eq(agsSimulationScenarios.id, scenarioId))
+    .limit(1);
+  const agentId = scenarioRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
 async function resolvePublishRequestRoutedConn(
   lookupConn: ReturnType<typeof db>,
   publishRequestId: number,
@@ -919,7 +937,15 @@ export async function createApprovalStep(input: {
   approverRole: string;
   state?: string;
 }) {
-  const [created] = await db()
+  // V1+ MR-3 fifty-second batch (PR-V1-122): Path B consumer via
+  // resolvePublishRequestRoutedConn (publishRequestId→agentId→draft→
+  // workspaceId).
+  const lookupConn = db();
+  const conn = await resolvePublishRequestRoutedConn(
+    lookupConn,
+    input.publishRequestId,
+  );
+  const [created] = await conn
     .insert(agsApprovalSteps)
     .values({
       publishRequestId: input.publishRequestId,
@@ -1122,8 +1148,17 @@ export async function saveSimulationScenario(input: {
   toggles: Record<string, unknown>;
   createdBy?: number;
 }) {
-  const conn = db();
+  // V1+ MR-3 fifty-second batch (PR-V1-122): Path B consumer.
+  // Dispatches on input.scenarioId — UPDATE branch routes via
+  // resolveSimulationScenarioRoutedConn (scenarioId→agentId→draft→
+  // workspaceId), INSERT branch routes via
+  // resolveAgentRoutedConn(input.agentId).
+  const lookupConn = db();
   if (input.scenarioId) {
+    const conn = await resolveSimulationScenarioRoutedConn(
+      lookupConn,
+      input.scenarioId,
+    );
     await conn
       .update(agsSimulationScenarios)
       .set({
@@ -1135,6 +1170,7 @@ export async function saveSimulationScenario(input: {
       .where(eq(agsSimulationScenarios.id, input.scenarioId));
     return getSimulationScenarioById(input.scenarioId);
   }
+  const conn = await resolveAgentRoutedConn(lookupConn, input.agentId);
   const [created] = await conn
     .insert(agsSimulationScenarios)
     .values({
