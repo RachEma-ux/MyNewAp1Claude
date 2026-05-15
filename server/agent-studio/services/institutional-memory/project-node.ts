@@ -34,11 +34,15 @@ export interface ProjectedInstitutionalMemoryNode {
   readonly label: string;
 }
 
+export const INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS = [
+  "node_type_not_mapped_to_source_table",
+  "row_missing_id_column",
+  "row_missing_label_column",
+  "row_id_not_stringifiable",
+] as const;
+
 export type InstitutionalMemoryProjectionSkipReason =
-  | "node_type_not_mapped_to_source_table"
-  | "row_missing_id_column"
-  | "row_missing_label_column"
-  | "row_id_not_stringifiable";
+  (typeof INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS)[number];
 
 /**
  * Returns the projected node OR `null` if the row cannot be projected.
@@ -141,4 +145,47 @@ export function isInstitutionalMemoryMappable(
   return (
     m.sourceTable !== null && m.idColumn !== null && m.labelColumn !== null
   );
+}
+
+// ============================================================================
+// Projection-result summary (T-G.22)
+// ============================================================================
+
+export interface InstitutionalMemoryProjectionResultSummary {
+  readonly totalRows: number;
+  readonly projected: number;
+  readonly skipped: number;
+  readonly skippedByReason: Readonly<
+    Record<InstitutionalMemoryProjectionSkipReason, number>
+  >;
+  /** Projected-out-of-input ratio in [0, 100], 1-decimal precision.
+   *  0 when totalRows is 0 (avoids NaN). */
+  readonly projectedPercent: number;
+}
+
+/**
+ * Aggregates a `ProjectInstitutionalMemoryNodesResult` into an
+ * operator-dashboard-ready summary. Useful for "X of Y rows projected,
+ * Z by reason" gauges in the lens-runner's logging output.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeInstitutionalMemoryProjectionResult(
+  result: ProjectInstitutionalMemoryNodesResult,
+): InstitutionalMemoryProjectionResultSummary {
+  const projected = result.nodes.length;
+  let skipped = 0;
+  for (const r of INSTITUTIONAL_MEMORY_PROJECTION_SKIP_REASONS) {
+    skipped += result.skippedByReason[r];
+  }
+  const totalRows = projected + skipped;
+  const projectedPercent =
+    totalRows === 0 ? 0 : Math.round((projected / totalRows) * 1000) / 10;
+  return {
+    totalRows,
+    projected,
+    skipped,
+    skippedByReason: result.skippedByReason,
+    projectedPercent,
+  };
 }
