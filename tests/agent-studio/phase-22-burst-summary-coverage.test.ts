@@ -46,6 +46,8 @@ const SHIPPED_PRS = [
   "#1037",
   "#1038",
   "#1039",
+  "#1040",
+  "#1041",
 ];
 
 describe("Phase 22 emission burst summary lockstep", () => {
@@ -76,8 +78,8 @@ describe("Phase 22 emission burst summary lockstep", () => {
     expect(summary).toContain("#1034");
   });
 
-  it("references the final closure SHA `089ef2e` (post acceptance #30 closure)", () => {
-    expect(summary).toContain("089ef2e");
+  it("references the final closure SHA `1acafbc0` (post acceptance flip #1041)", () => {
+    expect(summary).toContain("1acafbc0");
   });
 
   it("notes Phase 28 acceptance #30 substantially-closed at #1039", () => {
@@ -85,7 +87,17 @@ describe("Phase 22 emission burst summary lockstep", () => {
     expect(summary).toContain("#1039");
   });
 
-  it("acknowledges the 3-step self-update history (#1037 / #1038 / #1040)", () => {
-    expect(summary).toContain("3 self-update slices");
+  it("acknowledges the 4-step self-update history (#1037 → #1038 → #1040 → #1041)", () => {
+    expect(summary).toContain("4 self-update slices");
+  });
+
+  it("notes Phase 22 roadmap acceptance checkbox flip @ #1041", () => {
+    expect(summary).toContain("roadmap acceptance checkbox");
+    expect(summary).toContain("#1041");
+  });
+
+  it("references the 31-PR continuation total", () => {
+    expect(summary).toContain("31-PR");
+    expect(summary).toContain("31 PRs");
   });
 });
