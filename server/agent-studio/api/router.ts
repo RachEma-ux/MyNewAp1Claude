@@ -79,6 +79,7 @@ import { graphHealthRouter } from "../services/graph/health-router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
 import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-router";
+import { canvasRouter } from "../services/canvas/canvas-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { promotionRouter } from "../services/promotion/router";
@@ -2931,6 +2932,13 @@ export const agentStudioRouter = router({
   // pubsub observability. Single getPubsubStatus procedure today;
   // namespace exists so future approval-bus admin lands here.
   approvalBus: approvalBusAdminRouter,
+  // V1+ Phase 17 closure (2026-05-15, PR-V1-170): canvas tRPC surface.
+  // First external consumer of canvas-service — exposes the CRUD ops
+  // shipped through #752 / #844-#845 / #920 so the React UI can finally
+  // reach Canvas features. Mutations route through canvas-service which
+  // handles the canvas→vault→workspace split-handle + 17-γ projection
+  // event emission.
+  canvas: canvasRouter,
   // V1+ 17-γ follow-up (2026-05-14): canvas projection events
   // drain scheduler observability — `getDrainStatus` reads the
   // module-singleton tick state (#810) so operators can verify

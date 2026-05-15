@@ -37,6 +37,9 @@ export {
   listNoteReferencesForCanvas,
 } from "./canvas-service.js";
 
+// V1+ Phase 17 closure (PR-V1-170): canvas tRPC router.
+export { canvasRouter } from "./canvas-router.js";
+
 // V1+ Phase 17-β: projection helpers (CANVAS_REFERENCES_NOTE edge).
 export {
   buildCanvasReferenceProjection,
