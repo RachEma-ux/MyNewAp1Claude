@@ -10,7 +10,10 @@
 import { and, eq } from "drizzle-orm";
 
 import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
-import { agsExtensions } from "../../../../drizzle/tables/agent-studio-extensions.js";
+import {
+  agsExtensions,
+  agsExtensionInvocations,
+} from "../../../../drizzle/tables/agent-studio-extensions.js";
 import {
   ExtensionNotFoundError,
   ExtensionStatusInvalidError,
@@ -179,6 +182,17 @@ export async function getExtensionById(
  * Idempotent — returns `false` when no row matched, `true` on
  * delete. Routes via the same split-handle as setExtensionStatus.
  *
+ * PR-V1-180: cascade-delete `ags_extension_invocations` rows that FK
+ * to this extension first, then delete the parent row. Without this
+ * step, ANY extension with telemetry history (i.e. every extension
+ * that has ever been invoked) fails the parent DELETE with a foreign
+ * key violation, defeating the uninstall path entirely. The cascade
+ * is intentional: invocation telemetry is per-extension, not part
+ * of the audit-of-record (that lives in `ags_approval_steps` /
+ * `ags_pending_permission_requests`), so deleting it with the
+ * parent is correct. Operators wanting to preserve the telemetry
+ * should `setStatus(..., "revoked")` instead.
+ *
  * Operator-only — invocations from the extension framework itself
  * are not allowed (extensions can't unilaterally uninstall
  * themselves). Caller is responsible for ensuring the extension is
@@ -197,6 +211,9 @@ export async function uninstallExtension(
   if (lookup.length === 0) return false;
   const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) return false;
+  await db
+    .delete(agsExtensionInvocations)
+    .where(eq(agsExtensionInvocations.extensionId, extensionId));
   await db.delete(agsExtensions).where(eq(agsExtensions.id, extensionId));
   return true;
 }
