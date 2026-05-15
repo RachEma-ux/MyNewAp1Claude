@@ -87,6 +87,142 @@ export const FINDING_CLASS_TO_PROPOSAL_KIND: Readonly<Record<string, string>> =
     missing_source_version: "backfill_source_version_or_reproject_node",
   };
 
+// ============================================================================
+// Closed taxonomy + per-kind metadata for the canonical proposal kinds (T-D.12)
+// ============================================================================
+
+/**
+ * Closed taxonomy of every proposal kind the canonical
+ * `FINDING_CLASS_TO_PROPOSAL_KIND` table can emit, PLUS the explicit
+ * `review_self_loop` fallback. Unknown findingClass values still fall
+ * through to `review_<class>` at runtime, but that path is by
+ * definition not in the closed taxonomy and gets no metadata.
+ */
+export const QUALITY_PROPOSAL_KINDS = [
+  "link_or_archive_orphan_node",
+  "merge_duplicate_entities",
+  "re_promote_with_source_version",
+  "review_self_loop",
+  "backfill_or_delete_unprovenanced_node",
+  "backfill_node_or_delete_dangling_edge",
+  "deduplicate_parallel_edges",
+  "review_super_node_for_entity_resolution",
+  "review_isolated_subgraph_for_stale_or_orphan",
+  "backfill_source_version_or_reproject_node",
+] as const;
+
+export type QualityProposalKind = (typeof QUALITY_PROPOSAL_KINDS)[number];
+
+export function isQualityProposalKind(s: unknown): s is QualityProposalKind {
+  return (
+    typeof s === "string" &&
+    (QUALITY_PROPOSAL_KINDS as readonly string[]).includes(s)
+  );
+}
+
+export interface QualityProposalKindMetadata {
+  /** Display label for operator dashboards / proposal-row headers. */
+  readonly label: string;
+  /** Operator-facing description of what the proposal does. */
+  readonly description: string;
+  /** Closed-taxonomy automation classification:
+   *  - `one_click_safe`: deterministic, reversible — operator can
+   *    one-click approve.
+   *  - `review_required`: outcome is data-dependent, operator must
+   *    inspect candidate rows before deciding.
+   *  - `investigation_only`: no programmatic action — operator
+   *    decides whether the finding is intentional. */
+  readonly automationClass:
+    | "one_click_safe"
+    | "review_required"
+    | "investigation_only";
+  /** Whether the proposal involves a graph-mutating action (true) vs
+   *  a metadata-only annotation (false). Used to gate Phase 11.5
+   *  approval routing. */
+  readonly mutatesGraph: boolean;
+}
+
+export const QUALITY_PROPOSAL_KIND_METADATA: Readonly<
+  Record<QualityProposalKind, QualityProposalKindMetadata>
+> = {
+  link_or_archive_orphan_node: {
+    label: "Link or Archive Orphan Node",
+    description:
+      "Orphan node has zero edges in either direction — operator decides whether to backfill missing relationships or archive the node.",
+    automationClass: "review_required",
+    mutatesGraph: true,
+  },
+  merge_duplicate_entities: {
+    label: "Merge Duplicate Entities",
+    description:
+      "Two entities with canonicalized-equal labels — operator confirms merge, then entities consolidate to a single node with combined edges.",
+    automationClass: "review_required",
+    mutatesGraph: true,
+  },
+  re_promote_with_source_version: {
+    label: "Re-Promote with Latest Source Version",
+    description:
+      "Node references an outdated sourceVersionId — re-promote against the current pinned version for the same sourceId.",
+    automationClass: "one_click_safe",
+    mutatesGraph: true,
+  },
+  review_self_loop: {
+    label: "Review Self-Loop",
+    description:
+      "Edge where source and target node identities match — usually a bad ingest, but legitimate self-references exist (e.g. code-graph IMPORTS). Operator decides.",
+    automationClass: "investigation_only",
+    mutatesGraph: false,
+  },
+  backfill_or_delete_unprovenanced_node: {
+    label: "Backfill or Delete Unprovenanced Node",
+    description:
+      "Node has no sourceId at all (Phase 11 rollback violation). Operator either backfills provenance or deletes the row.",
+    automationClass: "review_required",
+    mutatesGraph: true,
+  },
+  backfill_node_or_delete_dangling_edge: {
+    label: "Backfill Node or Delete Dangling Edge",
+    description:
+      "Edge references a missing source/target node. Operator either restores the missing node or deletes the edge.",
+    automationClass: "review_required",
+    mutatesGraph: true,
+  },
+  deduplicate_parallel_edges: {
+    label: "Deduplicate Parallel Edges",
+    description:
+      "Multiple edges with identical typeKey + source + target — projection duplicates safe to merge into a single edge.",
+    automationClass: "one_click_safe",
+    mutatesGraph: true,
+  },
+  review_super_node_for_entity_resolution: {
+    label: "Review Super-Node for Entity Resolution",
+    description:
+      "Node with abnormally high degree — frequently signals an unresolved entity (e.g. 'unknown user' catch-all). Operator decides whether to split.",
+    automationClass: "investigation_only",
+    mutatesGraph: false,
+  },
+  review_isolated_subgraph_for_stale_or_orphan: {
+    label: "Review Isolated Subgraph",
+    description:
+      "Small connected component disconnected from the main graph — possibly orphaned migration leftovers. Operator decides whether to delete or merge.",
+    automationClass: "investigation_only",
+    mutatesGraph: false,
+  },
+  backfill_source_version_or_reproject_node: {
+    label: "Backfill Source Version or Reproject",
+    description:
+      "Node has sourceId but missing sourceVersionId — half-built projection state. Operator either fills the pin or reprojects the node.",
+    automationClass: "one_click_safe",
+    mutatesGraph: true,
+  },
+};
+
+export function getQualityProposalKindMetadata(
+  kind: QualityProposalKind,
+): QualityProposalKindMetadata {
+  return QUALITY_PROPOSAL_KIND_METADATA[kind];
+}
+
 export function proposalKindForFinding(findingClass: string): string {
   return (
     FINDING_CLASS_TO_PROPOSAL_KIND[findingClass] ?? `review_${findingClass}`

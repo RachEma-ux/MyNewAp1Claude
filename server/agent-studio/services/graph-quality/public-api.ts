@@ -69,6 +69,10 @@ export {
   findingClassForProposalKind,
   severityToConfidence,
   FINDING_CLASS_TO_PROPOSAL_KIND,
+  QUALITY_PROPOSAL_KINDS,
+  QUALITY_PROPOSAL_KIND_METADATA,
+  isQualityProposalKind,
+  getQualityProposalKindMetadata,
   AsdbUnavailableError as FindingConversionAsdbUnavailableError,
   FindingNotFoundError,
   FindingAlreadyConvertedError,
@@ -77,6 +81,8 @@ export type {
   ConvertFindingToProposalInput,
   ConvertFindingToProposalResult,
   ConvertFindingOptions,
+  QualityProposalKind,
+  QualityProposalKindMetadata,
 } from "./finding-to-proposal.js";
 
 export {
