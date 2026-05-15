@@ -223,6 +223,7 @@ runtime catches up.
 | `publish-governance-decision-metadata.test.ts` | `services/publish-targets/types` — `GOVERNANCE_DECISION_METADATA` (3-entry per-decision label + description + executorBranch {runs_pusher / stages_ledger_only / blocks_pusher} + requiresHumanApproval boolean for approved/pending/rejected) | T-E.3 / #1099 |
 | `agentic-planner-action-kind-metadata.test.ts` | `services/graph-agent/agentic-planner-contract` — `AGENTIC_PLANNER_ACTION_KIND_METADATA` (3-entry per-action-kind label + description + terminatesLoop + producesAnswer booleans for retrieve/answer/stop) | T-G.35 / #1100 |
 | `saved-view-visibility-metadata.test.ts` | `services/vault/saved-views-visibility` — `SAVED_VIEW_VISIBILITY_METADATA` (2-entry per-visibility label + description + visibleToOthers boolean for personal/workspace_shared) | T-V.1 / #1101 |
+| `realtime-doc-deny-reason-metadata.test.ts` | `services/vault/realtime-doc-authorize` — `REALTIME_DOC_AUTHORIZATION_DENY_REASON_METADATA` (3-entry per-reason label + description + remediation + classification {auth_required / policy_denial / transient_failure} for missing_user_id/not_a_vault_member/vault_membership_lookup_failed) | T-B.1 / #1102 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

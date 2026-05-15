@@ -58,6 +58,68 @@ export type RealtimeDocAuthorizationResult =
       readonly reason: RealtimeDocAuthorizationDenyReason;
     };
 
+// ============================================================================
+// Per-deny-reason operator-facing metadata (T-B.1)
+// ============================================================================
+
+export interface RealtimeDocAuthorizationDenyReasonMetadata {
+  /** Display label for operator dashboards / WS-upgrade decline logs. */
+  readonly label: string;
+  /** Short operator-facing description of why this denial occurred. */
+  readonly description: string;
+  /** Closed-taxonomy classification:
+   *  - `auth_required`: the caller is not authenticated — surface a
+   *    re-login prompt.
+   *  - `policy_denial`: the user IS authenticated but lacks vault
+   *    membership — surface "request access" affordance.
+   *  - `transient_failure`: lookup itself failed (DB error, timeout)
+   *    — caller may retry. */
+  readonly classification:
+    | "auth_required"
+    | "policy_denial"
+    | "transient_failure";
+  /** Operator-facing remediation hint. */
+  readonly remediation: string;
+}
+
+export const REALTIME_DOC_AUTHORIZATION_DENY_REASON_METADATA: Readonly<
+  Record<
+    RealtimeDocAuthorizationDenyReason,
+    RealtimeDocAuthorizationDenyReasonMetadata
+  >
+> = {
+  missing_user_id: {
+    label: "Missing User ID",
+    description:
+      "The WS-upgrade handler invoked authorization without a resolved userId — typically an unauthenticated connection attempt.",
+    classification: "auth_required",
+    remediation:
+      "Verify the auth layer attaches a userId before invoking the realtime-doc handler. If OAuth is bypassed, demo-mode connections need a stub user id.",
+  },
+  not_a_vault_member: {
+    label: "Not a Vault Member",
+    description:
+      "Authenticated user is not a member of the target vault — vault-membership table returned no match for this user+vault pair.",
+    classification: "policy_denial",
+    remediation:
+      "Surface a 'request access' affordance in the realtime-doc UI; do not auto-grant. Operator decides whether to add the user to the vault via the admin panel.",
+  },
+  vault_membership_lookup_failed: {
+    label: "Membership Lookup Failed",
+    description:
+      "The vault-membership query threw — defensive deny means the realtime-doc handler returned no allowance, but the underlying error is logged separately.",
+    classification: "transient_failure",
+    remediation:
+      "Investigate the lookup error in the trace logs. Caller may retry safely — the deny is fail-closed for safety, not a permanent rejection.",
+  },
+};
+
+export function getRealtimeDocAuthorizationDenyReasonMetadata(
+  reason: RealtimeDocAuthorizationDenyReason,
+): RealtimeDocAuthorizationDenyReasonMetadata {
+  return REALTIME_DOC_AUTHORIZATION_DENY_REASON_METADATA[reason];
+}
+
 export type GetVaultIdsForUserFn = (
   userId: number,
 ) => Promise<readonly number[]>;
