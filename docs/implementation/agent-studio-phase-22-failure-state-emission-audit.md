@@ -1,7 +1,9 @@
 # Phase 22 — Failure-state emission audit (T-I.4)
 
-**Date:** 2026-05-15
-**Status:** Audit snapshot. Maps the 25 closed-taxonomy failure states (#1002) onto existing emitters in `server/agent-studio/services/**`, so the future wiring slices have a fixed scope.
+**Date:** 2026-05-15 (refreshed after batch-A + first 4 batch-B wirings landed)
+**Status:** Audit + active emission tracking. Maps the 25 closed-taxonomy failure states (#1002) onto existing emitters in `server/agent-studio/services/**`, so the future wiring slices have a fixed scope.
+
+**Live emission status:** **10 of 25 closed kinds have live emitters** (6 batch-A + 4 batch-B). Remaining 15: 9 batch-B candidates (existing detection or DB state) + 5 detection-first (no detection yet) + 1 phase-gated.
 
 This document is the bridge between two artifacts:
 - **Closed-taxonomy contract** (`services/failure-states/contracts.ts`, #1002) — the 25 named failure states + categories + severity + recoverable metadata.
@@ -11,46 +13,51 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 ---
 
-## 1. Audit summary
+## 1. Audit summary (post batch-A + first 4 batch-B)
 
 | Status | Count | Description |
 |---|---|---|
-| ✅ Has existing emitter | 2 | Code already calls `recordErrorEvent` with a free-form class that maps to one of the 25 |
-| ⚠️ Has detection code but no emission | 6 | The condition is detected (cron, retention sweep, drift detector, etc.) but doesn't route through `recordErrorEvent` |
-| 🟡 Detection state exists in DB but no observability surface | 9 | A status column / audit table carries the state; no observability event is written |
-| ❌ No detection yet | 8 | Neither detection nor emission exists; gated on a downstream phase |
+| 🟢 LIVE via closed-taxonomy bridge | **10** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #15, #18, #19, #20, #21) |
+| ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written but not closed-taxonomy-encoded (kind #25 — locked by 20+ test assertions; deferred) |
+| 🟡 Detection state exists in DB but no observability surface | 3 | A status column / audit table carries the state; emission deferred (kinds #2, #7, #10) |
+| ❌ No detection yet — phase-gated | 10 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #6, #11, #12, #13, #14, #16, #17, #22, #23) plus partial-detection kind #12 captured indirectly today |
+| 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
+
+**Live coverage: 10/25 closed kinds (40%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / `projection_sync_failed` follow-ups close.
 
 ---
 
 ## 2. Per-state audit
 
-| # | Failure state | Category | Status | Existing emitter / detection | Wiring needed (target slice) |
+Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 detection state exists in DB | ⚠️ has detection code | ❌ no detection yet | 🔒 phase-gated
+
+| # | Failure state | Category | Status | Existing emitter / detection | Wiring (shipped or planned) |
 |---|---|---|---|---|---|
-| 1 | `promotion_failed` | governance | 🟡 | `ags_runtime_runs.finalStatus = "failed"` for promotion runs; no `recordErrorEvent` | New `recordPromotionFailureEvent` adapter in `services/promotion/` |
-| 2 | `note_conflict` | runtime | 🟡 | Conflict-resolution UI surfaces conflicts; not emitted as event | Adapter in `services/vault-notes/` |
-| 3 | `entity_resolution_conflict` | governance | ⚠️ | Detected in entity-resolution scanners (#977, etc.); writes findings rows not events | Adapter in `services/graph-quality/entity-resolution-scanner.ts` |
-| 4 | `neo4j_unavailable` | infrastructure | ⚠️ | Health-alert cron (J-1-β, #748) writes alert rows; no error event | Add bridge in `services/graph/health-alert-cron.ts` |
-| 5 | `neo4j_degraded` | infrastructure | ⚠️ | Same as #4 — health-alert cron writes alert rows | Same bridge |
-| 6 | `neo4j_query_timeout` | infrastructure | 🟡 | Cypher timeout configured at executor; no event on per-query timeout | Adapter in `services/graph/repository/neo4j-community-graph-repository.ts` |
-| 7 | `neo4j_projection_stale` | infrastructure | 🟡 | Freshness lag detected in projection-sync cron; no event | Adapter in `services/graph-projection/sync-cron.ts` |
-| 8 | `neo4j_projection_drift_detected` | infrastructure | ⚠️ | Drift cron (PR-AT-3) writes drift findings; no `recordErrorEvent` | Adapter in `services/graph-projection/drift-cron.ts` |
-| 9 | `projection_sync_failed` | infrastructure | ⚠️ | Projection-sync cron logs errors; doesn't record event | Same bridge as #7/#8 |
-| 10 | `graph_query_timeout` | retrieval | 🟡 | GraphRAG router timeout configured; no per-query event | Adapter in `services/rac/retrieval-executor.ts` |
-| 11 | `backlink_refresh_failed` | runtime | 🟡 | Backlink refresh job catches errors; no event | Adapter in `services/backlinks/refresh-cron.ts` |
-| 12 | `runtime_reference_hidden_by_permission` | governance | 🟡 | Permission post-filter redacts but no event | Adapter in `services/rac/permission-filter.ts` |
-| 13 | `cag_reference_invalidated` | governance | 🟡 | CAG compile metadata marks invalid; no event | Adapter in `services/cag/compile.ts` |
-| 14 | `graph_skill_reference_invalidated` | governance | 🟡 | Skill-pack version table tracks invalidation; no event | Adapter in `services/graph-skill-packs/` |
-| 15 | `tool_schema_changed` | governance | ❌ | MCP auto-sync (#776+) updates mirror; no schema-diff event | Adapter in `services/mcp/auto-sync.ts` |
-| 16 | `search_index_stale` | retrieval | 🟡 | Search-index lag tracked in retention; no event | Adapter in `services/document-search/index-cron.ts` |
-| 17 | `query_cache_stale` | retrieval | 🟡 | TTL on cache rows; no event when row served stale | Adapter in `services/graph-query-cache/` |
-| 18 | `text2cypher_rejected` | retrieval | ✅ | Text2Cypher guardrails reject + log; mappable to closed kind via wrapper | Closed-taxonomy wrapper in `services/text2cypher/` |
-| 19 | `cypher_query_template_failed` | retrieval | ⚠️ | Template registry executor catches errors; no event | Adapter in `services/cypher-templates/executor.ts` |
-| 20 | `retrieval_safety_filter_blocked_content` | retrieval | ⚠️ | Safety filter prunes content; no event | Adapter in `services/rac/safety-filter.ts` |
-| 21 | `graph_agent_answer_incomplete` | agent | ⚠️ | Iteration-budget exhaustion is logged in `ags_runtime_runs`; no event | Adapter in `services/graph-agent-lite/engine.ts` |
-| 22 | `golden_question_failed` | agent | ⚠️ | Evaluator writes failure to `ags_golden_questions`; no event | Adapter in `services/golden-questions/evaluator.ts` |
-| 23 | `graph_correction_rejected` | governance | 🟡 | Approval rejection updates correction row; no event | Adapter in `services/graph-quality/approve-and-apply.ts` |
-| 24 | `semantic_enrichment_rejected` | governance | ❌ | Semantic enrichment doesn't exist yet | Gated on T-D.3 (semantic enrichment agent runtime) |
-| 25 | `background_job_failed` | runtime | ✅ | `background-jobs.ts:868,954` writes `errorClass: "BackgroundJobFailed"` | Wrapper that maps to closed `background_job_failed` kind |
+| 1 | `promotion_failed` | governance | 🟢 **LIVE @ #1027 (T-I.5.B.4)** | `PromotionLifecycle.submit` validation-reject + `.reject` operator-reject | `services/promotion/lifecycle.ts` — two emit sites distinguished by `rejectionStage` |
+| 2 | `note_conflict` | runtime | 🟡 | Conflict-resolution UI surfaces conflicts; not emitted as event | Adapter in `services/vault-notes/` (deferred — needs detection-first) |
+| 3 | `entity_resolution_conflict` | governance | 🟢 **LIVE @ #1026 (T-I.5.B.3)** | `graph-quality-agent-run` per-scan when scanKind === "duplicate_entity" + findingsCount > 0 | `services/graph-quality/agent-run.ts` |
+| 4 | `neo4j_unavailable` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Health-alert scanner | `services/graph/health-alert.ts` |
+| 5 | `neo4j_degraded` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Same scanner (latency-high collapsed into degraded) | `services/graph/health-alert.ts` |
+| 6 | `neo4j_query_timeout` | infrastructure | 🟡 | Cypher timeout configured at executor; no event on per-query timeout | Adapter in `services/graph/repository/*` (deferred — needs timeout enforcement, not SLO warning) |
+| 7 | `neo4j_projection_stale` | infrastructure | 🟡 | Freshness lag detected in projection-sync cron; no event | Adapter in `services/graph-projection/sync-cron.ts` (deferred) |
+| 8 | `neo4j_projection_drift_detected` | infrastructure | 🟢 **LIVE @ #1015 (T-I.5.A.2)** | Drift cron emits when driftCount > 0 | `services/graph/projection/drift-cron.ts` |
+| 9 | `projection_sync_failed` | infrastructure | 🟢 **LIVE @ #1025 (T-I.5.B.2)** | Sync worker `status === "failed"` (includes partial-success) | `services/graph/projection/sync-worker.ts` |
+| 10 | `graph_query_timeout` | retrieval | 🟡 | GraphRAG router timeout configured; no per-query event | Adapter in `services/rac/retrieval-executor.ts` (deferred) |
+| 11 | `backlink_refresh_failed` | runtime | ❌ | No backlink refresh module exists yet | Phase-gated on backlink runtime addition |
+| 12 | `runtime_reference_hidden_by_permission` | governance | 🟡 | Permission post-filter redacts (captured indirectly via #1016 `reasonCounts.permission_denied`) | Could ship dedicated emission; today partially captured by safety-filter wiring |
+| 13 | `cag_reference_invalidated` | governance | ❌ | CAG invalidation runtime does not exist; only a docblock comment | Phase-gated on CAG invalidation runtime |
+| 14 | `graph_skill_reference_invalidated` | governance | ❌ | Skill-pack invalidation runtime does not exist | Phase-gated on skill-pack invalidation runtime |
+| 15 | `tool_schema_changed` | governance | 🟢 **LIVE @ #1017 (T-I.5.A.4)** | MCP auto-sync diff (pure-function `detectToolSchemaChanges`) | `services/mcp/auto-sync.ts` |
+| 16 | `search_index_stale` | retrieval | ❌ | No search-index module exists yet | Phase-gated |
+| 17 | `query_cache_stale` | retrieval | ❌ | No graph-query-cache module exists yet | Phase-gated |
+| 18 | `text2cypher_rejected` | retrieval | 🟢 **LIVE @ #1018 (T-I.5.A.5)** | Cypher validator rejection inside retrieval router | `services/graph/retrieval/retrieval-router.ts` |
+| 19 | `cypher_query_template_failed` | retrieval | 🟢 **LIVE @ #1019 (T-I.5.A.6)** | `executeTemplateAudited` catch block (no PII — `parameterKeys` only) | `services/graph/retrieval/retrieval-router.ts` |
+| 20 | `retrieval_safety_filter_blocked_content` | retrieval | 🟢 **LIVE @ #1016 (T-I.5.A.3)** | Safety filter post-step; one event per retrieval call with reasonCounts aggregation | `services/graph/retrieval/retrieval-router.ts` |
+| 21 | `graph_agent_answer_incomplete` | agent | 🟢 **LIVE @ #1023 (T-I.5.B.1)** | Engine agentic loop budget exhaustion (max_iterations / wall_clock_budget only) | `services/graph-agent/engine.ts` |
+| 22 | `golden_question_failed` | agent | ⚠️ | `runLiveEvaluation` invoked from a script, not server runtime — no obvious server-side emit point | Future wiring requires moving the evaluator into server runtime first |
+| 23 | `graph_correction_rejected` | governance | ❌ | No reject path exists in `services/graph-quality/` — only approve + dismiss | Phase-gated on graph-quality reject runtime |
+| 24 | `semantic_enrichment_rejected` | governance | 🔒 | Semantic enrichment agent does not exist yet | Gated on T-D.3 (semantic enrichment agent runtime) |
+| 25 | `background_job_failed` | runtime | ⚠️ | `background-jobs.ts:868,954` writes free-form `errorClass: "BackgroundJobFailed"` — locked by 20+ test/dashboard assertions | Additive wrapper (not retag) would double-emit — defer until dashboard query migration |
 
 ---
 
