@@ -84,8 +84,18 @@ function rowToExtension(r: Record<string, unknown>): ExtensionRecord {
 }
 
 async function loadExtensionById(id: number): Promise<ExtensionRecord> {
-  const db = getAsDb();
-  if (!db) throw new ExtensionNotFoundError(id);
+  // V1+ MR-3 seventy-sixth batch (PR-V1-146): Path-A read consumer.
+  // Mirrors manifest.ts::getExtensionById (#894) — pre-projection
+  // SELECT on agsExtensions.workspaceId, route the full SELECT.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new ExtensionNotFoundError(id);
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, id))
+    .limit(1);
+  if (wsRows.length === 0) throw new ExtensionNotFoundError(id);
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsExtensions)
