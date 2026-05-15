@@ -2834,9 +2834,14 @@ export async function updateRuntimeConfig(
     set.statusLineConfig = patch.statusLineConfig;
   if (patch.theme !== undefined) set.theme = patch.theme;
 
+  // V1+ MR-3 fifty-ninth batch (PR-V1-129): Path B consumer. We
+  // already need draft.id for the WHERE clause; reuse it for Path B
+  // routing via resolveDraftRoutedConn.
+  const lookupConn = db();
   const draft = await getCurrentDraft(agentId);
   if (!draft) throw new Error(`No current draft for agent ${agentId}`);
-  await db()
+  const conn = await resolveDraftRoutedConn(lookupConn, draft.id);
+  await conn
     .update(agsAgentDrafts)
     .set(set)
     .where(eq(agsAgentDrafts.id, draft.id));
@@ -2868,9 +2873,14 @@ export async function updateScheduleConfig(
   agentId: number,
   config: Record<string, unknown>
 ) {
+  // V1+ MR-3 fifty-ninth batch (PR-V1-129): Path B consumer via
+  // resolveDraftRoutedConn on draft.id (which we already need for
+  // the WHERE clause).
+  const lookupConn = db();
   const draft = await getCurrentDraft(agentId);
   if (!draft) throw new Error(`No current draft for agent ${agentId}`);
-  await db()
+  const conn = await resolveDraftRoutedConn(lookupConn, draft.id);
+  await conn
     .update(agsAgentDrafts)
     .set({
       scheduleConfig: config,
@@ -2888,7 +2898,11 @@ export async function updateScheduleConfigByDraftId(
   draftId: number,
   config: Record<string, unknown>
 ) {
-  await db()
+  // V1+ MR-3 fifty-ninth batch (PR-V1-129): Path B consumer via
+  // resolveDraftRoutedConn(draftId).
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
+  await conn
     .update(agsAgentDrafts)
     .set({
       scheduleConfig: config,
@@ -2941,7 +2955,11 @@ export async function createPendingPermissionRequest(input: {
   description?: string | null;
   rawPayload?: Record<string, unknown>;
 }): Promise<typeof agsPendingPermissionRequests.$inferSelect> {
-  const [created] = await db()
+  // V1+ MR-3 fifty-ninth batch (PR-V1-129): Path B consumer via
+  // resolveRuntimeRunRoutedConn (runId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveRuntimeRunRoutedConn(lookupConn, input.runtimeRunId);
+  const [created] = await conn
     .insert(agsPendingPermissionRequests)
     .values({
       runtimeRunId: input.runtimeRunId,
