@@ -75,6 +75,10 @@ const CanvasProjectionEventsDrainPage = lazy(
 );
 // V2 Phase MR-1 Phase-2 (PR-V1-157): region admin page.
 const RegionAdminPage = lazy(() => import("../pages/RegionAdminPage"));
+// V1+ Phase 18 follow-up (PR-V1-163): extensions admin page.
+const ExtensionsAdminPage = lazy(
+  () => import("../pages/ExtensionsAdminPage"),
+);
 // ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
 const AgentChatPage = lazy(() => import("../pages/AgentChatPage"));
 
@@ -194,6 +198,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── V2 Phase MR-1 Phase-2 (PR-V1-157): region admin (no agent context) ──
   if (path.startsWith("/agent-studio/region-admin")) {
     return { ...empty, view: "region-admin" as any, homeMode: null };
+  }
+  // ── V1+ Phase 18 follow-up (PR-V1-163): extensions admin (no agent context) ──
+  if (path.startsWith("/agent-studio/extensions-admin")) {
+    return { ...empty, view: "extensions-admin" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -424,6 +432,9 @@ export default function AgentStudioShell() {
         // ── V2 Phase MR-1 Phase-2 (PR-V1-157): region admin ──
         case "region-admin" as any:
           return <RegionAdminPage />;
+        // ── V1+ Phase 18 follow-up (PR-V1-163): extensions admin ──
+        case "extensions-admin" as any:
+          return <ExtensionsAdminPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
