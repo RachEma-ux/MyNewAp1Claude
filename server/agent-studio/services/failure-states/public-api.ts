@@ -11,10 +11,12 @@ export {
   listFailureStatesByCategory,
   listFailureStatesBySeverity,
   listOperatorActionRequiredFailureStates,
+  summarizeFailureStateOccurrences,
   type FailureState,
   type FailureStateCategory,
   type FailureStateSeverity,
   type FailureStateMetadata,
+  type FailureStateOccurrenceSummary,
 } from "./contracts.js";
 
 export {
