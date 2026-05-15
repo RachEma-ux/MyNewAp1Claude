@@ -203,6 +203,43 @@ export function PublishTargetsAdminPanel() {
               })()}
             </p>
           ) : null}
+          {/* PR-V1-219: per-targetType breakdown beneath the
+              enabled/disabled aggregate. Total tells "how many
+              targets"; type breakdown tells "what kind of target". The
+              `if (t.targetType in counts)` guard mirrors the canvas
+              snapshot kind breakdown (#967) — a future `PublishTargetType`
+              enum addition surfaces in the contract-anchor test rather
+              than silently being missed in the UI. */}
+          {targetsQ.data && targetsQ.data.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="publish-targets-type-breakdown"
+            >
+              {(() => {
+                const counts: Record<string, number> = {
+                  staging_env: 0,
+                  remote_vault: 0,
+                  external_kb: 0,
+                };
+                for (const t of targetsQ.data) {
+                  if (t.targetType in counts) counts[t.targetType] += 1;
+                }
+                return (
+                  <>
+                    <span className="font-medium">By type:</span>{" "}
+                    <span className="font-mono">{counts.staging_env}</span>{" "}
+                    staging_env
+                    {" / "}
+                    <span className="font-mono">{counts.remote_vault}</span>{" "}
+                    remote_vault
+                    {" / "}
+                    <span className="font-mono">{counts.external_kb}</span>{" "}
+                    external_kb
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
           {targetsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading targets…
