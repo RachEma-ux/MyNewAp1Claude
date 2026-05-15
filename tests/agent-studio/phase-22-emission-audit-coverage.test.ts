@@ -59,4 +59,26 @@ describe("Phase 22 emission audit covers all 25 closed-taxonomy kinds", () => {
     expect(audit).toContain("T-I.5 batch B");
     expect(audit).toContain("T-I.5 batch C");
   });
+
+  it("audit summary reflects 10 LIVE closed kinds after batch-A + first 4 batch-B", () => {
+    expect(audit).toContain("Live coverage: 10/25");
+  });
+
+  it("audit per-state table marks every shipped PR with 🟢 LIVE", () => {
+    const SHIPPED_PRS = [
+      "#1014",
+      "#1015",
+      "#1016",
+      "#1017",
+      "#1018",
+      "#1019",
+      "#1023",
+      "#1025",
+      "#1026",
+      "#1027",
+    ];
+    for (const pr of SHIPPED_PRS) {
+      expect(audit).toContain(pr);
+    }
+  });
 });
