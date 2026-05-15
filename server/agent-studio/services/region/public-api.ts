@@ -95,3 +95,9 @@ export {
   getProcessRegionKey,
   type CrossRegionGuardContext,
 } from "./cross-region-guard.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-159): tRPC middleware factory.
+export {
+  createCrossRegionMiddleware,
+  type CreateCrossRegionMiddlewareOptions,
+} from "./cross-region-trpc-middleware.js";
