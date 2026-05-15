@@ -176,6 +176,57 @@ export function GraphHealthAdminPanel() {
                   {driftCronQ.data.lastError?.message ?? "—"}
                 </span>
               </div>
+              {/* PR-V1-201: surface the previously-unrendered drift
+                  result aggregates. driftCount + permissionLeakCount
+                  get destructive highlight when > 0 since they
+                  represent integrity violations the operator should
+                  notice. */}
+              {driftCronQ.data.lastResult ? (
+                <>
+                  <div>
+                    <span className="font-medium">totalScanned:</span>{" "}
+                    <span className="font-mono">
+                      {driftCronQ.data.lastResult.totalScanned}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">driftCount:</span>{" "}
+                    <span
+                      className={`font-mono ${driftCronQ.data.lastResult.driftCount > 0 ? "text-destructive" : ""}`}
+                    >
+                      {driftCronQ.data.lastResult.driftCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">
+                      permissionLeakCount:
+                    </span>{" "}
+                    <span
+                      className={`font-mono ${driftCronQ.data.lastResult.permissionLeakCount > 0 ? "text-destructive" : ""}`}
+                    >
+                      {driftCronQ.data.lastResult.permissionLeakCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">persistedEvents:</span>{" "}
+                    <span className="font-mono">
+                      {driftCronQ.data.lastResult.persistedEvents}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">scope:</span>{" "}
+                    <span className="font-mono">
+                      {driftCronQ.data.lastResult.scope}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">scannedAt:</span>{" "}
+                    <span className="font-mono">
+                      {driftCronQ.data.lastResult.scannedAt}
+                    </span>
+                  </div>
+                </>
+              ) : null}
             </div>
           )}
         </CardContent>
