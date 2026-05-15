@@ -22,5 +22,6 @@ export {
   failureStateErrorClass,
   parseFailureStateFromErrorClass,
   recordFailureStateEvent,
+  recordFailureStateEvents,
   type RecordFailureStateEventInput,
 } from "./observability-bridge.js";
