@@ -18,8 +18,12 @@
  * slim wrapper page.
  */
 
+import { useState } from "react";
+
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 import { SectionLabel } from "./ui";
 
@@ -31,6 +35,35 @@ function fmtTs(ts: Date | string | null | undefined): string {
 }
 
 export function RegionAdminPanel() {
+  const utils = trpc.useUtils();
+  const [pinForm, setPinForm] = useState<{
+    workspaceId: string;
+    regionKey: string;
+    isReplicated: boolean;
+    notes: string;
+  }>({ workspaceId: "", regionKey: "", isReplicated: false, notes: "" });
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const setPinMutation = trpc.agentStudio.region.setPin.useMutation({
+    onSuccess: () => {
+      setMutationError(null);
+      void utils.agentStudio.region.listPins.invalidate();
+      void utils.agentStudio.region.getCacheStatus.invalidate();
+      void utils.agentStudio.region.getPubsubStatus.invalidate();
+      setPinForm((f) => ({ ...f, notes: "" }));
+    },
+    onError: (err) => setMutationError(err.message),
+  });
+  const removePinMutation = trpc.agentStudio.region.removePin.useMutation({
+    onSuccess: () => {
+      setMutationError(null);
+      void utils.agentStudio.region.listPins.invalidate();
+      void utils.agentStudio.region.getCacheStatus.invalidate();
+      void utils.agentStudio.region.getPubsubStatus.invalidate();
+    },
+    onError: (err) => setMutationError(err.message),
+  });
+
   const cacheQ = trpc.agentStudio.region.getCacheStatus.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
@@ -244,6 +277,7 @@ export function RegionAdminPanel() {
                     <th className="py-1 pr-3">Replicated</th>
                     <th className="py-1 pr-3">Updated</th>
                     <th className="py-1 pr-3">Notes</th>
+                    <th className="py-1 pr-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -256,12 +290,109 @@ export function RegionAdminPanel() {
                       </td>
                       <td className="py-1 pr-3">{fmtTs(p.updatedAt)}</td>
                       <td className="py-1 pr-3">{p.notes ?? "—"}</td>
+                      <td className="py-1 pr-3">
+                        <button
+                          type="button"
+                          className="text-xs underline text-destructive"
+                          disabled={removePinMutation.isPending}
+                          onClick={() =>
+                            removePinMutation.mutate({
+                              workspaceId: p.workspaceId,
+                            })
+                          }
+                        >
+                          remove
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Pin setter (PR-V1-172) */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Set / update workspace pin</SectionLabel>
+          {mutationError ? (
+            <p className="text-sm text-destructive">{mutationError}</p>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">Workspace ID</span>
+              <Input
+                type="number"
+                min={1}
+                value={pinForm.workspaceId}
+                onChange={(e) =>
+                  setPinForm((f) => ({ ...f, workspaceId: e.target.value }))
+                }
+                placeholder="e.g. 42"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">Region key</span>
+              <Input
+                value={pinForm.regionKey}
+                onChange={(e) =>
+                  setPinForm((f) => ({ ...f, regionKey: e.target.value }))
+                }
+                placeholder="e.g. us-west-1"
+                list="region-admin-region-keys"
+              />
+              <datalist id="region-admin-region-keys">
+                {regionsQ.data?.map((r) => (
+                  <option key={r.regionKey} value={r.regionKey} />
+                ))}
+              </datalist>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={pinForm.isReplicated}
+                onChange={(e) =>
+                  setPinForm((f) => ({ ...f, isReplicated: e.target.checked }))
+                }
+              />
+              <span className="font-medium">Replicated</span>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">Notes</span>
+              <Input
+                value={pinForm.notes}
+                onChange={(e) =>
+                  setPinForm((f) => ({ ...f, notes: e.target.value }))
+                }
+                placeholder="runbook annotation"
+              />
+            </label>
+          </div>
+          <Button
+            type="button"
+            disabled={
+              setPinMutation.isPending ||
+              !pinForm.workspaceId ||
+              !pinForm.regionKey
+            }
+            onClick={() => {
+              const wsId = Number.parseInt(pinForm.workspaceId, 10);
+              if (!Number.isFinite(wsId) || wsId <= 0) {
+                setMutationError("Workspace ID must be a positive integer");
+                return;
+              }
+              setPinMutation.mutate({
+                workspaceId: wsId,
+                regionKey: pinForm.regionKey,
+                isReplicated: pinForm.isReplicated,
+                notes: pinForm.notes.length > 0 ? pinForm.notes : null,
+              });
+            }}
+          >
+            {setPinMutation.isPending ? "Saving…" : "Set / update pin"}
+          </Button>
         </CardContent>
       </Card>
     </div>
