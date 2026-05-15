@@ -130,3 +130,86 @@ export function getScannerMetadata(
 export function listScannerMetadata(): readonly QualityScannerMetadata[] {
   return Object.values(QUALITY_SCANNER_METADATA);
 }
+
+// ============================================================================
+// Finding-list aggregation (T-D.8)
+// ============================================================================
+
+export const QUALITY_FINDING_SEVERITIES = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+] as const;
+
+export type QualityFindingSeverity = (typeof QUALITY_FINDING_SEVERITIES)[number];
+
+export interface QualityFindingListSummary {
+  readonly total: number;
+  /** Counts per closed-taxonomy `findingClass` (== scanKind). Sparse
+   *  in the failure mode where a finding row carries a non-registered
+   *  scanKind (stale ingest); those are counted separately. */
+  readonly byScanKind: Readonly<Record<string, number>>;
+  /** Counts per severity. Stable-shape — every QUALITY_FINDING_
+   *  SEVERITIES key keyed at 0+. */
+  readonly bySeverity: Readonly<Record<QualityFindingSeverity, number>>;
+  /** Counts per scanner category (provenance / structure / freshness
+   *  / deduplication / topology). Stable-shape across the closed
+   *  category taxonomy. */
+  readonly byCategory: Readonly<Record<QualityScannerCategory, number>>;
+  /** Findings whose `findingClass` doesn't match any registered
+   *  scanner (stale ingest). Surfaces drift between scanner registry
+   *  and persisted findings. */
+  readonly unknownScanKindCount: number;
+}
+
+/**
+ * Aggregates a list of quality findings into a stable-shape operator
+ * summary. Bridges between the persisted finding rows (in
+ * `ags_graph_quality_findings`) and the operator dashboard's "X by
+ * severity / Y by category / Z unknown" headline.
+ *
+ * Generic accessor signature — no coupling to a specific row shape.
+ * Unknown scanKind values are counted separately (registry drift
+ * signal) rather than thrown.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeQualityFindings<T>(
+  findings: ReadonlyArray<T>,
+  getScanKind: (item: T) => string,
+  getSeverity: (item: T) => QualityFindingSeverity,
+): QualityFindingListSummary {
+  const byScanKind: Record<string, number> = {};
+  const bySeverity: Record<string, number> = {};
+  for (const s of QUALITY_FINDING_SEVERITIES) bySeverity[s] = 0;
+  const byCategory: Record<string, number> = {
+    provenance: 0,
+    structure: 0,
+    freshness: 0,
+    deduplication: 0,
+    topology: 0,
+  };
+  let unknownScanKindCount = 0;
+  for (const f of findings) {
+    const scanKind = getScanKind(f);
+    byScanKind[scanKind] = (byScanKind[scanKind] ?? 0) + 1;
+    const sev = getSeverity(f);
+    bySeverity[sev] = (bySeverity[sev] ?? 0) + 1;
+    const meta = QUALITY_SCANNER_METADATA[scanKind];
+    if (meta) byCategory[meta.category] += 1;
+    else unknownScanKindCount += 1;
+  }
+  return {
+    total: findings.length,
+    byScanKind,
+    bySeverity: bySeverity as Readonly<
+      Record<QualityFindingSeverity, number>
+    >,
+    byCategory: byCategory as Readonly<
+      Record<QualityScannerCategory, number>
+    >,
+    unknownScanKindCount,
+  };
+}
+
