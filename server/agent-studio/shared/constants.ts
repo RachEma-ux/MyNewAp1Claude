@@ -147,6 +147,81 @@ export const AGS_AGENT_CLASSES = [
 ] as const;
 export type AgsAgentClass = (typeof AGS_AGENT_CLASSES)[number];
 
+// ============================================================================
+// Per-agent-class operator-facing metadata (T-S.2)
+// ============================================================================
+
+export interface AgsAgentClassMetadata {
+  /** Display label rendered in the agent-studio picker / class badge. */
+  readonly label: string;
+  /** Short operator-facing description of the agent class's role. */
+  readonly description: string;
+  /** Whether agents of this class typically invoke other agents
+   *  (orchestrators / automations) vs. answer queries directly. */
+  readonly invokesOtherAgents: boolean;
+  /** Default autonomy floor — agents of this class should not be
+   *  configured with a lower autonomy level by default. The runtime
+   *  enforces this only as guidance; operators may still override. */
+  readonly recommendedAutonomyFloor:
+    | "manual"
+    | "supervised"
+    | "semi_autonomous"
+    | "autonomous";
+}
+
+export const AGS_AGENT_CLASS_METADATA: Readonly<
+  Record<AgsAgentClass, AgsAgentClassMetadata>
+> = {
+  assistant: {
+    label: "Assistant",
+    description:
+      "General-purpose conversational agent — fields free-form user queries and threads context across turns.",
+    invokesOtherAgents: false,
+    recommendedAutonomyFloor: "supervised",
+  },
+  specialist: {
+    label: "Specialist",
+    description:
+      "Domain-focused agent with deep knowledge of a specific area — designed to answer narrow, expert-level questions.",
+    invokesOtherAgents: false,
+    recommendedAutonomyFloor: "supervised",
+  },
+  orchestrator: {
+    label: "Orchestrator",
+    description:
+      "Coordinates other agents — delegates sub-tasks, aggregates results, and decides the next agent to invoke.",
+    invokesOtherAgents: true,
+    recommendedAutonomyFloor: "semi_autonomous",
+  },
+  automation: {
+    label: "Automation",
+    description:
+      "Workflow-driven agent — runs on triggers/schedules and executes a deterministic pipeline. May invoke specialists.",
+    invokesOtherAgents: true,
+    recommendedAutonomyFloor: "autonomous",
+  },
+  researcher: {
+    label: "Researcher",
+    description:
+      "Investigation-focused agent — runs deep multi-step retrieval/synthesis chains and produces structured findings.",
+    invokesOtherAgents: false,
+    recommendedAutonomyFloor: "supervised",
+  },
+  auditor: {
+    label: "Auditor",
+    description:
+      "Read-only agent that inspects state and produces compliance / safety reports — no mutations, no tool dispatches.",
+    invokesOtherAgents: false,
+    recommendedAutonomyFloor: "manual",
+  },
+};
+
+export function getAgsAgentClassMetadata(
+  cls: AgsAgentClass,
+): AgsAgentClassMetadata {
+  return AGS_AGENT_CLASS_METADATA[cls];
+}
+
 export const AGS_AUTONOMY_LEVELS = [
   "manual",
   "supervised",
