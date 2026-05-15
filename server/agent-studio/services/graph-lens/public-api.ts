@@ -17,8 +17,10 @@ export {
   GRAPH_LENS_LAYOUTS,
   GRAPH_LENS_GOVERNANCE_SCOPES,
   GRAPH_LENS_KIND_METADATA,
+  GRAPH_LENS_LAYOUT_METADATA,
   isGraphLensKind,
   getGraphLensKindMetadata,
+  getGraphLensLayoutMetadata,
   GraphLensIdAlreadyRegisteredError,
   GraphLensNotFoundError,
 } from "./contracts.js";
@@ -29,6 +31,7 @@ export type {
   GraphLensGovernanceScope,
   GraphLensDefinition,
   GraphLensKindMetadata,
+  GraphLensLayoutMetadata,
 } from "./contracts.js";
 
 export {

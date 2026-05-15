@@ -201,6 +201,7 @@ runtime catches up.
 | `failure-state-category-metadata.test.ts` | `services/failure-states/contracts` — `FAILURE_STATE_CATEGORY_METADATA` (5-entry per-category operator label + description for the infrastructure/governance/retrieval/agent/runtime taxonomy) | T-I.31 / #1077 |
 | `failure-state-severity-metadata.test.ts` | `services/failure-states/contracts` — `FAILURE_STATE_SEVERITY_METADATA` (3-entry per-severity operator label + description + operatorAction {monitor/investigate/escalate} for info/warning/critical) | T-I.32 / #1078 |
 | `recommendation-permission-status-metadata.test.ts` | `services/recommendation/contracts` — `RECOMMENDATION_PERMISSION_STATUS_METADATA` (3-entry per-status label + description + rendered boolean for visible/redacted/hidden) | T-G.27 / #1079 |
+| `graph-lens-layout-metadata.test.ts` | `services/graph-lens/contracts` — `GRAPH_LENS_LAYOUT_METADATA` (5-entry per-layout label + description for force_directed/tree/matrix/timeline/dependency_path) | T-F.15 / #1080 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
