@@ -764,6 +764,23 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-region-routing] install skipped — ${message}`);
   }
 
+  // Step 3.33 — V1+ Phase MR-1 Phase-2 (2026-05-15): region cache re-warm
+  // cron. PR-V1-155. Defensive periodic re-warm so pin/region changes on
+  // other replicas (no cross-process pub-sub yet) eventually become
+  // visible to non-writer replicas. Also catches the edge case where a
+  // hook closure threw and the cache stayed stale.
+  // Default cadence: every 10 minutes. Env-flag-gated disable via
+  // AGS_REGION_CACHE_REWARM_CRON_DISABLED.
+  try {
+    const { ensureRegionCacheRewarmCronStarted } = await import(
+      "./services/region/region-cache-rewarm-cron"
+    );
+    ensureRegionCacheRewarmCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-region-cache-rewarm-cron] start skipped — ${message}`);
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't

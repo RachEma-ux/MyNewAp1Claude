@@ -74,3 +74,14 @@ export {
   maybeInstallRegionRouting,
   type InstallRegionRoutingResult,
 } from "./install-region-routing.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-155): region cache re-warm cron.
+export {
+  DEFAULT_REGION_CACHE_REWARM_CRON_EXPR,
+  tickRegionCacheRewarmCron,
+  getRegionCacheRewarmCronStatus,
+  ensureRegionCacheRewarmCronStarted,
+  type RegionCacheRewarmCronInput,
+  type RegionCacheRewarmCronResult,
+  type RegionCacheRewarmCronStatus,
+} from "./region-cache-rewarm-cron.js";
