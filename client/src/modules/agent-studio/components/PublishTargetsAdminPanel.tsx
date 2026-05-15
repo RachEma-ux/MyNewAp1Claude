@@ -58,9 +58,39 @@ export function PublishTargetsAdminPanel() {
       onSuccess: () => {
         setMutationError(null);
         void utils.agentStudio.publishTargets.listTargets.invalidate();
+        void utils.agentStudio.publishTargets.executionSummaries.invalidate();
       },
       onError: (err) => setMutationError(err.message),
     });
+
+  // PR-V1-188: per-target execution health summary joined into
+  // the registry table by targetId. Zero-filled service-side so
+  // every registry row has a corresponding summary entry.
+  const summariesQ =
+    trpc.agentStudio.publishTargets.executionSummaries.useQuery(undefined, {
+      refetchOnWindowFocus: false,
+    });
+  const summaryByTargetId = new Map<
+    number,
+    {
+      totalExecutions: number;
+      succeededCount: number;
+      pendingCount: number;
+      failedCount: number;
+      lastExecutedAt: Date | string | null;
+    }
+  >();
+  if (summariesQ.data) {
+    for (const s of summariesQ.data) {
+      summaryByTargetId.set(s.targetId, {
+        totalExecutions: s.totalExecutions,
+        succeededCount: s.succeededCount,
+        pendingCount: s.pendingCount,
+        failedCount: s.failedCount,
+        lastExecutedAt: s.lastExecutedAt,
+      });
+    }
+  }
 
   const parsedTargetFilter = Number.parseInt(targetFilter, 10);
   const recentQ =
@@ -114,12 +144,21 @@ export function PublishTargetsAdminPanel() {
                     <th className="py-1 pr-3">Endpoint</th>
                     <th className="py-1 pr-3">Provider conn</th>
                     <th className="py-1 pr-3">Enabled</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Executions: total (succeeded/pending/failed)"
+                    >
+                      Executions
+                    </th>
+                    <th className="py-1 pr-3">Last execution</th>
                     <th className="py-1 pr-3">Updated</th>
                     <th className="py-1 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {targetsQ.data.map((t) => (
+                  {targetsQ.data.map((t) => {
+                    const s = summaryByTargetId.get(t.id);
+                    return (
                     <tr key={t.id} className="border-t">
                       <td className="py-1 pr-3 font-mono text-xs">
                         {t.targetKey}
@@ -141,6 +180,17 @@ export function PublishTargetsAdminPanel() {
                       >
                         {t.enabled ? "yes" : "no"}
                       </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs"
+                        data-testid={`publish-target-executions-${t.id}`}
+                      >
+                        {s
+                          ? `${s.totalExecutions} (${s.succeededCount}/${s.pendingCount}/${s.failedCount})`
+                          : "—"}
+                      </td>
+                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                        {s ? fmtTs(s.lastExecutedAt) : "—"}
+                      </td>
                       <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
                         {fmtTs(t.updatedAt)}
                       </td>
@@ -161,7 +211,8 @@ export function PublishTargetsAdminPanel() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
