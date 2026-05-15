@@ -28,7 +28,10 @@ import { z } from "zod";
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import { getRegionCachePubsubStatus } from "./region-cache-pubsub.js";
 import { getRegionCacheRewarmCronStatus } from "./region-cache-rewarm-cron.js";
-import { warmRegionRoutingCache } from "./workspace-region-cache.js";
+import {
+  warmRegionRoutingCache,
+  resolveWorkspaceRegionLookup,
+} from "./workspace-region-cache.js";
 import {
   listActiveRegions,
   registerRegion,
@@ -183,4 +186,19 @@ export const regionAdminRouter = router({
       lastWarmedAt: summary.lastWarmedAt,
     };
   }),
+
+  /**
+   * PR-V1-183: operator workspace-location lookup. Pure read of the
+   * in-process cache (no DB roundtrip). Surfaces `regionKey` +
+   * `pinSource` ("explicit-pin" / "primary-fallback" /
+   * "no-active-region") + `pinExists` for the most common operator
+   * question: "Where does workspace X live, and how was that
+   * decided?" Misconfigurations (pin → inactive region) surface as
+   * `pinSource="no-active-region"` with `pinExists=true`.
+   */
+  lookupWorkspaceRegion: adminProcedure
+    .input(z.object({ workspaceId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return resolveWorkspaceRegionLookup(input.workspaceId);
+    }),
 });

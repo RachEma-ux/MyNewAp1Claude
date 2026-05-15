@@ -53,6 +53,7 @@ export {
 } from "./workspace-region-pin-service.js";
 
 // V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-149): in-process routing cache.
+// PR-V1-183: + `resolveWorkspaceRegionLookup` operator surface.
 export {
   warmRegionRoutingCache,
   getCachedRegionKeyForWorkspace,
@@ -61,6 +62,7 @@ export {
   getCachedRegionForWorkspace,
   getRegionRoutingCacheStatus,
   invalidateRegionRoutingCache,
+  resolveWorkspaceRegionLookup,
 } from "./workspace-region-cache.js";
 
 // V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-150): shim cutover bridge.

@@ -426,6 +426,108 @@ export function RegionAdminPanel() {
           </Button>
         </CardContent>
       </Card>
+
+      <WorkspaceLocationLookupCard />
     </div>
+  );
+}
+
+/**
+ * PR-V1-183: workspace-location lookup card. Operator enters a
+ * workspaceId; we return the resolved regionKey + pinSource so they
+ * can confirm where a workspace lives without writing SQL.
+ *
+ * Lazy enabled — only fires the query when the operator presses
+ * "Look up", so changing the input doesn't spam the cache.
+ */
+function WorkspaceLocationLookupCard() {
+  const [workspaceIdInput, setWorkspaceIdInput] = useState<string>("");
+  const [submittedId, setSubmittedId] = useState<number | null>(null);
+  const lookupQ = trpc.agentStudio.region.lookupWorkspaceRegion.useQuery(
+    { workspaceId: submittedId ?? -1 },
+    { enabled: submittedId !== null, refetchOnWindowFocus: false },
+  );
+  const parsed = Number.parseInt(workspaceIdInput, 10);
+  const inputValid = Number.isFinite(parsed) && parsed > 0;
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <SectionLabel>Workspace location lookup</SectionLabel>
+        <p className="text-xs text-muted-foreground">
+          Cache-only resolution: returns the regionKey the routing shim
+          would currently pick for this workspace. No DB roundtrip.
+        </p>
+        <div className="flex items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-xs font-medium"
+              htmlFor="region-lookup-workspace-id"
+            >
+              Workspace ID
+            </label>
+            <input
+              id="region-lookup-workspace-id"
+              type="number"
+              min={1}
+              className="w-32 border rounded px-2 py-1 text-sm"
+              value={workspaceIdInput}
+              onChange={(e) => setWorkspaceIdInput(e.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            data-testid="region-lookup-submit"
+            disabled={!inputValid || lookupQ.isFetching}
+            onClick={() => {
+              if (inputValid) setSubmittedId(parsed);
+            }}
+          >
+            {lookupQ.isFetching ? "Looking up…" : "Look up"}
+          </Button>
+        </div>
+        {submittedId !== null && lookupQ.data ? (
+          <div
+            className="text-sm space-y-1"
+            data-testid="region-lookup-result"
+          >
+            <div>
+              <span className="font-medium">workspaceId:</span>{" "}
+              <span className="font-mono">{lookupQ.data.workspaceId}</span>
+            </div>
+            <div>
+              <span className="font-medium">regionKey:</span>{" "}
+              <span className="font-mono">
+                {lookupQ.data.regionKey ?? "(none)"}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium">pinSource:</span>{" "}
+              <span
+                className={`font-mono ${lookupQ.data.pinSource === "no-active-region" ? "text-destructive" : ""}`}
+              >
+                {lookupQ.data.pinSource}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium">pinExists:</span>{" "}
+              <span className="font-mono">
+                {String(lookupQ.data.pinExists)}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium">cacheIsWarm:</span>{" "}
+              <span className="font-mono">
+                {String(lookupQ.data.cacheIsWarm)}
+              </span>
+            </div>
+          </div>
+        ) : submittedId !== null && lookupQ.error ? (
+          <p className="text-sm text-destructive">
+            Lookup failed: {lookupQ.error.message}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

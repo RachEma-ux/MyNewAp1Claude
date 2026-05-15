@@ -184,3 +184,90 @@ export function getRegionRoutingCacheStatus(): {
 export function invalidateRegionRoutingCache(): void {
   _cache = null;
 }
+
+/**
+ * PR-V1-183: operator-facing "where does this workspace live?"
+ * lookup. Pure read of the in-process cache — no DB roundtrip.
+ *
+ * `pinSource` tells the operator how the regionKey was decided:
+ *   - `"explicit-pin"`: workspace has a row in `agsWorkspaceRegionPins`
+ *   - `"primary-fallback"`: workspace has no pin; routing falls back
+ *     to the primary region
+ *   - `"no-active-region"`: cache cold OR pin references an inactive
+ *     region OR registry has no primary; caller-side behavior is
+ *     bootstrap (`getAsDb()`)
+ *
+ * `regionKey` is null when `pinSource === "no-active-region"`, else
+ * the resolved key.
+ *
+ * `pinExists` reports whether an explicit pin row was seen for this
+ * workspace at warm time, even if the pin pointed at a now-inactive
+ * region (which is the most common operator misconfiguration —
+ * having that bit visible saves a separate `getPin` call).
+ */
+export function resolveWorkspaceRegionLookup(workspaceId: number): {
+  readonly workspaceId: number;
+  readonly regionKey: string | null;
+  readonly pinSource:
+    | "explicit-pin"
+    | "primary-fallback"
+    | "no-active-region";
+  readonly pinExists: boolean;
+  readonly cacheIsWarm: boolean;
+  readonly lastWarmedAt: Date | null;
+} {
+  if (!_cache) {
+    return {
+      workspaceId,
+      regionKey: null,
+      pinSource: "no-active-region",
+      pinExists: false,
+      cacheIsWarm: false,
+      lastWarmedAt: null,
+    };
+  }
+  const pinned = _cache.workspacePinByWorkspaceId.get(workspaceId) ?? null;
+  if (pinned !== null) {
+    const region = _cache.activeRegions.find((r) => r.regionKey === pinned);
+    if (region) {
+      return {
+        workspaceId,
+        regionKey: region.regionKey,
+        pinSource: "explicit-pin",
+        pinExists: true,
+        cacheIsWarm: true,
+        lastWarmedAt: _cache.lastWarmedAt,
+      };
+    }
+    // Pin row exists but the region is inactive / missing. Caller
+    // surface should treat this as a configuration error — return
+    // pinSource = "no-active-region" with pinExists=true to make
+    // the misconfiguration visible.
+    return {
+      workspaceId,
+      regionKey: null,
+      pinSource: "no-active-region",
+      pinExists: true,
+      cacheIsWarm: true,
+      lastWarmedAt: _cache.lastWarmedAt,
+    };
+  }
+  if (_cache.primaryRegion) {
+    return {
+      workspaceId,
+      regionKey: _cache.primaryRegion.regionKey,
+      pinSource: "primary-fallback",
+      pinExists: false,
+      cacheIsWarm: true,
+      lastWarmedAt: _cache.lastWarmedAt,
+    };
+  }
+  return {
+    workspaceId,
+    regionKey: null,
+    pinSource: "no-active-region",
+    pinExists: false,
+    cacheIsWarm: true,
+    lastWarmedAt: _cache.lastWarmedAt,
+  };
+}
