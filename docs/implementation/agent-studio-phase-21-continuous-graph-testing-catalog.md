@@ -238,6 +238,7 @@ runtime catches up.
 | `canvas-projection-event-row-kind-metadata.test.ts` | `services/canvas/projection-events-drain-row-projector` — `CANVAS_PROJECTION_EVENT_ROW_KIND_METADATA` (2-entry per-kind label + description + referencesCurrentNote + isLinkAdd booleans for note_reference_changed/note_reference_removed) | T-C.2 / #1114 |
 | `runtime-config-block-metadata.test.ts` | `services/runtime/config-schema-version` — `RUNTIME_CONFIG_BLOCK_METADATA` (9-entry per-block label + description + domain {agent_behavior / knowledge_access / tool_orchestration / governance / scheduling_and_status}) | T-R.1 / #1115 |
 | `browse-sort-key-metadata.test.ts` | `services/vault/attachment-library` — `BROWSE_SORT_KEY_METADATA` (2-entry per-sort-key label + description + sortColumn {createdAt / byteSize} + ascending boolean for created_at_desc/size_desc) | T-V.3 / #1116 |
+| `security-impact-path-step-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_GRAPH_CANONICAL_IMPACT_PATH_STEP_METADATA` (7-entry per-step stepIndex + label + narrative + isOrigin + isTerminal booleans for cve/package/component/service/environment/owner/customer_exposure) | T-G.36 / #1117 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

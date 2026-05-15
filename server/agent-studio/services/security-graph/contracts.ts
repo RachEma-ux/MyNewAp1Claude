@@ -147,6 +147,96 @@ export type SecurityGraphCanonicalPathStep =
   (typeof SECURITY_GRAPH_CANONICAL_IMPACT_PATH)[number];
 
 // ============================================================================
+// Per-canonical-step operator-facing metadata (T-G.36)
+// ============================================================================
+
+export interface SecurityGraphCanonicalPathStepMetadata {
+  /** Zero-based position in the canonical impact path (0..6). */
+  readonly stepIndex: number;
+  /** Display label for the impact-path picker / drill-down. */
+  readonly label: string;
+  /** Operator-facing narrative explaining why this hop matters in
+   *  the inflicted-by → exposed-to traversal. */
+  readonly narrative: string;
+  /** Whether this step is the path's terminal hop (true for the last
+   *  entry only). */
+  readonly isTerminal: boolean;
+  /** Whether this step is the path's starting hop (true for the first
+   *  entry only). */
+  readonly isOrigin: boolean;
+}
+
+export const SECURITY_GRAPH_CANONICAL_IMPACT_PATH_STEP_METADATA: Readonly<
+  Record<
+    SecurityGraphCanonicalPathStep,
+    SecurityGraphCanonicalPathStepMetadata
+  >
+> = {
+  cve: {
+    stepIndex: 0,
+    label: "CVE",
+    narrative:
+      "The vulnerability itself — a published CVE record describing the defect, its CVSS score, and affected packages.",
+    isTerminal: false,
+    isOrigin: true,
+  },
+  package: {
+    stepIndex: 1,
+    label: "Package",
+    narrative:
+      "The package (e.g. an npm / pypi / Maven artifact) that contains the vulnerable code referenced by the CVE.",
+    isTerminal: false,
+    isOrigin: false,
+  },
+  component: {
+    stepIndex: 2,
+    label: "Component",
+    narrative:
+      "The internal component / library / module that depends on the vulnerable package — the first internal surface affected.",
+    isTerminal: false,
+    isOrigin: false,
+  },
+  service: {
+    stepIndex: 3,
+    label: "Service",
+    narrative:
+      "The service that ships the affected component — the runtime unit the operator deploys / monitors.",
+    isTerminal: false,
+    isOrigin: false,
+  },
+  environment: {
+    stepIndex: 4,
+    label: "Environment",
+    narrative:
+      "The environment (production / staging / dev) the service runs in — drives blast-radius and rollout urgency.",
+    isTerminal: false,
+    isOrigin: false,
+  },
+  owner: {
+    stepIndex: 5,
+    label: "Owner",
+    narrative:
+      "The team / individual who owns the affected service — the on-call routing target for the remediation work.",
+    isTerminal: false,
+    isOrigin: false,
+  },
+  customer_exposure: {
+    stepIndex: 6,
+    label: "Customer Exposure",
+    narrative:
+      "The customer-facing exposure created by the running service — the final hop closes the inflicted-by chain.",
+    isTerminal: true,
+    isOrigin: false,
+  },
+};
+
+export function getSecurityGraphCanonicalPathStepMetadata(
+  step: SecurityGraphCanonicalPathStep,
+): SecurityGraphCanonicalPathStepMetadata {
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH_STEP_METADATA[step];
+}
+
+// ============================================================================
 // Severity taxonomy (mirrors CVSS coarse buckets)
 // ============================================================================
 
