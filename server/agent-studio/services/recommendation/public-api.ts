@@ -22,9 +22,11 @@ export {
 
 export {
   assembleRecommendationResponse,
+  summarizeRecommendationCandidates,
   REDACTED_RECOMMENDATION_REASON,
   REDACTED_RECOMMENDATION_NODE_TYPE_KEY,
   REDACTED_RECOMMENDATION_NODE_ID,
   type RecommendationCandidate,
   type AssembleRecommendationResponseOptions,
+  type RecommendationCandidateListSummary,
 } from "./assemble-response.js";
