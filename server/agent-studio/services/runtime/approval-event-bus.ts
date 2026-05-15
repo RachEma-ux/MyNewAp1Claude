@@ -70,6 +70,31 @@ export interface ApprovalEventBus {
 }
 
 /**
+ * Late-bound hook fired on every `emit()`. D-RESUME-5 (PR-V1-165)
+ * wires this to `notifyApprovalDecided` for cross-process fan-out
+ * via Postgres LISTEN/NOTIFY. Default null = single-process
+ * baseline (D-RESUME-4); no NOTIFY traffic.
+ */
+let _onEmit: ((event: ApprovalDecidedEvent) => void) | null = null;
+
+export function setApprovalEventEmitHook(
+  hook: ((event: ApprovalDecidedEvent) => void) | null,
+): void {
+  _onEmit = hook;
+}
+
+function fireEmitHook(event: ApprovalDecidedEvent): void {
+  if (_onEmit) {
+    try {
+      _onEmit(event);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ags-approval-event-bus] emit hook threw — ${msg}`);
+    }
+  }
+}
+
+/**
  * Factory function for testability (D-RESUME-7).
  * Each call returns an isolated bus — useful so unit tests don't
  * cross-pollute via the singleton.
@@ -86,6 +111,7 @@ export function createApprovalEventBus(): ApprovalEventBus {
   return {
     emit(event: ApprovalDecidedEvent): void {
       emitter.emit(eventName(event.approvalRequestId), event);
+      fireEmitHook(event);
     },
 
     waitFor(
