@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveCaseRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  caseId: number,
+) {
+  // V1+ MR-3 forty-eighth batch (PR-V1-118): shared caseId→routed-
+  // conn helper. 4-step: SELECTs suiteId from agsTestCases.id =
+  // caseId, then chains into resolveSuiteRoutedConn (suiteId→agentId
+  // →draft→workspaceId). Falls back to lookupConn on any null.
+  const caseRows = await lookupConn
+    .select({ suiteId: agsTestCases.suiteId })
+    .from(agsTestCases)
+    .where(eq(agsTestCases.id, caseId))
+    .limit(1);
+  const suiteId = caseRows[0]?.suiteId;
+  if (suiteId == null) return lookupConn;
+  return await resolveSuiteRoutedConn(lookupConn, suiteId);
+}
+
 async function resolveSuiteRoutedConn(
   lookupConn: ReturnType<typeof db>,
   suiteId: number,
@@ -1227,8 +1245,13 @@ export async function saveTestCase(input: {
   expected?: Record<string, unknown>;
   assertions?: unknown[];
 }): Promise<typeof agsTestCases.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 forty-eighth batch (PR-V1-118): Path B consumer.
+  // Dispatches on input.caseId — UPDATE branch routes via
+  // resolveCaseRoutedConn (caseId→suiteId→agentId→draft→workspaceId),
+  // INSERT branch routes via resolveSuiteRoutedConn(input.suiteId).
+  const lookupConn = db();
   if (input.caseId) {
+    const conn = await resolveCaseRoutedConn(lookupConn, input.caseId);
     const [updated] = await conn
       .update(agsTestCases)
       .set({
@@ -1244,6 +1267,7 @@ export async function saveTestCase(input: {
     }
     return updated;
   }
+  const conn = await resolveSuiteRoutedConn(lookupConn, input.suiteId);
   const [created] = await conn
     .insert(agsTestCases)
     .values({
@@ -1258,7 +1282,11 @@ export async function saveTestCase(input: {
 }
 
 export async function removeTestCase(caseId: number) {
-  await db().delete(agsTestCases).where(eq(agsTestCases.id, caseId));
+  // V1+ MR-3 forty-eighth batch (PR-V1-118): Path B consumer via
+  // resolveCaseRoutedConn (caseId→suiteId→agentId→draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveCaseRoutedConn(lookupConn, caseId);
+  await conn.delete(agsTestCases).where(eq(agsTestCases.id, caseId));
 }
 
 export async function createTestRun(input: {
