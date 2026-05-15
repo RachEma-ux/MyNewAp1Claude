@@ -323,6 +323,27 @@ export class GraphRetrievalRouter {
       }
       return { result, auditError, templateRunId };
     } catch (executeErr) {
+      // T-I.5 batch A — bridge cypher-template execution failures to
+      // the Phase 22 closed-taxonomy emission surface. One event per
+      // execution failure. Fire-and-forget; observability writes
+      // never propagate (executeErr still throws below).
+      void recordFailureStateEvent({
+        failureState: "cypher_query_template_failed",
+        sourceKind: "graph-template-executor",
+        sourceId: input.runtimeRunId ?? null,
+        errorMessage:
+          executeErr instanceof Error
+            ? executeErr.message
+            : String(executeErr),
+        metadata: {
+          templateKey,
+          parameterKeys: Object.keys(parameters).sort(),
+          workspaceId: input.runtime.workspaceId,
+          durationMs: Date.now() - startedAt,
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
       // Audit even on failure so operators can see the templates that
       // misfired, then rethrow so the retrieval surface still reports
       // the actual error. The error-path return id (if any) is not
