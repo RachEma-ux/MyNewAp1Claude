@@ -52,11 +52,13 @@ export {
   DEFAULT_IMPACT_MAX_DEPTH,
   ABSOLUTE_IMPACT_MAX_DEPTH,
   normalizeImpactMaxDepth,
+  summarizeImpactAnalysisResult,
   type ImpactAnalysisKind,
   type ImpactAnalysisRequest,
   type ImpactAnalysisNode,
   type ImpactAnalysisEdge,
   type ImpactAnalysisResult,
+  type ImpactAnalysisResultSummary,
 } from "./impact-analysis-contracts.js";
 
 export {

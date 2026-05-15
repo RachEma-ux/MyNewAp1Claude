@@ -158,3 +158,63 @@ export function normalizeImpactMaxDepth(input: number | undefined): number {
   if (input > ABSOLUTE_IMPACT_MAX_DEPTH) return ABSOLUTE_IMPACT_MAX_DEPTH;
   return Math.floor(input);
 }
+
+// ============================================================================
+// Result aggregation (T-F.10)
+// ============================================================================
+
+export interface ImpactAnalysisResultSummary {
+  readonly totalNodes: number;
+  readonly visibleNodes: number;
+  readonly hiddenNodes: number;
+  readonly totalEdges: number;
+  readonly visibleEdges: number;
+  readonly hiddenEdges: number;
+  /** Histogram of node counts by depth (0..maxObservedDepth). Keys
+   *  are depth integers; useful for "how many nodes at depth 1 vs
+   *  depth 2 vs depth 3?" operator panel. Each key carries at least
+   *  one node — depth values not represented in the result are NOT
+   *  zeroed (depth is open-ended, not a closed taxonomy). */
+  readonly nodesByDepth: Readonly<Record<number, number>>;
+  /** Max depth observed in the result. 0 when no nodes; equals
+   *  starting-node depth when only the anchor is present. */
+  readonly maxObservedDepth: number;
+  /** Passthrough of `result.truncated`. */
+  readonly truncated: boolean;
+}
+
+/**
+ * Aggregates an `ImpactAnalysisResult` into a stable-shape summary
+ * suitable for operator dashboards. Visible / hidden counts let the
+ * lens UI render "12 hidden dependencies" without revealing what
+ * they are. Depth histogram supports radial-spread visualizations.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeImpactAnalysisResult(
+  result: ImpactAnalysisResult,
+): ImpactAnalysisResultSummary {
+  let visibleNodes = 0;
+  const nodesByDepth: Record<number, number> = {};
+  let maxObservedDepth = 0;
+  for (const n of result.nodes) {
+    if (n.visible) visibleNodes += 1;
+    nodesByDepth[n.depth] = (nodesByDepth[n.depth] ?? 0) + 1;
+    if (n.depth > maxObservedDepth) maxObservedDepth = n.depth;
+  }
+  let visibleEdges = 0;
+  for (const e of result.edges) {
+    if (e.visible) visibleEdges += 1;
+  }
+  return {
+    totalNodes: result.nodes.length,
+    visibleNodes,
+    hiddenNodes: result.nodes.length - visibleNodes,
+    totalEdges: result.edges.length,
+    visibleEdges,
+    hiddenEdges: result.edges.length - visibleEdges,
+    nodesByDepth,
+    maxObservedDepth,
+    truncated: result.truncated,
+  };
+}
