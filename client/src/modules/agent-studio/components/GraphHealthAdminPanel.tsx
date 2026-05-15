@@ -89,22 +89,50 @@ export function GraphHealthAdminPanel() {
               </div>
               {cronQ.data.lastResult ? (
                 <>
+                  {/* PR-V1-200: corrected field name (was `scanned`,
+                      actual server-side field is `decisionCount`).
+                      Plus added scope + scannedAt + status +
+                      latencyMs which were available but unrendered. */}
                   <div>
-                    <span className="font-medium">lastResult.scanned:</span>{" "}
+                    <span className="font-medium">decisionCount:</span>{" "}
                     <span className="font-mono">
-                      {cronQ.data.lastResult.scanned}
+                      {cronQ.data.lastResult.decisionCount}
                     </span>
                   </div>
                   <div>
-                    <span className="font-medium">lastResult.raised:</span>{" "}
+                    <span className="font-medium">raised:</span>{" "}
                     <span className="font-mono">
                       {cronQ.data.lastResult.raised}
                     </span>
                   </div>
                   <div>
-                    <span className="font-medium">lastResult.resolved:</span>{" "}
+                    <span className="font-medium">resolved:</span>{" "}
                     <span className="font-mono">
                       {cronQ.data.lastResult.resolved}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">scope:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.scope}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">status:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.status}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">latencyMs:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.latencyMs ?? "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">scannedAt:</span>{" "}
+                    <span className="font-mono">
+                      {cronQ.data.lastResult.scannedAt}
                     </span>
                   </div>
                 </>
