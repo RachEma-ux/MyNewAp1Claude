@@ -27,6 +27,29 @@ function fmtTs(ts: Date | string | null | undefined): string {
   return d.toISOString().replace("T", " ").replace(/\..+$/, "Z");
 }
 
+/**
+ * PR-V1-194: format duration between two timestamps for the
+ * executions table. Operator-friendly format: "—" when either side
+ * is missing (pending row), "<1s" / "Xs" / "Xm Ys" otherwise.
+ */
+function fmtDuration(
+  start: Date | string | null | undefined,
+  end: Date | string | null | undefined,
+): string {
+  if (!start || !end) return "—";
+  const s = typeof start === "string" ? new Date(start) : start;
+  const e = typeof end === "string" ? new Date(end) : end;
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "—";
+  const ms = e.getTime() - s.getTime();
+  if (ms < 0) return "—";
+  if (ms < 1000) return "<1s";
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+}
+
 function statusClass(status: string): string {
   switch (status) {
     case "succeeded":
@@ -374,6 +397,12 @@ export function PublishTargetsAdminPanel() {
                     <th className="py-1 pr-3">Promotion</th>
                     <th className="py-1 pr-3">Attempt</th>
                     <th className="py-1 pr-3">Status</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Duration: completedAt - startedAt"
+                    >
+                      Duration
+                    </th>
                     <th className="py-1 pr-3">Upstream</th>
                     <th className="py-1 pr-3">Error</th>
                     <th className="py-1 pr-3">Details</th>
@@ -401,6 +430,12 @@ export function PublishTargetsAdminPanel() {
                             className={`py-1 pr-3 font-mono text-xs ${statusClass(r.status)}`}
                           >
                             {r.status}
+                          </td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs whitespace-nowrap"
+                            data-testid={`publish-execution-duration-${r.id}`}
+                          >
+                            {fmtDuration(r.startedAt, r.completedAt)}
                           </td>
                           <td
                             className="py-1 pr-3 font-mono text-xs truncate max-w-[24ch]"
@@ -434,7 +469,7 @@ export function PublishTargetsAdminPanel() {
                             className="bg-muted/30"
                             data-testid={`publish-execution-details-row-${r.id}`}
                           >
-                            <td colSpan={8} className="p-2">
+                            <td colSpan={9} className="p-2">
                               {detailQ.isLoading ? (
                                 <p className="text-xs text-muted-foreground">
                                   Loading details…
