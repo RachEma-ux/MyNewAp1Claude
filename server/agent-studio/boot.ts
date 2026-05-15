@@ -738,6 +738,32 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.32 — V1+ Phase MR-1 Phase-2 (2026-05-15): region routing
+  // boot wiring. PR-V1-151. Env-flag-gated opt-in via AGS_REGION_ROUTING=on.
+  // Single-region operators leave the flag unset; the bootstrap getAsDb()
+  // continues to handle every read/write. Multi-region operators populate
+  // ags_regions + ags_workspace_region_pins, then flip the flag — the
+  // cache warms once at boot and the MR-3 shim consults it for every
+  // getAsDbForWorkspace(workspaceId) call.
+  try {
+    const { maybeInstallRegionRouting } = await import(
+      "./services/region/install-region-routing"
+    );
+    const result = await maybeInstallRegionRouting();
+    if (result.installed) {
+      console.log(
+        `[ags-region-routing] installed — activeRegions=${result.activeRegionCount} pins=${result.pinCount} primary=${result.primaryRegionKey ?? "(none)"}`,
+      );
+    } else {
+      console.log(
+        `[ags-region-routing] not installed — ${result.reason ?? "unknown"}`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-region-routing] install skipped — ${message}`);
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
