@@ -529,6 +529,12 @@ export function PublishTargetsAdminPanel() {
                     <th className="py-1 pr-3">Created</th>
                     <th className="py-1 pr-3">Target</th>
                     <th className="py-1 pr-3">Promotion</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Frozen source-note version id at dispatch time — anchor for rollback"
+                    >
+                      Version
+                    </th>
                     <th className="py-1 pr-3">Attempt</th>
                     <th className="py-1 pr-3">Status</th>
                     <th
@@ -562,6 +568,15 @@ export function PublishTargetsAdminPanel() {
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
                             {r.sourcePromotionId}
+                          </td>
+                          <td
+                            className="py-1 pr-3 font-mono text-xs truncate max-w-[16ch]"
+                            data-testid={`publish-execution-version-${r.id}`}
+                            title={r.sourceVersionId ?? undefined}
+                          >
+                            {r.sourceVersionId
+                              ? r.sourceVersionId.slice(0, 12)
+                              : "—"}
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
                             {r.attempt}
