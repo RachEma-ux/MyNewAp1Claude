@@ -52,6 +52,12 @@ export {
   DEFAULT_EXCESSIVE_FANOUT_THRESHOLD,
   type ScanForExcessiveFanoutOptions,
 } from "./scanners/excessive-fanout-scanner.js";
+export {
+  scanForIsolatedSubgraphs,
+  isolatedSubgraphScanner,
+  DEFAULT_ISOLATED_COMPONENT_THRESHOLD,
+  type ScanForIsolatedSubgraphsOptions,
+} from "./scanners/isolated-subgraph-scanner.js";
 
 export {
   convertFindingToProposal,
@@ -170,6 +176,7 @@ import { missingProvenanceScanner } from "./scanners/missing-provenance-scanner.
 import { danglingEdgeEndpointScanner } from "./scanners/dangling-edge-endpoint-scanner.js";
 import { parallelEdgesScanner } from "./scanners/parallel-edges-scanner.js";
 import { excessiveFanoutScanner } from "./scanners/excessive-fanout-scanner.js";
+import { isolatedSubgraphScanner } from "./scanners/isolated-subgraph-scanner.js";
 import type { QualityScannerRegistration } from "./scan-orchestrator.js";
 
 /**
@@ -186,4 +193,5 @@ export const QUALITY_SCANNER_REGISTRY: readonly QualityScannerRegistration[] = [
   danglingEdgeEndpointScanner,
   parallelEdgesScanner,
   excessiveFanoutScanner,
+  isolatedSubgraphScanner,
 ];
