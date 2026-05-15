@@ -50,6 +50,8 @@ import type {
   BackendHealth,
   GraphRepository,
 } from "./repository/types.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
+import type { FailureState } from "../failure-states/contracts.js";
 
 // ============================================================================
 // Severity + alert key taxonomy
@@ -316,6 +318,30 @@ export async function runHealthAlertScan(
   });
   const persisted = await persist(decisions, scope);
 
+  // T-I.5 batch A — bridge each newly-raised alert to the Phase 22
+  // closed-taxonomy emission surface so operator dashboards can group
+  // by failure state. Fire-and-forget; observability writes never
+  // propagate into the alerter return path.
+  for (const decision of decisions) {
+    const failureState = healthAlertKeyToFailureState(decision.alertKey);
+    if (!failureState) continue;
+    void recordFailureStateEvent({
+      failureState,
+      sourceKind: `graph-health.${repository.backendKey}`,
+      sourceId: scope,
+      errorMessage: decision.details ?? decision.alertKey,
+      severityOverride: decision.severity,
+      metadata: {
+        alertKey: decision.alertKey,
+        observedValue: decision.observedValue ?? null,
+        threshold: decision.threshold ?? null,
+        backendKey: repository.backendKey,
+      },
+    }).catch(() => {
+      // Fail-soft — observability writes never propagate.
+    });
+  }
+
   return {
     scope,
     scannedAt: new Date().toISOString(),
@@ -324,6 +350,27 @@ export async function runHealthAlertScan(
     decisions,
     persisted,
   };
+}
+
+/**
+ * Maps a `GraphHealthAlertKey` to the closed Phase 22 failure state
+ * (or null when the alert key doesn't have a 1:1 failure-state
+ * mapping). T-I.5 batch A wiring.
+ */
+export function healthAlertKeyToFailureState(
+  alertKey: GraphHealthAlertKey,
+): FailureState | null {
+  switch (alertKey) {
+    case "graph_health_unavailable":
+      return "neo4j_unavailable";
+    case "graph_health_degraded":
+      return "neo4j_degraded";
+    case "graph_health_latency_high":
+      // Latency-high reuses the degraded failure state — it's a
+      // softer signal of the same underlying degradation; collapsing
+      // them keeps the closed-taxonomy emission count bounded.
+      return "neo4j_degraded";
+  }
 }
 
 // ============================================================================
