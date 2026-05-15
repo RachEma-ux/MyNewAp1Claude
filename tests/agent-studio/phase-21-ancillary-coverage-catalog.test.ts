@@ -104,6 +104,7 @@ const ANCILLARY_TESTS = [
   "rac-planner-mode-metadata.test.ts",
   "rac-source-type-metadata.test.ts",
   "rac-retrieval-health-status-metadata.test.ts",
+  "rac-owner-module-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
