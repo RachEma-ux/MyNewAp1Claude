@@ -805,6 +805,34 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-region-cache-rewarm-cron] start skipped — ${message}`);
   }
 
+  // Step 3.35 — V1+ Phase 24 T-F.7 (2026-05-15): default lens-stack
+  // installer. Env-flag-gated: AGS_GRAPH_LENS_DEFAULTS_INSTALL=on and
+  // AGS_GRAPH_LENS_STUB_RUNNERS_INSTALL=on. Both default OFF — the
+  // lens-stack ships behind a feature flag because the concrete-per-
+  // kind runners are still placeholder stubs. When both flags flip on,
+  // the operator UI surfaces 8 default lens kinds (rag / rac / cag /
+  // graph_skill / mcp / governance / runtime / institutional_memory)
+  // with empty-state snapshots until concrete runners replace the
+  // stubs (T-F.8+ slices).
+  try {
+    const { maybeInstallDefaultLensStack } = await import(
+      "./services/graph-lens/public-api"
+    );
+    const result = maybeInstallDefaultLensStack();
+    if (result.fullyInstalled) {
+      console.log(
+        `[ags-graph-lens] default lens-stack installed — lenses=${result.lenses.installedIds.length} runners=${result.runners.installedKinds.length}`,
+      );
+    } else if (result.lenses.installed || result.runners.installed) {
+      console.log(
+        `[ags-graph-lens] partial install — lenses=${result.lenses.installed} runners=${result.runners.installed}`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-graph-lens] install skipped — ${message}`);
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
