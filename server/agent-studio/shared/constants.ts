@@ -428,6 +428,70 @@ export const AGS_MEMORY_TYPES = [
 ] as const;
 export type AgsMemoryType = (typeof AGS_MEMORY_TYPES)[number];
 
+// ============================================================================
+// Per-memory-type operator-facing metadata (T-S.6)
+// ============================================================================
+
+export interface AgsMemoryTypeMetadata {
+  /** Display label rendered in the memory configuration picker. */
+  readonly label: string;
+  /** Short operator-facing description of what this memory holds. */
+  readonly description: string;
+  /** Whether memory of this type survives session boundaries. */
+  readonly persistsAcrossSessions: boolean;
+  /** Closed-taxonomy scope:
+   *  - `single_agent`: memory is per-agent-instance (session,
+   *    persistent, episodic, preference).
+   *  - `cross_agent`: memory is shared across agents (shared). */
+  readonly scope: "single_agent" | "cross_agent";
+}
+
+export const AGS_MEMORY_TYPE_METADATA: Readonly<
+  Record<AgsMemoryType, AgsMemoryTypeMetadata>
+> = {
+  session: {
+    label: "Session",
+    description:
+      "Conversation-scoped working memory — context and intermediate state for the current run. Discarded after session ends.",
+    persistsAcrossSessions: false,
+    scope: "single_agent",
+  },
+  persistent: {
+    label: "Persistent",
+    description:
+      "Long-term agent knowledge that survives across sessions — facts the agent has learned about its domain or user.",
+    persistsAcrossSessions: true,
+    scope: "single_agent",
+  },
+  episodic: {
+    label: "Episodic",
+    description:
+      "Time-anchored record of prior agent interactions — operator can review what happened when. Indexed by timestamp + topic.",
+    persistsAcrossSessions: true,
+    scope: "single_agent",
+  },
+  preference: {
+    label: "Preference",
+    description:
+      "User-specific tuning — preferences, response style, format choices the agent should respect for this user.",
+    persistsAcrossSessions: true,
+    scope: "single_agent",
+  },
+  shared: {
+    label: "Shared",
+    description:
+      "Cross-agent knowledge accessible to multiple agents in the workspace — team-level memory, governance policies, common terminology.",
+    persistsAcrossSessions: true,
+    scope: "cross_agent",
+  },
+};
+
+export function getAgsMemoryTypeMetadata(
+  type: AgsMemoryType,
+): AgsMemoryTypeMetadata {
+  return AGS_MEMORY_TYPE_METADATA[type];
+}
+
 export const AGS_VISIBILITIES = ["private", "team", "org", "public"] as const;
 export type AgsVisibility = (typeof AGS_VISIBILITIES)[number];
 
