@@ -21,12 +21,63 @@
  *     dispatcher / openrouter imports.
  */
 
+export const QUALITY_SCANNER_CATEGORIES = [
+  "provenance",
+  "structure",
+  "freshness",
+  "deduplication",
+  "topology",
+] as const;
+
 export type QualityScannerCategory =
-  | "provenance"
-  | "structure"
-  | "freshness"
-  | "deduplication"
-  | "topology";
+  (typeof QUALITY_SCANNER_CATEGORIES)[number];
+
+// ============================================================================
+// Per-category operator-facing metadata (T-D.11)
+// ============================================================================
+
+export interface QualityScannerCategoryMetadata {
+  /** Display label for operator dashboard tabs / filter pickers. */
+  readonly label: string;
+  /** Short description of what kind of findings live in this category. */
+  readonly description: string;
+}
+
+export const QUALITY_SCANNER_CATEGORY_METADATA: Readonly<
+  Record<QualityScannerCategory, QualityScannerCategoryMetadata>
+> = {
+  provenance: {
+    label: "Provenance",
+    description:
+      "Findings about node source attribution — missing source ids, missing source-version pins, broken rollback chains.",
+  },
+  structure: {
+    label: "Structure",
+    description:
+      "Findings about graph topology validity — self-loops, dangling edge endpoints, structural integrity issues.",
+  },
+  freshness: {
+    label: "Freshness",
+    description:
+      "Findings about staleness — nodes referencing outdated source versions, missed re-promotion opportunities.",
+  },
+  deduplication: {
+    label: "Deduplication",
+    description:
+      "Findings about duplicate state — duplicate entities, parallel edges, redundant projection rows.",
+  },
+  topology: {
+    label: "Topology",
+    description:
+      "Findings about graph shape — orphan nodes, super-nodes, isolated subgraphs, fanout anomalies.",
+  },
+};
+
+export function getQualityScannerCategoryMetadata(
+  category: QualityScannerCategory,
+): QualityScannerCategoryMetadata {
+  return QUALITY_SCANNER_CATEGORY_METADATA[category];
+}
 
 export interface QualityScannerMetadata {
   readonly scanKind: string;
