@@ -195,7 +195,12 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     <th className="py-1 pr-3">Status</th>
                     <th className="py-1 pr-3">Lanes</th>
                     <th className="py-1 pr-3">Tools</th>
-                    <th className="py-1 pr-3">Approved</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="approvedAt (or disabledAt when status=disabled/revoked); hover the cell for the full installed/approved/disabled lifecycle"
+                    >
+                      Lifecycle
+                    </th>
                     <th
                       className="py-1 pr-3"
                       title="Actor user IDs: installed / approved / disabled"
@@ -267,8 +272,21 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                           ? "—"
                           : `${ext.declaredToolNames.length} tool${ext.declaredToolNames.length === 1 ? "" : "s"}`}
                       </td>
-                      <td className="py-1 pr-3">
-                        {fmtTs(ext.approvedAt)}
+                      <td
+                        className="py-1 pr-3"
+                        data-testid={`extension-row-approved-${ext.id}`}
+                        title={`installed ${fmtTs(ext.installedAt)} / approved ${fmtTs(ext.approvedAt)} / disabled ${fmtTs(ext.disabledAt)}`}
+                      >
+                        {/* PR-V1-198: when the extension is disabled
+                            or revoked, show the disabledAt instead of
+                            the approvedAt so the operator sees the
+                            most-recently-relevant timestamp inline.
+                            The tooltip carries all three for the full
+                            lifecycle audit. */}
+                        {ext.governanceStatus === "disabled" ||
+                        ext.governanceStatus === "revoked"
+                          ? fmtTs(ext.disabledAt)
+                          : fmtTs(ext.approvedAt)}
                       </td>
                       <td
                         className="py-1 pr-3 font-mono text-xs whitespace-nowrap"
