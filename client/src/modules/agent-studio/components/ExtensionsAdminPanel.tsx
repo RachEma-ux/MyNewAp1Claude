@@ -63,6 +63,9 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
 
   function refreshList() {
     void utils.agentStudio.extensions.list.invalidate({ workspaceId });
+    void utils.agentStudio.extensions.workspaceInvocationSummaries.invalidate({
+      workspaceId,
+    });
   }
   function onMutationSuccess() {
     setMutationError(null);
@@ -91,6 +94,33 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
     { workspaceId },
     { refetchOnWindowFocus: false },
   );
+  // PR-V1-181: per-extension invocation telemetry, joined into the
+  // table by extensionId. Refetches on the same cadence as `list`
+  // (mutation success → refreshList → both invalidate).
+  const summariesQ =
+    trpc.agentStudio.extensions.workspaceInvocationSummaries.useQuery(
+      { workspaceId },
+      { refetchOnWindowFocus: false },
+    );
+  const summaryByExtId = new Map<
+    number,
+    {
+      totalInvocations: number;
+      allowedCount: number;
+      deniedCount: number;
+      lastInvokedAt: Date | string | null;
+    }
+  >();
+  if (summariesQ.data) {
+    for (const s of summariesQ.data) {
+      summaryByExtId.set(s.extensionId, {
+        totalInvocations: s.totalInvocations,
+        allowedCount: s.allowedCount,
+        deniedCount: s.deniedCount,
+        lastInvokedAt: s.lastInvokedAt,
+      });
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -143,11 +173,20 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     <th className="py-1 pr-3">Lanes</th>
                     <th className="py-1 pr-3">Tools</th>
                     <th className="py-1 pr-3">Approved</th>
+                    <th
+                      className="py-1 pr-3"
+                      title="Invocations: total / allowed / denied"
+                    >
+                      Invocations
+                    </th>
+                    <th className="py-1 pr-3">Last invoked</th>
                     <th className="py-1 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {listQ.data.map((ext) => (
+                  {listQ.data.map((ext) => {
+                    const s = summaryByExtId.get(ext.id);
+                    return (
                     <tr key={ext.id} className="border-t">
                       <td className="py-1 pr-3 font-mono text-xs">
                         {ext.extensionKey}
@@ -174,6 +213,17 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                       </td>
                       <td className="py-1 pr-3">
                         {fmtTs(ext.approvedAt)}
+                      </td>
+                      <td
+                        className="py-1 pr-3 font-mono text-xs"
+                        data-testid={`extension-row-invocations-${ext.id}`}
+                      >
+                        {s
+                          ? `${s.totalInvocations} (${s.allowedCount}/${s.deniedCount})`
+                          : "—"}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {s ? fmtTs(s.lastInvokedAt) : "—"}
                       </td>
                       <td className="py-1 pr-3 space-x-2">
                         {ext.governanceStatus === "pending_approval" ? (
@@ -237,7 +287,8 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

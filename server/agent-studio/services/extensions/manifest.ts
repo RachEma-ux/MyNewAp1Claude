@@ -7,7 +7,7 @@
  * to the MCP dispatcher from extension code).
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, max, sql } from "drizzle-orm";
 
 import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
@@ -216,6 +216,79 @@ export async function uninstallExtension(
     .where(eq(agsExtensionInvocations.extensionId, extensionId));
   await db.delete(agsExtensions).where(eq(agsExtensions.id, extensionId));
   return true;
+}
+
+/**
+ * PR-V1-181: per-extension invocation summary.
+ *
+ * Returns `{ totalInvocations, allowedCount, deniedCount,
+ * lastInvokedAt }` aggregated from `ags_extension_invocations`.
+ * Operator-facing telemetry shown inline in the Extensions admin
+ * panel so operators can see at-a-glance whether an extension is
+ * actually being used / being denied. Read-only; this never
+ * mutates telemetry. Used by the new
+ * `agentStudio.extensions.workspaceInvocationSummaries` query
+ * which calls it for every extension in a workspace in one shot.
+ *
+ * The `capabilityCheck` column is the closed taxonomy `allowed` |
+ * `denied_undeclared` | `denied_revoked` | `denied_disabled`;
+ * everything not literally "allowed" counts as denied for the
+ * summary.
+ */
+export interface ExtensionInvocationSummary {
+  readonly extensionId: number;
+  readonly totalInvocations: number;
+  readonly allowedCount: number;
+  readonly deniedCount: number;
+  readonly lastInvokedAt: Date | null;
+}
+
+export async function getInvocationSummariesByWorkspace(
+  workspaceId: number,
+): Promise<ReadonlyArray<ExtensionInvocationSummary>> {
+  const db = getAsDbForWorkspace(workspaceId);
+  if (!db) return [];
+  const extensionRows = await db
+    .select({ id: agsExtensions.id })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.workspaceId, workspaceId));
+  if (extensionRows.length === 0) return [];
+  const extensionIds = extensionRows.map((r) => Number(r.id));
+  const summary = await db
+    .select({
+      extensionId: agsExtensionInvocations.extensionId,
+      total: sql<number>`count(*)::int`,
+      allowed:
+        sql<number>`count(*) filter (where ${agsExtensionInvocations.capabilityCheck} = 'allowed')::int`,
+      denied:
+        sql<number>`count(*) filter (where ${agsExtensionInvocations.capabilityCheck} <> 'allowed')::int`,
+      lastInvokedAt: max(agsExtensionInvocations.invokedAt),
+    })
+    .from(agsExtensionInvocations)
+    .where(inArray(agsExtensionInvocations.extensionId, extensionIds))
+    .groupBy(agsExtensionInvocations.extensionId);
+  const byId = new Map<number, ExtensionInvocationSummary>();
+  for (const r of summary) {
+    byId.set(Number(r.extensionId), {
+      extensionId: Number(r.extensionId),
+      totalInvocations: Number(r.total ?? 0),
+      allowedCount: Number(r.allowed ?? 0),
+      deniedCount: Number(r.denied ?? 0),
+      lastInvokedAt: (r.lastInvokedAt as Date | null) ?? null,
+    });
+  }
+  // Zero-fill extensions with no telemetry so the UI doesn't need
+  // to do its own merge to render "0 invocations" rows.
+  return extensionIds.map(
+    (id) =>
+      byId.get(id) ?? {
+        extensionId: id,
+        totalInvocations: 0,
+        allowedCount: 0,
+        deniedCount: 0,
+        lastInvokedAt: null,
+      },
+  );
 }
 
 export async function listExtensionsByWorkspace(
