@@ -1,6 +1,6 @@
 # Phase 22 emission burst — 2026-05-15 closure summary
 
-**Status:** **29-PR continuation closed @ main `089ef2e`**. The artifact landed in 3 self-update slices: #1037 (initial doc + lockstep) → #1038 (self-reference fix to reflect post-merge count) → #1040 (this final closure note, extends to 29 PRs after #1039 closed Phase 28 acceptance #30). Phase 22 closed-taxonomy emission surface is **live with 11 / 25 closed kinds emitting**; Phase 28 acceptance #30 ("Documentation complete") is **substantially closed @ #1039**.
+**Status:** **31-PR continuation closed @ main `1acafbc0`**. The artifact landed in 4 self-update slices: #1037 (initial doc + lockstep) → #1038 (self-reference fix to reflect post-merge count) → #1040 (closure note, extended to 29 PRs after #1039 closed Phase 28 acceptance #30) → #1041 (this update reflecting Phase 22 acceptance checkbox flip + #1041 itself). Phase 22 closed-taxonomy emission surface is **live with 11 / 25 closed kinds emitting**; Phase 28 acceptance #30 ("Documentation complete") is **substantially closed @ #1039**; **Phase 22 roadmap acceptance checkboxes flipped @ #1041**.
 
 This doc consolidates the 2026-05-15 emission burst (#1011 → #1039) into a single artifact so operators + future-Claude have one place to look. The audit doc (`agent-studio-phase-22-failure-state-emission-audit.md`) is the per-state map; this doc is the burst-level narrative.
 
@@ -18,8 +18,9 @@ This doc consolidates the 2026-05-15 emission burst (#1011 → #1039) into a sin
 | Phase 28 catalog sections | 5 | 6 (added §6 emission shipment) |
 | Phase 28 acceptance criterion #30 | ⚠️ partial | substantially closed (#1039) |
 | Phase 23 operator runbook | — | shipped (#1039) |
+| Phase 22 roadmap acceptance checkboxes | ⚠️ partial | flipped to [x] (#1041) |
 
-Main moved `1a90db57 → 089ef2e` over 29 PRs in a single autonomous continuation.
+Main moved `1a90db57 → 1acafbc0` over 31 PRs in a single autonomous continuation.
 
 ---
 
@@ -74,6 +75,7 @@ Five batch-B wirings with bundled guard-extensions (pattern shift from #1024's s
 - #1033 — Extended CLAUDE.md hard-rules integrity mortgage (13 → 30 rules).
 - #1035 — Phase 22 audit §7 with **10 operator-facing SQL queries** (ready-to-paste dashboards).
 - #1036 — Lockstep test for Phase 21 gap #18 (projection helper readiness — closes the forward claim against drift).
+- #1041 — Phase 22 roadmap acceptance checkbox flip with PR citations + Implementation Artifacts subsection + 10-test lockstep.
 
 ---
 
