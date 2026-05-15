@@ -23,6 +23,7 @@ import {
   runAgenticLoop,
   type AgenticLoopResult,
 } from "./agentic-loop.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 
 /**
  * Adapter interface for the existing OpenRouter Model Access path.
@@ -432,6 +433,33 @@ export class GraphAgentEngine {
       // the accumulated context. The model call path is identical
       // to the fixed pipeline — OpenRouter Model Access chokepoint.
       stepIndex += 1;
+      // T-I.5 batch B — bridge "agent converged via budget exhaustion"
+      // to the Phase 22 closed-taxonomy emission surface. Only the two
+      // budget-exhaustion termination reasons count; `planner_stop` and
+      // `planner_answer` are clean convergence. `invalid_action` is a
+      // separate planner-contract violation (not modeled in Phase 22
+      // closed taxonomy). Fire-and-forget; observability never
+      // propagates into the engine return path.
+      if (
+        loopResult.terminationReason === "max_iterations" ||
+        loopResult.terminationReason === "wall_clock_budget"
+      ) {
+        void recordFailureStateEvent({
+          failureState: "graph_agent_answer_incomplete",
+          sourceKind: "graph-agent-lite",
+          sourceId: runId,
+          errorMessage: `Agent loop exhausted ${loopResult.terminationReason}`,
+          metadata: {
+            terminationReason: loopResult.terminationReason,
+            plannerCallCount: loopResult.plannerCallCount,
+            retrievalModes,
+            workspaceId: runtime.workspaceId,
+          },
+        }).catch(() => {
+          // Fail-soft.
+        });
+      }
+
       const modelStartedAt = Date.now();
       const modelOutput = await this.options.modelAccess.execute({
         prompt: input.query,
