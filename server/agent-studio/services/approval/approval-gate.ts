@@ -372,6 +372,14 @@ export interface CreateApprovalRequestInput {
 export async function createApprovalRequest(
   input: CreateApprovalRequestInput,
 ): Promise<{ approvalRequestId: number; created: boolean }> {
+  // V1+ MR-3 thirty-eighth batch (PR-V1-108): Path B consumer.
+  // Resolve workspaceId via the agsAgentProviderBindings escape
+  // hatch and route the INSERT through getAsDbForWorkspace. The
+  // dedup-SELECT stays on the bootstrap handle (it's only reading
+  // the row's existence; idempotent). The post-INSERT
+  // agsRuntimePolicyEvents write stays on the bootstrap handle
+  // because that table is intentionally cross-workspace
+  // observability (Cat C; no workspaceId column).
   const db = getAsDb();
   if (!db) throw new Error("ASDB unavailable");
 
@@ -391,9 +399,20 @@ export async function createApprovalRequest(
     return { approvalRequestId: existing[0].id, created: false };
   }
 
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(
+    db,
+    input.agentDraftId,
+  );
+  const insertDb =
+    workspaceId != null ? getAsDbForWorkspace(workspaceId) : db;
+  if (!insertDb) throw new Error("ASDB unavailable");
+
   let created: typeof agsPendingPermissionRequests.$inferSelect;
   try {
-    const inserted = await db
+    const inserted = await insertDb
       .insert(agsPendingPermissionRequests)
       .values({
         runtimeRunId: input.runtimeRunId,
