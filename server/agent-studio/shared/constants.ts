@@ -370,6 +370,55 @@ export function getAgsEnvironmentMetadata(
 export const AGS_GOVERNANCE_VERDICTS = ["pass", "warning", "blocked"] as const;
 export type AgsGovernanceVerdict = (typeof AGS_GOVERNANCE_VERDICTS)[number];
 
+// ============================================================================
+// Per-verdict operator-facing metadata (T-S.5)
+// ============================================================================
+
+export interface AgsGovernanceVerdictMetadata {
+  /** Display label rendered in governance result cards / promotion banners. */
+  readonly label: string;
+  /** Short operator-facing description of what the verdict means. */
+  readonly description: string;
+  /** Whether downstream promotion / publish flows may proceed after
+   *  this verdict (true for pass/warning, false for blocked). */
+  readonly allowsPromotion: boolean;
+  /** Whether the verdict warrants an operator review prompt
+   *  (true for warning/blocked; false for pass). */
+  readonly requiresOperatorAttention: boolean;
+}
+
+export const AGS_GOVERNANCE_VERDICT_METADATA: Readonly<
+  Record<AgsGovernanceVerdict, AgsGovernanceVerdictMetadata>
+> = {
+  pass: {
+    label: "Pass",
+    description:
+      "Governance evaluation passed — all gates green. Downstream promotion flows may proceed without prompt.",
+    allowsPromotion: true,
+    requiresOperatorAttention: false,
+  },
+  warning: {
+    label: "Warning",
+    description:
+      "Governance flagged advisory issues — promotion may proceed but operator should review the warnings first.",
+    allowsPromotion: true,
+    requiresOperatorAttention: true,
+  },
+  blocked: {
+    label: "Blocked",
+    description:
+      "Governance hard-blocked the action — at least one gate failed. Promotion cannot proceed without remediation.",
+    allowsPromotion: false,
+    requiresOperatorAttention: true,
+  },
+};
+
+export function getAgsGovernanceVerdictMetadata(
+  verdict: AgsGovernanceVerdict,
+): AgsGovernanceVerdictMetadata {
+  return AGS_GOVERNANCE_VERDICT_METADATA[verdict];
+}
+
 export const AGS_MEMORY_TYPES = [
   "session",
   "persistent",
