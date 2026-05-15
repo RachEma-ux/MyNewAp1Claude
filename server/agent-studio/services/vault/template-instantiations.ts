@@ -28,8 +28,10 @@
 import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import { agsVaultTemplateInstantiations } from "../../../../drizzle/tables/agent-studio-vault-template-instantiations.js";
+import { agsVaultNotes } from "../../../../drizzle/tables/agent-studio.js";
+import { agsVaults } from "../../../../drizzle/tables/agent-studio.js";
 
 export function computeTemplateDigest(contentMd: string): string {
   return createHash("sha256").update(contentMd, "utf8").digest("hex");
@@ -60,8 +62,27 @@ export interface RecordedInstantiation {
 export async function recordTemplateInstantiation(
   input: RecordInstantiationInput,
 ): Promise<RecordedInstantiation | null> {
-  const db = getAsDb();
-  if (!db) return null;
+  // V1+ MR-3 sixty-first batch (PR-V1-131): Path-A style discovering
+  // helper. The ledger row points at a note, and note→vault→
+  // workspace gives us the routing key. Two-table JOIN on
+  // agsVaultNotes × agsVaults walks the chain in one round-trip,
+  // then the INSERT routes via getAsDbForWorkspace. Falls back to
+  // bootstrap when the note's vault is missing OR vault.workspaceId
+  // is null (legacy / pre-Phase-1 data); the FK constraint catches
+  // an orphan noteId at the DB layer.
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const lookup = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaultNotes)
+    .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+    .where(eq(agsVaultNotes.id, input.noteId))
+    .limit(1);
+  const workspaceId = lookup[0]?.workspaceId;
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const [row] = await db
     .insert(agsVaultTemplateInstantiations)
     .values({
