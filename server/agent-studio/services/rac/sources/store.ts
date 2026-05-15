@@ -154,8 +154,19 @@ export async function getProfile(profileId: number): Promise<RacProfile | null> 
 export async function listProfilesForDraft(
   agentDraftId: number,
 ): Promise<RacProfile[]> {
-  const db = getAsDb();
-  if (!db) throw new Error("ASDB unavailable");
+  // V1+ MR-3 sixty-fifth batch (PR-V1-135): Path B read consumer.
+  // agsRacProfiles.workspaceId is non-null (workspace-scoped); route
+  // the SELECT to the home region under Phase-2 via Path B.
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new Error("ASDB unavailable");
+  const { resolveWorkspaceIdForDraft } = await import(
+    "../../region/draft-workspace-resolver"
+  );
+  const workspaceId = await resolveWorkspaceIdForDraft(lookupDb, agentDraftId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select()
     .from(agsRacProfiles)
