@@ -643,6 +643,70 @@ export function summarizeImpactPathValidationOutcomes(
 export const IMPACT_PATH_VALIDATION_REASON_KEYS =
   IMPACT_PATH_VALIDATION_REASONS;
 
+// ============================================================================
+// Per-validation-reason operator-facing metadata (T-G.34)
+// ============================================================================
+
+export interface ImpactPathValidationReasonMetadata {
+  /** Display label for operator dashboards / impact-path validation
+   *  drill-downs. */
+  readonly label: string;
+  /** Short description of what the validation failure indicates. */
+  readonly description: string;
+  /** Closed-taxonomy classification:
+   *  - `caller_input_error`: the caller supplied a degenerate sequence
+   *    (empty, unknown step) — fix at the call site / picker UI.
+   *  - `structural_violation`: the caller supplied a recognisable
+   *    sequence but it violates the canonical impact-path ordering
+   *    (not strictly advancing / skips intermediate steps). */
+  readonly classification: "caller_input_error" | "structural_violation";
+  /** Operator-facing remediation hint. */
+  readonly remediation: string;
+}
+
+export const IMPACT_PATH_VALIDATION_REASON_METADATA: Readonly<
+  Record<ImpactPathValidationReason, ImpactPathValidationReasonMetadata>
+> = {
+  empty_sequence: {
+    label: "Empty Sequence",
+    description:
+      "The caller submitted an empty step sequence — impact-path validation needs at least one step to validate.",
+    classification: "caller_input_error",
+    remediation:
+      "Investigate the call site — the operator likely cleared the impact-path picker without re-submitting. UI should disable submit on empty sequences.",
+  },
+  unknown_step: {
+    label: "Unknown Step",
+    description:
+      "The sequence contains a step value that isn't in the canonical impact-path taxonomy — likely a stale ingest or schema drift.",
+    classification: "caller_input_error",
+    remediation:
+      "Check the step picker — it should restrict to SECURITY_GRAPH_CANONICAL_IMPACT_PATH values. If the value came from a stored sequence, the canonical path changed shape.",
+  },
+  sequence_not_strictly_advancing: {
+    label: "Not Strictly Advancing",
+    description:
+      "The sequence revisits or backtracks across canonical impact-path steps — impact analysis only supports forward traversal.",
+    classification: "structural_violation",
+    remediation:
+      "The picker should disallow selecting an earlier or duplicate step. Convert backtracking sequences into a separate reverse-traversal query.",
+  },
+  sequence_skips_steps: {
+    label: "Sequence Skips Steps",
+    description:
+      "The sequence jumps over intermediate canonical impact-path steps (e.g. cve → service skips package + component) — impact analysis requires consecutive steps.",
+    classification: "structural_violation",
+    remediation:
+      "The picker should auto-fill intermediate steps when the operator picks a non-adjacent step. Or, gate the picker so only adjacent steps are selectable from the current position.",
+  },
+};
+
+export function getImpactPathValidationReasonMetadata(
+  reason: ImpactPathValidationReason,
+): ImpactPathValidationReasonMetadata {
+  return IMPACT_PATH_VALIDATION_REASON_METADATA[reason];
+}
+
 export function validateImpactPathSequence(
   steps: ReadonlyArray<string>,
 ): CanonicalImpactPathValidationOutcome {
