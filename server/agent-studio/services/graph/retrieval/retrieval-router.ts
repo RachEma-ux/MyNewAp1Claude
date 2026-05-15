@@ -565,6 +565,32 @@ export class GraphRetrievalRouter {
       }).catch(() => {
         // Fail-soft.
       });
+
+      // T-I.5 batch B.5 — additionally emit `runtime_reference_hidden_by_permission`
+      // for the permission-denied subset (kinds #12 of the closed
+      // taxonomy). This is a SIBLING event to the aggregated safety
+      // filter emit above — operators querying for "references
+      // redacted by permission specifically" filter on this kind
+      // rather than parsing `reasonCounts.permission_denied` out of
+      // the broader safety event's metadata.
+      const permissionDeniedCount =
+        reasonCounts["permission_denied"] ?? 0;
+      if (permissionDeniedCount > 0) {
+        void recordFailureStateEvent({
+          failureState: "runtime_reference_hidden_by_permission",
+          sourceKind: "retrieval-router.permission-filter",
+          sourceId: input.runtimeRunId ?? null,
+          errorMessage: `${permissionDeniedCount} reference(s) redacted by permission`,
+          metadata: {
+            permissionDeniedCount,
+            blockedCount: filtered.events.length,
+            mode: input.mode,
+            workspaceId: input.runtime.workspaceId,
+          },
+        }).catch(() => {
+          // Fail-soft.
+        });
+      }
     }
 
     // Phase 12.5 §4 — fire the runtime-usage recorder when the request
