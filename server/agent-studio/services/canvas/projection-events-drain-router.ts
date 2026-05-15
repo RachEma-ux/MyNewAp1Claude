@@ -23,7 +23,11 @@
  */
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
-import { getCanvasProjectionEventsDrainLastTickResult } from "./projection-events-drain-tick.js";
+import {
+  getCanvasProjectionEventsDrainLastTickResult,
+  hasCanvasProjectionEventsDrainForwarder,
+  tickCanvasProjectionEventsDrain,
+} from "./projection-events-drain-tick.js";
 
 export const canvasProjectionEventsDrainRouter = router({
   /**
@@ -40,5 +44,24 @@ export const canvasProjectionEventsDrainRouter = router({
    */
   getDrainStatus: adminProcedure.query(async () => {
     return getCanvasProjectionEventsDrainLastTickResult();
+  }),
+
+  /**
+   * PR-V1-174: operator-triggered manual tick. Useful for:
+   *   - Smoke-testing forwarder install in dev without waiting for
+   *     the scheduler's interval (default 60s).
+   *   - Force-draining after an operator-supplied catch-up.
+   *
+   * Returns `{ ran: boolean, reason?: string,
+   * result?: <drain aggregate> }`. `ran: false, reason:
+   * "no_forwarder_installed"` when the forwarder hasn't been wired
+   * (mirrors the tick wrapper's existing no-op + WARN behavior).
+   */
+  forceTick: adminProcedure.mutation(async () => {
+    if (!hasCanvasProjectionEventsDrainForwarder()) {
+      return { ran: false as const, reason: "no_forwarder_installed" as const };
+    }
+    const result = await tickCanvasProjectionEventsDrain();
+    return { ran: true as const, result };
   }),
 });
