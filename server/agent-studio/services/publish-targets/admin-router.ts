@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
+  getPublishTargetExecutionSummaries,
   listPublishTargets,
   listRecentPublishExecutions,
   setPublishTargetEnabled,
@@ -71,4 +72,15 @@ export const publishTargetsAdminRouter = router({
     .mutation(async ({ input }) => {
       return setPublishTargetEnabled(input.targetId, input.enabled);
     }),
+
+  /**
+   * PR-V1-188: per-target execution summary. One row per
+   * registered target (zero-filled when no executions exist).
+   * Returns total / succeeded / pending / failed counts + last
+   * executed timestamp. Used by `PublishTargetsAdminPanel` to
+   * render inline health columns alongside the registry table.
+   */
+  executionSummaries: adminProcedure.query(async () => {
+    return getPublishTargetExecutionSummaries();
+  }),
 });

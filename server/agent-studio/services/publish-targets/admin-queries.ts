@@ -15,7 +15,7 @@
  *     `neo4j-driver` imports.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, max, sql } from "drizzle-orm";
 
 import {
   agsPublishTargets,
@@ -153,6 +153,74 @@ export class PublishTargetNotFoundForToggleError extends Error {
     super(`Publish target ${targetId} not found`);
     this.name = "PublishTargetNotFoundForToggleError";
   }
+}
+
+/**
+ * PR-V1-188: per-target execution summary. Symmetric with the
+ * extensions invocation-summary surface (#932). Aggregates
+ * `ags_publish_target_executions` per target into
+ * `{ totalExecutions, succeededCount, pendingCount, failedCount,
+ * lastExecutedAt }` so the operator can see at a glance whether
+ * a target is healthy without clicking through the recent log.
+ * Zero-fills targets with no executions yet so the UI doesn't
+ * client-side-merge.
+ */
+export interface PublishTargetExecutionSummary {
+  readonly targetId: number;
+  readonly totalExecutions: number;
+  readonly succeededCount: number;
+  readonly pendingCount: number;
+  readonly failedCount: number;
+  readonly lastExecutedAt: Date | null;
+}
+
+export async function getPublishTargetExecutionSummaries(): Promise<
+  ReadonlyArray<PublishTargetExecutionSummary>
+> {
+  const db = getAsDb();
+  if (!db) return [];
+  const targetRows = await db
+    .select({ id: agsPublishTargets.id })
+    .from(agsPublishTargets);
+  if (targetRows.length === 0) return [];
+  const targetIds = targetRows.map((r) => Number(r.id));
+  const summary = await db
+    .select({
+      targetId: agsPublishTargetExecutions.targetId,
+      total: sql<number>`count(*)::int`,
+      succeeded:
+        sql<number>`count(*) filter (where ${agsPublishTargetExecutions.status} = 'succeeded')::int`,
+      pending:
+        sql<number>`count(*) filter (where ${agsPublishTargetExecutions.status} = 'pending')::int`,
+      failed:
+        sql<number>`count(*) filter (where ${agsPublishTargetExecutions.status} = 'failed')::int`,
+      lastExecutedAt: max(agsPublishTargetExecutions.createdAt),
+    })
+    .from(agsPublishTargetExecutions)
+    .where(inArray(agsPublishTargetExecutions.targetId, targetIds))
+    .groupBy(agsPublishTargetExecutions.targetId);
+  const byTargetId = new Map<number, PublishTargetExecutionSummary>();
+  for (const r of summary) {
+    byTargetId.set(Number(r.targetId), {
+      targetId: Number(r.targetId),
+      totalExecutions: Number(r.total ?? 0),
+      succeededCount: Number(r.succeeded ?? 0),
+      pendingCount: Number(r.pending ?? 0),
+      failedCount: Number(r.failed ?? 0),
+      lastExecutedAt: (r.lastExecutedAt as Date | null) ?? null,
+    });
+  }
+  return targetIds.map(
+    (id) =>
+      byTargetId.get(id) ?? {
+        targetId: id,
+        totalExecutions: 0,
+        succeededCount: 0,
+        pendingCount: 0,
+        failedCount: 0,
+        lastExecutedAt: null,
+      },
+  );
 }
 
 export async function setPublishTargetEnabled(
