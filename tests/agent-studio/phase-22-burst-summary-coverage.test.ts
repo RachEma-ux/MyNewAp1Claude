@@ -43,6 +43,7 @@ const SHIPPED_PRS = [
   "#1034",
   "#1035",
   "#1036",
+  "#1037",
 ];
 
 describe("Phase 22 emission burst summary lockstep", () => {
@@ -73,7 +74,7 @@ describe("Phase 22 emission burst summary lockstep", () => {
     expect(summary).toContain("#1034");
   });
 
-  it("references the main commit SHA `dd9d878`", () => {
-    expect(summary).toContain("dd9d878");
+  it("references the main commit SHA `8712ad6` (this artifact's own merge SHA)", () => {
+    expect(summary).toContain("8712ad6");
   });
 });
