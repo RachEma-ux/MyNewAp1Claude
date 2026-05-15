@@ -499,6 +499,43 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolvePublishRequestRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  publishRequestId: number,
+) {
+  // V1+ MR-3 fifty-first batch (PR-V1-121): shared publishRequestId
+  // →routed-conn helper. agsPublishRequests.agentId is a direct FK
+  // — single SELECT, then chain into resolveAgentRoutedConn. Falls
+  // back to lookupConn on any null.
+  const requestRows = await lookupConn
+    .select({ agentId: agsPublishRequests.agentId })
+    .from(agsPublishRequests)
+    .where(eq(agsPublishRequests.id, publishRequestId))
+    .limit(1);
+  const agentId = requestRows[0]?.agentId;
+  if (agentId == null) return lookupConn;
+  return await resolveAgentRoutedConn(lookupConn, agentId);
+}
+
+async function resolveApprovalStepRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  stepId: number,
+) {
+  // V1+ MR-3 fifty-first batch (PR-V1-121): shared stepId→routed-
+  // conn helper. agsApprovalSteps.publishRequestId is a direct FK
+  // — single SELECT, then chain into resolvePublishRequestRoutedConn
+  // (5-step total: stepId→publishRequestId→agentId→draft→workspaceId).
+  // Falls back to lookupConn on any null.
+  const stepRows = await lookupConn
+    .select({ publishRequestId: agsApprovalSteps.publishRequestId })
+    .from(agsApprovalSteps)
+    .where(eq(agsApprovalSteps.id, stepId))
+    .limit(1);
+  const publishRequestId = stepRows[0]?.publishRequestId;
+  if (publishRequestId == null) return lookupConn;
+  return await resolvePublishRequestRoutedConn(lookupConn, publishRequestId);
+}
+
 async function resolveSimulationRunRoutedConn(
   lookupConn: ReturnType<typeof db>,
   runId: number,
@@ -926,7 +963,11 @@ export async function decideApprovalStep(input: {
   decidedBy: number;
   decisionNote?: string;
 }) {
-  const conn = db();
+  // V1+ MR-3 fifty-first batch (PR-V1-121): Path B consumer via
+  // resolveApprovalStepRoutedConn (stepId→publishRequestId→agentId→
+  // draft→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveApprovalStepRoutedConn(lookupConn, input.stepId);
   const terminal = buildApprovalStepStateUpdate({
     state: input.state,
     reason: input.decisionNote ?? `decided by user ${input.decidedBy}`,
@@ -980,11 +1021,19 @@ export async function updatePublishRequestState(input: {
     | "failed_terminal";
   reason?: string;
 }) {
+  // V1+ MR-3 fifty-first batch (PR-V1-121): Path B consumer via
+  // resolvePublishRequestRoutedConn (publishRequestId→agentId→draft→
+  // workspaceId).
+  const lookupConn = db();
+  const conn = await resolvePublishRequestRoutedConn(
+    lookupConn,
+    input.publishRequestId,
+  );
   const terminal = buildPublishRequestStateUpdate({
     state: input.state,
     reason: input.reason,
   });
-  await db()
+  await conn
     .update(agsPublishRequests)
     .set({
       state: terminal.state,
