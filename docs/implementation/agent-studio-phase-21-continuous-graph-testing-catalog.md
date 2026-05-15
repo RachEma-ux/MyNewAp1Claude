@@ -173,6 +173,7 @@ runtime catches up.
 | `security-graph-finding-summary.test.ts` | `services/security-graph/contracts` — `summarizeSecurityFindings` (bySeverity / byCanonicalPathStep / mostSevereIndex) | T-G.15 / #1049 |
 | `code-graph-summarize.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `summarizeCodeGraph` (nodesByType / edgesByType / unknown counts) | T-G.16 / #1050 |
 | `graph-algorithm-coverage.test.ts` | `services/graph-algorithm/contracts` — `summarizeGraphAlgorithmCoverage` (byBackendSupport / availableOnCe / triggersAuraUpgrade / cePercent) | T-G.17 / #1051 |
+| `graph-lens-registry-summary.test.ts` | `services/graph-lens/registry` — `summarizeGraphLensRegistry` (byKind / byLayout / byGovernanceScope) | T-F.9 / #1052 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

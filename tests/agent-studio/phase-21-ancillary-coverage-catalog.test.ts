@@ -60,6 +60,7 @@ const ANCILLARY_TESTS = [
   "security-graph-finding-summary.test.ts",
   "code-graph-summarize.test.ts",
   "graph-algorithm-coverage.test.ts",
+  "graph-lens-registry-summary.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
