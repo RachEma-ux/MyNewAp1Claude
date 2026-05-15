@@ -43,6 +43,7 @@ import {
 import type { GraphRepository } from "../graph/repository/index.js";
 import { pushAgentRunNotifications } from "./agent-run-notifications.js";
 import { captureUnexpectedTrpcError } from "../workspace-observability/public-api.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -234,6 +235,30 @@ export async function runQualityAgent(
       summaries.push({ scanKind, result });
       if (result.status === "completed") {
         allFailed = false;
+        // T-I.5 batch B — bridge per-scanner findings to the Phase 22
+        // closed-taxonomy emission surface. Today only
+        // `duplicate_entity` has a direct closed-kind mapping
+        // (`entity_resolution_conflict`); other scanners feed proposals
+        // without their own Phase 22 closed kind. Fire-and-forget.
+        if (
+          scanKind === "duplicate_entity" &&
+          result.findingsCount > 0
+        ) {
+          void recordFailureStateEvent({
+            failureState: "entity_resolution_conflict",
+            sourceKind: "graph-quality-agent",
+            sourceId: result.scanId == null ? null : String(result.scanId),
+            errorMessage: `Duplicate-entity scan flagged ${result.findingsCount} conflict candidate(s)`,
+            metadata: {
+              scanKind,
+              scanId: result.scanId,
+              findingsCount: result.findingsCount,
+              agentRunId,
+            },
+          }).catch(() => {
+            // Fail-soft.
+          });
+        }
         if (input.autoConvertFindings && result.scanId != null) {
           const findingIds = await listFindingIdsForScan(
             db,
