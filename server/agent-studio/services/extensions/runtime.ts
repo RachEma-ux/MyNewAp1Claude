@@ -27,7 +27,7 @@
 
 import { eq } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
   agsExtensions,
   agsExtensionInvocations,
@@ -107,7 +107,23 @@ async function recordInvocation(
   },
   getDb: typeof getAsDb = getAsDb,
 ): Promise<void> {
-  const db = getDb();
+  // V1+ MR-3 thirty-first batch (PR-V1-100): split-handle pattern via
+  // the extension's workspaceId. `agsExtensionInvocations` doesn't
+  // carry workspaceId directly, but the parent `agsExtensions` row
+  // does (non-null). Discovery SELECT pulls it up, then the INSERT
+  // routes via getAsDbForWorkspace. Soft-return on empty lookup
+  // (matches the pre-existing fall-through semantics — observability
+  // path, not source of truth). The getDb test seam wraps the
+  // BOOTSTRAP lookup so tests passing `() => null` continue to no-op.
+  const lookupDb = getDb();
+  if (!lookupDb) return;
+  const lookup = await lookupDb
+    .select({ workspaceId: agsExtensions.workspaceId })
+    .from(agsExtensions)
+    .where(eq(agsExtensions.id, input.extensionId))
+    .limit(1);
+  if (lookup.length === 0) return;
+  const db = getAsDbForWorkspace(lookup[0].workspaceId);
   if (!db) return;
   await db.insert(agsExtensionInvocations).values({
     extensionId: input.extensionId,
