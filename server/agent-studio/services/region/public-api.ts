@@ -60,3 +60,9 @@ export {
   getRegionRoutingCacheStatus,
   invalidateRegionRoutingCache,
 } from "./workspace-region-cache.js";
+
+// V2 Phase MR-1 Phase-2 (2026-05-15, PR-V1-150): shim cutover bridge.
+export {
+  installRegionRouter,
+  uninstallRegionRouter,
+} from "./region-routing-bridge.js";
