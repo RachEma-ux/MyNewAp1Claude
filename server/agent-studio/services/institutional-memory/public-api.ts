@@ -9,9 +9,12 @@ export {
   listMappedInstitutionalMemoryNodeTypes,
   listUnmappedInstitutionalMemoryNodeTypes,
   summarizeInstitutionalMemoryCoverage,
+  INSTITUTIONAL_MEMORY_NODE_TYPE_METADATA,
+  getInstitutionalMemoryNodeTypeMetadata,
   type InstitutionalMemoryNodeType,
   type InstitutionalMemorySourceMapping,
   type InstitutionalMemoryCoverageSummary,
+  type InstitutionalMemoryNodeTypeMetadata,
 } from "./contracts.js";
 
 export {

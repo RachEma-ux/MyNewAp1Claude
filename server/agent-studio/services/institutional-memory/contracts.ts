@@ -54,6 +54,93 @@ export function isInstitutionalMemoryNodeType(
 }
 
 // ============================================================================
+// Per-node-type operator-facing metadata (T-G.26)
+// ============================================================================
+
+export interface InstitutionalMemoryNodeTypeMetadata {
+  /** Display label for operator UI tabs / lens overlays. */
+  readonly label: string;
+  /** Short description of what this node type represents. */
+  readonly description: string;
+}
+
+export const INSTITUTIONAL_MEMORY_NODE_TYPE_METADATA: Readonly<
+  Record<InstitutionalMemoryNodeType, InstitutionalMemoryNodeTypeMetadata>
+> = {
+  person: {
+    label: "Person",
+    description:
+      "An individual contributor (user record). Projection respects per-workspace visibility.",
+  },
+  team: {
+    label: "Team",
+    description:
+      "A group of people working together (currently synthesized from workspace_members).",
+  },
+  project: {
+    label: "Project",
+    description:
+      "A named initiative or workstream — the unit of planning + tracking.",
+  },
+  system: {
+    label: "System",
+    description:
+      "A logical system / infrastructure component owned by one or more teams.",
+  },
+  service: {
+    label: "Service",
+    description:
+      "A deployed service unit composed of code and configuration.",
+  },
+  decision: {
+    label: "Decision",
+    description:
+      "A recorded organizational decision (ADR or similar) with context and rationale.",
+  },
+  policy: {
+    label: "Policy",
+    description:
+      "A governance rule that binds operations — approval gates, data handling, etc.",
+  },
+  workflow: {
+    label: "Workflow",
+    description:
+      "An automation workflow (trigger + action chain) registered in the platform.",
+  },
+  document: {
+    label: "Document",
+    description:
+      "A knowledge artifact (note / page / file) anchored to the institutional context.",
+  },
+  outcome: {
+    label: "Outcome",
+    description:
+      "A recorded result — incident postmortem, project closure, success / failure metric.",
+  },
+  responsibility: {
+    label: "Responsibility",
+    description:
+      "An ownership assignment — which person / team is responsible for which system / service.",
+  },
+  timeline_event: {
+    label: "Timeline Event",
+    description:
+      "A time-anchored event (runtime run, decision, incident) on the institutional timeline.",
+  },
+  governance_record: {
+    label: "Governance Record",
+    description:
+      "A formal governance act — approval, audit, exception grant, policy deviation.",
+  },
+};
+
+export function getInstitutionalMemoryNodeTypeMetadata(
+  type: InstitutionalMemoryNodeType,
+): InstitutionalMemoryNodeTypeMetadata {
+  return INSTITUTIONAL_MEMORY_NODE_TYPE_METADATA[type];
+}
+
+// ============================================================================
 // Source-table mapping
 // ============================================================================
 
