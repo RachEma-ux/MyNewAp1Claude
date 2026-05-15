@@ -41,8 +41,10 @@ export {
   listExtensionsByWorkspace,
   getInvocationSummariesByWorkspace,
   listRecentInvocationsByWorkspace,
+  getExtensionInvocationById,
   type ExtensionInvocationSummary,
   type ExtensionInvocationLogRow,
+  type ExtensionInvocationDetail,
 } from "./manifest.js";
 
 export {

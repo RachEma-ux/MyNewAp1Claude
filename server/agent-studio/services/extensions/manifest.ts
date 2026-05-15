@@ -319,6 +319,45 @@ export interface ExtensionInvocationLogRow {
   readonly invokedAt: Date;
 }
 
+/**
+ * PR-V1-204: fetch a single extension invocation by id, including
+ * the `details` JSON blob. On-demand because the blob can be large
+ * (forwarder response payloads, capability-check context, etc.) —
+ * UI fetches when an operator clicks "view details" on a row.
+ * Symmetric with `getPublishExecutionById` (#940). Returns null on
+ * no-match. No workspace-bound check here — caller is admin, but if
+ * we ever expose this to a tenant-scoped surface the lookup should
+ * intersect with the workspace's installed extension ids first.
+ */
+export interface ExtensionInvocationDetail extends ExtensionInvocationLogRow {
+  readonly details: Record<string, unknown> | null;
+}
+
+export async function getExtensionInvocationById(
+  invocationId: number,
+): Promise<ExtensionInvocationDetail | null> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) return null;
+  const rows = await lookupDb
+    .select()
+    .from(agsExtensionInvocations)
+    .where(eq(agsExtensionInvocations.id, invocationId))
+    .limit(1);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: Number(r.id),
+    extensionId: Number(r.extensionId),
+    lane: String(r.lane),
+    invokedToolName: (r.invokedToolName as string | null) ?? null,
+    capabilityCheck: String(r.capabilityCheck),
+    succeeded: (r.succeeded as boolean | null) ?? null,
+    errorMessage: (r.errorMessage as string | null) ?? null,
+    invokedAt: r.invokedAt as Date,
+    details: (r.details as Record<string, unknown> | null) ?? null,
+  };
+}
+
 export async function listRecentInvocationsByWorkspace(args: {
   workspaceId: number;
   extensionId?: number;

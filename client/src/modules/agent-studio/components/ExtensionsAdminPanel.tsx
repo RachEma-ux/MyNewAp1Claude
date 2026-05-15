@@ -66,6 +66,12 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
   const [expandedConfigId, setExpandedConfigId] = useState<number | null>(
     null,
   );
+  // PR-V1-204: per-row invocation `details` drill-down. The recent
+  // log payload does NOT include `details` (could be large per row);
+  // fetch on-demand via the new `getInvocationById` query.
+  const [expandedInvocationId, setExpandedInvocationId] = useState<
+    number | null
+  >(null);
 
   function refreshList() {
     void utils.agentStudio.extensions.list.invalidate({ workspaceId });
@@ -146,6 +152,16 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
     },
     { refetchOnWindowFocus: false },
   );
+  // PR-V1-204: lazy-fetched per-invocation details. Same pattern as
+  // publish-execution detail drill-down (#940).
+  const invocationDetailQ =
+    trpc.agentStudio.extensions.getInvocationById.useQuery(
+      { invocationId: expandedInvocationId ?? -1 },
+      {
+        enabled: expandedInvocationId !== null,
+        refetchOnWindowFocus: false,
+      },
+    );
   const extensionKeyById = new Map<number, string>();
   if (listQ.data) {
     for (const e of listQ.data) extensionKeyById.set(e.id, e.extensionKey);
@@ -461,44 +477,95 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     <th className="py-1 pr-3">Capability</th>
                     <th className="py-1 pr-3">OK?</th>
                     <th className="py-1 pr-3">Error</th>
+                    <th className="py-1 pr-3">Details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentQ.data.map((r) => (
-                    <tr key={r.id} className="border-t">
-                      <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
-                        {fmtTs(r.invokedAt)}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {extensionKeyById.get(r.extensionId) ??
-                          `#${r.extensionId}`}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {r.lane}
-                      </td>
-                      <td className="py-1 pr-3 font-mono text-xs">
-                        {r.invokedToolName ?? "—"}
-                      </td>
-                      <td
-                        className={`py-1 pr-3 font-mono text-xs ${r.capabilityCheck === "allowed" ? "" : "text-destructive"}`}
-                      >
-                        {r.capabilityCheck}
-                      </td>
-                      <td className="py-1 pr-3">
-                        {r.succeeded === null
-                          ? "—"
-                          : r.succeeded
-                            ? "✓"
-                            : "✗"}
-                      </td>
-                      <td
-                        className="py-1 pr-3 text-xs truncate max-w-[40ch]"
-                        title={r.errorMessage ?? undefined}
-                      >
-                        {r.errorMessage ?? ""}
-                      </td>
-                    </tr>
-                  ))}
+                  {recentQ.data.map((r) => {
+                    const isInvDetailExpanded = expandedInvocationId === r.id;
+                    return (
+                      <React.Fragment key={r.id}>
+                        <tr className="border-t">
+                          <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                            {fmtTs(r.invokedAt)}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {extensionKeyById.get(r.extensionId) ??
+                              `#${r.extensionId}`}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {r.lane}
+                          </td>
+                          <td className="py-1 pr-3 font-mono text-xs">
+                            {r.invokedToolName ?? "—"}
+                          </td>
+                          <td
+                            className={`py-1 pr-3 font-mono text-xs ${r.capabilityCheck === "allowed" ? "" : "text-destructive"}`}
+                          >
+                            {r.capabilityCheck}
+                          </td>
+                          <td className="py-1 pr-3">
+                            {r.succeeded === null
+                              ? "—"
+                              : r.succeeded
+                                ? "✓"
+                                : "✗"}
+                          </td>
+                          <td
+                            className="py-1 pr-3 text-xs truncate max-w-[40ch]"
+                            title={r.errorMessage ?? undefined}
+                          >
+                            {r.errorMessage ?? ""}
+                          </td>
+                          <td className="py-1 pr-3">
+                            <button
+                              type="button"
+                              className="text-xs underline"
+                              data-testid={`extension-invocation-details-toggle-${r.id}`}
+                              onClick={() =>
+                                setExpandedInvocationId(
+                                  isInvDetailExpanded ? null : r.id,
+                                )
+                              }
+                            >
+                              {isInvDetailExpanded ? "hide" : "view"}
+                            </button>
+                          </td>
+                        </tr>
+                        {isInvDetailExpanded ? (
+                          <tr
+                            className="bg-muted/30"
+                            data-testid={`extension-invocation-details-row-${r.id}`}
+                          >
+                            <td colSpan={8} className="p-2">
+                              {invocationDetailQ.isLoading ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Loading details…
+                                </p>
+                              ) : invocationDetailQ.error ? (
+                                <p className="text-xs text-destructive">
+                                  Failed to load:{" "}
+                                  {invocationDetailQ.error.message}
+                                </p>
+                              ) : !invocationDetailQ.data ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Invocation not found.
+                                </p>
+                              ) : (
+                                <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                  {JSON.stringify(
+                                    invocationDetailQ.data.details ?? {},
+                                    null,
+                                    2,
+                                  )}
+                                </pre>
+                              )}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
