@@ -351,6 +351,69 @@ export function getCanonicalImpactPathFromStep(
   return SECURITY_GRAPH_CANONICAL_IMPACT_PATH.slice(idx);
 }
 
+/**
+ * Mirror of {@link getCanonicalImpactPathFromStep} — returns the slice
+ * of the canonical path from the origin (`cve`) up to and INCLUDING
+ * `endStep`. Useful for "you are HERE" indicators in step pickers.
+ */
+export function getCanonicalImpactPathToStep(
+  endStep: SecurityGraphCanonicalPathStep,
+): ReadonlyArray<SecurityGraphCanonicalPathStep> {
+  const idx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(endStep);
+  if (idx === -1) {
+    throw new Error(
+      `Unknown canonical impact step: ${String(endStep)}`,
+    );
+  }
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH.slice(0, idx + 1);
+}
+
+/**
+ * Returns the inclusive slice between `startStep` and `endStep`. The
+ * caller must pass steps in canonical order (start <= end); reversed
+ * inputs throw `Error("startStep must precede endStep ...")` rather
+ * than returning a reversed/empty slice.
+ */
+export function getCanonicalImpactSubPath(
+  startStep: SecurityGraphCanonicalPathStep,
+  endStep: SecurityGraphCanonicalPathStep,
+): ReadonlyArray<SecurityGraphCanonicalPathStep> {
+  const startIdx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(startStep);
+  const endIdx = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(endStep);
+  if (startIdx === -1 || endIdx === -1) {
+    throw new Error(
+      `Unknown canonical impact step in sub-path: start=${String(startStep)}, end=${String(endStep)}`,
+    );
+  }
+  if (startIdx > endIdx) {
+    throw new Error(
+      `startStep must precede endStep in canonical order (got start=${startStep}, end=${endStep})`,
+    );
+  }
+  return SECURITY_GRAPH_CANONICAL_IMPACT_PATH.slice(startIdx, endIdx + 1);
+}
+
+/**
+ * Returns the signed hop distance from `a` to `b` along the canonical
+ * impact path. Positive when `b` is later than `a`, negative when
+ * earlier, zero when equal. Returns `null` when either step is not on
+ * the canonical path (caller checks for "unknown step" without a try
+ * / catch boilerplate).
+ */
+export function getCanonicalImpactDistance(
+  a: string,
+  b: string,
+): number | null {
+  const ai = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(
+    a as SecurityGraphCanonicalPathStep,
+  );
+  const bi = SECURITY_GRAPH_CANONICAL_IMPACT_PATH.indexOf(
+    b as SecurityGraphCanonicalPathStep,
+  );
+  if (ai === -1 || bi === -1) return null;
+  return bi - ai;
+}
+
 /** Validation outcome for {@link validateImpactPathSequence}. */
 export type CanonicalImpactPathValidationOutcome =
   | { readonly ok: true }

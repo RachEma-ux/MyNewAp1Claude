@@ -181,6 +181,7 @@ runtime catches up.
 | `quality-finding-list-summary.test.ts` | `services/graph-quality/scanner-metadata` — `summarizeQualityFindings` (byScanKind / bySeverity / byCategory + unknownScanKindCount drift signal) | T-D.8 / #1057 |
 | `extract-failure-state-annotations.test.ts` | `services/failure-states/observability-bridge` — `extractFailureStateAnnotations` (inverse of `getCanonicalFailureStateAnnotations`; round-trip + severity-override validation) | T-I.26 / #1058 |
 | `recommendation-candidate-list-summary.test.ts` | `services/recommendation/assemble-response` — `summarizeRecommendationCandidates` (pre-assemble diagnostic over raw candidate list with confidence-floor classification) | T-G.18 / #1059 |
+| `security-graph-impact-path-helpers.test.ts` | `services/security-graph/contracts` — `getCanonicalImpactPathToStep` + `getCanonicalImpactSubPath` + `getCanonicalImpactDistance` (3 path-walk helpers complementing the existing from/next/previous suite) | T-G.19 / #1060 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
