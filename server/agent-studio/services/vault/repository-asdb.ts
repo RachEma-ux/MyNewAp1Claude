@@ -99,7 +99,22 @@ export class AsdbVaultRepository implements VaultRepository {
   }
 
   async createNote(input: NoteCreateInput, createdByUserId: number): Promise<{ id: number; versionId: number }> {
-    const conn = getAsDb();
+    // V1+ MR-3 thirty-third batch (PR-V1-102): vault→workspace split-
+    // handle. Three child-table writes all route to the same handle
+    // resolved once at the top of the function via the vault lookup
+    // — preserves atomicity (a node, its version, and the
+    // currentVersionId backfill all hit the same handle).
+    const lookupConn = getAsDb();
+    if (!lookupConn) throw new Error("ASDB unavailable");
+    const lookup = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaults)
+      .where(eq(agsVaults.id, input.vaultId))
+      .limit(1);
+    const workspaceId = lookup[0]?.workspaceId ?? null;
+    const conn =
+      workspaceId != null ? getAsDbForWorkspace(workspaceId) : lookupConn;
+    if (!conn) throw new Error("ASDB unavailable");
     const [note] = await conn
       .insert(agsVaultNotes)
       .values({
