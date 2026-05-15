@@ -318,7 +318,22 @@ export class AsdbVaultRepository implements VaultRepository {
     vaultId: number,
     options?: { folderId?: number; limit?: number },
   ): Promise<NoteSelectByIdResult[]> {
-    const conn = getAsDb();
+    // V1+ MR-3 seventy-first batch (PR-V1-141): Path-A read consumer.
+    // vaultId → agsVaults.workspaceId in a single pre-projection
+    // SELECT, then route the SELECT on agsVaultNotes to the home
+    // region. Falls back to bootstrap when the vault row is missing
+    // OR vault.workspaceId IS NULL.
+    const lookupConn = getAsDb();
+    if (!lookupConn) return [];
+    const ws = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaults)
+      .where(eq(agsVaults.id, vaultId))
+      .limit(1);
+    const conn =
+      ws.length > 0
+        ? (getAsDbForWorkspace(ws[0].workspaceId) ?? lookupConn)
+        : lookupConn;
     const conditions = [
       eq(agsVaultNotes.vaultId, vaultId),
       sql`${agsVaultNotes.deletedAt} IS NULL`,
