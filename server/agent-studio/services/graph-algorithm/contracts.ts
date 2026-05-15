@@ -207,6 +207,91 @@ export const GRAPH_ALGORITHM_METADATA: Readonly<
 };
 
 // ============================================================================
+// Per-algorithm UI metadata (T-G.31)
+// ============================================================================
+
+export const GRAPH_ALGORITHM_CATEGORIES = [
+  "centrality",
+  "community",
+  "similarity",
+  "path_analysis",
+  "impact_analysis",
+] as const;
+
+export type GraphAlgorithmCategory =
+  (typeof GRAPH_ALGORITHM_CATEGORIES)[number];
+
+export interface GraphAlgorithmKindMetadata {
+  /** Display label for operator dashboards / algorithm pickers. */
+  readonly label: string;
+  /** Closed-taxonomy UI grouping for the algorithm picker. */
+  readonly category: GraphAlgorithmCategory;
+  /** Operator-facing description (longer than `GRAPH_ALGORITHM_METADATA.description`,
+   *  describes what the algorithm answers for the operator, not how it's
+   *  implemented). */
+  readonly operatorIntent: string;
+}
+
+export const GRAPH_ALGORITHM_KIND_METADATA: Readonly<
+  Record<GraphAlgorithmKind, GraphAlgorithmKindMetadata>
+> = {
+  centrality: {
+    label: "Centrality",
+    category: "centrality",
+    operatorIntent:
+      "Which nodes are the most-connected hubs in this subgraph? Surfaces 'institutional weight' targets for review or audit.",
+  },
+  community_detection: {
+    label: "Community Detection",
+    category: "community",
+    operatorIntent:
+      "Which clusters of densely-connected nodes exist? Partitions the graph into communities for operator triage.",
+  },
+  similarity: {
+    label: "Node Similarity",
+    category: "similarity",
+    operatorIntent:
+      "Which node-pairs share the most neighbors or features? Surfaces merge candidates and analogy seeds.",
+  },
+  shortest_path: {
+    label: "Shortest Path",
+    category: "path_analysis",
+    operatorIntent:
+      "What is the shortest connection between two specific nodes? Answers 'how is A related to B' in the fewest hops.",
+  },
+  dependency_paths: {
+    label: "Dependency Paths",
+    category: "path_analysis",
+    operatorIntent:
+      "What are all dependency chains between two nodes? Filtered to `DEPENDS_ON` / `IMPORTS` / `CALLS` edges.",
+  },
+  blast_radius: {
+    label: "Blast Radius",
+    category: "impact_analysis",
+    operatorIntent:
+      "What nodes are reachable from a starting node within N hops? Sizes 'who is affected if this changes'.",
+  },
+  entity_clustering: {
+    label: "Entity Clustering",
+    category: "community",
+    operatorIntent:
+      "Which entities are likely duplicates? Groups merge candidates for entity-resolution review.",
+  },
+  influence_analysis: {
+    label: "Influence Analysis",
+    category: "centrality",
+    operatorIntent:
+      "Which nodes have outsized downstream influence? Page-rank-style scoring within the subgraph.",
+  },
+};
+
+export function getGraphAlgorithmKindMetadata(
+  kind: GraphAlgorithmKind,
+): GraphAlgorithmKindMetadata {
+  return GRAPH_ALGORITHM_KIND_METADATA[kind];
+}
+
+// ============================================================================
 // Request + Result shapes
 // ============================================================================
 

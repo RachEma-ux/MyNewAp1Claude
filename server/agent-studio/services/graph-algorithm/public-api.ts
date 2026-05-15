@@ -17,6 +17,9 @@ export {
   summarizeGraphAlgorithmCoverage,
   GRAPH_ALGORITHM_BACKEND_SUPPORT_METADATA,
   getGraphAlgorithmBackendSupportMetadata,
+  GRAPH_ALGORITHM_CATEGORIES,
+  GRAPH_ALGORITHM_KIND_METADATA,
+  getGraphAlgorithmKindMetadata,
   type GraphAlgorithmKind,
   type GraphAlgorithmBackendSupport,
   type GraphAlgorithmMetadata,
@@ -27,4 +30,6 @@ export {
   type GraphAlgorithmPreflightOutcome,
   type GraphAlgorithmCoverageSummary,
   type GraphAlgorithmBackendSupportMetadata,
+  type GraphAlgorithmCategory,
+  type GraphAlgorithmKindMetadata,
 } from "./contracts.js";

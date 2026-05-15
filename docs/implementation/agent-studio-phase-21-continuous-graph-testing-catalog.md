@@ -207,6 +207,7 @@ runtime catches up.
 | `quality-scanner-category-metadata.test.ts` | `services/graph-quality/scanner-metadata` — `QUALITY_SCANNER_CATEGORY_METADATA` (5-entry per-category label + description for provenance/structure/freshness/deduplication/topology); promotes the previously union-only `QualityScannerCategory` to a tuple-derived export | T-D.11 / #1083 |
 | `security-finding-severity-metadata.test.ts` | `services/security-graph/contracts` — `SECURITY_FINDING_SEVERITY_METADATA` (5-entry per-severity label + description + cvssRange + operatorAction {informational/monitor/schedule_patch/patch_soon/patch_now}) | T-G.29 / #1084 |
 | `code-graph-edge-type-metadata.test.ts` | `services/code-graph/contracts/code-intelligence-contracts` — `CODE_GRAPH_EDGE_TYPE_METADATA` (10-entry per-edge-type label + description for imports/calls/declares/implements/depends_on/reads_from_table/writes_to_table/routes_to/renders_component/tests) | T-G.30 / #1085 |
+| `graph-algorithm-kind-metadata.test.ts` | `services/graph-algorithm/contracts` — `GRAPH_ALGORITHM_KIND_METADATA` (8-entry per-algorithm label + operatorIntent + closed-taxonomy `category` UI grouping over centrality/community/similarity/path_analysis/impact_analysis) | T-G.31 / #1086 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
