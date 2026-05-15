@@ -78,6 +78,53 @@ export const FAILURE_STATE_CATEGORIES = [
 export type FailureStateCategory = (typeof FAILURE_STATE_CATEGORIES)[number];
 
 // ============================================================================
+// Per-category operator-facing metadata (T-I.31)
+// ============================================================================
+
+export interface FailureStateCategoryMetadata {
+  /** Display label for operator dashboard tabs. */
+  readonly label: string;
+  /** Short description of what failures belong in this category. */
+  readonly description: string;
+}
+
+export const FAILURE_STATE_CATEGORY_METADATA: Readonly<
+  Record<FailureStateCategory, FailureStateCategoryMetadata>
+> = {
+  infrastructure: {
+    label: "Infrastructure",
+    description:
+      "Backend / database / projection failures — Neo4j unavailable, projection drift, sync errors.",
+  },
+  governance: {
+    label: "Governance",
+    description:
+      "Approval / permission / policy-related failures — promotion rejection, schema changes, permission-hidden references.",
+  },
+  retrieval: {
+    label: "Retrieval",
+    description:
+      "Knowledge retrieval pipeline failures — text2cypher rejection, query template errors, safety-filter blocks.",
+  },
+  agent: {
+    label: "Agent",
+    description:
+      "Agent runtime failures — budget exhaustion, golden-question failures, planner errors.",
+  },
+  runtime: {
+    label: "Runtime",
+    description:
+      "Background job / scheduled task failures — note conflicts, background job failures, backlink refresh errors.",
+  },
+};
+
+export function getFailureStateCategoryMetadata(
+  category: FailureStateCategory,
+): FailureStateCategoryMetadata {
+  return FAILURE_STATE_CATEGORY_METADATA[category];
+}
+
+// ============================================================================
 // Severity taxonomy
 // ============================================================================
 
