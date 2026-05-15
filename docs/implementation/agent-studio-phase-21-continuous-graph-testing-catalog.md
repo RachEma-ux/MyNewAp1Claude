@@ -219,6 +219,7 @@ runtime catches up.
 | `rac-retrieval-health-status-metadata.test.ts` | `services/rac/ingestion/types` — `RAC_RETRIEVAL_HEALTH_STATUS_METADATA` (4-entry per-status label + description + attemptRetrieval + notifyOperator booleans); union→tuple promotion of `RacRetrievalHealthStatus` | T-A.9 / #1095 |
 | `rac-owner-module-metadata.test.ts` | `services/rac/sources/types` — `RAC_OWNER_MODULE_METADATA` (4-entry per-owner-module label + description + firstParty boolean for agentStudio/dataAnalysis/projectsSystem/external); union→tuple promotion of `RacOwnerModule` | T-A.10 / #1096 |
 | `publish-target-type-metadata.test.ts` | `services/publish-targets/types` — `PUBLISH_TARGET_TYPE_METADATA` (3-entry per-target-type label + description + internalDestination + requiresProviderConnection booleans for staging_env/remote_vault/external_kb) | T-E.1 / #1097 |
+| `publish-execution-status-metadata.test.ts` | `services/publish-targets/types` — `PUBLISH_EXECUTION_STATUS_METADATA` (4-entry per-status label + description + terminal + successful booleans for pending/in_flight/succeeded/failed) | T-E.2 / #1098 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

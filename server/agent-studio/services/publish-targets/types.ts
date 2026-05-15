@@ -101,6 +101,63 @@ export const PUBLISH_EXECUTION_STATUSES = [
 export type PublishExecutionStatus =
   (typeof PUBLISH_EXECUTION_STATUSES)[number];
 
+// ============================================================================
+// Per-execution-status operator-facing metadata (T-E.2)
+// ============================================================================
+
+export interface PublishExecutionStatusMetadata {
+  /** Display label rendered in the publish-targets ledger UI. */
+  readonly label: string;
+  /** Short operator-facing description of what this status indicates. */
+  readonly description: string;
+  /** Whether this status represents a finished execution (true) or
+   *  one still progressing (false). Drives the "X publishes
+   *  in-flight" gauge. */
+  readonly terminal: boolean;
+  /** Whether this status represents a successful execution (true) vs
+   *  a failure / non-success (false). Only meaningful when terminal. */
+  readonly successful: boolean;
+}
+
+export const PUBLISH_EXECUTION_STATUS_METADATA: Readonly<
+  Record<PublishExecutionStatus, PublishExecutionStatusMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Execution is staged but the pusher has not yet been invoked — typically awaiting governance approval.",
+    terminal: false,
+    successful: false,
+  },
+  in_flight: {
+    label: "In Flight",
+    description:
+      "Pusher is actively communicating with the target — execution may succeed or fail next.",
+    terminal: false,
+    successful: false,
+  },
+  succeeded: {
+    label: "Succeeded",
+    description:
+      "Pusher completed without error and the target acknowledged the payload — the upstream artifact id is recorded.",
+    terminal: true,
+    successful: true,
+  },
+  failed: {
+    label: "Failed",
+    description:
+      "Pusher threw an error or the target rejected the payload — the errorMessage column carries the failure reason.",
+    terminal: true,
+    successful: false,
+  },
+};
+
+export function getPublishExecutionStatusMetadata(
+  status: PublishExecutionStatus,
+): PublishExecutionStatusMetadata {
+  return PUBLISH_EXECUTION_STATUS_METADATA[status];
+}
+
 export interface PublishTargetRecord {
   readonly id: number;
   readonly targetKey: string;
