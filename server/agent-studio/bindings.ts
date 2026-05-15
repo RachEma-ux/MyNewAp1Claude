@@ -288,7 +288,24 @@ export async function getAgentProviderBinding(
   draftId: number,
   role: string = "primary",
 ): Promise<AgentProviderBindingPublic | null> {
-  const db = getAsDb();
+  // V1+ MR-3 seventy-second batch (PR-V1-142): Path-A read consumer.
+  // agsAgentProviderBindings.workspaceId is non-null (Path B
+  // primitive's source-of-truth column); pre-projection SELECT pulls
+  // it up keyed by (draftId, role), then the full-row SELECT routes
+  // via getAsDbForWorkspace.
+  const lookupDb = getAsDb();
+  const wsRows = await lookupDb
+    .select({ workspaceId: agsAgentProviderBindings.workspaceId })
+    .from(agsAgentProviderBindings)
+    .where(
+      and(
+        eq(agsAgentProviderBindings.draftId, draftId),
+        eq(agsAgentProviderBindings.role, role),
+      ),
+    )
+    .limit(1);
+  if (wsRows.length === 0) return null;
+  const db = getAsDbForWorkspace(wsRows[0].workspaceId) ?? lookupDb;
   const rows = await db
     .select()
     .from(agsAgentProviderBindings)
