@@ -31,6 +31,7 @@ export {
   parseFailureStateFromErrorClass,
   getCanonicalFailureStateAnnotations,
   extractFailureStateAnnotations,
+  annotateRowsWithFailureState,
   recordFailureStateEvent,
   recordFailureStateEvents,
   summarizeFailureStateEventList,

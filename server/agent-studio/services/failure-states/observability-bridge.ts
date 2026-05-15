@@ -238,6 +238,29 @@ function isFailureStateSeverity(value: unknown): value is FailureStateSeverity {
 }
 
 /**
+ * Batch helper — extracts failure-state annotations for every row in a
+ * list, returning paired (row, annotations) objects. `annotations` is
+ * null for rows whose errorClass isn't bridge-emitted. Useful for
+ * dashboard queries that return mixed rows and want to enrich each one
+ * for downstream filtering/grouping.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function annotateRowsWithFailureState<T>(
+  rows: ReadonlyArray<T>,
+  getErrorClass: (row: T) => string,
+  getMetadata: (row: T) => Record<string, unknown> | null,
+): readonly { row: T; annotations: CanonicalFailureStateAnnotations | null }[] {
+  return rows.map((row) => ({
+    row,
+    annotations: extractFailureStateAnnotations({
+      errorClass: getErrorClass(row),
+      metadata: getMetadata(row),
+    }),
+  }));
+}
+
+/**
  * Aggregates a list of observability `ErrorEventRow` records into the
  * canonical failure-state operator summary. Free-form rows (rows
  * whose `errorClass` does not begin with `failure_state:` or whose
