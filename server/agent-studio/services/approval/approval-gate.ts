@@ -89,7 +89,7 @@
  * here explains the boundary by name; the test guards the code body.
  */
 import { and, eq } from "drizzle-orm";
-import { getAsDb } from "../../db/connection";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection";
 import {
   agsPendingPermissionRequests,
   agsRuntimePolicyEvents,
@@ -295,7 +295,24 @@ export async function evaluateApprovalGate(
       !lastUsed ||
       now.getTime() - new Date(lastUsed).getTime() >= LAST_USED_STALENESS_MS;
     if (isStale) {
-      await db
+      // V1+ MR-3 thirty-seventh batch (PR-V1-107): Path B consumer.
+      // Resolve workspaceId via the agsAgentProviderBindings escape
+      // hatch (the approval row carries agentDraftId; the agent-tier
+      // tables don't have workspaceId, but bindings do). If the
+      // draft has no binding (legacy / binding-pending), fall back
+      // to the bootstrap handle — preserves pre-migration semantics
+      // for unbound drafts.
+      const { resolveWorkspaceIdForDraft } = await import(
+        "../region/draft-workspace-resolver"
+      );
+      const workspaceId = await resolveWorkspaceIdForDraft(
+        db,
+        input.agentDraftId,
+      );
+      const updateDb =
+        workspaceId != null ? getAsDbForWorkspace(workspaceId) : db;
+      if (!updateDb) throw new Error("ASDB unavailable");
+      await updateDb
         .update(agsPendingPermissionRequests)
         .set({ lastUsedAt: now })
         .where(eq(agsPendingPermissionRequests.id, row.id));
