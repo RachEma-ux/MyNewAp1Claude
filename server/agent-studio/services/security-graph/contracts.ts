@@ -50,6 +50,78 @@ export function isSecurityGraphNodeType(s: unknown): s is SecurityGraphNodeType 
 }
 
 // ============================================================================
+// Per-node-type operator-facing metadata (T-G.24)
+// ============================================================================
+
+export interface SecurityGraphNodeTypeMetadata {
+  /** Display label for operator UI tabs / lens overlays. */
+  readonly label: string;
+  /** Short description of what this node type represents. */
+  readonly description: string;
+}
+
+export const SECURITY_GRAPH_NODE_TYPE_METADATA: Readonly<
+  Record<SecurityGraphNodeType, SecurityGraphNodeTypeMetadata>
+> = {
+  cve: {
+    label: "CVE",
+    description:
+      "Common Vulnerabilities and Exposures entry — the canonical vulnerability identifier.",
+  },
+  security_finding: {
+    label: "Security Finding",
+    description:
+      "A non-CVE security observation: misconfiguration, weak credential, exposed surface.",
+  },
+  component: {
+    label: "Component",
+    description:
+      "A logical software / hardware component that may be vulnerable or harden-able.",
+  },
+  package: {
+    label: "Package",
+    description:
+      "A versioned dependency artifact (npm / pip / OS package) that components depend on.",
+  },
+  service: {
+    label: "Service",
+    description:
+      "A running service or application — composed of components, exposed to environments.",
+  },
+  environment: {
+    label: "Environment",
+    description:
+      "A deployment target (production / staging / customer-vault) where services run.",
+  },
+  owner: {
+    label: "Owner",
+    description:
+      "The person or team responsible for the service in an environment — patch-decision authority.",
+  },
+  customer_exposure: {
+    label: "Customer Exposure",
+    description:
+      "Customer-facing scope — which customers are exposed if a service is compromised.",
+  },
+  policy: {
+    label: "Policy",
+    description:
+      "A governance policy — patch SLOs, mandatory upgrades, accepted-risk windows.",
+  },
+  control: {
+    label: "Control",
+    description:
+      "A mitigation control — WAF rule, network segmentation, runtime sandbox.",
+  },
+};
+
+export function getSecurityGraphNodeTypeMetadata(
+  type: SecurityGraphNodeType,
+): SecurityGraphNodeTypeMetadata {
+  return SECURITY_GRAPH_NODE_TYPE_METADATA[type];
+}
+
+// ============================================================================
 // Canonical impact path (roadmap §Phase 25)
 // ============================================================================
 

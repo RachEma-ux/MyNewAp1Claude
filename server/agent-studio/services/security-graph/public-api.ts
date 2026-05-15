@@ -9,6 +9,8 @@ export {
   SECURITY_FINDINGS_VIEW_PERMISSION_KEY,
   SECURITY_GRAPH_DEFAULT_PERMISSION_SCOPE,
   isSecurityGraphNodeType,
+  getSecurityGraphNodeTypeMetadata,
+  SECURITY_GRAPH_NODE_TYPE_METADATA,
   isSecurityFindingSeverity,
   cvssScoreToSeverity,
   severityRank,
@@ -33,4 +35,5 @@ export {
   type CanonicalImpactPathValidationOutcome,
   type ImpactPathValidationReason,
   type ImpactPathValidationBatchSummary,
+  type SecurityGraphNodeTypeMetadata,
 } from "./contracts.js";
