@@ -232,6 +232,7 @@ runtime catches up.
 | `note-promotion-state-metadata.test.ts` | `services/retention/lifecycle-state-vocab` — `NOTE_PROMOTION_STATE_METADATA` (8-entry per-state label + description + outcome {in_progress / accepted / declined / reverted / cancelled / obsolete} + terminal boolean; mirrors `NOTE_PROMOTION_TERMINAL_STATES`) | T-L.3 / #1108 |
 | `extension-governance-status-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_GOVERNANCE_STATUS_METADATA` (5-entry per-status label + description + invocable + lifecycle {awaiting_decision / active / dormant / revoked} for pending_approval/approved/rejected/disabled/revoked) | T-X.1 / #1109 |
 | `extension-capability-lane-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_CAPABILITY_LANE_METADATA` (4-entry per-lane label + description + invokesTools + pipelineOrder 1..4 for retrieve/assemble/compose/tool) | T-X.2 / #1110 |
+| `extension-capability-check-metadata.test.ts` | `services/extensions/contracts` — `EXTENSION_CAPABILITY_CHECK_METADATA` (4-entry per-check label + description + proceeds + denialReason {null / manifest_mismatch / governance_revoked / operator_disabled}) | T-X.3 / #1111 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

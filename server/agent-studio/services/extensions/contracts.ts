@@ -195,6 +195,67 @@ export const EXTENSION_CAPABILITY_CHECKS = [
 export type ExtensionCapabilityCheck =
   (typeof EXTENSION_CAPABILITY_CHECKS)[number];
 
+// ============================================================================
+// Per-capability-check operator-facing metadata (T-X.3)
+// ============================================================================
+
+export interface ExtensionCapabilityCheckMetadata {
+  /** Display label rendered in capability-check audit logs. */
+  readonly label: string;
+  /** Short operator-facing description of what the check result means. */
+  readonly description: string;
+  /** Whether the dispatch should proceed (true) — only `allowed`. */
+  readonly proceeds: boolean;
+  /** Closed-taxonomy denial reason (null when proceeds=true):
+   *  - `manifest_mismatch`: extension didn't declare this capability.
+   *  - `governance_revoked`: extension was hard-revoked by governance.
+   *  - `operator_disabled`: extension is operator-paused but recoverable. */
+  readonly denialReason:
+    | null
+    | "manifest_mismatch"
+    | "governance_revoked"
+    | "operator_disabled";
+}
+
+export const EXTENSION_CAPABILITY_CHECK_METADATA: Readonly<
+  Record<ExtensionCapabilityCheck, ExtensionCapabilityCheckMetadata>
+> = {
+  allowed: {
+    label: "Allowed",
+    description:
+      "Capability check passed — the extension declared this capability AND its governance status permits invocation.",
+    proceeds: true,
+    denialReason: null,
+  },
+  denied_undeclared: {
+    label: "Denied — Undeclared Capability",
+    description:
+      "The dispatch targeted a capability the extension's manifest did not declare. Suggests an extension bug or manifest drift.",
+    proceeds: false,
+    denialReason: "manifest_mismatch",
+  },
+  denied_revoked: {
+    label: "Denied — Revoked",
+    description:
+      "Extension governance status is `revoked` — terminal denial; the extension key cannot dispatch any capability.",
+    proceeds: false,
+    denialReason: "governance_revoked",
+  },
+  denied_disabled: {
+    label: "Denied — Disabled",
+    description:
+      "Extension is in `disabled` status — operator-paused but recoverable. Re-enabling the extension lifts this denial.",
+    proceeds: false,
+    denialReason: "operator_disabled",
+  },
+};
+
+export function getExtensionCapabilityCheckMetadata(
+  check: ExtensionCapabilityCheck,
+): ExtensionCapabilityCheckMetadata {
+  return EXTENSION_CAPABILITY_CHECK_METADATA[check];
+}
+
 /**
  * Extension manifest — the static identity + capability declaration
  * an operator (or signing system) provides when installing.
