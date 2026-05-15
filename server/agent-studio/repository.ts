@@ -499,6 +499,25 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveHookRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  hookId: number,
+) {
+  // V1+ MR-3 fifty-fourth batch (PR-V1-124): shared hookId→routed-
+  // conn helper. agsDraftHooks.draftId is a direct FK — single
+  // SELECT, then chain into resolveDraftRoutedConn (which itself
+  // calls Path B's resolveWorkspaceIdForDraft). Falls back to
+  // lookupConn on any null. Twelfth sister helper.
+  const hookRows = await lookupConn
+    .select({ draftId: agsDraftHooks.draftId })
+    .from(agsDraftHooks)
+    .where(eq(agsDraftHooks.id, hookId))
+    .limit(1);
+  const draftId = hookRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
 async function resolveRuntimeRunRoutedConn(
   lookupConn: ReturnType<typeof db>,
   runId: number,
@@ -1917,8 +1936,12 @@ export async function saveHook(input: {
   requiresApproval?: boolean;
   enabled?: boolean;
 }): Promise<typeof agsDraftHooks.$inferSelect> {
-  const conn = db();
+  // V1+ MR-3 fifty-fourth batch (PR-V1-124): Path B consumer.
+  // UPDATE branch routes via resolveHookRoutedConn (hookId→draftId);
+  // INSERT branch routes via resolveDraftRoutedConn(input.draftId).
+  const lookupConn = db();
   if (input.hookId) {
+    const conn = await resolveHookRoutedConn(lookupConn, input.hookId);
     const [updated] = await conn
       .update(agsDraftHooks)
       .set({
@@ -1935,6 +1958,7 @@ export async function saveHook(input: {
     if (!updated) throw new Error(`Hook ${input.hookId} not found`);
     return updated;
   }
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
   const [created] = await conn
     .insert(agsDraftHooks)
     .values({
@@ -1951,7 +1975,11 @@ export async function saveHook(input: {
 }
 
 export async function removeHook(hookId: number) {
-  await db().delete(agsDraftHooks).where(eq(agsDraftHooks.id, hookId));
+  // V1+ MR-3 fifty-fourth batch (PR-V1-124): Path B consumer via
+  // resolveHookRoutedConn (hookId→draftId→workspaceId).
+  const lookupConn = db();
+  const conn = await resolveHookRoutedConn(lookupConn, hookId);
+  await conn.delete(agsDraftHooks).where(eq(agsDraftHooks.id, hookId));
 }
 
 export async function replaceHooks(
@@ -1965,7 +1993,11 @@ export async function replaceHooks(
     enabled?: boolean;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-fourth batch (PR-V1-124): Path B consumer via
+  // resolveDraftRoutedConn. DELETE-all + bulk-INSERT share a single
+  // routed conn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn.delete(agsDraftHooks).where(eq(agsDraftHooks.draftId, draftId));
   if (hooks.length === 0) return;
   await conn.insert(agsDraftHooks).values(
