@@ -20,6 +20,9 @@ export {
   GRAPH_ALGORITHM_CATEGORIES,
   GRAPH_ALGORITHM_KIND_METADATA,
   getGraphAlgorithmKindMetadata,
+  GRAPH_ALGORITHM_PREFLIGHT_DECISIONS,
+  GRAPH_ALGORITHM_PREFLIGHT_DECISION_METADATA,
+  getGraphAlgorithmPreflightDecisionMetadata,
   type GraphAlgorithmKind,
   type GraphAlgorithmBackendSupport,
   type GraphAlgorithmMetadata,
@@ -32,4 +35,5 @@ export {
   type GraphAlgorithmBackendSupportMetadata,
   type GraphAlgorithmCategory,
   type GraphAlgorithmKindMetadata,
+  type GraphAlgorithmPreflightDecisionMetadata,
 } from "./contracts.js";
