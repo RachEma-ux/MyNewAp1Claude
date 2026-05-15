@@ -34,6 +34,114 @@ export const EXPORT_ELIGIBILITY_GATES = [
 
 export type ExportEligibilityGate = typeof EXPORT_ELIGIBILITY_GATES[number];
 
+// ============================================================================
+// Per-gate operator-facing metadata (T-E.4)
+// ============================================================================
+
+export interface ExportEligibilityGateMetadata {
+  /** Display label rendered in the export pre-flight UI / verdict drill-down. */
+  readonly label: string;
+  /** Short operator-facing description of what the gate checks. */
+  readonly description: string;
+  /** Closed-taxonomy classification of the gate concern:
+   *  - `governance`: governance verdict / approval / readiness signal.
+   *  - `metadata_completeness`: required candidate fields populated.
+   *  - `provider_binding`: model + provider binding validity.
+   *  - `idempotency`: prevents duplicate imports / canonical entries.
+   *  - `runtime_readiness`: post-import behavior signal (e.g. RAC). */
+  readonly concern:
+    | "governance"
+    | "metadata_completeness"
+    | "provider_binding"
+    | "idempotency"
+    | "runtime_readiness";
+  /** Whether this gate's failure is operator-fixable (true) or
+   *  requires re-running an upstream pipeline (false). UI uses this
+   *  to render a "fix it" vs "wait for upstream" affordance. */
+  readonly operatorFixable: boolean;
+}
+
+export const EXPORT_ELIGIBILITY_GATE_METADATA: Readonly<
+  Record<ExportEligibilityGate, ExportEligibilityGateMetadata>
+> = {
+  version_release: {
+    label: "Version Released",
+    description:
+      "Candidate's source version must be a released (non-draft) version — exports never ship in-progress drafts.",
+    concern: "governance",
+    operatorFixable: true,
+  },
+  provider_binding_valid: {
+    label: "Provider Binding Valid",
+    description:
+      "Candidate's provider-binding row must exist and reference a known provider. Phase 30 D-PMB-1 invariant.",
+    concern: "provider_binding",
+    operatorFixable: true,
+  },
+  provider_connection_active: {
+    label: "Provider Connection Active",
+    description:
+      "Bound provider connection must be in `active` lifecycle state — disabled connections fail this gate.",
+    concern: "provider_binding",
+    operatorFixable: true,
+  },
+  model_approved: {
+    label: "Model Approved",
+    description:
+      "Candidate's model ref must be in the workspace's approved-model allowlist — unapproved models cannot ship.",
+    concern: "governance",
+    operatorFixable: true,
+  },
+  readiness_score_threshold: {
+    label: "Readiness Score Meets Threshold",
+    description:
+      "Candidate's readinessScore must meet or exceed the publish threshold (default 70).",
+    concern: "runtime_readiness",
+    operatorFixable: false,
+  },
+  governance_verdict_acceptable: {
+    label: "Governance Verdict Acceptable",
+    description:
+      "Governance evaluation must return verdict in {approved / approved_with_warnings} — rejected verdicts hard-block export.",
+    concern: "governance",
+    operatorFixable: true,
+  },
+  metadata_complete: {
+    label: "Metadata Complete",
+    description:
+      "Required metadata fields (description, capability lane, owner) must be populated on the candidate row.",
+    concern: "metadata_completeness",
+    operatorFixable: true,
+  },
+  not_already_imported: {
+    label: "Not Already Imported",
+    description:
+      "Same source-id must not already exist in the catalog — Phase 30 register guard idempotency. Prevents duplicate import flows.",
+    concern: "idempotency",
+    operatorFixable: false,
+  },
+  no_duplicate_canonical_entry: {
+    label: "No Duplicate Canonical Entry",
+    description:
+      "No other catalog row at the same `(sourceType, sourceId)` pair — surfaces ahead of register so UI flags before click.",
+    concern: "idempotency",
+    operatorFixable: false,
+  },
+  rac_readiness: {
+    label: "RAC Readiness",
+    description:
+      "Candidate's RAC retrieval signals (source registrations / embedding bindings) are wired through — post-import RAC will work.",
+    concern: "runtime_readiness",
+    operatorFixable: true,
+  },
+};
+
+export function getExportEligibilityGateMetadata(
+  gate: ExportEligibilityGate,
+): ExportEligibilityGateMetadata {
+  return EXPORT_ELIGIBILITY_GATE_METADATA[gate];
+}
+
 export interface ExportEligibilityGateResult {
   gate: ExportEligibilityGate;
   /** True when the candidate satisfies the gate. */
