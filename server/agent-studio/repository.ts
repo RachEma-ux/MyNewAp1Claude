@@ -499,6 +499,24 @@ export async function getToolBindingById(bindingId: number) {
  * Replace all tool bindings on a draft. Used by rollback to restore an
  * immutable version's tool set onto the active draft.
  */
+async function resolveSkillRoutedConn(
+  lookupConn: ReturnType<typeof db>,
+  skillId: number,
+) {
+  // V1+ MR-3 fifty-sixth batch (PR-V1-126): shared skillId→routed-
+  // conn helper. agsDraftSkills.draftId is a direct FK — single
+  // SELECT, then chain into resolveDraftRoutedConn. Fourteenth
+  // sister helper.
+  const skillRows = await lookupConn
+    .select({ draftId: agsDraftSkills.draftId })
+    .from(agsDraftSkills)
+    .where(eq(agsDraftSkills.id, skillId))
+    .limit(1);
+  const draftId = skillRows[0]?.draftId;
+  if (draftId == null) return lookupConn;
+  return await resolveDraftRoutedConn(lookupConn, draftId);
+}
+
 async function resolveMcpServerRoutedConn(
   lookupConn: ReturnType<typeof db>,
   serverId: number,
@@ -2319,7 +2337,11 @@ export async function attachSkill(input: {
   requiresApproval?: boolean;
   argsSchema?: Record<string, unknown>;
 }): Promise<typeof agsDraftSkills.$inferSelect> {
-  const [created] = await db()
+  // V1+ MR-3 fifty-sixth batch (PR-V1-126): Path B consumer via
+  // resolveDraftRoutedConn(input.draftId).
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, input.draftId);
+  const [created] = await conn
     .insert(agsDraftSkills)
     .values({
       draftId: input.draftId,
@@ -2337,7 +2359,11 @@ export async function attachSkill(input: {
 }
 
 export async function removeSkill(skillId: number) {
-  await db().delete(agsDraftSkills).where(eq(agsDraftSkills.id, skillId));
+  // V1+ MR-3 fifty-sixth batch (PR-V1-126): Path B consumer via
+  // resolveSkillRoutedConn (skillId→draftId).
+  const lookupConn = db();
+  const conn = await resolveSkillRoutedConn(lookupConn, skillId);
+  await conn.delete(agsDraftSkills).where(eq(agsDraftSkills.id, skillId));
 }
 
 export async function replaceSkills(
@@ -2352,7 +2378,11 @@ export async function replaceSkills(
     argsSchema?: Record<string, unknown>;
   }>
 ) {
-  const conn = db();
+  // V1+ MR-3 fifty-sixth batch (PR-V1-126): Path B consumer via
+  // resolveDraftRoutedConn. DELETE-all + bulk-INSERT share a single
+  // routed conn.
+  const lookupConn = db();
+  const conn = await resolveDraftRoutedConn(lookupConn, draftId);
   await conn.delete(agsDraftSkills).where(eq(agsDraftSkills.draftId, draftId));
   if (skills.length === 0) return;
   await conn.insert(agsDraftSkills).values(
