@@ -13,6 +13,7 @@ export {
   listAllowedEdgeTypesToTarget,
   validateCodeGraphEdgeWithReason,
   validateCodeGraphEdgeBatch,
+  summarizeCodeGraph,
   type CodeGraphNodeType,
   type CodeGraphEdgeType,
   type CodeGraphEdgeConstraint,
@@ -20,4 +21,5 @@ export {
   type CodeGraphEdgeValidationOutcome,
   type CodeGraphEdgeBatchInput,
   type CodeGraphEdgeBatchResult,
+  type CodeGraphSummary,
 } from "./code-intelligence-contracts.js";

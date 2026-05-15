@@ -324,3 +324,63 @@ export function validateCodeGraphEdgeBatch(
     rejectionsByReason,
   };
 }
+
+// ============================================================================
+// Code-graph aggregation (T-G.16)
+// ============================================================================
+
+export interface CodeGraphSummary {
+  readonly totalNodes: number;
+  readonly totalEdges: number;
+  readonly nodesByType: Readonly<Record<CodeGraphNodeType, number>>;
+  readonly edgesByType: Readonly<Record<CodeGraphEdgeType, number>>;
+  /** Nodes whose typeKey is not in the closed taxonomy. Useful for
+   *  catching stale-string ingest. */
+  readonly unknownNodeTypeCount: number;
+  /** Edges whose typeKey is not in the closed taxonomy. */
+  readonly unknownEdgeTypeCount: number;
+}
+
+/**
+ * Aggregates a node + edge list into a stable-shape summary over
+ * the closed CodeGraphNodeType / CodeGraphEdgeType taxonomies.
+ *
+ * Generic accessor signature — no coupling to a specific row shape.
+ * Unknown taxonomy values are counted separately rather than thrown,
+ * so a partial-ingest doesn't blow up the summary.
+ *
+ * Pure function. Does NOT mutate the input.
+ */
+export function summarizeCodeGraph<N, E>(
+  nodes: ReadonlyArray<N>,
+  edges: ReadonlyArray<E>,
+  getNodeType: (node: N) => string,
+  getEdgeType: (edge: E) => string,
+): CodeGraphSummary {
+  const nodesByType: Record<string, number> = {};
+  for (const t of CODE_GRAPH_NODE_TYPES) nodesByType[t] = 0;
+  const edgesByType: Record<string, number> = {};
+  for (const t of CODE_GRAPH_EDGE_TYPES) edgesByType[t] = 0;
+
+  let unknownNodeTypeCount = 0;
+  for (const n of nodes) {
+    const t = getNodeType(n);
+    if (isCodeGraphNodeType(t)) nodesByType[t] += 1;
+    else unknownNodeTypeCount += 1;
+  }
+  let unknownEdgeTypeCount = 0;
+  for (const e of edges) {
+    const t = getEdgeType(e);
+    if (isCodeGraphEdgeType(t)) edgesByType[t] += 1;
+    else unknownEdgeTypeCount += 1;
+  }
+  return {
+    totalNodes: nodes.length,
+    totalEdges: edges.length,
+    nodesByType: nodesByType as Readonly<Record<CodeGraphNodeType, number>>,
+    edgesByType: edgesByType as Readonly<Record<CodeGraphEdgeType, number>>,
+    unknownNodeTypeCount,
+    unknownEdgeTypeCount,
+  };
+}
+
