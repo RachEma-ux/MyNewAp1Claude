@@ -24,6 +24,8 @@ import {
   syncToolKnowledge as defaultSyncToolKnowledge,
   type SyncToolKnowledgeResult,
 } from "./tool-knowledge-sync";
+import { detectToolSchemaChanges } from "./detect-tool-schema-changes.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 
 export interface AutoSyncContext {
   workspaceId: number;
@@ -69,7 +71,34 @@ export interface InstallAutoSyncOptions {
  */
 export function installAutoSync(opts: InstallAutoSyncOptions): () => void {
   const sync = opts.syncToolKnowledge ?? defaultSyncToolKnowledge;
-  const listener: SnapshotListener = async ({ current }) => {
+  const listener: SnapshotListener = async ({ current, previous }) => {
+    // T-I.5 batch A — detect tool-schema changes BEFORE the sync runs
+    // (which would otherwise overwrite the previous mirror, masking
+    // the diff). Pure-function diff; closed-taxonomy emission via the
+    // Phase 22 bridge. Fire-and-forget — never blocks the sync flow.
+    const changes = detectToolSchemaChanges(current.tools, previous?.tools);
+    if (changes.length > 0) {
+      const kindCounts: Record<string, number> = {};
+      for (const c of changes) {
+        kindCounts[c.kind] = (kindCounts[c.kind] ?? 0) + 1;
+      }
+      void recordFailureStateEvent({
+        failureState: "tool_schema_changed",
+        sourceKind: "mcp-registry",
+        sourceId: String(current.serverId),
+        errorMessage: `MCP server #${current.serverId} published ${changes.length} tool schema change(s)`,
+        metadata: {
+          serverId: current.serverId,
+          version: current.version,
+          changeCount: changes.length,
+          kindCounts,
+          toolNames: changes.slice(0, 20).map((c) => c.toolName),
+        },
+      }).catch(() => {
+        // Fail-soft.
+      });
+    }
+
     let ctx: AutoSyncContext | null;
     try {
       ctx = await Promise.resolve(opts.resolveContext(current.serverId));
