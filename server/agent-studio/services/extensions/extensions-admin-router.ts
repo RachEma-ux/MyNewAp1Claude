@@ -32,6 +32,7 @@ import {
 import {
   approveExtension,
   getExtensionById,
+  getInvocationSummariesByWorkspace,
   installExtension,
   listExtensionsByWorkspace,
   setExtensionStatus,
@@ -151,5 +152,19 @@ export const extensionsAdminRouter = router({
     .input(GetInputSchema)
     .mutation(async ({ input }) => {
       return { removed: await uninstallExtension(input.extensionId) };
+    }),
+
+  /**
+   * PR-V1-181: per-extension invocation telemetry summary for an
+   * entire workspace. Returns one row per installed extension
+   * (zero-filled when no telemetry exists) with
+   * `{ totalInvocations, allowedCount, deniedCount, lastInvokedAt }`.
+   * Used by `ExtensionsAdminPanel` to render inline counts in the
+   * table without needing a per-row fetch.
+   */
+  workspaceInvocationSummaries: adminProcedure
+    .input(z.object({ workspaceId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return getInvocationSummariesByWorkspace(input.workspaceId);
     }),
 });
