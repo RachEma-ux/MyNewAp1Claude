@@ -143,7 +143,74 @@ export function getCagPackEventSeverityMetadata(
   return CAG_PACK_EVENT_SEVERITY_METADATA[severity];
 }
 
-export type CagPackActorType = "system" | "user" | "scheduler" | "runtime";
+/**
+ * Closed-taxonomy CAG pack actor type — who emitted a pack lifecycle
+ * event. Promoted at T-G.42 for the metadata table below.
+ */
+export const CAG_PACK_ACTOR_TYPES = [
+  "system",
+  "user",
+  "scheduler",
+  "runtime",
+] as const;
+export type CagPackActorType = (typeof CAG_PACK_ACTOR_TYPES)[number];
+
+// ============================================================================
+// Per-actor-type operator-facing metadata (T-G.42)
+// ============================================================================
+
+export interface CagPackActorTypeMetadata {
+  /** Display label rendered in the pack event log actor column. */
+  readonly label: string;
+  /** Short operator-facing description of who or what fires events
+   *  under this actor type. */
+  readonly description: string;
+  /** Whether emissions under this actor type carry an associated
+   *  user ID (true for `user` only). */
+  readonly requiresUserId: boolean;
+  /** Whether this actor is automated (true for system / scheduler /
+   *  runtime; false for `user`). */
+  readonly isAutomated: boolean;
+}
+
+export const CAG_PACK_ACTOR_TYPE_METADATA: Readonly<
+  Record<CagPackActorType, CagPackActorTypeMetadata>
+> = {
+  system: {
+    label: "System",
+    description:
+      "Platform-level internal actor — boot-time emissions, migrations, fresh-install seeding. No operator behind the action.",
+    requiresUserId: false,
+    isAutomated: true,
+  },
+  user: {
+    label: "User",
+    description:
+      "Operator-driven action — manual mark-stale, manual archive, manual refresh-force. Carries an attributable user ID.",
+    requiresUserId: true,
+    isAutomated: false,
+  },
+  scheduler: {
+    label: "Scheduler",
+    description:
+      "Cron-driven action — periodic freshness scans, scheduled archival, retention sweeps. No operator behind the action.",
+    requiresUserId: false,
+    isAutomated: true,
+  },
+  runtime: {
+    label: "Runtime",
+    description:
+      "Runtime-loop action — agent flow that touched the pack during execution (use / validate / refresh-skip). Triggered by live traffic.",
+    requiresUserId: false,
+    isAutomated: true,
+  },
+};
+
+export function getCagPackActorTypeMetadata(
+  actor: CagPackActorType,
+): CagPackActorTypeMetadata {
+  return CAG_PACK_ACTOR_TYPE_METADATA[actor];
+}
 
 /**
  * Tool risk taxonomy per D-TOOL-1 (RAC_TOOL_CLASSIFICATION.md).
