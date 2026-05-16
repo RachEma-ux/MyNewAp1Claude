@@ -17,6 +17,7 @@ import {
   agsVaultNoteVersions,
   agsVaultNoteConflicts,
 } from "../../../../drizzle/tables/agent-studio-vault.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 import type {
   VaultRepository,
   NoteSelectByIdResult,
@@ -288,6 +289,28 @@ export class AsdbVaultRepository implements VaultRepository {
         submittedVersion: latest.version,
         submitterUserId: userId,
         metadata: { contentMdHash: computeContentHash(input.contentMd) },
+      });
+      // T-I.41: emit closed-taxonomy `note_conflict` event. Fire-and-
+      // forget per the bridge's fail-soft contract — observability
+      // writes never throw into the caller's flow. The conflict row
+      // and the error_event row are written independently; both write
+      // failures fail-soft so the operator dashboard sees as much
+      // signal as possible.
+      void recordFailureStateEvent({
+        failureState: "note_conflict",
+        sourceKind: "vault.repository.create-version",
+        sourceId: String(input.noteId),
+        userId,
+        errorMessage: `Note ${input.noteId} optimistic-lock conflict (expected v${input.expectedVersion}, latest v${latest.version})`,
+        metadata: {
+          noteId: input.noteId,
+          expectedVersion: input.expectedVersion,
+          latestVersion: latest.version,
+          submitterUserId: userId,
+          versionGap: latest.version - input.expectedVersion,
+        },
+      }).catch(() => {
+        // Fail-soft.
       });
       return { versionId: -1, conflict: true as const, latestVersion: latest.version };
     }

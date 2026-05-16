@@ -13,17 +13,17 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 ---
 
-## 1. Audit summary (post batch-A + first 4 batch-B + T-I.38 golden-question wiring + T-I.40 graph-correction-rejected wiring)
+## 1. Audit summary (batch-B target HIT post #1216)
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **14** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
+| 🟢 LIVE via closed-taxonomy bridge | **15** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written (kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
-| 🟡 Detection state exists in DB but no observability surface | 4 | A status column / audit table carries the state; emission deferred (kinds #2, #6, #7, #10) |
+| 🟡 Detection state exists in DB but no observability surface | 3 | A status column / audit table carries the state; emission deferred (kinds #6, #7, #10) |
 | ❌ No detection yet — phase-gated | 5 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 14/25 closed kinds (56%).** Batch-B target: 15/25 (60%) one more wiring away. T-I.38 (#1213) corrected the premise of the prior audit row for #22 — `runLiveEvaluation` was already callable from server runtime. T-I.40 (#1215) corrected the premise of #23 — `rejectCorrectionProposal` was already shipped in initial Phase 23 lifecycle work, just needed the bridge call wired in. Sum: 14 + 1 + 4 + 5 + 1 = 25 ✓.
+**Live coverage: 15/25 closed kinds (60%).** **Batch-B target met (15/25).** T-I.38 (#1213) corrected the premise of #22 — `runLiveEvaluation` was already callable from server runtime. T-I.40 (#1215) corrected the premise of #23 — `rejectCorrectionProposal` was already shipped; just needed the bridge call. T-I.41 (#1216) corrected the premise of #2 — `repository-asdb.ts` optimistic-lock branch was already detecting and persisting conflicts; just needed the bridge call. Sum: 15 + 1 + 3 + 5 + 1 = 25 ✓.
 
 ---
 
@@ -34,7 +34,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | # | Failure state | Category | Status | Existing emitter / detection | Wiring (shipped or planned) |
 |---|---|---|---|---|---|
 | 1 | `promotion_failed` | governance | 🟢 **LIVE @ #1027 (T-I.5.B.4)** | `PromotionLifecycle.submit` validation-reject + `.reject` operator-reject | `services/promotion/lifecycle.ts` — two emit sites distinguished by `rejectionStage` |
-| 2 | `note_conflict` | runtime | 🟡 | Conflict-resolution UI surfaces conflicts; not emitted as event | Adapter in `services/vault-notes/` (deferred — needs detection-first) |
+| 2 | `note_conflict` | runtime | 🟢 **LIVE @ #1216 (T-I.41)** | `services/vault/repository-asdb.ts` `createNoteVersion` optimistic-lock branch — emits when `latest.version !== input.expectedVersion`; the conflict row write + bridge call are both fail-soft so the operator dashboard sees as much signal as possible | `services/vault/repository-asdb.ts` |
 | 3 | `entity_resolution_conflict` | governance | 🟢 **LIVE @ #1026 (T-I.5.B.3)** | `graph-quality-agent-run` per-scan when scanKind === "duplicate_entity" + findingsCount > 0 | `services/graph-quality/agent-run.ts` |
 | 4 | `neo4j_unavailable` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Health-alert scanner | `services/graph/health-alert.ts` |
 | 5 | `neo4j_degraded` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Same scanner (latency-high collapsed into degraded) | `services/graph/health-alert.ts` |
