@@ -25,7 +25,61 @@
  * ADR: docs/architecture/agent-studio-extension-framework-strategy.md
  */
 
-export type CommandScope = "read" | "write" | "destructive";
+/**
+ * Closed-taxonomy command-registry scope. Promoted to a tuple at
+ * T-G.49 so the metadata table + lockstep tests can be authored.
+ */
+export const COMMAND_SCOPES = ["read", "write", "destructive"] as const;
+export type CommandScope = (typeof COMMAND_SCOPES)[number];
+
+// ============================================================================
+// Per-command-scope operator-facing metadata (T-G.49)
+// ============================================================================
+
+export interface CommandScopeMetadata {
+  /** Display label rendered in the command palette scope chip. */
+  readonly label: string;
+  /** Short operator-facing description of what command scope implies
+   *  for execution semantics. */
+  readonly description: string;
+  /** Stable rank 0-2 for scope severity (0=read → 2=destructive). */
+  readonly rank: 0 | 1 | 2;
+  /** Whether the palette must surface an extra confirmation step for
+   *  this scope (true for `destructive` only). */
+  readonly requiresExtraConfirmation: boolean;
+}
+
+export const COMMAND_SCOPE_METADATA: Readonly<
+  Record<CommandScope, CommandScopeMetadata>
+> = {
+  read: {
+    label: "Read",
+    description:
+      "Command reads state — opens a panel, fetches data, surfaces a view. No mutation; no confirmation needed.",
+    rank: 0,
+    requiresExtraConfirmation: false,
+  },
+  write: {
+    label: "Write",
+    description:
+      "Command writes state — creates, updates, or mutates a record. Single-click invocation; no extra confirmation.",
+    rank: 1,
+    requiresExtraConfirmation: false,
+  },
+  destructive: {
+    label: "Destructive",
+    description:
+      "Command deletes or hard-overrides state. Palette must surface an extra confirmation step before dispatch.",
+    rank: 2,
+    requiresExtraConfirmation: true,
+  },
+};
+
+export function getCommandScopeMetadata(
+  scope: CommandScope,
+): CommandScopeMetadata {
+  return COMMAND_SCOPE_METADATA[scope];
+}
 
 export interface CommandRegistration {
   readonly commandKey: string;
