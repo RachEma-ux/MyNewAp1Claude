@@ -402,9 +402,11 @@ function RenderEnvelopeView({
   }
   // T-F.72 + T-F.73 + T-F.74: apply ALL three drill-in filters
   // (typeKey + visibility + search) to the nodes preview. Edges
-  // remain unfiltered — every axis narrows NODES only. The search
-  // is a case-insensitive substring match across `id` + `label`;
-  // hidden nodes (label undefined) match by id alone.
+  // T-F.81: the 3-axis drill-in narrows NODES; the edges preview
+  // composes via filteredNodeIds / filteredEdges so dangling edges
+  // (endpoints filtered out) stay hidden from the operator surface.
+  // The search is a case-insensitive substring match across
+  // `id` + `label`; hidden nodes (label undefined) match by id alone.
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const filteredNodes = snapshot.nodes.filter((n) => {
     if (typeKeyFilter != null && n.typeKey !== typeKeyFilter) return false;
@@ -417,6 +419,12 @@ function RenderEnvelopeView({
     }
     return true;
   });
+  const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+  const filteredEdges = snapshot.edges.filter(
+    (e) =>
+      filteredNodeIds.has(e.sourceNodeId) &&
+      filteredNodeIds.has(e.targetNodeId),
+  );
   const hasAnyFilter =
     typeKeyFilter != null ||
     visibilityFilter !== "all" ||
@@ -732,7 +740,12 @@ function RenderEnvelopeView({
           </div>
           {snapshot.edges.length > 0 ? (
             <div>
-              <SectionLabel>Edges (first 15)</SectionLabel>
+              <SectionLabel>
+                Edges{" "}
+                {hasAnyFilter
+                  ? `(first 15 of ${filteredEdges.length} matching filters)`
+                  : `(first 15 of ${snapshot.edges.length})`}
+              </SectionLabel>
               <table
                 className="w-full text-xs"
                 data-testid="graph-lens-render-edges-preview"
@@ -745,16 +758,36 @@ function RenderEnvelopeView({
                   </tr>
                 </thead>
                 <tbody>
-                  {snapshot.edges.slice(0, 15).map((e, i) => (
-                    <tr
-                      key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
-                      className="border-t border-border"
-                    >
-                      <td className="py-1 font-mono">{e.typeKey}</td>
-                      <td className="py-1 font-mono">{e.sourceNodeId}</td>
-                      <td className="py-1 font-mono">{e.targetNodeId}</td>
+                  {filteredEdges.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="py-2 text-center text-muted-foreground italic"
+                        data-testid="graph-lens-render-edges-empty-after-filter"
+                      >
+                        No edges match the active filters.{" "}
+                        <button
+                          type="button"
+                          className="underline not-italic"
+                          data-testid="graph-lens-edges-empty-state-clear-all"
+                          onClick={onClearAllFilters}
+                        >
+                          Clear all filters
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredEdges.slice(0, 15).map((e, i) => (
+                      <tr
+                        key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
+                        className="border-t border-border"
+                      >
+                        <td className="py-1 font-mono">{e.typeKey}</td>
+                        <td className="py-1 font-mono">{e.sourceNodeId}</td>
+                        <td className="py-1 font-mono">{e.targetNodeId}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
