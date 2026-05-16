@@ -53,10 +53,16 @@ function renderBucketList(buckets: ReadonlyArray<Bucket>, emptyHint: string) {
   );
 }
 
+const FINDINGS_LIST_LIMIT = 50;
+
 export function GraphQualityFindingsPanel() {
   const statsQ = trpc.agentStudio.graphQuality.getStats.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
+  const findingsQ = trpc.agentStudio.graphQuality.listFindings.useQuery(
+    { limit: FINDINGS_LIST_LIMIT },
+    { refetchOnWindowFocus: false },
+  );
 
   if (statsQ.isLoading) {
     return (
@@ -135,6 +141,69 @@ export function GraphQualityFindingsPanel() {
           {renderBucketList(
             findingsBySeverity,
             "No findings yet — scans haven't produced any quality alerts.",
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>
+            Recent findings
+            {findingsQ.data
+              ? findingsQ.data.length === FINDINGS_LIST_LIMIT
+                ? ` (first ${FINDINGS_LIST_LIMIT}, newest first)`
+                : ` (${findingsQ.data.length}, newest first)`
+              : ""}
+          </SectionLabel>
+          {findingsQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading findings…</p>
+          ) : findingsQ.error ? (
+            <p
+              className="text-sm text-destructive"
+              data-testid="graph-quality-findings-list-error"
+            >
+              Failed to load findings: {findingsQ.error.message}
+            </p>
+          ) : !findingsQ.data || findingsQ.data.length === 0 ? (
+            <p
+              className="text-sm text-muted-foreground italic"
+              data-testid="graph-quality-findings-list-empty"
+            >
+              No findings yet — scans haven&apos;t produced any quality alerts.
+            </p>
+          ) : (
+            <table
+              className="w-full text-xs"
+              data-testid="graph-quality-findings-list"
+            >
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-1">id</th>
+                  <th className="py-1">class</th>
+                  <th className="py-1">severity</th>
+                  <th className="py-1">status</th>
+                  <th className="py-1">source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {findingsQ.data.map((f) => (
+                  <tr
+                    key={f.id}
+                    className="border-t border-border"
+                    data-testid={`graph-quality-finding-row-${f.id}`}
+                  >
+                    <td className="py-1 font-mono">{f.id}</td>
+                    <td className="py-1 font-mono">{f.findingClass}</td>
+                    <td className="py-1 font-mono">{f.severity}</td>
+                    <td className="py-1 font-mono">{f.status}</td>
+                    <td className="py-1 font-mono text-muted-foreground">
+                      {f.sourceTypeKey ?? "—"}
+                      {f.sourceId ? `: ${f.sourceId}` : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>
