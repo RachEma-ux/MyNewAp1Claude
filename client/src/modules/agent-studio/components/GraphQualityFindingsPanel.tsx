@@ -99,6 +99,15 @@ export function GraphQualityFindingsPanel() {
   const [triageFindingId, setTriageFindingId] = useState<number | null>(null);
   const [triageDraft, setTriageDraft] = useState<string>("");
   const [triageError, setTriageError] = useState<string | null>(null);
+  // T-F.89 (T-F.4-ζ.1): bulk selection model. A Set keyed on finding
+  // id so per-row toggles are O(1) and "select-all" can union/diff a
+  // page-slice cheaply. Selection survives filter changes (operator
+  // may multi-step their triage) — explicit Clear-selection control
+  // is the only auto-clear path. Status-gated affordance per
+  // lesson 54: only `open` findings are selectable.
+  const [selectedFindingIds, setSelectedFindingIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   function openReasonEditor(findingId: number) {
     setReasonFindingId(findingId);
     setReasonDraft("");
@@ -125,6 +134,17 @@ export function GraphQualityFindingsPanel() {
   function clearAllFilters() {
     setSeverityFilter(null);
     setStatusFilter(null);
+  }
+  function toggleFindingSelection(findingId: number) {
+    setSelectedFindingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(findingId)) next.delete(findingId);
+      else next.add(findingId);
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedFindingIds(new Set());
   }
 
   const utils = trpc.useUtils();
@@ -377,20 +397,73 @@ export function GraphQualityFindingsPanel() {
                   Triage failed: {triageError}
                 </p>
               ) : null}
-              <table
-                className="w-full text-xs"
-                data-testid="graph-quality-findings-list"
-              >
-                <thead>
-                  <tr className="text-left text-muted-foreground">
-                    <th className="py-1">id</th>
-                    <th className="py-1">class</th>
-                    <th className="py-1">severity</th>
-                    <th className="py-1">status</th>
-                    <th className="py-1">source</th>
-                    <th className="py-1"></th>
-                  </tr>
-                </thead>
+              {(() => {
+                const selectableFindings = findingsQ.data.filter(
+                  (f) => f.status === "open",
+                );
+                const pageAllSelected =
+                  selectableFindings.length > 0 &&
+                  selectableFindings.every((f) =>
+                    selectedFindingIds.has(f.id),
+                  );
+                function togglePageAll() {
+                  setSelectedFindingIds((prev) => {
+                    const next = new Set(prev);
+                    if (pageAllSelected) {
+                      for (const f of selectableFindings) next.delete(f.id);
+                    } else {
+                      for (const f of selectableFindings) next.add(f.id);
+                    }
+                    return next;
+                  });
+                }
+                return (
+                  <>
+                    {selectedFindingIds.size > 0 ? (
+                      <div
+                        className="flex flex-wrap items-center gap-3 text-xs"
+                        data-testid="graph-quality-bulk-selection-bar"
+                      >
+                        <span
+                          className="font-medium"
+                          data-testid="graph-quality-bulk-selection-count"
+                        >
+                          {selectedFindingIds.size} selected
+                        </span>
+                        <button
+                          type="button"
+                          className="underline text-muted-foreground"
+                          data-testid="graph-quality-bulk-clear-selection"
+                          onClick={clearSelection}
+                        >
+                          Clear selection
+                        </button>
+                      </div>
+                    ) : null}
+                    <table
+                      className="w-full text-xs"
+                      data-testid="graph-quality-findings-list"
+                    >
+                      <thead>
+                        <tr className="text-left text-muted-foreground">
+                          <th className="py-1">
+                            <input
+                              type="checkbox"
+                              data-testid="graph-quality-bulk-select-all"
+                              checked={pageAllSelected}
+                              disabled={selectableFindings.length === 0}
+                              onChange={togglePageAll}
+                              aria-label="Select all open findings on this page"
+                            />
+                          </th>
+                          <th className="py-1">id</th>
+                          <th className="py-1">class</th>
+                          <th className="py-1">severity</th>
+                          <th className="py-1">status</th>
+                          <th className="py-1">source</th>
+                          <th className="py-1"></th>
+                        </tr>
+                      </thead>
                 <tbody>
                   {findingsQ.data.map((f) => {
                     const isDismissable = f.status === "open";
@@ -404,12 +477,25 @@ export function GraphQualityFindingsPanel() {
                     const isExpanded = expandedFindingId === f.id;
                     const isReasonOpen = reasonFindingId === f.id;
                     const isTriageOpen = triageFindingId === f.id;
+                    const isSelectable = f.status === "open";
+                    const isSelected = selectedFindingIds.has(f.id);
                     return (
                       <Fragment key={f.id}>
                         <tr
                           className="border-t border-border"
                           data-testid={`graph-quality-finding-row-${f.id}`}
                         >
+                          <td className="py-1">
+                            {isSelectable ? (
+                              <input
+                                type="checkbox"
+                                data-testid={`graph-quality-finding-select-${f.id}`}
+                                checked={isSelected}
+                                onChange={() => toggleFindingSelection(f.id)}
+                                aria-label={`Select finding ${f.id}`}
+                              />
+                            ) : null}
+                          </td>
                           <td className="py-1 font-mono">{f.id}</td>
                           <td className="py-1 font-mono">{f.findingClass}</td>
                           <td className="py-1 font-mono">{f.severity}</td>
@@ -458,7 +544,7 @@ export function GraphQualityFindingsPanel() {
                             data-testid={`graph-quality-finding-trail-row-${f.id}`}
                           >
                             <td
-                              colSpan={6}
+                              colSpan={7}
                               className="bg-muted/20 px-3 py-2 text-xs"
                             >
                               <FindingTrailView
@@ -473,7 +559,7 @@ export function GraphQualityFindingsPanel() {
                             data-testid={`graph-quality-finding-triage-row-${f.id}`}
                           >
                             <td
-                              colSpan={6}
+                              colSpan={7}
                               className="bg-muted/20 px-3 py-2 text-xs"
                             >
                               <div className="space-y-2">
@@ -538,7 +624,7 @@ export function GraphQualityFindingsPanel() {
                             data-testid={`graph-quality-finding-reason-row-${f.id}`}
                           >
                             <td
-                              colSpan={6}
+                              colSpan={7}
                               className="bg-muted/20 px-3 py-2 text-xs"
                             >
                               <div className="space-y-2">
@@ -602,6 +688,9 @@ export function GraphQualityFindingsPanel() {
                   })}
                 </tbody>
               </table>
+                  </>
+                );
+              })()}
             </>
           )}
         </CardContent>

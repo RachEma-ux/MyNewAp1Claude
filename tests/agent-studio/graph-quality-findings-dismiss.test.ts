@@ -86,10 +86,10 @@ describe("Graph Quality Findings dismiss δ-slice (T-F.85 / T-F.4-δ)", () => {
     expect(src).toMatch(/data-testid="graph-quality-dismiss-error"/);
   });
 
-  it("table header gains a 6th (empty) column for the action button", () => {
+  it("table header has a trailing empty <th> for the action button column (T-F.89 added a leading checkbox col ahead of id)", () => {
     const src = readPanel();
     expect(src).toMatch(
-      /<thead>[\s\S]{0,600}<th[^>]*>id<\/th>[\s\S]{0,200}<th[^>]*>class<\/th>[\s\S]{0,200}<th[^>]*>severity<\/th>[\s\S]{0,200}<th[^>]*>status<\/th>[\s\S]{0,200}<th[^>]*>source<\/th>[\s\S]{0,200}<th[^>]*><\/th>/,
+      /<thead>[\s\S]{0,1200}<th[^>]*>id<\/th>[\s\S]{0,200}<th[^>]*>class<\/th>[\s\S]{0,200}<th[^>]*>severity<\/th>[\s\S]{0,200}<th[^>]*>status<\/th>[\s\S]{0,200}<th[^>]*>source<\/th>[\s\S]{0,200}<th[^>]*><\/th>/,
     );
   });
 });

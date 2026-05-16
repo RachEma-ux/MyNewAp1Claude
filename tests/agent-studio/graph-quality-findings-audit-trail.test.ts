@@ -52,10 +52,10 @@ describe("Graph Quality Findings audit-trail θ-slice (T-F.86 / T-F.4-θ)", () =
     expect(src).toMatch(/isExpanded\s*\?\s*"Hide trail"\s*:\s*"View trail"/);
   });
 
-  it("expansion row uses a 6-col colSpan to span the full table width", () => {
+  it("expansion row uses a 7-col colSpan to span the full table width (T-F.89 added a leading checkbox col)", () => {
     const src = readPanel();
     expect(src).toMatch(
-      /isExpanded\s*\?\s*\([\s\S]{0,400}colSpan=\{6\}/,
+      /isExpanded\s*\?\s*\([\s\S]{0,400}colSpan=\{7\}/,
     );
     expect(src).toMatch(
       /data-testid=\{`graph-quality-finding-trail-row-\$\{f\.id\}`\}/,

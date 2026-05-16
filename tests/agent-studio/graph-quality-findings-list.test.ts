@@ -31,10 +31,10 @@ describe("Graph Quality Findings list β-slice (T-F.83 / T-F.4-β)", () => {
     expect(src).toMatch(/limit:\s*FINDINGS_LIST_LIMIT/);
   });
 
-  it("findings list table renders id / class / severity / status / source (5 columns)", () => {
+  it("findings list table renders id / class / severity / status / source (5 data columns; T-F.89 added a leading checkbox col)", () => {
     const src = readPanel();
     expect(src).toMatch(
-      /<thead>[\s\S]{0,600}<th[^>]*>id<\/th>[\s\S]{0,200}<th[^>]*>class<\/th>[\s\S]{0,200}<th[^>]*>severity<\/th>[\s\S]{0,200}<th[^>]*>status<\/th>[\s\S]{0,200}<th[^>]*>source<\/th>/,
+      /<thead>[\s\S]{0,1200}<th[^>]*>id<\/th>[\s\S]{0,200}<th[^>]*>class<\/th>[\s\S]{0,200}<th[^>]*>severity<\/th>[\s\S]{0,200}<th[^>]*>status<\/th>[\s\S]{0,200}<th[^>]*>source<\/th>/,
     );
   });
 
