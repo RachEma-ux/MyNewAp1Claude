@@ -1173,6 +1173,55 @@ export function getAgsEffortLevelMetadata(
 export const AGS_MEMORY_SCOPES = ["user", "project", "local"] as const;
 export type AgsMemoryScope = (typeof AGS_MEMORY_SCOPES)[number];
 
+// ============================================================================
+// Per-memory-scope operator-facing metadata (T-S.16)
+// ============================================================================
+
+export interface AgsMemoryScopeMetadata {
+  /** Display label rendered in the memory-scope picker. */
+  readonly label: string;
+  /** Short operator-facing description of where the memory lives. */
+  readonly description: string;
+  /** Whether the memory is shared across projects (true for `user`
+   *  only). */
+  readonly crossProject: boolean;
+  /** Whether the memory survives `git clone` (true for user/project;
+   *  false for local because local is typically gitignored). */
+  readonly survivesClone: boolean;
+}
+
+export const AGS_MEMORY_SCOPE_METADATA: Readonly<
+  Record<AgsMemoryScope, AgsMemoryScopeMetadata>
+> = {
+  user: {
+    label: "User",
+    description:
+      "User-level memory in `~/.claude/projects/*` — shared across every project the user works on.",
+    crossProject: true,
+    survivesClone: true,
+  },
+  project: {
+    label: "Project",
+    description:
+      "Project-level memory checked into the repo — shared across the team via `git`.",
+    crossProject: false,
+    survivesClone: true,
+  },
+  local: {
+    label: "Local",
+    description:
+      "Local-only memory not checked in (typically gitignored) — operator-specific overrides that don't ship to teammates.",
+    crossProject: false,
+    survivesClone: false,
+  },
+};
+
+export function getAgsMemoryScopeMetadata(
+  scope: AgsMemoryScope,
+): AgsMemoryScopeMetadata {
+  return AGS_MEMORY_SCOPE_METADATA[scope];
+}
+
 /** Plugin loader type (per openllm `SdkPluginConfigSchema`). */
 export const AGS_PLUGIN_TYPES = ["local"] as const;
 export type AgsPluginType = (typeof AGS_PLUGIN_TYPES)[number];

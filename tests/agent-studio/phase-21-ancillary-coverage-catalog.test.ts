@@ -141,6 +141,7 @@ const ANCILLARY_TESTS = [
   "ags-effort-level-metadata.test.ts",
   "ags-mcp-transport-metadata.test.ts",
   "ags-permission-source-metadata.test.ts",
+  "ags-memory-scope-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
