@@ -26,6 +26,7 @@ import type {
 } from "./ingestion";
 import { EmbeddingDimMismatchError } from "./ingestion";
 import type { RetrievalPlan, RetrievalPlanItem } from "./retrieval-planner";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge";
 
 /** D-RET-6 default. Per-profile override flows through `RetrievalPlan.profile.timeoutMs`. */
 export const DEFAULT_RETRIEVAL_TIMEOUT_MS = 3000;
@@ -88,10 +89,40 @@ export async function executeRetrieval(
     for (const w of r.warnings) warnings.push(`source=${r.sourceId}: ${w}`);
   }
 
+  const totalLatencyMs = Date.now() - start;
+
+  // T-I.51 — Phase 22 closed-taxonomy emission for kind #10
+  // `graph_query_timeout`. One event per executor call (NOT per
+  // timed-out source) to avoid drowning the dashboard when an entire
+  // plan times out simultaneously. `timedOutSourceIds` carries the
+  // per-source breakdown so operators can drill into which sources
+  // hung. Fire-and-forget per the bridge's fail-soft contract; the
+  // executor's own caller surface (`perSource[].errorReason`) remains
+  // the authoritative behavior signal.
+  const timedOutSources = perSource.filter((r) => r.errorReason === "timeout");
+  if (timedOutSources.length > 0) {
+    void recordFailureStateEvent({
+      failureState: "graph_query_timeout",
+      sourceKind: "rac-retrieval-executor",
+      sourceId:
+        input.runtimeRunId !== undefined ? String(input.runtimeRunId) : null,
+      errorMessage: `${timedOutSources.length} of ${perSource.length} sources timed out (timeoutMs=${timeoutMs})`,
+      metadata: {
+        timeoutMs,
+        timedOutCount: timedOutSources.length,
+        totalSourceCount: perSource.length,
+        timedOutSourceIds: timedOutSources.map((r) => r.sourceId),
+        totalLatencyMs,
+      },
+    }).catch(() => {
+      // Fail-soft.
+    });
+  }
+
   return {
     perSource,
     chunks,
-    totalLatencyMs: Date.now() - start,
+    totalLatencyMs,
     warnings,
   };
 }

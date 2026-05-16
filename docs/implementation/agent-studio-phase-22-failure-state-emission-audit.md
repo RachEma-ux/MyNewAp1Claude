@@ -1,9 +1,9 @@
 # Phase 22 — Failure-state emission audit (T-I.4)
 
-**Date:** 2026-05-15 (refreshed after batch-A + first 4 batch-B wirings landed)
+**Date:** 2026-05-16 (refreshed after T-I.51 retrieval-executor wiring closed kind #10)
 **Status:** Audit + active emission tracking. Maps the 25 closed-taxonomy failure states (#1002) onto existing emitters in `server/agent-studio/services/**`, so the future wiring slices have a fixed scope.
 
-**Live emission status:** **12 of 25 closed kinds have live emitters** (6 batch-A + 5 batch-B + 1 sibling-emit @ #1030). Remaining 13: 2 ⚠️ partial (count-pin / script-only) + 4 🟡 detection-only + 6 ❌ phase-gated + 1 🔒 T-D.3.
+**Live emission status:** **17 of 25 closed kinds have live emitters** (6 batch-A + 5 batch-B + 1 sibling-emit @ #1030 + kind #7 5-PR sub-arc + kind #10 retrieval-executor sibling-emit @ T-I.51). Remaining 8: 1 ⚠️ partial (count-pin / script-only) + 1 🟡 detection-only + 5 ❌ phase-gated + 1 🔒 T-D.3.
 
 This document is the bridge between two artifacts:
 - **Closed-taxonomy contract** (`services/failure-states/contracts.ts`, #1002) — the 25 named failure states + categories + severity + recoverable metadata.
@@ -13,17 +13,17 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 ---
 
-## 1. Audit summary (post #1222 — kind #7 sub-arc closure)
+## 1. Audit summary (post T-I.51 — kind #10 sibling-emit closure)
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **16** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #7, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
+| 🟢 LIVE via closed-taxonomy bridge | **17** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #7, #8, #9, #10, #12, #15, #18, #19, #20, #21, #22, #23) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written (kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
-| 🟡 Detection state exists in DB but no observability surface | 2 | A status column / audit table carries the state; emission deferred (kinds #6, #10) |
+| 🟡 Detection state exists in DB but no observability surface | 1 | A status column / audit table carries the state; emission deferred (kind #6) |
 | ❌ No detection yet — phase-gated | 5 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 16/25 closed kinds (64%).** **Batch-B target met (15/25); first post-batch-B kind closure is #7.** T-I.38 (#1213) corrected the premise of #22. T-I.40 (#1215) corrected the premise of #23. T-I.41 (#1216) corrected the premise of #2. **T-I.43 → T-I.47 (#1218-#1222) is the first NEW-detection sub-arc** — kind #7 didn't have a freshness-lag computation; the 5-PR ladder built one from scratch (detector → orchestrator → DB fetcher → admin tRPC → scheduled cron). Sum: 16 + 1 + 2 + 5 + 1 = 25 ✓.
+**Live coverage: 17/25 closed kinds (68%).** **Batch-B target met (15/25); kind #7 closed via 5-PR new-detection ladder; kind #10 closed via 1-PR sibling-emit at T-I.51.** T-I.38 (#1213) corrected the premise of #22. T-I.40 (#1215) corrected the premise of #23. T-I.41 (#1216) corrected the premise of #2. **T-I.43 → T-I.47 (#1218-#1222) is the first NEW-detection sub-arc** — kind #7 didn't have a freshness-lag computation; the 5-PR ladder built one from scratch. T-I.51 took the simpler 1-PR path for kind #10 because the detection already existed (`runWithTimeout` → `errorReason: "timeout"` branch in `runItem`); only the emission was missing. Sum: 17 + 1 + 1 + 5 + 1 = 25 ✓.
 
 ---
 
@@ -42,7 +42,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 7 | `neo4j_projection_stale` | infrastructure | 🟢 **LIVE @ T-I.43 → T-I.47 (#1218-#1222)** | 5-PR sub-arc shipped detector + emitter + orchestrator + DB fetcher + admin tRPC + scheduled cron at 04:15 UTC; emits one event per stale projection (lag > 1h default) | `services/graph/projection/staleness-detector.ts` + `staleness-cron.ts` |
 | 8 | `neo4j_projection_drift_detected` | infrastructure | 🟢 **LIVE @ #1015 (T-I.5.A.2)** | Drift cron emits when driftCount > 0 | `services/graph/projection/drift-cron.ts` |
 | 9 | `projection_sync_failed` | infrastructure | 🟢 **LIVE @ #1025 (T-I.5.B.2)** | Sync worker `status === "failed"` (includes partial-success) | `services/graph/projection/sync-worker.ts` |
-| 10 | `graph_query_timeout` | retrieval | 🟡 | GraphRAG router timeout configured; no per-query event | Adapter in `services/rac/retrieval-executor.ts` (deferred) |
+| 10 | `graph_query_timeout` | retrieval | 🟢 **LIVE @ T-I.51** | `services/rac/retrieval-executor.ts` `executeRetrieval` — counts `perSource[r].errorReason === "timeout"` after the parallel `runItem` fan-out and emits ONE event per executor call when count > 0; `timedOutSourceIds` metadata carries the per-source breakdown so dashboards can drill in without per-source emission noise | `services/rac/retrieval-executor.ts` |
 | 11 | `backlink_refresh_failed` | runtime | ❌ | No backlink refresh module exists yet | Phase-gated on backlink runtime addition |
 | 12 | `runtime_reference_hidden_by_permission` | governance | 🟢 **LIVE @ #1030 (T-I.5.B.5)** | Permission-denied subset of safety-filter events emits dedicated kind (sibling to #1016's aggregated emit) | `services/graph/retrieval/retrieval-router.ts` |
 | 13 | `cag_reference_invalidated` | governance | ❌ | CAG invalidation runtime does not exist; only a docblock comment | Phase-gated on CAG invalidation runtime |
@@ -129,7 +129,7 @@ This shape:
 
 The original ordering speculated detection-state per kind. As the wirings landed, several speculative premises proved wrong (the audit assumed detection didn't exist where it actually did — see §1 corrections). This refreshed view groups by actual current state, not original ordering.
 
-### Done — 16 wirings shipped (one past batch-B; kind #7 closure begins post-batch-B push)
+### Done — 17 wirings shipped (kind #7 5-PR ladder + kind #10 1-PR sibling-emit)
 
 | # | Kind | PR / Slice | Notes |
 |---|---|---|---|
@@ -149,15 +149,15 @@ The original ordering speculated detection-state per kind. As the wirings landed
 | #21 | `graph_agent_answer_incomplete` | T-I.5.B.1 / #1023 | Engine agentic loop budget exhaustion |
 | #22 | `golden_question_failed` | T-I.38 / #1213 | `runLiveEvaluation` per failed question — corrected "needs runtime move" premise |
 | #23 | `graph_correction_rejected` | T-I.40 / #1215 | `decide({decision: "rejected"})` branch only — corrected "no reject path exists" premise |
+| #10 | `graph_query_timeout` | T-I.51 | `executeRetrieval` aggregated emit after parallel `runItem` fan-out — one event per executor call (NOT per source) with `timedOutSourceIds` metadata for drill-down |
 
 ### Detection-only blocker — 1 ⚠️
 
 - #25 `background_job_failed` — locked by count-pinned tests (lesson 22). Closure requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice after operator-dashboard query migration.
 
-### Detection-gap — 2 🟡 (remaining)
+### Detection-gap — 1 🟡 (remaining)
 
-- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first. The kind-#7 5-PR ladder (#1218-#1222) is the reference pattern: pure detector → orchestrator → DB fetcher → admin tRPC → scheduled cron.
-- #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts. Same 5-PR ladder applies.
+- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first. The kind-#7 5-PR ladder (#1218-#1222) is the reference pattern: pure detector → orchestrator → DB fetcher → admin tRPC → scheduled cron. Distinct from kind #10 (closed @ T-I.51) because that one only needed a sibling-emit at the existing executor timeout branch; #6 needs to introduce the per-Cypher-query timeout enforcement first.
 
 ### Phase-gated — 5 ❌ + 1 🔒
 
