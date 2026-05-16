@@ -136,3 +136,32 @@ export {
   maybeInstallRuntimeLensRunnerWithAsdb,
   type MaybeInstallRuntimeLensRunnerWithAsdbOptions,
 } from "./install-runtime-lens-runner-with-asdb.js";
+
+export {
+  buildGovernanceLensSnapshot,
+  clampGovernanceLensLimit,
+  createGovernanceLensRunner,
+  isGovernanceNodeVisibleToViewer,
+  GOVERNANCE_LENS_ABSOLUTE_LIMIT,
+  GOVERNANCE_LENS_DEFAULT_LIMIT,
+  type BuildGovernanceLensSnapshotInput,
+  type CreateGovernanceLensRunnerDeps,
+  type GovernanceLensReadFn,
+  type GovernanceLensReadParams,
+  type GovernanceLensReadResult,
+  type GovernanceLensRequestRow,
+  type GovernanceLensStepRow,
+} from "./runners/governance-lens-runner.js";
+
+export {
+  createGovernanceLensAsdbReader,
+  type CreateGovernanceLensAsdbReaderOptions,
+} from "./runners/governance-lens-asdb-reader.js";
+
+export {
+  maybeInstallGovernanceLensRunner,
+  maybeInstallGovernanceLensRunnerWithAsdb,
+  type MaybeInstallGovernanceLensRunnerOptions,
+  type MaybeInstallGovernanceLensRunnerResult,
+  type MaybeInstallGovernanceLensRunnerWithAsdbOptions,
+} from "./install-governance-lens-runner.js";
