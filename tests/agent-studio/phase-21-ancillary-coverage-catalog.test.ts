@@ -213,6 +213,7 @@ const ANCILLARY_TESTS = [
   "summarize-graph-correction-proposals.test.ts",
   "summarize-graph-correction-audit-events.test.ts",
   "summarize-lifecycle-holds.test.ts",
+  "summarize-presence.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
