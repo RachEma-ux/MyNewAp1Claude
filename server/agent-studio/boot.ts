@@ -853,6 +853,41 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-graph-lens] install skipped — ${message}`);
   }
 
+  // Step 3.36 — V1+ Phase 24 T-F.70 (2026-05-16): real lens runners
+  // boot composer. Env-flag-gated per-kind:
+  //   AGS_GRAPH_LENS_<KIND>_RUNNER_INSTALL=on
+  // for KIND in RUNTIME / GOVERNANCE / MCP / CAG / RAG / RAC /
+  // GRAPH_SKILL / INSTITUTIONAL_MEMORY. Each flag is independent —
+  // operators can enable any subset, the rest fall back to whatever
+  // Step 3.35 installed (stubs when stub flag is on; nothing
+  // otherwise).
+  //
+  // IMPORTANT: an operator who sets BOTH the stub install flag
+  // (Step 3.35) AND a real install flag (this step) for the same kind
+  // will get a `LensRunnerAlreadyRegisteredForKindError` at boot
+  // because `registerLensRunner` rejects duplicate kind keys. This
+  // try-catch swallows the error AND logs the per-kind perKind result
+  // — boot continues with whichever runners did register. Pick ONE
+  // strategy per kind: real OR stub, never both.
+  try {
+    const { maybeInstallAllLensRunnersWithAsdb } = await import(
+      "./services/graph-lens/public-api"
+    );
+    const result = maybeInstallAllLensRunnersWithAsdb();
+    if (result.installedCount > 0) {
+      const installedKinds = Object.entries(result.perKind)
+        .filter(([, installed]) => installed)
+        .map(([kind]) => kind)
+        .join(", ");
+      console.log(
+        `[ags-graph-lens] real lens runners installed — count=${result.installedCount}/8 fullyInstalled=${result.fullyInstalled} kinds=[${installedKinds}]`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-graph-lens] real runners install skipped — ${message}`);
+  }
+
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.
   // PR-V1-1 (#748) shipped the pure evaluator + persistence; this cron
   // wakes the scan automatically every 5 minutes so operators don't
