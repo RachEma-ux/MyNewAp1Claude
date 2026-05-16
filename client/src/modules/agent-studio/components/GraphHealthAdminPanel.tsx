@@ -77,6 +77,14 @@ export function GraphHealthAdminPanel() {
     trpc.agentStudio.graphProjection.getDriftCronStatus.useQuery(undefined, {
       refetchOnWindowFocus: false,
     });
+  // T-I.50 (#1226): projection staleness cron status. Shipped end-to-
+  // end via the 5-PR sub-arc (#1218-#1222) + boot wiring (#1224); this
+  // panel surface lets operators see staleness counts in the same
+  // location as drift and alert crons.
+  const stalenessCronQ =
+    trpc.agentStudio.graphProjection.getStalenessCronStatus.useQuery(undefined, {
+      refetchOnWindowFocus: false,
+    });
 
   return (
     <div className="space-y-4">
@@ -248,6 +256,87 @@ export function GraphHealthAdminPanel() {
                     <span className="font-medium">scannedAt:</span>{" "}
                     <span className="font-mono">
                       {driftCronQ.data.lastResult.scannedAt}
+                    </span>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Projection staleness cron status</SectionLabel>
+          {stalenessCronQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading staleness cron status…
+            </p>
+          ) : stalenessCronQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load staleness cron: {stalenessCronQ.error.message}
+            </p>
+          ) : stalenessCronQ.data == null ? (
+            <p className="text-sm text-muted-foreground">
+              No staleness cron status.
+            </p>
+          ) : (
+            <div
+              className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm"
+              data-testid="graph-projection-staleness-cron-grid"
+            >
+              <div>
+                <span className="font-medium">lastRunAt:</span>{" "}
+                <span className="font-mono">
+                  {fmtTs(stalenessCronQ.data.lastRunAt)}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">lastError:</span>{" "}
+                <span
+                  className={`font-mono ${stalenessCronQ.data.lastError ? "text-destructive" : ""}`}
+                >
+                  {stalenessCronQ.data.lastError?.message ?? "—"}
+                </span>
+              </div>
+              {stalenessCronQ.data.lastResult ? (
+                <>
+                  <div>
+                    <span className="font-medium">
+                      distinctProjectionCount:
+                    </span>{" "}
+                    <span className="font-mono">
+                      {stalenessCronQ.data.lastResult.distinctProjectionCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">staleCount:</span>{" "}
+                    <span
+                      className={`font-mono ${stalenessCronQ.data.lastResult.staleCount > 0 ? "text-destructive" : ""}`}
+                    >
+                      {stalenessCronQ.data.lastResult.staleCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">
+                      neverSucceededCount:
+                    </span>{" "}
+                    <span
+                      className={`font-mono ${stalenessCronQ.data.lastResult.neverSucceededCount > 0 ? "text-destructive" : ""}`}
+                    >
+                      {stalenessCronQ.data.lastResult.neverSucceededCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">freshCount:</span>{" "}
+                    <span className="font-mono">
+                      {stalenessCronQ.data.lastResult.freshCount}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">scannedAt:</span>{" "}
+                    <span className="font-mono">
+                      {stalenessCronQ.data.lastResult.scannedAt}
                     </span>
                   </div>
                 </>
