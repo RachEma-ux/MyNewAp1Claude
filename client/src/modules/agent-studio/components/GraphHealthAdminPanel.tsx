@@ -1,5 +1,5 @@
 /**
- * Graph Health admin panel — PR-V1-190 + T-I.55 + T-I.56.
+ * Graph Health admin panel — PR-V1-190 + T-I.55 + T-I.56 + T-I.57.
  *
  * Operator surface for the graph-health alert cron (J-1-β, #758).
  * The graphHealth router (`getAlertCronStatus` + `listOpen`) has
@@ -16,6 +16,12 @@
  * resolves alerts when the next scan no longer observes the breach
  * key); the operator path dismisses a specific alert id without
  * waiting for the next scan.
+ *
+ * T-I.57 added a Run-now button for the health-alert scan itself
+ * (admin tRPC `agentStudio.graphHealth.runAlertScan`). Mirrors
+ * T-I.55's shape — runs the same `runHealthAlertScan` the cron
+ * wrapper invokes, useful for confirming threshold changes or
+ * triaging backend issues without waiting for the 5-min cron tick.
  */
 
 import { useState } from "react";
@@ -92,6 +98,26 @@ export function GraphHealthAdminPanel() {
   const stalenessCronQ =
     trpc.agentStudio.graphProjection.getStalenessCronStatus.useQuery(undefined, {
       refetchOnWindowFocus: false,
+    });
+
+  // T-I.57: operator-triggered ad-hoc health alert scan. Mirrors
+  // the T-I.55 staleness Run-now button shape. Useful for confirming
+  // a freshly-deployed threshold change or triaging a suspected
+  // backend issue without waiting for the next 5-minute cron tick.
+  const [alertScanFeedback, setAlertScanFeedback] = useState<string | null>(
+    null,
+  );
+  const runAlertScanMutation =
+    trpc.agentStudio.graphHealth.runAlertScan.useMutation({
+      onSuccess: (data) => {
+        setAlertScanFeedback(
+          `Scan complete: status=${data.status}, decisions=${data.decisions.length}, raised=${data.persisted.raised}, resolved=${data.persisted.resolved}.`,
+        );
+        void utils.agentStudio.graphHealth.getAlertCronStatus.invalidate();
+        void utils.agentStudio.graphHealth.listOpen.invalidate();
+      },
+      onError: (err) =>
+        setAlertScanFeedback(`Alert scan failed: ${err.message}`),
     });
 
   // T-I.55: operator-triggered ad-hoc staleness check. Mirrors the
@@ -229,6 +255,25 @@ export function GraphHealthAdminPanel() {
               ) : null}
             </div>
           )}
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="text-sm underline"
+              disabled={runAlertScanMutation.isPending}
+              onClick={() => runAlertScanMutation.mutate()}
+              data-testid="graph-health-alert-scan-run-now-button"
+            >
+              {runAlertScanMutation.isPending ? "Scanning…" : "Run alert scan now"}
+            </button>
+            {alertScanFeedback ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="graph-health-alert-scan-run-now-feedback"
+              >
+                {alertScanFeedback}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
