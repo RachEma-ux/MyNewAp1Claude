@@ -44,6 +44,7 @@ import {
   agsGraphCorrectionDecisions,
   agsGraphCorrectionAuditEvents,
 } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
+import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -322,6 +323,32 @@ async function decide(
       rationale: input.rationale ?? null,
     },
   });
+
+  // T-I.40: emit `graph_correction_rejected` closed-taxonomy event on
+  // the reject decision. Approve / revision_requested do not emit —
+  // approve is a healthy lifecycle transition; revision_requested is
+  // a routine reviewer signal, not a failure. Fire-and-forget per the
+  // bridge's fail-soft contract.
+  if (input.decision === "rejected") {
+    void recordFailureStateEvent({
+      failureState: "graph_correction_rejected",
+      sourceKind: "graph-correction.lifecycle.reject",
+      sourceId: String(input.proposalId),
+      userId: input.decidedByUserId,
+      errorMessage: `Graph correction proposal ${input.proposalId} rejected by reviewer`,
+      metadata: {
+        proposalId: input.proposalId,
+        proposalKind: current.proposalKind,
+        targetTypeKey: current.targetTypeKey,
+        targetId: current.targetId,
+        decidedByUserId: input.decidedByUserId,
+        hasRationale: input.rationale !== null && input.rationale !== undefined,
+        priorStatus: current.status,
+      },
+    }).catch(() => {
+      // Fail-soft.
+    });
+  }
 
   const updated = await getProposalById(input.proposalId, options);
   if (!updated) throw new CorrectionProposalNotFoundError(input.proposalId);
