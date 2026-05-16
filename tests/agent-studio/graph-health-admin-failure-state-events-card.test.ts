@@ -33,8 +33,13 @@ describe("T-I.60 — failure-state events card on GraphHealthAdminPanel", () => 
   });
 
   it("passes a default limit of 50 (smaller than the tRPC's 200 default)", () => {
+    // Regex relaxed by T-I.64: the same useQuery now also threads a
+    // `kind` arg, so the input object is no longer `{ limit: 50 }`
+    // alone. Anchor the assertion to the useQuery + a `limit: 50`
+    // appearing inside it, rather than requiring the closing brace
+    // immediately after.
     expect(
-      /listRecentFailureStateEvents\.useQuery\(\s*\{\s*limit:\s*50\s*\}/.test(
+      /listRecentFailureStateEvents\.useQuery\(\s*\{[\s\S]{0,400}limit:\s*50/.test(
         src,
       ),
     ).toBe(true);

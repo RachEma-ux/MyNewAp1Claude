@@ -50,6 +50,13 @@
  * readability so operators see the closed kind directly. Closes
  * the gap that left the raw rows unrendered after T-I.60 + T-I.61
  * surfaced summary + drilldowns but not the individual events.
+ *
+ * T-I.64 added a kind-filter <select> consumer of T-I.63's
+ * optional `kind` narrower on `listRecentFailureStateEvents`.
+ * Lets operators investigating a quieter kind escape the 50-row
+ * buffer being dominated by a louder neighbor (the canonical
+ * incident pattern is `graph_query_timeout` flooding while a
+ * smaller kind like `text2cypher_rejected` triages in parallel).
  */
 
 import { useState } from "react";
@@ -57,6 +64,46 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SectionLabel } from "./ui";
+
+/**
+ * Closed-taxonomy kinds, mirrored from
+ * `server/agent-studio/services/failure-states/contracts.ts`
+ * `FAILURE_STATES`. Inlined here to avoid a server-import boundary
+ * crossing for the kind-filter dropdown options. Drift would be
+ * caught by the server's `z.enum(FAILURE_STATES)` validator on
+ * `listRecentFailureStateEvents` — sending an unknown kind would
+ * 400, surfacing the drift loudly rather than silently filtering
+ * to zero rows.
+ *
+ * T-I.64.
+ */
+const FAILURE_STATE_KIND_OPTIONS = [
+  "promotion_failed",
+  "note_conflict",
+  "entity_resolution_conflict",
+  "neo4j_unavailable",
+  "neo4j_degraded",
+  "neo4j_query_timeout",
+  "neo4j_projection_stale",
+  "neo4j_projection_drift_detected",
+  "projection_sync_failed",
+  "graph_query_timeout",
+  "backlink_refresh_failed",
+  "runtime_reference_hidden_by_permission",
+  "cag_reference_invalidated",
+  "graph_skill_reference_invalidated",
+  "tool_schema_changed",
+  "search_index_stale",
+  "query_cache_stale",
+  "text2cypher_rejected",
+  "cypher_query_template_failed",
+  "retrieval_safety_filter_blocked_content",
+  "graph_agent_answer_incomplete",
+  "golden_question_failed",
+  "graph_correction_rejected",
+  "semantic_enrichment_rejected",
+  "background_job_failed",
+] as const;
 
 function fmtTs(ts: Date | string | null | undefined): string {
   if (!ts) return "—";
@@ -136,9 +183,18 @@ export function GraphHealthAdminPanel() {
   // is the natural placement. Default limit 50 (smaller than the
   // tRPC's 200 default — keeps the inline table sized for an
   // overview without separate pagination).
+  //
+  // T-I.64 — `kindFilter === null` requests the full 25-kind stream
+  // (default behavior). When the operator picks a specific kind,
+  // we pass `kind: [kindFilter]` so the server pre-filters the
+  // errorClass IN list, dedicating the 50-row buffer to that kind.
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
   const failureStateEventsQ =
     trpc.agentStudio.workspaceObservability.listRecentFailureStateEvents.useQuery(
-      { limit: 50 },
+      {
+        limit: 50,
+        kind: kindFilter !== null ? [kindFilter as never] : undefined,
+      },
       { refetchOnWindowFocus: false },
     );
 
@@ -736,6 +792,46 @@ export function GraphHealthAdminPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Recent failure-state events</SectionLabel>
+          {/* T-I.64: kind-filter dropdown. Sits outside the
+              data-conditional rendering so the operator can change
+              filter during loading without losing the control.
+              Selecting "All kinds" sends `kind: undefined` (full
+              25-kind stream); any specific selection narrows to
+              that kind's IN list. */}
+          <div className="flex items-center gap-2 text-xs">
+            <label
+              htmlFor="graph-health-failure-state-events-kind-filter"
+              className="text-muted-foreground"
+            >
+              Filter by kind:
+            </label>
+            <select
+              id="graph-health-failure-state-events-kind-filter"
+              data-testid="graph-health-failure-state-events-kind-filter"
+              className="rounded border bg-background px-2 py-1 font-mono text-xs"
+              value={kindFilter ?? ""}
+              onChange={(e) =>
+                setKindFilter(e.target.value === "" ? null : e.target.value)
+              }
+            >
+              <option value="">All kinds</option>
+              {FAILURE_STATE_KIND_OPTIONS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            {kindFilter !== null ? (
+              <button
+                type="button"
+                onClick={() => setKindFilter(null)}
+                className="text-xs text-muted-foreground underline"
+                data-testid="graph-health-failure-state-events-kind-filter-clear"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
           {failureStateEventsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading recent failure-state events…
