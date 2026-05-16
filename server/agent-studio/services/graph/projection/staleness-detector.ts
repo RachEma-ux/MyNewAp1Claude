@@ -189,3 +189,37 @@ export function emitStaleProjections(
     });
   }
 }
+
+/**
+ * Manual-trigger orchestrator (T-I.43 follow-up): loads rows from a
+ * supplied row-fetcher, runs the pure detector, fires the emitter, and
+ * returns the summary. The DB-reading default fetcher is the caller's
+ * responsibility — tests inject a stub fetcher; production tRPC /
+ * cron callers pass a Drizzle-based one.
+ *
+ * Decoupled from the cron factory because the detector should be
+ * runnable both on-demand (operator-triggered tRPC) and on schedule
+ * (`makeRetentionCron`); the cron wrapper is a separate slice.
+ */
+export type StalenessRowFetcher = () => Promise<readonly ProjectionSyncJobRow[]>;
+
+export interface RunStalenessCheckOptions
+  extends DetectStaleProjectionsOptions,
+    EmitStaleProjectionsOptions {
+  readonly fetchRows: StalenessRowFetcher;
+}
+
+export async function runStalenessCheck(
+  options: RunStalenessCheckOptions,
+): Promise<ProjectionStalenessSummary> {
+  const rows = await options.fetchRows();
+  const summary = detectStaleProjections(rows, {
+    now: options.now,
+    thresholdMs: options.thresholdMs,
+  });
+  emitStaleProjections(summary, {
+    recordFailureStateEvent: options.recordFailureStateEvent,
+    thresholdMs: options.thresholdMs,
+  });
+  return summary;
+}
