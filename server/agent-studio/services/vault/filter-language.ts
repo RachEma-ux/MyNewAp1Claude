@@ -151,3 +151,76 @@ export function extractFolderIdConstraint(
   }
   return null;
 }
+
+/**
+ * T-F.100 (filter-β): pure-function predicate applying a parsed
+ * `FilterDocument` to an in-memory note record. All conditions are
+ * AND-joined; an empty `conditions` list matches everything.
+ *
+ * The note shape is intentionally narrow — only the fields that V1
+ * conditions reference. Callers (ζ preview's client-side narrower,
+ * future server-side query builder) pass whatever row type they
+ * have; TypeScript's structural typing accepts any superset.
+ *
+ * `null` filter document = match-all (preserves "no narrowing
+ * applied" semantics from `parseFilterDocument`).
+ */
+export interface FilterableNote {
+  readonly slug: string;
+  readonly title: string;
+  readonly governanceStatus: string;
+  readonly updatedAt: string | Date;
+  /**
+   * Notes may or may not carry an explicit `folderId` field. The
+   * predicate treats `undefined` as "not in any folder" — a
+   * `folderId eq N` condition will not match.
+   */
+  readonly folderId?: number | null;
+}
+
+function matchesCondition(
+  note: FilterableNote,
+  condition: FilterCondition,
+): boolean {
+  switch (condition.field) {
+    case "folderId":
+      // `folderId eq N` matches only when the note explicitly has
+      // that folderId. `null` / `undefined` does not match.
+      return note.folderId === condition.value;
+    case "slug":
+      return note.slug === condition.value;
+    case "title":
+      // Case-insensitive substring match. Operators expect "draft"
+      // to find "Draft notes" — case-sensitive would surprise.
+      return note.title
+        .toLowerCase()
+        .includes(condition.value.toLowerCase());
+    case "governanceStatus":
+      return condition.value.includes(note.governanceStatus);
+    case "updatedAt": {
+      const noteMs =
+        typeof note.updatedAt === "string"
+          ? Date.parse(note.updatedAt)
+          : note.updatedAt.getTime();
+      const boundMs = Date.parse(condition.value);
+      if (Number.isNaN(noteMs) || Number.isNaN(boundMs)) {
+        // Defensively reject malformed timestamps — never match
+        // on a comparison we can't evaluate.
+        return false;
+      }
+      return condition.op === "gte" ? noteMs >= boundMs : noteMs <= boundMs;
+    }
+  }
+}
+
+export function applyFilterDocument<T extends FilterableNote>(
+  notes: ReadonlyArray<T>,
+  doc: FilterDocument | null,
+): T[] {
+  if (doc === null || doc.conditions.length === 0) {
+    return notes.slice();
+  }
+  return notes.filter((n) =>
+    doc.conditions.every((c) => matchesCondition(n, c)),
+  );
+}

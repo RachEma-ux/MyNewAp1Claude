@@ -15,7 +15,9 @@ import {
   FilterDocumentSchema,
   parseFilterDocument,
   extractFolderIdConstraint,
+  applyFilterDocument,
   type FilterDocument,
+  type FilterableNote,
 } from "../../server/agent-studio/services/vault/filter-language.js";
 
 describe("FilterConditionSchema — V1 discriminated union", () => {
@@ -254,5 +256,191 @@ describe("extractFolderIdConstraint — ζ-preview compatibility helper", () => 
   it("legacy { folderId: N } shape resolves through extractFolderIdConstraint", () => {
     const doc = parseFilterDocument({ folderId: 9 });
     expect(extractFolderIdConstraint(doc)).toBe(9);
+  });
+});
+
+describe("applyFilterDocument — pure-function predicate (T-F.100 / filter-β)", () => {
+  const notes: FilterableNote[] = [
+    {
+      slug: "draft-meeting",
+      title: "Draft meeting notes",
+      governanceStatus: "draft",
+      updatedAt: "2026-05-10T12:00:00.000Z",
+      folderId: 1,
+    },
+    {
+      slug: "approved-roadmap",
+      title: "Approved roadmap",
+      governanceStatus: "approved",
+      updatedAt: "2026-05-15T08:00:00.000Z",
+      folderId: 2,
+    },
+    {
+      slug: "no-folder",
+      title: "Floating note",
+      governanceStatus: "draft",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+      // folderId omitted — not in any folder
+    },
+    {
+      slug: "old-archive",
+      title: "Old archive item",
+      governanceStatus: "archived",
+      updatedAt: "2025-01-01T00:00:00.000Z",
+      folderId: 1,
+    },
+  ];
+
+  it("null document matches everything (returns a copy, not the same ref)", () => {
+    const out = applyFilterDocument(notes, null);
+    expect(out).toEqual(notes);
+    expect(out).not.toBe(notes);
+  });
+
+  it("empty-conditions document also matches everything", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [],
+    });
+    expect(out).toHaveLength(notes.length);
+  });
+
+  it("folderId eq narrows to notes with the matching folderId only", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [{ field: "folderId", op: "eq", value: 1 }],
+    });
+    expect(out.map((n) => n.slug)).toEqual(["draft-meeting", "old-archive"]);
+  });
+
+  it("folderId eq does NOT match notes with undefined / null folderId", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [{ field: "folderId", op: "eq", value: 99 }],
+    });
+    expect(out).toHaveLength(0);
+  });
+
+  it("slug eq is exact-match (no substring)", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [{ field: "slug", op: "eq", value: "draft-meeting" }],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].slug).toBe("draft-meeting");
+
+    const noMatch = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [{ field: "slug", op: "eq", value: "draft" }],
+    });
+    expect(noMatch).toHaveLength(0);
+  });
+
+  it("title contains is case-insensitive substring", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [{ field: "title", op: "contains", value: "DRAFT" }],
+    });
+    expect(out.map((n) => n.slug)).toEqual(["draft-meeting"]);
+  });
+
+  it("governanceStatus in narrows to any-of", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [
+        {
+          field: "governanceStatus",
+          op: "in",
+          value: ["approved", "archived"],
+        },
+      ],
+    });
+    expect(out.map((n) => n.slug).sort()).toEqual([
+      "approved-roadmap",
+      "old-archive",
+    ]);
+  });
+
+  it("updatedAt gte includes the bound (inclusive)", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [
+        {
+          field: "updatedAt",
+          op: "gte",
+          value: "2026-05-14T00:00:00.000Z",
+        },
+      ],
+    });
+    expect(out.map((n) => n.slug).sort()).toEqual([
+      "approved-roadmap",
+      "no-folder",
+    ]);
+  });
+
+  it("updatedAt lte includes the bound (inclusive)", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [
+        {
+          field: "updatedAt",
+          op: "lte",
+          value: "2026-05-10T12:00:00.000Z",
+        },
+      ],
+    });
+    expect(out.map((n) => n.slug).sort()).toEqual([
+      "draft-meeting",
+      "old-archive",
+    ]);
+  });
+
+  it("multiple conditions are AND-joined", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [
+        {
+          field: "governanceStatus",
+          op: "in",
+          value: ["draft"],
+        },
+        { field: "folderId", op: "eq", value: 1 },
+      ],
+    });
+    // Only draft-meeting matches both (no-folder is draft but
+    // has no folderId, old-archive has folderId=1 but is archived).
+    expect(out.map((n) => n.slug)).toEqual(["draft-meeting"]);
+  });
+
+  it("accepts Date instances for updatedAt (alongside string)", () => {
+    const notesWithDates: FilterableNote[] = notes.map((n) => ({
+      ...n,
+      updatedAt: new Date(n.updatedAt as string),
+    }));
+    const out = applyFilterDocument(notesWithDates, {
+      version: 1,
+      conditions: [
+        {
+          field: "updatedAt",
+          op: "gte",
+          value: "2026-05-14T00:00:00.000Z",
+        },
+      ],
+    });
+    expect(out.map((n) => n.slug).sort()).toEqual([
+      "approved-roadmap",
+      "no-folder",
+    ]);
+  });
+
+  it("preserves input row order (stable filter, not a sort)", () => {
+    const out = applyFilterDocument(notes, {
+      version: 1,
+      conditions: [
+        { field: "governanceStatus", op: "in", value: ["draft"] },
+      ],
+    });
+    // The two drafts appear in their original input order.
+    expect(out.map((n) => n.slug)).toEqual(["draft-meeting", "no-folder"]);
   });
 });
