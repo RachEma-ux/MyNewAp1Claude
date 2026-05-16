@@ -38,6 +38,11 @@
  * taxonomy event stream. Placement here is intentional: closed-
  * taxonomy events skew graph-health adjacent (#4, #5, #7, #8, #9,
  * #10, #12, plus retrieval/agent kinds).
+ *
+ * T-I.61 extended the T-I.60 card with a per-source-kind breakdown
+ * table aggregated client-side from `rows` (no server change).
+ * Answers "which emitter is loudest right now" alongside the
+ * "which kind is most common" question the by-kind table answers.
  */
 
 import { useState } from "react";
@@ -811,6 +816,55 @@ export function GraphHealthAdminPanel() {
                             </td>
                           </tr>
                         ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {/* T-I.61: per-source-kind breakdown, computed client-
+                  side from the raw rows. Operators use this to
+                  answer "which emitter is loudest right now"
+                  without a separate server query. Same descending-
+                  count sort as the by-kind table; render gated on
+                  totalEvents > 0 (so an empty workspace doesn't
+                  show the section header). */}
+              {failureStateEventsQ.data.rows.length > 0 ? (
+                <div className="overflow-x-auto pt-2 border-t">
+                  <p className="text-xs text-muted-foreground pb-1">
+                    Per source-kind (over the {failureStateEventsQ.data.rows.length}{" "}
+                    sampled rows)
+                  </p>
+                  <table
+                    className="w-full text-sm border-collapse"
+                    data-testid="graph-health-failure-state-events-by-source-kind-table"
+                  >
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="py-1 pr-3">Source kind</th>
+                        <th className="py-1 pr-3">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const counts = new Map<string, number>();
+                        for (const r of failureStateEventsQ.data.rows) {
+                          counts.set(
+                            r.sourceKind,
+                            (counts.get(r.sourceKind) ?? 0) + 1,
+                          );
+                        }
+                        return Array.from(counts.entries())
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([sourceKind, count]) => (
+                            <tr key={sourceKind} className="border-t">
+                              <td className="py-1 pr-3 font-mono text-xs">
+                                {sourceKind}
+                              </td>
+                              <td className="py-1 pr-3 font-mono text-xs">
+                                {count}
+                              </td>
+                            </tr>
+                          ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
