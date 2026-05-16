@@ -156,7 +156,7 @@ The original ordering speculated detection-state per kind. As the wirings landed
 ### Detection-gap — 3 🟡
 
 - #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first.
-- #7 `neo4j_projection_stale` — **DETECTOR + ORCHESTRATOR + DB FETCHER shipped @ #1218 (T-I.43) + #1219 (T-I.44) + #1220 (T-I.45)** in `services/graph/projection/staleness-detector.ts`. Pure-function detector groups `agsGraphProjectionSyncJobs` rows per projection key, computes max(completedAt) among succeeded runs, partitions into stale / neverSucceeded / freshCount. `runStalenessCheck({ fetchRows, ... })` orchestrator composes fetcher → detector → emitter. `loadStalenessRowsFromAsDb({ limit?, getDb? })` reads ASDB and maps to `ProjectionSyncJobRow[]`. Together these compose into an end-to-end check: `runStalenessCheck({ fetchRows: () => loadStalenessRowsFromAsDb() })`. The only remaining slice is the cron-schedule wrapper using `makeRetentionCron` (which adds boot-time scheduling — touches scheduler init).
+- #7 `neo4j_projection_stale` — **FULLY CLOSED @ T-I.43 → T-I.47 (5-PR sub-arc)**: pure detector + emitter pair #1218; `runStalenessCheck` orchestrator #1219; `loadStalenessRowsFromAsDb` DB fetcher #1220; admin tRPC `agentStudio.graphProjection.runStalenessCheck` #1221; `makeRetentionCron`-wrapped scheduled cron at 04:15 UTC daily + status surface `agentStudio.graphProjection.getStalenessCronStatus` #1222. Status promotion to 🟢 LIVE in next §1/§2 audit refresh.
 - #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts.
 
 ### Phase-gated — 5 ❌ + 1 🔒
