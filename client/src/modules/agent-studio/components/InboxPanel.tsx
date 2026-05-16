@@ -59,6 +59,43 @@ export function InboxPanel() {
       },
     });
 
+  // ── T-F.109 (T-F.6-γ): dismiss mutation ──
+  // Two-step confirm per lesson 64 — dismiss removes the row from
+  // inbox; while the server reuses the same `read` infrastructure,
+  // from the operator's POV the row vanishes. Recovery requires
+  // pulling the underlying source surface (e.g. the approval bus)
+  // — not single-click reversible per lesson 66.
+  const [dismissConfirmRowId, setDismissConfirmRowId] = useState<number | null>(
+    null,
+  );
+  const [dismissError, setDismissError] = useState<string | null>(null);
+  const [dismissErrorRowId, setDismissErrorRowId] = useState<number | null>(
+    null,
+  );
+
+  const dismissMutation =
+    trpc.agentStudio.workspaceObservability.dismissNotifications.useMutation({
+      onSuccess: () => {
+        utils.agentStudio.workspaceObservability.getMyInbox.invalidate();
+        setDismissError(null);
+        setDismissErrorRowId(null);
+        setDismissConfirmRowId(null);
+      },
+      onError: (err, vars) => {
+        setDismissError(err.message);
+        setDismissErrorRowId(vars.notificationIds[0] ?? null);
+      },
+    });
+
+  function openDismissConfirm(id: number): void {
+    setDismissConfirmRowId(id);
+    setDismissError(null);
+    setDismissErrorRowId(null);
+  }
+  function cancelDismissConfirm(): void {
+    setDismissConfirmRowId(null);
+  }
+
   const notifications = inboxQuery.data?.notifications ?? [];
   const unreadCount = inboxQuery.data?.unreadCount ?? {
     total: 0,
@@ -92,10 +129,10 @@ export function InboxPanel() {
         data-testid="inbox-banner"
       >
         <div>
-          <span className="font-medium text-foreground">Inbox β:</span>{" "}
-          mark-read live (per-row). The server also supports dismiss,
-          mark-all-by-kind, and dismiss-all-by-kind — those land in follow-up
-          slices.
+          <span className="font-medium text-foreground">Inbox γ:</span>{" "}
+          mark-read + dismiss live (per-row). The server also supports
+          mark-all-by-kind and dismiss-all-by-kind bulk actions — those land
+          in follow-up slices.
         </div>
       </div>
 
@@ -223,6 +260,74 @@ export function InboxPanel() {
                       data-testid={`inbox-row-mark-read-error-${n.id}`}
                     >
                       Mark-read failed: {markReadError}
+                    </div>
+                  ) : null}
+                  {/* ── T-F.109 (T-F.6-γ): dismiss ── */}
+                  {dismissConfirmRowId !== n.id ? (
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-0.5 text-xs hover:bg-muted disabled:opacity-50"
+                        disabled={
+                          dismissMutation.isPending &&
+                          dismissMutation.variables?.notificationIds?.[0] ===
+                            n.id
+                        }
+                        onClick={() => openDismissConfirm(n.id)}
+                        data-testid={`inbox-row-dismiss-${n.id}`}
+                      >
+                        Dismiss…
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className="mt-1 rounded border border-destructive/30 bg-destructive/5 p-2 text-xs"
+                      data-testid={`inbox-row-dismiss-confirm-${n.id}`}
+                    >
+                      <div className="text-foreground">
+                        Dismiss notification{" "}
+                        <span className="font-mono">{n.notificationKind}</span>{" "}
+                        (#{n.id})? This removes it from your inbox.
+                      </div>
+                      <div className="mt-1 flex gap-2">
+                        <button
+                          type="button"
+                          className="rounded border border-destructive bg-destructive px-2 py-0.5 text-xs text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+                          disabled={
+                            dismissMutation.isPending &&
+                            dismissMutation.variables?.notificationIds?.[0] ===
+                              n.id
+                          }
+                          onClick={() =>
+                            dismissMutation.mutate({
+                              notificationIds: [n.id],
+                            })
+                          }
+                          data-testid={`inbox-row-dismiss-confirm-button-${n.id}`}
+                        >
+                          {dismissMutation.isPending &&
+                          dismissMutation.variables?.notificationIds?.[0] ===
+                            n.id
+                            ? "Dismissing…"
+                            : "Confirm dismiss"}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border px-2 py-0.5 text-xs hover:bg-muted"
+                          onClick={cancelDismissConfirm}
+                          data-testid={`inbox-row-dismiss-cancel-${n.id}`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {dismissError != null && dismissErrorRowId === n.id ? (
+                    <div
+                      className="mt-1 text-xs text-destructive"
+                      data-testid={`inbox-row-dismiss-error-${n.id}`}
+                    >
+                      Dismiss failed: {dismissError}
                     </div>
                   ) : null}
                 </div>
