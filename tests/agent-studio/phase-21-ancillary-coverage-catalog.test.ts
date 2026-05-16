@@ -184,6 +184,7 @@ const ANCILLARY_TESTS = [
   "static-fact-retrieve-hook.test.ts",
   "static-chunk-assemble-hook.test.ts",
   "static-block-compose-hook.test.ts",
+  "summarize-lane-hook-registry.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
