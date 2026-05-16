@@ -34,6 +34,29 @@ function fmtPercent(n: number): string {
   return `${n.toFixed(1)}%`;
 }
 
+/**
+ * T-F.76 cross-lens linking — map shared typeKeys to the canonical
+ * lens kind that surfaces them as a first-class node. When a node
+ * row in the current preview matches this map AND the current lens
+ * is NOT the canonical kind, the operator can jump to the canonical
+ * lens with the node id pre-loaded into the search filter so the
+ * same entity is reachable across lens boundaries.
+ *
+ * The map is intentionally small and explicit — only the typeKeys
+ * that appear in multiple lens runners (per lesson 43 / cross-lens
+ * shape alignment) are listed:
+ *   - `cag_pack` appears in cag (T-F.65) AND rac (T-F.67).
+ *   - `runtime_run` appears in runtime (T-F.59) AND mcp (T-F.64).
+ *
+ * Adding new shared typeKeys is a one-line edit + a follow-up unit
+ * test extension. The source-scan test asserts the 2 known entries
+ * so future regressions trip loudly.
+ */
+const CROSS_LENS_TYPEKEY_TARGETS: Readonly<Record<string, string>> = {
+  cag_pack: "cag",
+  runtime_run: "runtime",
+};
+
 export function GraphLensBrowserPanel() {
   const [workspaceId, setWorkspaceId] = useState<number>(1);
   const [selectedLensId, setSelectedLensId] = useState<string | null>(null);
@@ -254,6 +277,13 @@ export function GraphLensBrowserPanel() {
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
               onClearAllFilters={clearAllFilters}
+              onJumpToLens={(targetLensId, prefilledSearch) => {
+                setSelectedLensId(targetLensId);
+                setTypeKeyFilter(null);
+                setVisibilityFilter("all");
+                setSearchQuery(prefilledSearch);
+              }}
+              lensList={listQ.data ?? null}
             />
           ) : null}
         </CardContent>
@@ -298,6 +328,13 @@ interface RenderEnvelopeViewProps {
   readonly searchQuery: string;
   readonly onSearchQueryChange: (next: string) => void;
   readonly onClearAllFilters: () => void;
+  readonly onJumpToLens: (targetLensId: string, prefilledSearch: string) => void;
+  readonly lensList:
+    | ReadonlyArray<{
+        definition: { id: string; kind: string };
+        hasRunner: boolean;
+      }>
+    | null;
 }
 
 function RenderEnvelopeView({
@@ -309,6 +346,8 @@ function RenderEnvelopeView({
   searchQuery,
   onSearchQueryChange,
   onClearAllFilters,
+  onJumpToLens,
+  lensList,
 }: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
@@ -548,13 +587,14 @@ function RenderEnvelopeView({
                   <th className="py-1">typeKey</th>
                   <th className="py-1">visible</th>
                   <th className="py-1">label</th>
+                  <th className="py-1"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredNodes.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="py-2 text-center text-muted-foreground italic"
                       data-testid="graph-lens-render-nodes-empty-after-filter"
                     >
@@ -570,16 +610,42 @@ function RenderEnvelopeView({
                     </td>
                   </tr>
                 ) : (
-                  filteredNodes.slice(0, 15).map((n) => (
-                    <tr key={n.id} className="border-t border-border">
-                      <td className="py-1 font-mono">{n.id}</td>
-                      <td className="py-1 font-mono">{n.typeKey}</td>
-                      <td className="py-1 font-mono">
-                        {n.visible ? "true" : "false"}
-                      </td>
-                      <td className="py-1">{n.label ?? "—"}</td>
-                    </tr>
-                  ))
+                  filteredNodes.slice(0, 15).map((n) => {
+                    const targetKind = CROSS_LENS_TYPEKEY_TARGETS[n.typeKey];
+                    const isCurrentLens = targetKind === snapshot.kind;
+                    const targetLens =
+                      targetKind && !isCurrentLens && lensList != null
+                        ? lensList.find(
+                            (entry) =>
+                              entry.definition.kind === targetKind &&
+                              entry.hasRunner,
+                          )
+                        : undefined;
+                    return (
+                      <tr key={n.id} className="border-t border-border">
+                        <td className="py-1 font-mono">{n.id}</td>
+                        <td className="py-1 font-mono">{n.typeKey}</td>
+                        <td className="py-1 font-mono">
+                          {n.visible ? "true" : "false"}
+                        </td>
+                        <td className="py-1">{n.label ?? "—"}</td>
+                        <td className="py-1">
+                          {targetLens ? (
+                            <button
+                              type="button"
+                              className="underline text-muted-foreground"
+                              data-testid={`graph-lens-jump-to-${targetKind}-${n.id}`}
+                              onClick={() =>
+                                onJumpToLens(targetLens.definition.id, n.id)
+                              }
+                            >
+                              Open in {targetKind}
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
