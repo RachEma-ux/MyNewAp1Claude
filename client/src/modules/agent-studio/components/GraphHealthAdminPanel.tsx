@@ -198,12 +198,24 @@ export function GraphHealthAdminPanel() {
   const [sourceKindFilter, setSourceKindFilter] = useState<string | null>(
     null,
   );
+  // T-I.67 — time-window filter. `null` = no `createdSince` (full
+  // buffer = whatever the server's 50-row tail yields). Specific
+  // window = milliseconds before "now" at render time, computed in
+  // the useQuery arg so it picks up the current time on each
+  // refetch (not frozen at component-mount).
+  const [createdSinceWindowMs, setCreatedSinceWindowMs] = useState<
+    number | null
+  >(null);
   const failureStateEventsQ =
     trpc.agentStudio.workspaceObservability.listRecentFailureStateEvents.useQuery(
       {
         limit: 50,
         kind: kindFilter !== null ? [kindFilter as never] : undefined,
         sourceKind: sourceKindFilter ?? undefined,
+        createdSince:
+          createdSinceWindowMs !== null
+            ? new Date(Date.now() - createdSinceWindowMs)
+            : undefined,
       },
       { refetchOnWindowFocus: false },
     );
@@ -839,6 +851,50 @@ export function GraphHealthAdminPanel() {
                 data-testid="graph-health-failure-state-events-kind-filter-clear"
               >
                 Clear
+              </button>
+            ) : null}
+          </div>
+          {/* T-I.67: time-window filter. Operator-friendly preset
+              buttons (1h / 24h / 7d) that drive `createdSince` on
+              the useQuery. "All time" clears back to no
+              `createdSince`. Time-window is the third axis in the
+              events-card drill-in (after kind + sourceKind);
+              naturally bounded by the server's existing
+              `createdSince` filter on `listErrorEvents`. */}
+          <div
+            className="flex items-center gap-2 text-xs"
+            data-testid="graph-health-failure-state-events-time-window-filter"
+          >
+            <span className="text-muted-foreground">Time window:</span>
+            {(
+              [
+                { label: "1h", ms: 60 * 60 * 1000 },
+                { label: "24h", ms: 24 * 60 * 60 * 1000 },
+                { label: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() =>
+                  setCreatedSinceWindowMs(
+                    createdSinceWindowMs === opt.ms ? null : opt.ms,
+                  )
+                }
+                className={`rounded border px-2 py-0.5 font-mono ${createdSinceWindowMs === opt.ms ? "bg-muted" : "bg-background"}`}
+                data-testid={`graph-health-failure-state-events-time-window-${opt.label}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+            {createdSinceWindowMs !== null ? (
+              <button
+                type="button"
+                onClick={() => setCreatedSinceWindowMs(null)}
+                className="text-xs text-muted-foreground underline"
+                data-testid="graph-health-failure-state-events-time-window-clear"
+              >
+                All time
               </button>
             ) : null}
           </div>
