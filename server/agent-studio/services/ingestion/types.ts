@@ -56,18 +56,25 @@ export interface ParsedPart {
   };
 }
 
-/** Locked unitType enum (D-NKU-2). */
+/**
+ * Locked unitType enum (D-NKU-2). Promoted to a tuple-derived
+ * constant at T-G.66 so the aggregator + lockstep tests + future
+ * UI metadata can iterate the values without redeclaring them.
+ */
+export const NORMALIZED_KNOWLEDGE_UNIT_TYPES = [
+  "text",
+  "markdown_section",
+  "html_block",
+  "json_object",
+  "pdf_page",
+  "code_function",
+  "code_class",
+  "table_row",
+  "tool_knowledge",
+  "extracted_artifact",
+] as const;
 export type NormalizedKnowledgeUnitType =
-  | "text"
-  | "markdown_section"
-  | "html_block"
-  | "json_object"
-  | "pdf_page"
-  | "code_function"
-  | "code_class"
-  | "table_row"
-  | "tool_knowledge"
-  | "extracted_artifact";
+  (typeof NORMALIZED_KNOWLEDGE_UNIT_TYPES)[number];
 
 /** Normalizer output — what the KnowledgeUnitService persists. */
 export interface NormalizedKnowledgeUnitInput {
