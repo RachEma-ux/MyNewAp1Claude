@@ -33,8 +33,12 @@ function readPanel(): string {
 describe("Bases filter-edit γ-slice (T-F.101 / T-F.2-filter-γ)", () => {
   it("panel imports FilterDocumentSchema from shared/ (not server/) so client + server share the same schema source", () => {
     const src = readPanel();
+    // The single import statement bundles γ + δ slice's symbols
+    // (FilterDocumentSchema for save-validation, plus the parser +
+    // applier helpers added in δ). Asserting on the source path
+    // + presence of FilterDocumentSchema in the import set.
     expect(src).toMatch(
-      /import\s+\{\s*FilterDocumentSchema\s*\}\s+from\s+"@shared\/bases-filter-language"/,
+      /import\s+\{[\s\S]{0,500}FilterDocumentSchema[\s\S]{0,500}\}\s+from\s+"@shared\/bases-filter-language"/,
     );
   });
 
