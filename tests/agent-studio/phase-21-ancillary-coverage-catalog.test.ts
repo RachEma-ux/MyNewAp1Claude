@@ -181,6 +181,7 @@ const ANCILLARY_TESTS = [
   "graph-skill-risk-level-metadata.test.ts",
   "runtime-dispatch-result-metadata.test.ts",
   "saved-views-default-lens-kind.test.ts",
+  "static-fact-retrieve-hook.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
