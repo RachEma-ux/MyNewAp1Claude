@@ -126,3 +126,13 @@ export {
   type MaybeInstallRuntimeLensRunnerOptions,
   type MaybeInstallRuntimeLensRunnerResult,
 } from "./install-runtime-lens-runner.js";
+
+export {
+  createRuntimeLensAsdbReader,
+  type CreateRuntimeLensAsdbReaderOptions,
+} from "./runners/runtime-lens-asdb-reader.js";
+
+export {
+  maybeInstallRuntimeLensRunnerWithAsdb,
+  type MaybeInstallRuntimeLensRunnerWithAsdbOptions,
+} from "./install-runtime-lens-runner-with-asdb.js";
