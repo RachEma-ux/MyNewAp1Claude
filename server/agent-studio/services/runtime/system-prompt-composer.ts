@@ -68,7 +68,68 @@ const RUNTIME_POLICY = Object.freeze({
   ].join("\n"),
 });
 
-export type ComposerMode = "disabled" | "safe_degraded" | "strict";
+/**
+ * Closed-taxonomy system-prompt composer mode. Promoted to a tuple at
+ * T-G.51 so the metadata table + lockstep tests can be authored.
+ */
+export const COMPOSER_MODES = [
+  "disabled",
+  "safe_degraded",
+  "strict",
+] as const;
+export type ComposerMode = (typeof COMPOSER_MODES)[number];
+
+// ============================================================================
+// Per-composer-mode operator-facing metadata (T-G.51)
+// ============================================================================
+
+export interface ComposerModeMetadata {
+  /** Display label rendered in the runtime config UI. */
+  readonly label: string;
+  /** Short operator-facing description of how this mode behaves when
+   *  a capability pack is missing at composition time. */
+  readonly description: string;
+  /** Whether the composer assembles a prompt at all (true for
+   *  `safe_degraded` + `strict`; false for `disabled` which short-
+   *  circuits to a baseline path entirely). */
+  readonly composes: boolean;
+  /** Whether `composeSystemPrompt` throws when `capabilityPack === null`
+   *  (true for `strict` only — surfaces `OrchestrationError` with
+   *  code `cag_required`; the other two fall back gracefully). */
+  readonly throwsOnMissingPack: boolean;
+}
+
+export const COMPOSER_MODE_METADATA: Readonly<
+  Record<ComposerMode, ComposerModeMetadata>
+> = {
+  disabled: {
+    label: "Disabled",
+    description:
+      "Composer is bypassed entirely — runtime uses the baseline prompt path without CAG block injection. No errors raised.",
+    composes: false,
+    throwsOnMissingPack: false,
+  },
+  safe_degraded: {
+    label: "Safe Degraded",
+    description:
+      "Composer assembles a prompt even when the capability pack is missing — falls back to safer-than-strict defaults. No errors raised.",
+    composes: true,
+    throwsOnMissingPack: false,
+  },
+  strict: {
+    label: "Strict",
+    description:
+      "Composer requires a capability pack. Throws `OrchestrationError(cag_required)` when the pack is null — runtime refuses to compose.",
+    composes: true,
+    throwsOnMissingPack: true,
+  },
+};
+
+export function getComposerModeMetadata(
+  mode: ComposerMode,
+): ComposerModeMetadata {
+  return COMPOSER_MODE_METADATA[mode];
+}
 
 /**
  * Thrown by `composeSystemPrompt` when `mode === "strict"` and
