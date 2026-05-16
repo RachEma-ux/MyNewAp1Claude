@@ -147,6 +147,27 @@ export function BasesPanel() {
       },
       onError: (err) => setRenameError(err.message),
     });
+  // T-F.97 (T-F.2-θ): per-row Share-flip mutation. Reuses
+  // `updateSavedView` with a `visibility` patch only — no other
+  // fields. One-click toggle (no two-step confirm); the action is
+  // reversible (operator can flip back instantly), unlike delete.
+  // Error surface stays per-row.
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareErrorBaseId, setShareErrorBaseId] = useState<number | null>(
+    null,
+  );
+  const shareMutation =
+    trpc.agentStudio.vault.updateSavedView.useMutation({
+      onSuccess: () => {
+        setShareError(null);
+        setShareErrorBaseId(null);
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err, variables) => {
+        setShareError(err.message);
+        setShareErrorBaseId(variables.id);
+      },
+    });
   const deleteMutation =
     trpc.agentStudio.vault.deleteSavedView.useMutation({
       onSuccess: () => {
@@ -428,6 +449,12 @@ export function BasesPanel() {
                   const isDeletePending =
                     deleteMutation.isPending &&
                     deleteMutation.variables?.viewId === b.id;
+                  const isSharePending =
+                    shareMutation.isPending &&
+                    shareMutation.variables?.id === b.id;
+                  const isShared = b.visibility === "workspace_shared";
+                  const nextShareVisibility: "personal" | "workspace_shared" =
+                    isShared ? "personal" : "workspace_shared";
                   return (
                     <Fragment key={b.id}>
                       <tr
@@ -476,8 +503,41 @@ export function BasesPanel() {
                               Delete…
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            disabled={isSharePending}
+                            className="underline text-muted-foreground disabled:opacity-50"
+                            data-testid={`bases-row-share-${b.id}`}
+                            onClick={() =>
+                              shareMutation.mutate({
+                                id: b.id,
+                                visibility: nextShareVisibility,
+                              })
+                            }
+                          >
+                            {isSharePending
+                              ? "Updating…"
+                              : isShared
+                                ? "Make personal"
+                                : "Share with workspace"}
+                          </button>
                         </td>
                       </tr>
+                      {shareError !== null && shareErrorBaseId === b.id ? (
+                        <tr data-testid={`bases-row-share-error-row-${b.id}`}>
+                          <td
+                            colSpan={6}
+                            className="bg-destructive/10 px-3 py-2 text-xs"
+                          >
+                            <p
+                              className="text-destructive"
+                              data-testid={`bases-row-share-error-${b.id}`}
+                            >
+                              Share-flip failed: {shareError}
+                            </p>
+                          </td>
+                        </tr>
+                      ) : null}
                       {isExpanded ? (
                         <tr data-testid={`bases-row-detail-${b.id}`}>
                           <td colSpan={6} className="bg-muted/20 px-3 py-2 text-xs">
