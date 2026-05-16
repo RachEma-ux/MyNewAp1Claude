@@ -95,6 +95,7 @@ const GraphLensBrowserPage = lazy(
 const GraphQualityFindingsPage = lazy(
   () => import("../pages/GraphQualityFindingsPage"),
 );
+const BasesPage = lazy(() => import("../pages/BasesPage"));
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -259,6 +260,14 @@ function parseRoute(path: string): ParsedRoute {
     return {
       ...empty,
       view: "graph-quality-findings" as any,
+      homeMode: null,
+    };
+  }
+  // ── T-F.91 (T-F.2-α): bases (no agent context) ──
+  if (path.startsWith("/agent-studio/bases")) {
+    return {
+      ...empty,
+      view: "bases" as any,
       homeMode: null,
     };
   }
@@ -457,6 +466,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-quality-findings");
       return;
     }
+    // T-F.91 (T-F.2-α): bases sidebar entry.
+    if ((key as string) === "bases") {
+      navigate("/agent-studio/bases");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -552,6 +566,9 @@ export default function AgentStudioShell() {
         // ── T-F.82 (T-F.4-α): graph-quality findings ──
         case "graph-quality-findings" as any:
           return <GraphQualityFindingsPage />;
+        // ── T-F.91 (T-F.2-α): bases ──
+        case "bases" as any:
+          return <BasesPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
