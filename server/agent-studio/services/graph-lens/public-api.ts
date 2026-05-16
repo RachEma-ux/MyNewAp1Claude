@@ -249,3 +249,31 @@ export {
   type MaybeInstallRagLensRunnerResult,
   type MaybeInstallRagLensRunnerWithAsdbOptions,
 } from "./install-rag-lens-runner.js";
+
+export {
+  buildRacLensSnapshot,
+  clampRacLensLimit,
+  createRacLensRunner,
+  isRacNodeVisibleToViewer,
+  RAC_LENS_ABSOLUTE_LIMIT,
+  RAC_LENS_DEFAULT_LIMIT,
+  type BuildRacLensSnapshotInput,
+  type CreateRacLensRunnerDeps,
+  type RacLensReadFn,
+  type RacLensReadParams,
+  type RacLensReadResult,
+  type RacLensTraceRow,
+} from "./runners/rac-lens-runner.js";
+
+export {
+  createRacLensAsdbReader,
+  type CreateRacLensAsdbReaderOptions,
+} from "./runners/rac-lens-asdb-reader.js";
+
+export {
+  maybeInstallRacLensRunner,
+  maybeInstallRacLensRunnerWithAsdb,
+  type MaybeInstallRacLensRunnerOptions,
+  type MaybeInstallRacLensRunnerResult,
+  type MaybeInstallRacLensRunnerWithAsdbOptions,
+} from "./install-rac-lens-runner.js";
