@@ -75,7 +75,53 @@ export interface WriteContextBlockInput {
   metadata?: Record<string, unknown> | null;
 }
 
-export type FeedbackVerdict = "thumbs_up" | "thumbs_down";
+/**
+ * Closed-taxonomy RAC trace feedback verdict. Promoted to a tuple at
+ * T-A.14 so the metadata table + lockstep tests can be authored.
+ */
+export const RAC_TRACE_FEEDBACK_VERDICTS = [
+  "thumbs_up",
+  "thumbs_down",
+] as const;
+export type FeedbackVerdict = (typeof RAC_TRACE_FEEDBACK_VERDICTS)[number];
+
+// ============================================================================
+// Per-feedback-verdict operator-facing metadata (T-A.14)
+// ============================================================================
+
+export interface RacTraceFeedbackVerdictMetadata {
+  /** Display label rendered in the feedback summary panel. */
+  readonly label: string;
+  /** Short operator-facing description of what this verdict means
+   *  for downstream learning loops. */
+  readonly description: string;
+  /** Whether this verdict is a positive signal (true for `thumbs_up`;
+   *  false for `thumbs_down`). Drives the dashboard summary breakdown. */
+  readonly isPositive: boolean;
+}
+
+export const RAC_TRACE_FEEDBACK_VERDICT_METADATA: Readonly<
+  Record<FeedbackVerdict, RacTraceFeedbackVerdictMetadata>
+> = {
+  thumbs_up: {
+    label: "Thumbs Up",
+    description:
+      "User affirmed the answer — the trace becomes positive training signal for downstream learning loops.",
+    isPositive: true,
+  },
+  thumbs_down: {
+    label: "Thumbs Down",
+    description:
+      "User rejected the answer — the trace becomes negative training signal and surfaces in the quality dashboard.",
+    isPositive: false,
+  },
+};
+
+export function getRacTraceFeedbackVerdictMetadata(
+  verdict: FeedbackVerdict,
+): RacTraceFeedbackVerdictMetadata {
+  return RAC_TRACE_FEEDBACK_VERDICT_METADATA[verdict];
+}
 
 export interface RecordFeedbackInput {
   workspaceId: number;
