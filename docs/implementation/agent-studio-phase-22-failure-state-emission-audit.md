@@ -156,7 +156,7 @@ The original ordering speculated detection-state per kind. As the wirings landed
 ### Detection-gap — 3 🟡
 
 - #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first.
-- #7 `neo4j_projection_stale` — projection-sync worker writes status but no `stale` lag detection (would need a freshness-lag computation against last-projection-timestamp).
+- #7 `neo4j_projection_stale` — **DETECTOR shipped @ #1218 (T-I.43)** in `services/graph/projection/staleness-detector.ts` (pure function + emitter pair); the DB-reading cron wrapper that calls it is the remaining slice. Detector groups `agsGraphProjectionSyncJobs` rows per projection key, computes max(completedAt) among succeeded runs, and emits `neo4j_projection_stale` for any projection exceeding the threshold (default 1 hour).
 - #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts.
 
 ### Phase-gated — 5 ❌ + 1 🔒
