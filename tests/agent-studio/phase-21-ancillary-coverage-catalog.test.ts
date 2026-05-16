@@ -151,6 +151,7 @@ const ANCILLARY_TESTS = [
   "quality-finding-severity-metadata.test.ts",
   "text2cypher-validation-failure-reason-metadata.test.ts",
   "export-candidate-key-metadata.test.ts",
+  "forbidden-export-candidate-key-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

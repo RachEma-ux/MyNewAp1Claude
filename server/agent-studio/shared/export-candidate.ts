@@ -350,3 +350,145 @@ export const FORBIDDEN_EXPORT_CANDIDATE_KEYS = [
   "env",
   "process",
 ] as const;
+export type ForbiddenExportCandidateKey =
+  (typeof FORBIDDEN_EXPORT_CANDIDATE_KEYS)[number];
+
+// ============================================================================
+// Per-forbidden-key operator-facing metadata (T-E.6)
+// ============================================================================
+
+export type ForbiddenExportCandidateKeyLeakClass =
+  | "agent_studio_internal"
+  | "release_internal"
+  | "draft_internal"
+  | "env_handoff";
+
+export interface ForbiddenExportCandidateKeyMetadata {
+  /** Display label rendered in the contract-violation report. */
+  readonly label: string;
+  /** Short operator-facing description of what kind of secret /
+   *  privileged content this key would leak if it ever appeared on
+   *  the export candidate shape. */
+  readonly description: string;
+  /** Closed-taxonomy classification of the leak surface. */
+  readonly leakClass: ForbiddenExportCandidateKeyLeakClass;
+  /** Whether the field name suggests the value would directly carry
+   *  credential material (true for apiKey / secret / secrets /
+   *  credentials / bearerToken / providerConfig). False for
+   *  indirection keys (apiKeyEnvVar / envVar / env / process) and
+   *  privileged-content keys (releaseNotes / approvalStateJson /
+   *  systemInstructions / roleInstructions). */
+  readonly isCredentialDirect: boolean;
+}
+
+export const FORBIDDEN_EXPORT_CANDIDATE_KEY_METADATA: Readonly<
+  Record<
+    ForbiddenExportCandidateKey,
+    ForbiddenExportCandidateKeyMetadata
+  >
+> = {
+  providerConfig: {
+    label: "providerConfig",
+    description:
+      "Agent Studio provider configuration object — frequently contains nested apiKey / bearerToken fields. Must never cross the export boundary.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  apiKey: {
+    label: "apiKey",
+    description:
+      "Bare API key string — the canonical credential leak. Must never appear on the export candidate.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  apiKeyEnvVar: {
+    label: "apiKeyEnvVar",
+    description:
+      "Indirection pointer to the env var name that holds the API key — leaks deployment shape and can identify the secret slot.",
+    leakClass: "env_handoff",
+    isCredentialDirect: false,
+  },
+  secret: {
+    label: "secret",
+    description:
+      "Generic single-secret slot — could carry any credential value. Must never appear on the export candidate.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  secrets: {
+    label: "secrets",
+    description:
+      "Generic multi-secret slot — could carry any credential value(s). Must never appear on the export candidate.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  credentials: {
+    label: "credentials",
+    description:
+      "Generic credentials slot — typically a tuple or object holding username/password or token. Must never appear on the export candidate.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  bearerToken: {
+    label: "bearerToken",
+    description:
+      "Bare bearer-token string — the canonical OAuth-style credential leak. Must never appear on the export candidate.",
+    leakClass: "agent_studio_internal",
+    isCredentialDirect: true,
+  },
+  releaseNotes: {
+    label: "releaseNotes",
+    description:
+      "Release-internal prose — may reference unreleased products, internal SLOs, or confidential incident details. Not for consumer export.",
+    leakClass: "release_internal",
+    isCredentialDirect: false,
+  },
+  approvalStateJson: {
+    label: "approvalStateJson",
+    description:
+      "Release-internal approval state — exposes the approver chain and rejection reasons. Not for consumer export.",
+    leakClass: "release_internal",
+    isCredentialDirect: false,
+  },
+  systemInstructions: {
+    label: "systemInstructions",
+    description:
+      "Draft-internal system prompt prose — operator IP / proprietary instructions. Not for consumer export.",
+    leakClass: "draft_internal",
+    isCredentialDirect: false,
+  },
+  roleInstructions: {
+    label: "roleInstructions",
+    description:
+      "Draft-internal role-block prose — operator IP / proprietary role wiring. Not for consumer export.",
+    leakClass: "draft_internal",
+    isCredentialDirect: false,
+  },
+  envVar: {
+    label: "envVar",
+    description:
+      "Env-var name reference — leaks deployment shape and can identify privileged slot names.",
+    leakClass: "env_handoff",
+    isCredentialDirect: false,
+  },
+  env: {
+    label: "env",
+    description:
+      "Generic env-bag — could carry arbitrary environment values, including credentials. Must never appear on the export candidate.",
+    leakClass: "env_handoff",
+    isCredentialDirect: false,
+  },
+  process: {
+    label: "process",
+    description:
+      "Node `process` surface — leaks the entire host process including process.env. Must never appear on the export candidate.",
+    leakClass: "env_handoff",
+    isCredentialDirect: false,
+  },
+};
+
+export function getForbiddenExportCandidateKeyMetadata(
+  key: ForbiddenExportCandidateKey,
+): ForbiddenExportCandidateKeyMetadata {
+  return FORBIDDEN_EXPORT_CANDIDATE_KEY_METADATA[key];
+}
