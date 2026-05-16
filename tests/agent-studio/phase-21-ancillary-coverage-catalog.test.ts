@@ -188,6 +188,7 @@ const ANCILLARY_TESTS = [
   "summarize-extensions.test.ts",
   "summarize-quality-scanner-registry.test.ts",
   "summarize-cag-capability-packs.test.ts",
+  "summarize-command-registry.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

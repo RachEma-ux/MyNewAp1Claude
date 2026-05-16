@@ -11,11 +11,17 @@ export {
   registerCommand,
   getCommand,
   listCommands,
+  summarizeCommandRegistry,
   CommandKeyConflictError,
   _resetCommandRegistryForTests,
+  COMMAND_SCOPES,
+  COMMAND_SCOPE_METADATA,
+  getCommandScopeMetadata,
 } from "./command-registry.js";
 export type {
   CommandRegistration,
   CommandScope,
+  CommandScopeMetadata,
+  CommandRegistrySummary,
   ListCommandsOptions,
 } from "./command-registry.js";

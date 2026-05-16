@@ -148,3 +148,62 @@ export function listCommands(
 export function _resetCommandRegistryForTests(): void {
   registry = new Map();
 }
+
+// ============================================================================
+// Registry aggregator (T-G.60)
+// ============================================================================
+
+/**
+ * Stable-shape summary of the command registry. Operator dashboards
+ * + the command palette consume this to answer "how many commands
+ * are registered" + "which scopes / modules are populated" at a
+ * glance.
+ *
+ * Instantiates the registry-plus-row-state aggregator pair pattern
+ * (lesson 30 of the V1+ session memory) on the command-registry
+ * surface — this is the registry half (the row half would be a
+ * future `command_invocations` audit table aggregator).
+ *
+ * Stable-shape guarantees (mirrors prior aggregators T-X.5 / T-D.16
+ * / etc.):
+ *   - `byScope[scope]` zero-filled across `COMMAND_SCOPES`.
+ *   - `byModule[module]` is sparse — module names are open-ended
+ *     strings; only modules that appear in the registry show up.
+ *   - `moduleCount` counts DISTINCT module names (excludes commands
+ *     with `module === undefined`).
+ *   - `noModuleCount` counts commands with `module === undefined`
+ *     (orphan commands not grouped under a module).
+ */
+export interface CommandRegistrySummary {
+  readonly total: number;
+  /** Per-scope count, zero-filled across the closed taxonomy. */
+  readonly byScope: Readonly<Record<CommandScope, number>>;
+  /** Per-module count. Sparse — open-ended string axis. */
+  readonly byModule: Readonly<Record<string, number>>;
+  /** Distinct module names with at least 1 command. */
+  readonly moduleCount: number;
+  /** Commands registered without a module field. */
+  readonly noModuleCount: number;
+}
+
+export function summarizeCommandRegistry(): CommandRegistrySummary {
+  const byScope: Record<string, number> = {};
+  for (const s of COMMAND_SCOPES) byScope[s] = 0;
+  const byModule: Record<string, number> = {};
+  let noModuleCount = 0;
+  for (const cmd of registry.values()) {
+    byScope[cmd.scope] = (byScope[cmd.scope] ?? 0) + 1;
+    if (cmd.module === undefined) {
+      noModuleCount += 1;
+    } else {
+      byModule[cmd.module] = (byModule[cmd.module] ?? 0) + 1;
+    }
+  }
+  return {
+    total: registry.size,
+    byScope: byScope as Readonly<Record<CommandScope, number>>,
+    byModule,
+    moduleCount: Object.keys(byModule).length,
+    noModuleCount,
+  };
+}
