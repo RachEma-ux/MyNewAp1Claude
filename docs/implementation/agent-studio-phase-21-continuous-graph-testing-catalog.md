@@ -341,6 +341,7 @@ runtime catches up.
 | `text2cypher-failure-state-wiring.test.ts` | `services/graph/retrieval/retrieval-router.ts` (text2cypher) | T-I.5.A.5 / #1018 |
 | `cypher-template-failure-state-wiring.test.ts` | `services/graph/retrieval/retrieval-router.ts` (executeTemplateAudited) | T-I.5.A.6 / #1019 |
 | `failure-state-bridge-wiring-coverage.test.ts` | Bridge coverage guard — locks all 6 batch-A wirings in one table | T-I.6 / #1020 |
+| `live-evaluator.test.ts` §"failure-state emission (T-I.38)" | `services/graph-skill/golden-questions/live-evaluator.ts` — fires `recordFailureStateEvent({failureState: "golden_question_failed"})` per failed question with `suiteKey`/`questionKey`/`workspaceId`/`actualSkillPackKey`/`actualTemplateKey`/`actualCitationCount`/`actualRetrievalMode`/`durationMs`/`engineErrored`/`failureCount` metadata; emitter injection via `LiveEvaluationOptions.recordFailureStateEvent` (default = canonical bridge; `null` suppresses); first emitter wiring on the regression-suite evaluator path; closes the `golden_question_failed` taxonomy slot that was declared in `FAILURE_STATE_METADATA` since T-I.4 but had no emitter | T-I.38 / #1213 |
 
 ### 7.3 — Catalog gap status update
 
