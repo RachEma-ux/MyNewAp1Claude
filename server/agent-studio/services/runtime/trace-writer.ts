@@ -42,7 +42,67 @@ import type { ApprovalDecision } from "../approval/approval-gate";
  */
 export const RUNTIME_VALIDATION_VERDICTS = ["ok", "rejected"] as const;
 export type ValidationVerdict = (typeof RUNTIME_VALIDATION_VERDICTS)[number];
-export type DispatchResult = "ok" | "error" | "blocked";
+/**
+ * Closed-taxonomy runtime dispatch result. Promoted to a tuple at
+ * T-G.58 so the metadata table + lockstep tests can be authored.
+ */
+export const RUNTIME_DISPATCH_RESULTS = [
+  "ok",
+  "error",
+  "blocked",
+] as const;
+export type DispatchResult = (typeof RUNTIME_DISPATCH_RESULTS)[number];
+
+// ============================================================================
+// Per-dispatch-result operator-facing metadata (T-G.58)
+// ============================================================================
+
+export interface RuntimeDispatchResultMetadata {
+  /** Display label rendered in the trace-writer dispatch-result column. */
+  readonly label: string;
+  /** Short operator-facing description of what this dispatch result
+   *  implies for the tool call's downstream outcome. */
+  readonly description: string;
+  /** Whether the tool was actually invoked (true for `ok` + `error`
+   *  — both attempted dispatch; false for `blocked` which short-
+   *  circuits before the tool runs). */
+  readonly attempted: boolean;
+  /** Whether the tool returned successfully (true for `ok` only;
+   *  false for `error` + `blocked`). */
+  readonly successful: boolean;
+}
+
+export const RUNTIME_DISPATCH_RESULT_METADATA: Readonly<
+  Record<DispatchResult, RuntimeDispatchResultMetadata>
+> = {
+  ok: {
+    label: "Success",
+    description:
+      "Tool dispatched and returned a successful result — receipt captured, evidence added to the run trace.",
+    attempted: true,
+    successful: true,
+  },
+  error: {
+    label: "Error",
+    description:
+      "Tool dispatched but the invocation errored out — exception captured on the trace row; agent may retry or surface to the user.",
+    attempted: true,
+    successful: false,
+  },
+  blocked: {
+    label: "Blocked",
+    description:
+      "Tool dispatch refused before invocation — approval denied, governance verdict blocked, or pre-dispatch check failed.",
+    attempted: false,
+    successful: false,
+  },
+};
+
+export function getRuntimeDispatchResultMetadata(
+  result: DispatchResult,
+): RuntimeDispatchResultMetadata {
+  return RUNTIME_DISPATCH_RESULT_METADATA[result];
+}
 
 // ============================================================================
 // Per-validation-verdict operator-facing metadata (T-G.56)
