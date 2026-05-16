@@ -637,6 +637,11 @@ function RenderEnvelopeView({
                 nodes={filteredNodes}
                 edges={snapshot.edges}
               />
+            ) : snapshot.layout === "tree" ? (
+              <TreeGraphViz
+                nodes={filteredNodes}
+                edges={snapshot.edges}
+              />
             ) : (
               <SnapshotGraphViz
                 nodes={filteredNodes}
@@ -1138,6 +1143,172 @@ function MatrixGraphViz({
             >
               {colNode.label ?? colNode.id}
             </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * T-F.80 TreeGraphViz — third layout-specific renderer.
+ *
+ * Selected when `snapshot.layout === "tree"`. The RAC Context Plan
+ * View + Graph Skill Pack View lenses both declare this layout —
+ * their snapshots model parent→child hierarchies (plan-item →
+ * source-binding; skill-pack → cypher-template → source-note).
+ *
+ * Layout strategy:
+ *   1. Compute in-degree per node from the filtered edge set.
+ *   2. Roots = nodes with in-degree 0.
+ *   3. BFS from each root, assigning depth = parent.depth + 1.
+ *   4. Orphan fallback: nodes the BFS never reaches (cycle-only
+ *      subgraphs, dangling) get pinned to a synthetic floor lane at
+ *      `maxDepth + 1`.
+ *   5. y = depth × dy; x = sibling-index-within-depth × dx, centered.
+ *
+ * Edges remain straight lines between their endpoints — same
+ * dangling-suppression discipline as the other renderers.
+ */
+function TreeGraphViz({
+  nodes,
+  edges,
+}: {
+  readonly nodes: ReadonlyArray<{
+    typeKey: string;
+    id: string;
+    visible: boolean;
+    label?: string;
+  }>;
+  readonly edges: ReadonlyArray<{
+    typeKey: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    visible: boolean;
+  }>;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground italic"
+        data-testid="graph-lens-tree-viz-empty"
+      >
+        No nodes to render.
+      </p>
+    );
+  }
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+  for (const n of nodes) {
+    inDegree.set(n.id, 0);
+    adjacency.set(n.id, []);
+  }
+  for (const e of edges) {
+    if (!nodeIds.has(e.sourceNodeId) || !nodeIds.has(e.targetNodeId)) {
+      continue;
+    }
+    inDegree.set(e.targetNodeId, (inDegree.get(e.targetNodeId) ?? 0) + 1);
+    adjacency.get(e.sourceNodeId)?.push(e.targetNodeId);
+  }
+  // BFS from each root; depth=0 for roots, depth+1 per hop.
+  const depth = new Map<string, number>();
+  const queue: string[] = [];
+  for (const n of nodes) {
+    if (inDegree.get(n.id) === 0) {
+      depth.set(n.id, 0);
+      queue.push(n.id);
+    }
+  }
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDepth = depth.get(current) ?? 0;
+    for (const child of adjacency.get(current) ?? []) {
+      if (!depth.has(child)) {
+        depth.set(child, currentDepth + 1);
+        queue.push(child);
+      }
+    }
+  }
+  // Orphan fallback: any node not reached by BFS (e.g., part of a
+  // cycle with no in-degree-0 entry) gets pinned to a floor lane.
+  let maxDepth = 0;
+  for (const d of depth.values()) {
+    if (d > maxDepth) maxDepth = d;
+  }
+  for (const n of nodes) {
+    if (!depth.has(n.id)) depth.set(n.id, maxDepth + 1);
+  }
+  // Group by depth, preserve filtered-node order within each lane.
+  const lanes = new Map<number, Array<typeof nodes[number]>>();
+  for (const n of nodes) {
+    const d = depth.get(n.id) ?? 0;
+    if (!lanes.has(d)) lanes.set(d, []);
+    lanes.get(d)!.push(n);
+  }
+  const sortedDepths = Array.from(lanes.keys()).sort((a, b) => a - b);
+  const width = 480;
+  const dy = 56;
+  const marginY = 28;
+  const totalLanes = sortedDepths.length;
+  const height = marginY * 2 + Math.max(totalLanes - 1, 0) * dy + 24;
+  const positions = new Map<string, { x: number; y: number }>();
+  sortedDepths.forEach((d, laneIdx) => {
+    const lane = lanes.get(d)!;
+    const slotW = lane.length === 0 ? width : width / (lane.length + 1);
+    const y = marginY + laneIdx * dy;
+    lane.forEach((n, slotIdx) => {
+      positions.set(n.id, { x: slotW * (slotIdx + 1), y });
+    });
+  });
+  const renderableEdges = edges.filter(
+    (e) => positions.has(e.sourceNodeId) && positions.has(e.targetNodeId),
+  );
+  return (
+    <div data-testid="graph-lens-tree-viz">
+      <SectionLabel>
+        Tree ({nodes.length} nodes, {totalLanes} depth lanes,{" "}
+        {renderableEdges.length} edges)
+      </SectionLabel>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-2xl border border-border rounded"
+        data-testid="graph-lens-tree-viz-svg"
+      >
+        {renderableEdges.map((e, i) => {
+          const s = positions.get(e.sourceNodeId)!;
+          const t = positions.get(e.targetNodeId)!;
+          return (
+            <line
+              key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
+              x1={s.x}
+              y1={s.y}
+              x2={t.x}
+              y2={t.y}
+              stroke="currentColor"
+              strokeOpacity={e.visible ? 0.4 : 0.15}
+              strokeWidth={1}
+            />
+          );
+        })}
+        {nodes.map((n) => {
+          const p = positions.get(n.id)!;
+          return (
+            <g key={n.id} data-testid={`graph-lens-tree-viz-node-${n.id}`}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={5}
+                fill={n.visible ? "currentColor" : "transparent"}
+                stroke="currentColor"
+                strokeDasharray={n.visible ? undefined : "2 2"}
+              />
+              <title>
+                {n.visible
+                  ? `${n.typeKey}: ${n.label ?? n.id}`
+                  : `${n.typeKey}: (hidden)`}
+              </title>
+            </g>
           );
         })}
       </svg>
