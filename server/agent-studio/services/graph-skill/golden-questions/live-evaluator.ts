@@ -29,6 +29,10 @@
  */
 
 import type { GraphAgentAnswer, GraphAgentRunInput } from "../../graph-agent/contracts.js";
+import {
+  recordFailureStateEvent,
+  type RecordFailureStateEventInput,
+} from "../../failure-states/observability-bridge.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -68,6 +72,16 @@ export interface LiveEvaluationOptions {
   readonly perQuestionTimeoutMs?: number;
   /** Optional clock injection for deterministic duration recording in tests. */
   readonly now?: () => number;
+  /**
+   * Optional failure-state emitter override. Defaults to the canonical
+   * `recordFailureStateEvent` bridge. Tests inject a stub; production
+   * paths leave it undefined to get fire-and-forget ASDB writes. Set to
+   * `null` to suppress emission entirely (e.g. for unit test paths that
+   * don't want observability side-effects).
+   */
+  readonly recordFailureStateEvent?:
+    | ((input: RecordFailureStateEventInput) => Promise<unknown>)
+    | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -271,6 +285,11 @@ export async function runLiveEvaluation(
   let totalErrored = 0;
   let passedSuites = 0;
 
+  const emitter =
+    options.recordFailureStateEvent === undefined
+      ? recordFailureStateEvent
+      : options.recordFailureStateEvent;
+
   for (const suite of suites) {
     const results: GoldenQuestionScore[] = [];
     for (const q of suite.questions) {
@@ -279,6 +298,31 @@ export async function runLiveEvaluation(
       totalQuestions++;
       if (scored.passed) totalPassed++;
       if (scored.error !== undefined) totalErrored++;
+      if (!scored.passed && emitter !== null) {
+        // Fire-and-forget — fail-soft per the observability bridge contract.
+        void emitter({
+          failureState: "golden_question_failed",
+          sourceKind: "golden-questions.live-evaluator",
+          sourceId: `${q.suiteKey}/${q.questionKey}`,
+          userId: options.userId,
+          errorMessage:
+            scored.failures.length > 0
+              ? scored.failures.join("; ")
+              : "Golden question failed (no specific failure reason recorded)",
+          metadata: {
+            suiteKey: q.suiteKey,
+            questionKey: q.questionKey,
+            workspaceId: options.workspaceId,
+            actualSkillPackKey: scored.actualSkillPackKey ?? null,
+            actualTemplateKey: scored.actualTemplateKey ?? null,
+            actualCitationCount: scored.actualCitationCount,
+            actualRetrievalMode: scored.actualRetrievalMode,
+            durationMs: scored.durationMs,
+            engineErrored: scored.error !== undefined,
+            failureCount: scored.failures.length,
+          },
+        });
+      }
     }
     const suitePassed = results.every((r) => r.passed);
     if (suitePassed) passedSuites++;
