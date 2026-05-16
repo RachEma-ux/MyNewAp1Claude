@@ -51,10 +51,15 @@ export function GraphLensBrowserPanel() {
   const [visibilityFilter, setVisibilityFilter] = useState<
     "all" | "visible_only" | "hidden_only"
   >("all");
+  // T-F.74: substring search across `node.id` + `node.label`. Pure
+  // client-side, case-insensitive, no debounce (the snapshot is
+  // already in memory). Composes with the other two narrowers.
+  const [searchQuery, setSearchQuery] = useState<string>("");
   function selectLens(lensId: string) {
     setSelectedLensId(lensId);
     setTypeKeyFilter(null);
     setVisibilityFilter("all");
+    setSearchQuery("");
   }
 
   const listQ = trpc.agentStudio.graphLens.list.useQuery(undefined, {
@@ -237,6 +242,8 @@ export function GraphLensBrowserPanel() {
               onTypeKeyFilterChange={setTypeKeyFilter}
               visibilityFilter={visibilityFilter}
               onVisibilityFilterChange={setVisibilityFilter}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
             />
           ) : null}
         </CardContent>
@@ -278,6 +285,8 @@ interface RenderEnvelopeViewProps {
   readonly onVisibilityFilterChange: (
     next: "all" | "visible_only" | "hidden_only",
   ) => void;
+  readonly searchQuery: string;
+  readonly onSearchQueryChange: (next: string) => void;
 }
 
 function RenderEnvelopeView({
@@ -286,6 +295,8 @@ function RenderEnvelopeView({
   onTypeKeyFilterChange,
   visibilityFilter,
   onVisibilityFilterChange,
+  searchQuery,
+  onSearchQueryChange,
 }: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
@@ -315,20 +326,27 @@ function RenderEnvelopeView({
   for (const n of snapshot.nodes) {
     nodesByTypeKey.set(n.typeKey, (nodesByTypeKey.get(n.typeKey) ?? 0) + 1);
   }
-  // T-F.72 + T-F.73: apply the typeKey drill-in filter AND the
-  // visibility drill-in filter to the nodes preview (and re-slice
-  // the first-15 cap from the filtered subset). Edges remain
-  // unfiltered — the typeKey + visibility axes are about NODE
-  // narrowing, not edge narrowing. Both narrowers compose: if both
-  // are active, only nodes matching BOTH are shown.
+  // T-F.72 + T-F.73 + T-F.74: apply ALL three drill-in filters
+  // (typeKey + visibility + search) to the nodes preview. Edges
+  // remain unfiltered — every axis narrows NODES only. The search
+  // is a case-insensitive substring match across `id` + `label`;
+  // hidden nodes (label undefined) match by id alone.
+  const trimmedQuery = searchQuery.trim().toLowerCase();
   const filteredNodes = snapshot.nodes.filter((n) => {
     if (typeKeyFilter != null && n.typeKey !== typeKeyFilter) return false;
     if (visibilityFilter === "visible_only" && !n.visible) return false;
     if (visibilityFilter === "hidden_only" && n.visible) return false;
+    if (trimmedQuery !== "") {
+      const idMatch = n.id.toLowerCase().includes(trimmedQuery);
+      const labelMatch = (n.label ?? "").toLowerCase().includes(trimmedQuery);
+      if (!idMatch && !labelMatch) return false;
+    }
     return true;
   });
   const hasAnyFilter =
-    typeKeyFilter != null || visibilityFilter !== "all";
+    typeKeyFilter != null ||
+    visibilityFilter !== "all" ||
+    trimmedQuery !== "";
   return (
     <div className="space-y-3" data-testid="graph-lens-render-ok">
       <div className="text-xs text-muted-foreground space-y-0.5">
@@ -367,35 +385,67 @@ function RenderEnvelopeView({
         </p>
       ) : (
         <>
-          <div
-            className="flex items-center gap-2 text-xs"
-            data-testid="graph-lens-visibility-filter-group"
-          >
-            <span className="text-muted-foreground">Show:</span>
-            {(["all", "visible_only", "hidden_only"] as const).map((mode) => {
-              const isActive = visibilityFilter === mode;
-              const label =
-                mode === "all"
-                  ? "All"
-                  : mode === "visible_only"
-                  ? "Visible only"
-                  : "Hidden only";
-              return (
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div
+              className="flex items-center gap-2"
+              data-testid="graph-lens-visibility-filter-group"
+            >
+              <span className="text-muted-foreground">Show:</span>
+              {(["all", "visible_only", "hidden_only"] as const).map((mode) => {
+                const isActive = visibilityFilter === mode;
+                const label =
+                  mode === "all"
+                    ? "All"
+                    : mode === "visible_only"
+                    ? "Visible only"
+                    : "Hidden only";
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`rounded border px-2 py-0.5 ${
+                      isActive
+                        ? "bg-muted/50 border-border"
+                        : "border-transparent hover:underline"
+                    }`}
+                    data-testid={`graph-lens-visibility-filter-${mode}`}
+                    onClick={() => onVisibilityFilterChange(mode)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              className="flex items-center gap-2"
+              data-testid="graph-lens-search-filter-group"
+            >
+              <label
+                htmlFor="graph-lens-search-input"
+                className="text-muted-foreground"
+              >
+                Search:
+              </label>
+              <input
+                id="graph-lens-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                placeholder="id or label substring…"
+                className="w-56 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                data-testid="graph-lens-search-input"
+              />
+              {searchQuery !== "" ? (
                 <button
-                  key={mode}
                   type="button"
-                  className={`rounded border px-2 py-0.5 ${
-                    isActive
-                      ? "bg-muted/50 border-border"
-                      : "border-transparent hover:underline"
-                  }`}
-                  data-testid={`graph-lens-visibility-filter-${mode}`}
-                  onClick={() => onVisibilityFilterChange(mode)}
+                  className="underline text-muted-foreground"
+                  data-testid="graph-lens-search-clear"
+                  onClick={() => onSearchQueryChange("")}
                 >
-                  {label}
+                  Clear
                 </button>
-              );
-            })}
+              ) : null}
+            </div>
           </div>
           <div>
             <SectionLabel>By typeKey</SectionLabel>
