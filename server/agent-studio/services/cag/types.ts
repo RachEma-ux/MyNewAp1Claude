@@ -87,7 +87,61 @@ export type CagPackEventType =
   | "pack_refresh_skipped"
   | "pack_refresh_forced";
 
-export type CagPackEventSeverity = "info" | "warn" | "error";
+/**
+ * Closed-taxonomy CAG pack event severity. Promoted to a tuple at
+ * T-G.41 so the metadata table + lockstep tests can be authored.
+ */
+export const CAG_PACK_EVENT_SEVERITIES = ["info", "warn", "error"] as const;
+export type CagPackEventSeverity = (typeof CAG_PACK_EVENT_SEVERITIES)[number];
+
+// ============================================================================
+// Per-event-severity operator-facing metadata (T-G.41)
+// ============================================================================
+
+export interface CagPackEventSeverityMetadata {
+  /** Display label rendered in the CAG-pack event log filter. */
+  readonly label: string;
+  /** Short operator-facing description of when this severity fires
+   *  and what triage urgency it implies. */
+  readonly description: string;
+  /** Stable rank 0-2 for severity comparison (0=info → 2=error). */
+  readonly rank: 0 | 1 | 2;
+  /** Whether this severity is an error condition the operator must
+   *  triage (true for `error` only; info + warn are advisory). */
+  readonly requiresTriage: boolean;
+}
+
+export const CAG_PACK_EVENT_SEVERITY_METADATA: Readonly<
+  Record<CagPackEventSeverity, CagPackEventSeverityMetadata>
+> = {
+  info: {
+    label: "Info",
+    description:
+      "Routine event — pack created, used, refresh skipped because still fresh. Operator review optional.",
+    rank: 0,
+    requiresTriage: false,
+  },
+  warn: {
+    label: "Warn",
+    description:
+      "Anomalous event — pack marked stale, refresh forced, lifecycle transition that warrants a glance.",
+    rank: 1,
+    requiresTriage: false,
+  },
+  error: {
+    label: "Error",
+    description:
+      "Failure event — pack validation failed, compile error, schema drift. Operator must triage.",
+    rank: 2,
+    requiresTriage: true,
+  },
+};
+
+export function getCagPackEventSeverityMetadata(
+  severity: CagPackEventSeverity,
+): CagPackEventSeverityMetadata {
+  return CAG_PACK_EVENT_SEVERITY_METADATA[severity];
+}
 
 export type CagPackActorType = "system" | "user" | "scheduler" | "runtime";
 
