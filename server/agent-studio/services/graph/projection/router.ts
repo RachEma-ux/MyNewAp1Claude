@@ -24,6 +24,7 @@ import {
   loadStalenessRowsFromAsDb,
   runStalenessCheck,
 } from "./staleness-detector.js";
+import { getProjectionStalenessCronStatus } from "./staleness-cron.js";
 
 const RunStalenessCheckInput = z
   .object({
@@ -42,6 +43,15 @@ export const graphProjectionRouter = router({
    */
   getDriftCronStatus: adminProcedure.query(async () => {
     return getProjectionDriftCronStatus();
+  }),
+
+  /**
+   * Staleness cron status (T-I.47). Same shape as drift cron status.
+   * The schedule-cron wrapper around `runStalenessCheck` runs daily
+   * at 04:15 UTC by default.
+   */
+  getStalenessCronStatus: adminProcedure.query(async () => {
+    return getProjectionStalenessCronStatus();
   }),
 
   /**
