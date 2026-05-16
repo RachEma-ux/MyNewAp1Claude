@@ -191,6 +191,7 @@ const ANCILLARY_TESTS = [
   "summarize-command-registry.test.ts",
   "summarize-proposed-tool-calls.test.ts",
   "summarize-publish-targets.test.ts",
+  "summarize-publish-executions.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
