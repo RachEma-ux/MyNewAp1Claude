@@ -883,6 +883,70 @@ export const AGS_PERMISSION_SOURCES = [
 ] as const;
 export type AgsPermissionSource = (typeof AGS_PERMISSION_SOURCES)[number];
 
+// ============================================================================
+// Per-permission-source operator-facing metadata (T-S.15)
+// ============================================================================
+
+export interface AgsPermissionSourceMetadata {
+  /** Display label rendered in the permission rule trace. */
+  readonly label: string;
+  /** Short operator-facing description of where the rule originated. */
+  readonly description: string;
+  /** Stable precedence rank — higher rank wins in case of conflict.
+   *  Mirrors the resolver: session > cliArg > localSettings >
+   *  projectSettings > userSettings. */
+  readonly precedence: 0 | 1 | 2 | 3 | 4;
+  /** Whether this rule source survives across sessions (true for
+   *  the settings tiers; false for cliArg + session). */
+  readonly persistent: boolean;
+}
+
+export const AGS_PERMISSION_SOURCE_METADATA: Readonly<
+  Record<AgsPermissionSource, AgsPermissionSourceMetadata>
+> = {
+  userSettings: {
+    label: "User Settings",
+    description:
+      "Rule defined in the user-level settings file — applies across all projects this user touches.",
+    precedence: 0,
+    persistent: true,
+  },
+  projectSettings: {
+    label: "Project Settings",
+    description:
+      "Rule defined in the project-level settings file — applies to anyone working in this project.",
+    precedence: 1,
+    persistent: true,
+  },
+  localSettings: {
+    label: "Local Settings",
+    description:
+      "Rule defined in the local-only settings file — typically operator overrides not checked into version control.",
+    precedence: 2,
+    persistent: true,
+  },
+  cliArg: {
+    label: "CLI Argument",
+    description:
+      "Rule passed as a command-line argument — overrides settings tiers for this CLI invocation only.",
+    precedence: 3,
+    persistent: false,
+  },
+  session: {
+    label: "Session",
+    description:
+      "Rule established during this interactive session (e.g. an `allow once` decision) — highest precedence; dies with the session.",
+    precedence: 4,
+    persistent: false,
+  },
+};
+
+export function getAgsPermissionSourceMetadata(
+  source: AgsPermissionSource,
+): AgsPermissionSourceMetadata {
+  return AGS_PERMISSION_SOURCE_METADATA[source];
+}
+
 /** MCP server transport types from openllm-agent2's `coreSchemas.ts:110-160`. */
 // Phase 15a: added "websocket" to match the upstream MCP spec's full transport set
 export const AGS_MCP_TRANSPORTS = [
