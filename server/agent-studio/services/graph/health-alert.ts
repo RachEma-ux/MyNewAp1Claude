@@ -378,7 +378,7 @@ export async function runHealthAlertScan(
       failureState,
       sourceKind: `graph-health.${repository.backendKey}`,
       sourceId: scope,
-      errorMessage: decision.details ?? decision.alertKey,
+      errorMessage: decision.alertKey,
       severityOverride: decision.severity,
       metadata: {
         alertKey: decision.alertKey,

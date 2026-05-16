@@ -330,7 +330,8 @@ export class GraphRetrievalRouter {
       void recordFailureStateEvent({
         failureState: "cypher_query_template_failed",
         sourceKind: "graph-template-executor",
-        sourceId: input.runtimeRunId ?? null,
+        sourceId:
+          input.runtimeRunId !== undefined ? String(input.runtimeRunId) : null,
         errorMessage:
           executeErr instanceof Error
             ? executeErr.message
@@ -398,7 +399,10 @@ export class GraphRetrievalRouter {
         void recordFailureStateEvent({
           failureState: "text2cypher_rejected",
           sourceKind: "retrieval-router.text2cypher",
-          sourceId: input.runtimeRunId ?? null,
+          sourceId:
+            input.runtimeRunId !== undefined
+              ? String(input.runtimeRunId)
+              : null,
           errorMessage: `Text2Cypher rejected: ${reason}`,
           metadata: {
             reason,
@@ -553,7 +557,8 @@ export class GraphRetrievalRouter {
       void recordFailureStateEvent({
         failureState: "retrieval_safety_filter_blocked_content",
         sourceKind: "retrieval-router",
-        sourceId: input.runtimeRunId ?? null,
+        sourceId:
+          input.runtimeRunId !== undefined ? String(input.runtimeRunId) : null,
         errorMessage: `Safety filter pruned ${filtered.events.length} block(s)`,
         metadata: {
           blockedCount: filtered.events.length,
@@ -579,7 +584,10 @@ export class GraphRetrievalRouter {
         void recordFailureStateEvent({
           failureState: "runtime_reference_hidden_by_permission",
           sourceKind: "retrieval-router.permission-filter",
-          sourceId: input.runtimeRunId ?? null,
+          sourceId:
+            input.runtimeRunId !== undefined
+              ? String(input.runtimeRunId)
+              : null,
           errorMessage: `${permissionDeniedCount} reference(s) redacted by permission`,
           metadata: {
             permissionDeniedCount,

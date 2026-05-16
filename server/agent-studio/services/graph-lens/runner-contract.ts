@@ -198,7 +198,13 @@ export interface LensRunnerRegistryCoverageSummary {
  * Reads the module-local registry. Pure with respect to its inputs.
  */
 export function summarizeLensRunnerRegistry(): LensRunnerRegistryCoverageSummary {
-  const totalKinds = GRAPH_LENS_KINDS.length;
+  // Widened to `number` so the zero-guard below isn't a TS2367
+  // "impossible comparison" against the literal-narrowed length of
+  // the closed `GRAPH_LENS_KINDS` tuple. The guard stays defensive
+  // for the case where the taxonomy is reduced to zero in a future
+  // edit; better cheap-to-keep than a real divide-by-zero on the
+  // operator dashboard.
+  const totalKinds: number = GRAPH_LENS_KINDS.length;
   const registered: GraphLensKind[] = [];
   const missing: GraphLensKind[] = [];
   for (const k of GRAPH_LENS_KINDS) {

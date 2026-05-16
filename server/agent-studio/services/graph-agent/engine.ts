@@ -447,7 +447,7 @@ export class GraphAgentEngine {
         void recordFailureStateEvent({
           failureState: "graph_agent_answer_incomplete",
           sourceKind: "graph-agent-lite",
-          sourceId: runId,
+          sourceId: String(runId),
           errorMessage: `Agent loop exhausted ${loopResult.terminationReason}`,
           metadata: {
             terminationReason: loopResult.terminationReason,

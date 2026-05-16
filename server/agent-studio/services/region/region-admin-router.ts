@@ -54,7 +54,7 @@ const RegisterRegionInputSchema = z.object({
   neo4jUri: z.string().nullable().optional(),
   credentialBindingId: z.string().nullable().optional(),
   isPrimary: z.boolean().optional(),
-  settings: z.record(z.unknown()).nullable().optional(),
+  settings: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 const SetPinInputSchema = z.object({
