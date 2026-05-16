@@ -554,6 +554,26 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.25.1 — T-I.47/T-I.49 (2026-05-16): projection staleness cron.
+  // 5-PR sub-arc (#1218-#1222) shipped the detector + orchestrator +
+  // fetcher + admin tRPC + scheduled cron module. This step starts the
+  // schedule at boot time. Runs daily at 04:15 UTC (slot between
+  // runtime-runs sweep 04:00 and drift cron 04:30). Emits
+  // `neo4j_projection_stale` events for each projection whose
+  // most-recent successful run is older than the threshold (1h default).
+  // Env-flag-gated via AGS_PROJECTION_STALENESS_CRON_DISABLED.
+  try {
+    const { ensureProjectionStalenessCronStarted } = await import(
+      "./services/graph/projection/staleness-cron"
+    );
+    ensureProjectionStalenessCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-projection-staleness-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3.26 — V1+ Phase 19-β (2026-05-13): register default publish
   // pushers for the three target types defined in PR-V1-2 (#749):
   // staging_env, remote_vault, external_kb. PR-V1-2 shipped the
