@@ -60,6 +60,11 @@ import { getObservabilityDashboard } from "./dashboard.js";
 import { getInboxComposite } from "./inbox.js";
 import { getRetentionCronStatus } from "./retention-cron.js";
 import { getStaleRunningCronStatus } from "./stale-running-job-cron.js";
+import { FAILURE_STATES } from "../failure-states/contracts.js";
+import {
+  failureStateErrorClass,
+  summarizeFailureStateEventList,
+} from "../failure-states/observability-bridge.js";
 
 /**
  * Self-instrumentation: this router OWNS the error_events table,
@@ -624,6 +629,58 @@ export const workspaceObservabilityRouter = router({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
         }));
+      }
+    }),
+
+  /**
+   * T-I.59 — operator surface for closed-taxonomy emission rows.
+   *
+   * Wraps `listErrorEvents` with a prebaked `errorClass IN` filter
+   * over the 25 `failure_state:<kind>` values from the closed
+   * taxonomy (Phase 22 §1002), so callers don't have to enumerate
+   * the kind list every time. Returns both the raw rows AND a
+   * `summarizeFailureStateEventList`-shaped summary so the operator
+   * dashboard can render counts-by-kind, distinct sourceKinds, and
+   * oldest/newest timestamps without re-aggregating client-side.
+   *
+   * adminProcedure — these rows can span workspaces (closed-taxonomy
+   * events include cross-workspace surfaces like graph-projection
+   * crons + MCP auto-sync); only operators view this stream.
+   *
+   * Note: free-form `errorClass` rows (#25 background_job_failed, all
+   * tRPC errors) are intentionally NOT returned here. Use the
+   * existing `listErrorEvents` (protectedProcedure) for the unbounded
+   * read surface; this one is the closed-taxonomy subset.
+   */
+  listRecentFailureStateEvents: adminProcedure
+    .input(
+      z
+        .object({
+          /** Defaults to 200; max 500 (matches listErrorEvents). */
+          limit: z.number().int().min(1).max(500).optional(),
+          /** Optional `createdAt >=` filter, e.g. last-24h dashboards. */
+          createdSince: z.coerce.date().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      try {
+        const rows = await listErrorEvents({
+          errorClass: FAILURE_STATES.map(failureStateErrorClass),
+          limit: input?.limit ?? 200,
+          createdSince: input?.createdSince,
+        });
+        return {
+          rows,
+          summary: summarizeFailureStateEventList(rows),
+        };
+      } catch (e) {
+        throwTrpcAndCapture(
+          new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: e instanceof Error ? e.message : String(e),
+          }),
+        );
       }
     }),
 
