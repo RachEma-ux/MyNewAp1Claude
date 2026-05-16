@@ -10,9 +10,17 @@
  * operator-facing read surfaces — no mutations.
  */
 
+import { z } from "zod";
 import { router, adminProcedure } from "../../../_core/trpc.js";
 import { getHealthAlertCronStatus } from "./health-alert-cron.js";
-import { listOpenHealthAlerts } from "./health-alert.js";
+import {
+  listOpenHealthAlerts,
+  resolveHealthAlertById,
+} from "./health-alert.js";
+
+const ResolveAlertInput = z.object({
+  alertId: z.number().int().positive(),
+});
 
 export const graphHealthRouter = router({
   /**
@@ -34,4 +42,21 @@ export const graphHealthRouter = router({
   listOpen: adminProcedure.query(async () => {
     return listOpenHealthAlerts("default");
   }),
+
+  /**
+   * T-I.56 — operator-triggered single-alert resolution. Distinct
+   * from the auto-resolution path in `persistHealthAlertDecisions`
+   * (which resolves alerts when the next scan no longer observes
+   * the breach key); this lets operators dismiss a specific alert
+   * by id without waiting for the next scan.
+   *
+   * Returns `{ resolved: boolean }` — `false` is idempotent (alert
+   * already resolved, wrong id, or wrong scope). Same single-global-
+   * scope assumption as `listOpen`.
+   */
+  resolveAlert: adminProcedure
+    .input(ResolveAlertInput)
+    .mutation(async ({ input }) => {
+      return resolveHealthAlertById(input.alertId, "default");
+    }),
 });

@@ -431,6 +431,45 @@ export function healthAlertKeyToFailureState(
  * future operator dashboard surface; exposed here so callers don't
  * need to import drizzle directly.
  */
+/**
+ * T-I.56 — operator-triggered single-alert resolution. Distinct from
+ * the auto-resolution path inside `persistHealthAlertDecisions` (which
+ * resolves alerts when the latest scan no longer observes the breach
+ * key); this path resolves a *specific* alert id so operators can
+ * dismiss it without waiting for the next scan to clear it.
+ *
+ * Returns `{ resolved: boolean }` — `true` when a row was updated
+ * (i.e. the alert existed and was open); `false` when no row matched
+ * (already resolved, wrong id, or wrong scope). Idempotent — calling
+ * twice on the same id surfaces `false` on the second call.
+ *
+ * No-op when ASDB is null (test-mode fall-through).
+ */
+export async function resolveHealthAlertById(
+  id: number,
+  scope: string = "default",
+): Promise<{ resolved: boolean }> {
+  const db = getAsDb();
+  if (!db) return { resolved: false };
+  const res = await db
+    .update(agsRuntimeAlerts)
+    .set({ resolvedAt: new Date() })
+    .where(
+      and(
+        eq(agsRuntimeAlerts.id, id),
+        eq(agsRuntimeAlerts.scope, scope),
+        isNull(agsRuntimeAlerts.resolvedAt),
+      ),
+    );
+  const cnt =
+    typeof (res as { rowCount?: number }).rowCount === "number"
+      ? (res as { rowCount: number }).rowCount
+      : Array.isArray(res)
+        ? (res as unknown[]).length
+        : 0;
+  return { resolved: cnt > 0 };
+}
+
 export async function listOpenHealthAlerts(
   scope: string = "default",
 ): Promise<
