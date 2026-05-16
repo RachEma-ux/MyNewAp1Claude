@@ -183,6 +183,147 @@ export const AGENT_STUDIO_EXPORT_CANDIDATE_KEYS = [
   "activeSourceVersionId",
   "exportStatus",
 ] as const;
+export type AgentStudioExportCandidateKey =
+  (typeof AGENT_STUDIO_EXPORT_CANDIDATE_KEYS)[number];
+
+// ============================================================================
+// Per-export-candidate-key operator-facing metadata (T-E.5)
+// ============================================================================
+
+export type AgentStudioExportCandidateKeyCategory =
+  | "identity"
+  | "lifecycle"
+  | "binding"
+  | "provenance";
+
+export interface AgentStudioExportCandidateKeyMetadata {
+  /** Display label rendered in the export-candidate review UI. */
+  readonly label: string;
+  /** Short operator-facing description of what this key carries and
+   *  why an export consumer would read it. */
+  readonly description: string;
+  /** Closed-taxonomy category for grouping the candidate-review panel
+   *  in the UI. */
+  readonly category: AgentStudioExportCandidateKeyCategory;
+  /** Whether the value of this key is itself drawn from a closed
+   *  enum elsewhere in the codebase (true for `lifecycleState`,
+   *  `readiness`, `governance`, `racReadiness`, `exportStatus`,
+   *  `sourceModule`; false for the rest which are scalar IDs / free
+   *  strings / object shapes). */
+  readonly isClosedTaxonomyValue: boolean;
+}
+
+export const AGENT_STUDIO_EXPORT_CANDIDATE_KEY_METADATA: Readonly<
+  Record<
+    AgentStudioExportCandidateKey,
+    AgentStudioExportCandidateKeyMetadata
+  >
+> = {
+  workspaceId: {
+    label: "Workspace ID",
+    description:
+      "Owning workspace UUID for this export candidate — scopes export consumer queries by tenant.",
+    category: "identity",
+    isClosedTaxonomyValue: false,
+  },
+  agentId: {
+    label: "Agent ID",
+    description:
+      "Agent UUID this candidate exports. Stable across versions of the same agent.",
+    category: "identity",
+    isClosedTaxonomyValue: false,
+  },
+  versionId: {
+    label: "Version ID",
+    description:
+      "Agent-version UUID this candidate exports. Distinguishes one ready release from another.",
+    category: "identity",
+    isClosedTaxonomyValue: false,
+  },
+  name: {
+    label: "Name",
+    description:
+      "Display name of the agent at this version — surfaced in the consumer's catalog.",
+    category: "identity",
+    isClosedTaxonomyValue: false,
+  },
+  lifecycleState: {
+    label: "Lifecycle State",
+    description:
+      "AGS lifecycle state of this version (one of AGS_LIFECYCLE_STATES). Export only fires for ready states.",
+    category: "lifecycle",
+    isClosedTaxonomyValue: true,
+  },
+  readiness: {
+    label: "Readiness",
+    description:
+      "Coarse readiness verdict (one of AGS_GOVERNANCE_VERDICTS) — pass/warning/blocked.",
+    category: "lifecycle",
+    isClosedTaxonomyValue: true,
+  },
+  governance: {
+    label: "Governance",
+    description:
+      "Governance verdict (one of AGS_GOVERNANCE_VERDICTS) — the cross-cut decision after policy evaluation.",
+    category: "lifecycle",
+    isClosedTaxonomyValue: true,
+  },
+  racReadiness: {
+    label: "RAC Readiness",
+    description:
+      "RAC-specific readiness verdict (one of AGS_GOVERNANCE_VERDICTS) — surfaces source / planner / assembler health.",
+    category: "lifecycle",
+    isClosedTaxonomyValue: true,
+  },
+  binding: {
+    label: "Binding",
+    description:
+      "Provider + model binding shape — what model this candidate ships against. Object value; not enumerated.",
+    category: "binding",
+    isClosedTaxonomyValue: false,
+  },
+  capabilities: {
+    label: "Capabilities",
+    description:
+      "Capability hash / declared capability surface — what the agent claims to handle. Object value; not enumerated.",
+    category: "binding",
+    isClosedTaxonomyValue: false,
+  },
+  sourceModule: {
+    label: "Source Module",
+    description:
+      "Originating internal module (one of AGS_SOURCE_MODULES) — disambiguates which Agent Studio surface produced this candidate.",
+    category: "provenance",
+    isClosedTaxonomyValue: true,
+  },
+  sourceRefId: {
+    label: "Source Ref ID",
+    description:
+      "Foreign-key reference into the source module's domain (e.g., draft ID, release ID). Scalar; not enumerated.",
+    category: "provenance",
+    isClosedTaxonomyValue: false,
+  },
+  activeSourceVersionId: {
+    label: "Active Source Version ID",
+    description:
+      "Version pointer into the source module's history — pins what was active when the candidate was emitted.",
+    category: "provenance",
+    isClosedTaxonomyValue: false,
+  },
+  exportStatus: {
+    label: "Export Status",
+    description:
+      "Closed-taxonomy export status (per export-pipeline state vocabulary) — surfaces queued / pushed / failed.",
+    category: "lifecycle",
+    isClosedTaxonomyValue: true,
+  },
+};
+
+export function getAgentStudioExportCandidateKeyMetadata(
+  key: AgentStudioExportCandidateKey,
+): AgentStudioExportCandidateKeyMetadata {
+  return AGENT_STUDIO_EXPORT_CANDIDATE_KEY_METADATA[key];
+}
 
 /**
  * Keys that have historically been (or could plausibly become) the source of
