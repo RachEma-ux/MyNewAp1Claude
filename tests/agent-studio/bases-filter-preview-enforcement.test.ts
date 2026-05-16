@@ -117,8 +117,13 @@ describe("Bases ζ-preview typed filter enforcement δ-slice (T-F.102 / T-F.2-fi
 
   it("Notes table renders from previewNotes (post-narrow), NOT previewQuery.data (pre-narrow)", () => {
     const src = readPanel();
+    // T-F.104 (a.2-narrow) restructured the per-row render from
+    // arrow-returns-JSX `(n) => (...)` into a block body
+    // `(n) => { const isOpen = ...; return (...)` so the Open/Close
+    // toggle can compute `isOpen` once per row. Loosen the regex to
+    // accept either form by anchoring on the map + the per-row testid.
     expect(src).toMatch(
-      /\{previewNotes\.map\(\(n\)\s*=>\s*\([\s\S]{0,200}data-testid=\{`bases-row-preview-note-\$\{base\.id\}-\$\{n\.id\}`\}/,
+      /\{previewNotes\.map\(\(n\)\s*=>\s*[\s\S]{0,1000}data-testid=\{`bases-row-preview-note-\$\{base\.id\}-\$\{n\.id\}`\}/,
     );
     // Empty-state predicate also uses previewNotes.length.
     expect(src).toMatch(
