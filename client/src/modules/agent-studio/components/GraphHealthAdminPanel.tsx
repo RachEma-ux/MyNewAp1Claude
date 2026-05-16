@@ -31,6 +31,13 @@
  * enforces. Useful for confirming a Neo4j re-projection after
  * promotion / post-migration smoke-tests without waiting for the
  * 04:30 UTC daily cron tick.
+ *
+ * T-I.60 added a "Recent failure-state events" Card — first UI
+ * consumer of T-I.59's `listRecentFailureStateEvents` admin tRPC.
+ * Renders the summary rollup + per-kind breakdown over the closed-
+ * taxonomy event stream. Placement here is intentional: closed-
+ * taxonomy events skew graph-health adjacent (#4, #5, #7, #8, #9,
+ * #10, #12, plus retrieval/agent kinds).
  */
 
 import { useState } from "react";
@@ -108,6 +115,20 @@ export function GraphHealthAdminPanel() {
     trpc.agentStudio.graphProjection.getStalenessCronStatus.useQuery(undefined, {
       refetchOnWindowFocus: false,
     });
+
+  // T-I.60 — first UI consumer of T-I.59's `listRecentFailureStateEvents`.
+  // Closed-taxonomy events skew graph-health adjacent (kinds
+  // #4 neo4j_unavailable, #5 neo4j_degraded, #7 projection_stale,
+  // #8 drift_detected, #9 projection_sync_failed, #10 query_timeout,
+  // #12 reference_hidden, plus retrieval/agent kinds), so this panel
+  // is the natural placement. Default limit 50 (smaller than the
+  // tRPC's 200 default — keeps the inline table sized for an
+  // overview without separate pagination).
+  const failureStateEventsQ =
+    trpc.agentStudio.workspaceObservability.listRecentFailureStateEvents.useQuery(
+      { limit: 50 },
+      { refetchOnWindowFocus: false },
+    );
 
   // T-I.57: operator-triggered ad-hoc health alert scan. Mirrors
   // the T-I.55 staleness Run-now button shape. Useful for confirming
@@ -691,6 +712,110 @@ export function GraphHealthAdminPanel() {
                 </p>
               ) : null}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* T-I.60: Recent closed-taxonomy failure-state events. Reads
+          via T-I.59's `listRecentFailureStateEvents` admin tRPC;
+          renders summary header (total / closed-taxonomy /
+          free-form / distinct sources) + the per-kind breakdown
+          from `occurrenceSummary.byKind` + the most-recent rows. */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SectionLabel>Recent failure-state events</SectionLabel>
+          {failureStateEventsQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading recent failure-state events…
+            </p>
+          ) : failureStateEventsQ.error ? (
+            <p className="text-sm text-destructive">
+              Failed to load failure-state events: {failureStateEventsQ.error.message}
+            </p>
+          ) : failureStateEventsQ.data == null ? (
+            <p className="text-sm text-muted-foreground">No data.</p>
+          ) : (
+            <>
+              <div
+                className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm"
+                data-testid="graph-health-failure-state-events-summary"
+              >
+                <div>
+                  <span className="font-medium">totalEvents:</span>{" "}
+                  <span className="font-mono">
+                    {failureStateEventsQ.data.summary.totalEvents}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">closedTaxonomyEvents:</span>{" "}
+                  <span className="font-mono">
+                    {failureStateEventsQ.data.summary.closedTaxonomyEvents}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">freeFormEvents:</span>{" "}
+                  <span
+                    className={`font-mono ${failureStateEventsQ.data.summary.freeFormEvents > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}
+                  >
+                    {failureStateEventsQ.data.summary.freeFormEvents}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">distinctSourceKinds:</span>{" "}
+                  <span className="font-mono">
+                    {failureStateEventsQ.data.summary.distinctSourceKinds}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">oldestAt:</span>{" "}
+                  <span className="font-mono text-xs">
+                    {fmtTs(failureStateEventsQ.data.summary.oldestAt)}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">newestAt:</span>{" "}
+                  <span className="font-mono text-xs">
+                    {fmtTs(failureStateEventsQ.data.summary.newestAt)}
+                  </span>
+                </div>
+              </div>
+              {failureStateEventsQ.data.summary.closedTaxonomyEvents > 0 ? (
+                <div className="overflow-x-auto pt-2 border-t">
+                  <table
+                    className="w-full text-sm border-collapse"
+                    data-testid="graph-health-failure-state-events-by-kind-table"
+                  >
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="py-1 pr-3">Kind</th>
+                        <th className="py-1 pr-3">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(
+                        failureStateEventsQ.data.summary.occurrenceSummary
+                          .byKind,
+                      )
+                        .filter(([, n]) => (n as number) > 0)
+                        .sort(
+                          ([, a], [, b]) =>
+                            (b as number) - (a as number),
+                        )
+                        .map(([kind, n]) => (
+                          <tr key={kind} className="border-t">
+                            <td className="py-1 pr-3 font-mono text-xs">
+                              {kind}
+                            </td>
+                            <td className="py-1 pr-3 font-mono text-xs">
+                              {n as number}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
           )}
         </CardContent>
       </Card>
