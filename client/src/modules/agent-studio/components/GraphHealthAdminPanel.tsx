@@ -938,6 +938,48 @@ export function GraphHealthAdminPanel() {
             <p className="text-sm text-muted-foreground">No data.</p>
           ) : (
             <>
+              {/* T-I.68: empty-state messaging. When the buffer is
+                  empty (rows.length === 0), distinguish two cases:
+                  filters narrowed to nothing (clearable) vs. the
+                  workspace simply hasn't recorded any closed-
+                  taxonomy events yet (informational). Without this,
+                  operators staring at totalEvents:0 can't tell
+                  whether their filter worked or whether they
+                  triaged into a true empty. */}
+              {failureStateEventsQ.data.rows.length === 0 ? (
+                <div
+                  className="rounded border bg-muted/30 p-3 text-sm"
+                  data-testid="graph-health-failure-state-events-empty"
+                >
+                  {kindFilter !== null ||
+                  sourceKindFilter !== null ||
+                  createdSinceWindowMs !== null ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <p>
+                        No closed-taxonomy events match the active
+                        filter(s).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKindFilter(null);
+                          setSourceKindFilter(null);
+                          setCreatedSinceWindowMs(null);
+                        }}
+                        className="text-xs text-muted-foreground underline"
+                        data-testid="graph-health-failure-state-events-empty-clear-all"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
+                  ) : (
+                    <p>
+                      No closed-taxonomy failure-state events recorded
+                      yet.
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <div
                 className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm"
                 data-testid="graph-health-failure-state-events-summary"
