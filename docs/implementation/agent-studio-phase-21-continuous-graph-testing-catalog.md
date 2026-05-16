@@ -288,6 +288,7 @@ runtime catches up.
 | `http-method-metadata.test.ts` | `services/publish-targets/http-pusher` — `HTTP_METHOD_METADATA` (3-entry per-method label + description + isCreate + isIdempotent booleans for POST/PUT/PATCH; also promotes `HTTP_METHODS` closed-tuple) | T-G.54 / #1164 |
 | `graph-quality-agent-run-status-metadata.test.ts` | `services/graph-quality-agent-runs-retention` — `GRAPH_QUALITY_AGENT_RUN_STATUS_METADATA` (3-entry per-status label + description + terminal + successful booleans for running/completed/failed; also promotes `GRAPH_QUALITY_AGENT_RUN_STATUSES` closed-tuple) | T-D.14 / #1165 |
 | `rac-trace-feedback-verdict-metadata.test.ts` | `services/rac/trace/store` — `RAC_TRACE_FEEDBACK_VERDICT_METADATA` (2-entry per-verdict label + description + isPositive boolean for thumbs_up/thumbs_down; also promotes `RAC_TRACE_FEEDBACK_VERDICTS` closed-tuple) | T-A.14 / #1166 |
+| `pii-severity-metadata.test.ts` | `services/ingestion/pii-detector` — `PII_SEVERITY_METADATA` (2-entry per-severity label + description + halts boolean for warn/block; also promotes `PII_SEVERITIES` closed-tuple) | T-D.15 / #1167 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

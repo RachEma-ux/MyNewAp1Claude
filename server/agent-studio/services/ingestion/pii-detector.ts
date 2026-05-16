@@ -38,7 +38,51 @@ export type PiiEntity =
   | "api_key_aws_access"
   | "api_key_openai";
 
-export type PiiSeverity = "warn" | "block";
+/**
+ * Closed-taxonomy PII severity. Promoted to a tuple at T-D.15 so the
+ * metadata table + lockstep tests can be authored.
+ */
+export const PII_SEVERITIES = ["warn", "block"] as const;
+export type PiiSeverity = (typeof PII_SEVERITIES)[number];
+
+// ============================================================================
+// Per-PII-severity operator-facing metadata (T-D.15)
+// ============================================================================
+
+export interface PiiSeverityMetadata {
+  /** Display label rendered in the PII-finding admin badge. */
+  readonly label: string;
+  /** Short operator-facing description of what this severity does at
+   *  ingestion time. */
+  readonly description: string;
+  /** Whether the ingestion pipeline halts on this severity (true for
+   *  `block` only; `warn` records the finding but lets ingestion
+   *  proceed). */
+  readonly halts: boolean;
+}
+
+export const PII_SEVERITY_METADATA: Readonly<
+  Record<PiiSeverity, PiiSeverityMetadata>
+> = {
+  warn: {
+    label: "Warn",
+    description:
+      "PII detected — finding recorded on the ingestion job for operator review; ingestion proceeds with the value redacted in storage.",
+    halts: false,
+  },
+  block: {
+    label: "Block",
+    description:
+      "High-confidence credential / API-key detected — ingestion job hard-halts to prevent secret leakage into downstream storage.",
+    halts: true,
+  },
+};
+
+export function getPiiSeverityMetadata(
+  severity: PiiSeverity,
+): PiiSeverityMetadata {
+  return PII_SEVERITY_METADATA[severity];
+}
 
 export interface PiiFinding {
   entity: PiiEntity;
