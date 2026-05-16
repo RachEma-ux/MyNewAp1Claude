@@ -9,7 +9,76 @@
 
 import type { GraphRepository } from "../repository/index.js";
 
-export type DriftClass = "missing_in_neo4j" | "extra_in_neo4j" | "stale_version" | "permission_leak";
+/**
+ * Closed-taxonomy drift classification. Promoted to a tuple-derived
+ * constant at T-G.39 so it.each-style lockstep tests can enumerate
+ * every value and the metadata table below can drive operator UX.
+ */
+export const DRIFT_CLASSES = [
+  "missing_in_neo4j",
+  "extra_in_neo4j",
+  "stale_version",
+  "permission_leak",
+] as const;
+export type DriftClass = (typeof DRIFT_CLASSES)[number];
+
+// ============================================================================
+// Per-drift-class operator-facing metadata (T-G.39)
+// ============================================================================
+
+export type DriftClassSeverity = "warning" | "critical";
+
+export interface DriftClassMetadata {
+  /** Display label rendered in the projection-drift admin panel. */
+  readonly label: string;
+  /** Short operator-facing description of what this drift class means
+   *  and how it arises in practice. */
+  readonly description: string;
+  /** Severity bucket — `permission_leak` is `critical` (security signal);
+   *  the other three are `warning` (eventual-consistency signals). */
+  readonly severity: DriftClassSeverity;
+  /** Whether this drift class indicates a security-relevant divergence
+   *  (true for `permission_leak` only — surfaces rows that exist in
+   *  Neo4j but should be hidden by Postgres-side permission filters). */
+  readonly isSecurityRelevant: boolean;
+}
+
+export const DRIFT_CLASS_METADATA: Readonly<
+  Record<DriftClass, DriftClassMetadata>
+> = {
+  missing_in_neo4j: {
+    label: "Missing in Neo4j",
+    description:
+      "Postgres has a row but the projection layer hasn't materialized it into Neo4j yet — usually a transient lag the next projection run resolves.",
+    severity: "warning",
+    isSecurityRelevant: false,
+  },
+  extra_in_neo4j: {
+    label: "Extra in Neo4j",
+    description:
+      "Neo4j has a node that no longer exists in Postgres source-of-truth — a leftover from a delete that didn't propagate.",
+    severity: "warning",
+    isSecurityRelevant: false,
+  },
+  stale_version: {
+    label: "Stale Version",
+    description:
+      "Both Postgres and Neo4j have the row but Neo4j's `latestVersionId` is behind Postgres — needs a re-project to catch up.",
+    severity: "warning",
+    isSecurityRelevant: false,
+  },
+  permission_leak: {
+    label: "Permission Leak",
+    description:
+      "Neo4j has a node visible to a user-role that Postgres permission filters would hide. Security-relevant; investigate immediately.",
+    severity: "critical",
+    isSecurityRelevant: true,
+  },
+};
+
+export function getDriftClassMetadata(c: DriftClass): DriftClassMetadata {
+  return DRIFT_CLASS_METADATA[c];
+}
 
 export interface DriftEvent {
   readonly driftClass: DriftClass;
