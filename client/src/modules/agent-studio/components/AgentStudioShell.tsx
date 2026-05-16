@@ -96,6 +96,8 @@ const GraphQualityFindingsPage = lazy(
   () => import("../pages/GraphQualityFindingsPage"),
 );
 const BasesPage = lazy(() => import("../pages/BasesPage"));
+// ── T-F.107 (T-F.6-α): personal workspace inbox ──
+const InboxPage = lazy(() => import("../pages/InboxPage"));
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -268,6 +270,14 @@ function parseRoute(path: string): ParsedRoute {
     return {
       ...empty,
       view: "bases" as any,
+      homeMode: null,
+    };
+  }
+  // ── T-F.107 (T-F.6-α): inbox (no agent context) ──
+  if (path.startsWith("/agent-studio/inbox")) {
+    return {
+      ...empty,
+      view: "inbox" as any,
       homeMode: null,
     };
   }
@@ -471,6 +481,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/bases");
       return;
     }
+    // T-F.107 (T-F.6-α): inbox sidebar entry.
+    if ((key as string) === "inbox") {
+      navigate("/agent-studio/inbox");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -569,6 +584,9 @@ export default function AgentStudioShell() {
         // ── T-F.91 (T-F.2-α): bases ──
         case "bases" as any:
           return <BasesPage />;
+        // ── T-F.107 (T-F.6-α): inbox ──
+        case "inbox" as any:
+          return <InboxPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }

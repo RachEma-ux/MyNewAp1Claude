@@ -43,6 +43,7 @@ import {
   Telescope,
   ShieldAlert,
   Table2,
+  Inbox,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -104,7 +105,9 @@ export type AgentStudioView =
   // ── T-F.82 (T-F.4-α): graph-quality findings ──
   | "graph-quality-findings"
   // ── T-F.91 (T-F.2-α): bases ──
-  | "bases";
+  | "bases"
+  // ── T-F.107 (T-F.6-α): inbox ──
+  | "inbox";
 
 interface SectionGroup {
   label: string;
@@ -234,6 +237,17 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "bases",
         label: "Bases",
         icon: Table2,
+      },
+    ],
+  },
+  // ── T-F.107 (T-F.6-α): inbox ──
+  {
+    label: "Inbox",
+    items: [
+      {
+        key: "inbox",
+        label: "Inbox",
+        icon: Inbox,
       },
     ],
   },

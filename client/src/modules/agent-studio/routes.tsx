@@ -47,6 +47,7 @@ export const agentStudioRoutes: AgentStudioRouteEntry[] = [
   { path: "/agent-studio/graph-lens-browser", component: AgentStudioShell, label: "Graph Lens Browser" },
   { path: "/agent-studio/graph-quality-findings", component: AgentStudioShell, label: "Graph Quality Findings" },
   { path: "/agent-studio/bases", component: AgentStudioShell, label: "Bases" },
+  { path: "/agent-studio/inbox", component: AgentStudioShell, label: "Inbox" },
   { path: "/agent-studio/:agentId/runs/:runId", component: AgentStudioShell, label: "Agent Run Detail" },
   { path: "/agent-studio/:agentId/versions/compare", component: AgentStudioShell, label: "Versions Compare" },
   { path: "/agent-studio/:agentId/:section", component: AgentStudioShell, label: "Agent Section" },
