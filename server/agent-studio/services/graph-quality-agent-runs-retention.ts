@@ -32,7 +32,67 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import { getAsDb } from "../db/connection.js";
 import { agsGraphQualityAgentRuns } from "../../../drizzle/tables/agent-studio-graph-quality.js";
 
-export type GraphQualityAgentRunStatus = "running" | "completed" | "failed";
+/**
+ * Closed-taxonomy graph-quality agent-run status. Promoted to a tuple
+ * at T-D.14 so the metadata table + lockstep tests can be authored.
+ */
+export const GRAPH_QUALITY_AGENT_RUN_STATUSES = [
+  "running",
+  "completed",
+  "failed",
+] as const;
+export type GraphQualityAgentRunStatus =
+  (typeof GRAPH_QUALITY_AGENT_RUN_STATUSES)[number];
+
+// ============================================================================
+// Per-status operator-facing metadata (T-D.14)
+// ============================================================================
+
+export interface GraphQualityAgentRunStatusMetadata {
+  /** Display label rendered in the quality-agent run-log status column. */
+  readonly label: string;
+  /** Short operator-facing description of what this status means
+   *  for the agent run's place in its lifecycle. */
+  readonly description: string;
+  /** Whether the status is terminal — no further lifecycle transitions
+   *  expected (true for `completed` + `failed`; false for `running`). */
+  readonly terminal: boolean;
+  /** Whether the run produced a successful outcome (true for
+   *  `completed` only; false for `running` + `failed`). */
+  readonly successful: boolean;
+}
+
+export const GRAPH_QUALITY_AGENT_RUN_STATUS_METADATA: Readonly<
+  Record<GraphQualityAgentRunStatus, GraphQualityAgentRunStatusMetadata>
+> = {
+  running: {
+    label: "Running",
+    description:
+      "Agent run is in flight — the scanner has started but has not yet emitted findings or reached a terminal state.",
+    terminal: false,
+    successful: false,
+  },
+  completed: {
+    label: "Completed",
+    description:
+      "Agent run finished cleanly — findings emitted to the quality-finding table, run can be pruned after retention window.",
+    terminal: true,
+    successful: true,
+  },
+  failed: {
+    label: "Failed",
+    description:
+      "Agent run errored out before producing findings — exception captured in the run row. Operator should review the trace.",
+    terminal: true,
+    successful: false,
+  },
+};
+
+export function getGraphQualityAgentRunStatusMetadata(
+  status: GraphQualityAgentRunStatus,
+): GraphQualityAgentRunStatusMetadata {
+  return GRAPH_QUALITY_AGENT_RUN_STATUS_METADATA[status];
+}
 
 /** Default terminal statuses pruned by a sweep. */
 const DEFAULT_TERMINAL_STATUSES: readonly GraphQualityAgentRunStatus[] = [

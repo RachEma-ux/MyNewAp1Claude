@@ -173,6 +173,7 @@ const ANCILLARY_TESTS = [
   "marketplace-item-source-metadata.test.ts",
   "conflict-behavior-metadata.test.ts",
   "http-method-metadata.test.ts",
+  "graph-quality-agent-run-status-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
