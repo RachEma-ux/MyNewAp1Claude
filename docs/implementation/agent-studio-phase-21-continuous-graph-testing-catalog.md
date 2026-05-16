@@ -270,6 +270,7 @@ runtime catches up.
 | `contracted-extension-lane-metadata.test.ts` | `services/extensions/lane-hook-contracts` — `CONTRACTED_EXTENSION_LANE_METADATA` (3-entry per-contracted-lane label + description + pipelineOrder (1..3) + producesContributedChunks booleans for retrieve/assemble/compose) | T-X.4 / #1146 |
 | `allowed-procedure-namespace-metadata.test.ts` | `services/graph/retrieval/text2cypher-validator` — `ALLOWED_PROCEDURE_NAMESPACE_METADATA` (7-entry per-namespace label + description + providerBucket (neo4j/apoc/gds) + expectsGraphProjection booleans for db.schema./apoc.path./apoc.coll./gds.shortestPath/gds.betweenness/gds.degree/gds.pageRank; also promotes `AllowedProcedureNamespace` type alias) | T-G.38 / #1147 |
 | `drift-class-metadata.test.ts` | `services/graph/projection/drift-detector` — `DRIFT_CLASS_METADATA` (4-entry per-class label + description + severity (warning/critical) + isSecurityRelevant booleans for missing_in_neo4j/extra_in_neo4j/stale_version/permission_leak; also promotes `DRIFT_CLASSES` closed-tuple) | T-G.39 / #1148 |
+| `cag-pack-status-metadata.test.ts` | `services/cag/types` — `CAG_PACK_STATUS_METADATA` (4-entry per-status label + description + compilable + terminal booleans for fresh/stale/archived/invalid; also promotes `CAG_PACK_STATUSES` closed-tuple) | T-G.40 / #1149 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

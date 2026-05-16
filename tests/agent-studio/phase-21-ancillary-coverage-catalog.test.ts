@@ -157,6 +157,7 @@ const ANCILLARY_TESTS = [
   "contracted-extension-lane-metadata.test.ts",
   "allowed-procedure-namespace-metadata.test.ts",
   "drift-class-metadata.test.ts",
+  "cag-pack-status-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

@@ -6,7 +6,77 @@
  * the store/events runtime.
  */
 
-export type CagPackStatus = "fresh" | "stale" | "archived" | "invalid";
+/**
+ * Closed-taxonomy CAG pack lifecycle status. Promoted from a union to
+ * a tuple-derived constant at T-G.40 so it.each-style lockstep tests
+ * can enumerate every value and the metadata table below can drive
+ * operator UX.
+ */
+export const CAG_PACK_STATUSES = [
+  "fresh",
+  "stale",
+  "archived",
+  "invalid",
+] as const;
+export type CagPackStatus = (typeof CAG_PACK_STATUSES)[number];
+
+// ============================================================================
+// Per-pack-status operator-facing metadata (T-G.40)
+// ============================================================================
+
+export interface CagPackStatusMetadata {
+  /** Display label rendered in the CAG-pack admin panel. */
+  readonly label: string;
+  /** Short operator-facing description of what this status implies
+   *  for runtime use of the pack. */
+  readonly description: string;
+  /** Whether the pack can be compiled into a runtime CAG block at
+   *  this status (true for `fresh` only). */
+  readonly compilable: boolean;
+  /** Whether the pack is in a terminal lifecycle state (true for
+   *  `archived` + `invalid` — operator-driven retirement vs failure;
+   *  false for `fresh` + `stale` which are still live in some form). */
+  readonly terminal: boolean;
+}
+
+export const CAG_PACK_STATUS_METADATA: Readonly<
+  Record<CagPackStatus, CagPackStatusMetadata>
+> = {
+  fresh: {
+    label: "Fresh",
+    description:
+      "Pack is current — passes freshness invariants and can be compiled into a runtime CAG block.",
+    compilable: true,
+    terminal: false,
+  },
+  stale: {
+    label: "Stale",
+    description:
+      "Pack has aged past its freshness window — still usable for diagnostics but cannot compile into a runtime block until refreshed.",
+    compilable: false,
+    terminal: false,
+  },
+  archived: {
+    label: "Archived",
+    description:
+      "Pack was retired by an operator decision — preserved for audit / lineage but no longer reachable from active routes.",
+    compilable: false,
+    terminal: true,
+  },
+  invalid: {
+    label: "Invalid",
+    description:
+      "Pack failed validation — schema / governance / consistency check exposed a fault. Operator must remediate or archive.",
+    compilable: false,
+    terminal: true,
+  },
+};
+
+export function getCagPackStatusMetadata(
+  status: CagPackStatus,
+): CagPackStatusMetadata {
+  return CAG_PACK_STATUS_METADATA[status];
+}
 
 export type CagPackEventType =
   | "pack_created"
