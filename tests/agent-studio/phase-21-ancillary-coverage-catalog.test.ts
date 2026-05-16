@@ -209,6 +209,7 @@ const ANCILLARY_TESTS = [
   "summarize-projection-drift-events.test.ts",
   "summarize-rac-sources.test.ts",
   "summarize-user-notifications.test.ts",
+  "summarize-attachments.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
