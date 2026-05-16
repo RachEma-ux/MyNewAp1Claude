@@ -182,9 +182,10 @@ implicitly. Empty `conditions` = match everything (no narrowing).
 This ADR (T-F.99) ships:
 
 - The ADR document itself (this file).
-- `server/agent-studio/services/vault/filter-language.ts` —
-  exported `FilterConditionSchema`, `FilterDocumentSchema`, inferred
-  types `FilterCondition` + `FilterDocument`, helper
+- `shared/bases-filter-language.ts` (moved to `shared/` in γ slice
+  for client + server reuse without crossing the server/client
+  boundary) — exported `FilterConditionSchema`, `FilterDocumentSchema`,
+  inferred types `FilterCondition` + `FilterDocument`, helper
   `parseFilterDocument(input: unknown): FilterDocument | null`.
 - Unit tests for the parser (`tests/agent-studio/vault-filter-
   language.test.ts`).

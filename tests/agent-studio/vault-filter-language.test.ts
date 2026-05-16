@@ -18,7 +18,7 @@ import {
   applyFilterDocument,
   type FilterDocument,
   type FilterableNote,
-} from "../../server/agent-studio/services/vault/filter-language.js";
+} from "../../shared/bases-filter-language.js";
 
 describe("FilterConditionSchema — V1 discriminated union", () => {
   it("accepts folderId eq number", () => {

@@ -23,6 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SectionLabel } from "./ui";
+import { FilterDocumentSchema } from "@shared/bases-filter-language";
 
 /**
  * Discriminator for the `agsVaultSavedViews.viewKind` column. Kept
@@ -85,6 +86,8 @@ export function BasesPanel() {
     setRenameError(null);
     setExpandedBaseId(null);
     setConfirmDeleteBaseId(null);
+    setFilterEditBaseId(null);
+    setFilterEditDraft("");
   }
   function closeRenameEditor() {
     setRenameBaseId(null);
@@ -106,6 +109,8 @@ export function BasesPanel() {
     setRenameBaseId(null);
     setRenameDraft("");
     setExpandedBaseId(null);
+    setFilterEditBaseId(null);
+    setFilterEditDraft("");
   }
   function closeDeleteConfirm() {
     setConfirmDeleteBaseId(null);
@@ -174,6 +179,32 @@ export function BasesPanel() {
   // other JSON keys in `filters` are surfaced in the β detail view
   // but not yet narrowed. The preview banner names this gap.
   const [previewBaseId, setPreviewBaseId] = useState<number | null>(null);
+  // T-F.101 (T-F.2-filter-γ): inline filter editor on the β detail
+  // row. Operator opens "Edit filters", textarea pre-populated with
+  // the current JSON; Save validates against FilterDocumentSchema
+  // (Zod) before calling updateSavedView. Invalid JSON or schema
+  // mismatch surfaces a per-row error without round-tripping.
+  // Mutually exclusive with rename / delete-confirm (filter-edit
+  // is itself a row mutation). The edit form lives INSIDE the β
+  // detail expansion row, so it requires the detail to be expanded.
+  const [filterEditBaseId, setFilterEditBaseId] = useState<number | null>(
+    null,
+  );
+  const [filterEditDraft, setFilterEditDraft] = useState<string>("");
+  const [filterEditError, setFilterEditError] = useState<string | null>(null);
+  function openFilterEditor(baseId: number, currentJson: string) {
+    setFilterEditBaseId(baseId);
+    setFilterEditDraft(currentJson);
+    setFilterEditError(null);
+    setRenameBaseId(null);
+    setRenameDraft("");
+    setConfirmDeleteBaseId(null);
+  }
+  function closeFilterEditor() {
+    setFilterEditBaseId(null);
+    setFilterEditDraft("");
+    setFilterEditError(null);
+  }
   const shareMutation =
     trpc.agentStudio.vault.updateSavedView.useMutation({
       onSuccess: () => {
@@ -185,6 +216,15 @@ export function BasesPanel() {
         setShareError(err.message);
         setShareErrorBaseId(variables.id);
       },
+    });
+  const filterEditMutation =
+    trpc.agentStudio.vault.updateSavedView.useMutation({
+      onSuccess: () => {
+        setFilterEditError(null);
+        closeFilterEditor();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setFilterEditError(err.message),
     });
   const deleteMutation =
     trpc.agentStudio.vault.deleteSavedView.useMutation({
@@ -618,7 +658,57 @@ export function BasesPanel() {
                       {isExpanded ? (
                         <tr data-testid={`bases-row-detail-${b.id}`}>
                           <td colSpan={6} className="bg-muted/20 px-3 py-2 text-xs">
-                            <BaseRowDetail base={b} />
+                            <BaseRowDetail
+                              base={b}
+                              filterEdit={{
+                                isOpen: filterEditBaseId === b.id,
+                                draft: filterEditDraft,
+                                error: filterEditError,
+                                isPending:
+                                  filterEditMutation.isPending &&
+                                  filterEditMutation.variables?.id === b.id,
+                                onOpen: () =>
+                                  openFilterEditor(
+                                    b.id,
+                                    JSON.stringify(
+                                      b.filters ?? { version: 1, conditions: [] },
+                                      null,
+                                      2,
+                                    ),
+                                  ),
+                                onChange: setFilterEditDraft,
+                                onSave: () => {
+                                  let parsed: unknown;
+                                  try {
+                                    parsed = JSON.parse(filterEditDraft);
+                                  } catch (e) {
+                                    setFilterEditError(
+                                      `Invalid JSON: ${
+                                        e instanceof Error
+                                          ? e.message
+                                          : String(e)
+                                      }`,
+                                    );
+                                    return;
+                                  }
+                                  const validated =
+                                    FilterDocumentSchema.safeParse(parsed);
+                                  if (!validated.success) {
+                                    setFilterEditError(
+                                      `Schema validation failed: ${validated.error.errors
+                                        .map((e) => e.message)
+                                        .join("; ")}`,
+                                    );
+                                    return;
+                                  }
+                                  filterEditMutation.mutate({
+                                    id: b.id,
+                                    filters: validated.data,
+                                  });
+                                },
+                                onCancel: closeFilterEditor,
+                              }}
+                            />
                           </td>
                         </tr>
                       ) : null}
@@ -784,6 +874,7 @@ export function BasesPanel() {
  */
 function BaseRowDetail({
   base,
+  filterEdit,
 }: {
   readonly base: {
     readonly id: number;
@@ -794,6 +885,24 @@ function BaseRowDetail({
     readonly createdAt: string | Date;
     readonly ownerUserId: number | null;
     readonly parentSavedViewId: number | null;
+  };
+  /**
+   * T-F.101 (T-F.2-filter-γ) filter-edit affordance. Wired from
+   * the parent so the editor state survives BaseRowDetail
+   * re-renders. When `isOpen` is true the Filters section
+   * renders an editable textarea instead of the read-only JSON
+   * preview; Save validates against FilterDocumentSchema before
+   * round-tripping through updateSavedView.
+   */
+  readonly filterEdit: {
+    readonly isOpen: boolean;
+    readonly draft: string;
+    readonly error: string | null;
+    readonly isPending: boolean;
+    readonly onOpen: () => void;
+    readonly onChange: (value: string) => void;
+    readonly onSave: () => void;
+    readonly onCancel: () => void;
   };
 }) {
   return (
@@ -821,8 +930,70 @@ function BaseRowDetail({
         </ul>
       </div>
       <div>
-        <p className="font-medium">Filters</p>
-        {base.filters && Object.keys(base.filters).length > 0 ? (
+        <div className="flex items-center justify-between">
+          <p className="font-medium">Filters</p>
+          {!filterEdit.isOpen ? (
+            <button
+              type="button"
+              className="underline text-muted-foreground"
+              data-testid={`bases-row-detail-filters-edit-${base.id}`}
+              onClick={filterEdit.onOpen}
+            >
+              Edit filters…
+            </button>
+          ) : null}
+        </div>
+        {filterEdit.isOpen ? (
+          <div
+            className="space-y-2"
+            data-testid={`bases-row-detail-filters-editor-${base.id}`}
+          >
+            <label
+              className="block text-muted-foreground"
+              htmlFor={`bases-row-detail-filters-textarea-${base.id}`}
+            >
+              FilterDocument JSON (V1 schema; max 32 conditions):
+            </label>
+            <textarea
+              id={`bases-row-detail-filters-textarea-${base.id}`}
+              data-testid={`bases-row-detail-filters-textarea-${base.id}`}
+              className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[10px]"
+              rows={10}
+              value={filterEdit.draft}
+              onChange={(e) => filterEdit.onChange(e.target.value)}
+              disabled={filterEdit.isPending}
+              spellCheck={false}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={filterEdit.isPending}
+                className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-filters-save-${base.id}`}
+                onClick={filterEdit.onSave}
+              >
+                {filterEdit.isPending ? "Saving…" : "Save filters"}
+              </button>
+              <button
+                type="button"
+                disabled={filterEdit.isPending}
+                className="underline text-muted-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-filters-cancel-${base.id}`}
+                onClick={filterEdit.onCancel}
+              >
+                Cancel
+              </button>
+            </div>
+            {filterEdit.error ? (
+              <p
+                className="text-destructive"
+                data-testid={`bases-row-detail-filters-error-${base.id}`}
+              >
+                {filterEdit.error}
+              </p>
+            ) : null}
+          </div>
+        ) : base.filters && Object.keys(base.filters).length > 0 ? (
           <pre
             className="mt-1 max-h-40 overflow-auto rounded bg-background/50 p-2 font-mono text-[10px]"
             data-testid={`bases-row-detail-filters-${base.id}`}
