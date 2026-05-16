@@ -269,6 +269,7 @@ runtime catches up.
 | `rac-source-retrieval-mechanism-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_RETRIEVAL_MECHANISM_METADATA` (5-entry per-mechanism label + description + requiresEmbeddings + callsExternal booleans for precompiled/vector/graph/external_api/structured) | T-A.12 / #1145 |
 | `contracted-extension-lane-metadata.test.ts` | `services/extensions/lane-hook-contracts` — `CONTRACTED_EXTENSION_LANE_METADATA` (3-entry per-contracted-lane label + description + pipelineOrder (1..3) + producesContributedChunks booleans for retrieve/assemble/compose) | T-X.4 / #1146 |
 | `allowed-procedure-namespace-metadata.test.ts` | `services/graph/retrieval/text2cypher-validator` — `ALLOWED_PROCEDURE_NAMESPACE_METADATA` (7-entry per-namespace label + description + providerBucket (neo4j/apoc/gds) + expectsGraphProjection booleans for db.schema./apoc.path./apoc.coll./gds.shortestPath/gds.betweenness/gds.degree/gds.pageRank; also promotes `AllowedProcedureNamespace` type alias) | T-G.38 / #1147 |
+| `drift-class-metadata.test.ts` | `services/graph/projection/drift-detector` — `DRIFT_CLASS_METADATA` (4-entry per-class label + description + severity (warning/critical) + isSecurityRelevant booleans for missing_in_neo4j/extra_in_neo4j/stale_version/permission_leak; also promotes `DRIFT_CLASSES` closed-tuple) | T-G.39 / #1148 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
