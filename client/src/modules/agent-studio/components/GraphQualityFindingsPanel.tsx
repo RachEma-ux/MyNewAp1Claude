@@ -21,7 +21,7 @@
  * tRPC procedures are already in place).
  */
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -76,6 +76,12 @@ export function GraphQualityFindingsPanel() {
   // mutation failure (network / not-found / state-conflict) inline
   // so the operator gets feedback without a global toast.
   const [dismissError, setDismissError] = useState<string | null>(null);
+  // T-F.86: per-row audit-trail expansion. Only one row's trail is
+  // open at a time — keeps the operator surface focused + makes the
+  // trail tRPC query gated (enabled only when a row is expanded).
+  const [expandedFindingId, setExpandedFindingId] = useState<number | null>(
+    null,
+  );
   const hasAnyFilter = severityFilter !== null || statusFilter !== null;
   function clearAllFilters() {
     setSeverityFilter(null);
@@ -102,6 +108,13 @@ export function GraphQualityFindingsPanel() {
         void utils.agentStudio.graphQuality.getStats.invalidate();
       },
       onError: (err) => setDismissError(err.message),
+    },
+  );
+  const trailQ = trpc.agentStudio.graphQuality.getFindingAuditTrail.useQuery(
+    { findingId: expandedFindingId ?? 0 },
+    {
+      enabled: expandedFindingId !== null,
+      refetchOnWindowFocus: false,
     },
   );
 
@@ -326,36 +339,63 @@ export function GraphQualityFindingsPanel() {
                     const isPending =
                       dismissMutation.isPending &&
                       dismissMutation.variables?.findingId === f.id;
+                    const isExpanded = expandedFindingId === f.id;
                     return (
-                      <tr
-                        key={f.id}
-                        className="border-t border-border"
-                        data-testid={`graph-quality-finding-row-${f.id}`}
-                      >
-                        <td className="py-1 font-mono">{f.id}</td>
-                        <td className="py-1 font-mono">{f.findingClass}</td>
-                        <td className="py-1 font-mono">{f.severity}</td>
-                        <td className="py-1 font-mono">{f.status}</td>
-                        <td className="py-1 font-mono text-muted-foreground">
-                          {f.sourceTypeKey ?? "—"}
-                          {f.sourceId ? `: ${f.sourceId}` : ""}
-                        </td>
-                        <td className="py-1">
-                          {isDismissable ? (
+                      <Fragment key={f.id}>
+                        <tr
+                          className="border-t border-border"
+                          data-testid={`graph-quality-finding-row-${f.id}`}
+                        >
+                          <td className="py-1 font-mono">{f.id}</td>
+                          <td className="py-1 font-mono">{f.findingClass}</td>
+                          <td className="py-1 font-mono">{f.severity}</td>
+                          <td className="py-1 font-mono">{f.status}</td>
+                          <td className="py-1 font-mono text-muted-foreground">
+                            {f.sourceTypeKey ?? "—"}
+                            {f.sourceId ? `: ${f.sourceId}` : ""}
+                          </td>
+                          <td className="py-1 space-x-2">
                             <button
                               type="button"
-                              disabled={isPending}
-                              className="underline text-muted-foreground disabled:opacity-50"
-                              data-testid={`graph-quality-finding-dismiss-${f.id}`}
+                              className="underline text-muted-foreground"
+                              data-testid={`graph-quality-finding-trail-toggle-${f.id}`}
                               onClick={() =>
-                                dismissMutation.mutate({ findingId: f.id })
+                                setExpandedFindingId(isExpanded ? null : f.id)
                               }
                             >
-                              {isPending ? "Dismissing…" : "Dismiss"}
+                              {isExpanded ? "Hide trail" : "View trail"}
                             </button>
-                          ) : null}
-                        </td>
-                      </tr>
+                            {isDismissable ? (
+                              <button
+                                type="button"
+                                disabled={isPending}
+                                className="underline text-muted-foreground disabled:opacity-50"
+                                data-testid={`graph-quality-finding-dismiss-${f.id}`}
+                                onClick={() =>
+                                  dismissMutation.mutate({ findingId: f.id })
+                                }
+                              >
+                                {isPending ? "Dismissing…" : "Dismiss"}
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr
+                            data-testid={`graph-quality-finding-trail-row-${f.id}`}
+                          >
+                            <td
+                              colSpan={6}
+                              className="bg-muted/20 px-3 py-2 text-xs"
+                            >
+                              <FindingTrailView
+                                trailQ={trailQ}
+                                findingId={f.id}
+                              />
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -364,6 +404,143 @@ export function GraphQualityFindingsPanel() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * T-F.86 FindingTrailView — inline audit-trail expansion for a
+ * findings-list row. Consumes `getFindingAuditTrail` (server work
+ * shipped earlier as part of Phase 23 §1, single bundled query).
+ *
+ * Renders three stacked sections:
+ *   1. Finding row (createdAt + sourceTypeKey:sourceId + details).
+ *   2. Proposal (when present — kind / status / confidence /
+ *      rationale / proposedBy* / createdAt).
+ *   3. Audit events (eventKind + createdAt + optional metadata).
+ *
+ * `trailQ` is passed in from the parent so the gating
+ * (`enabled: expandedFindingId !== null`) lives at the parent level
+ * and the trail isn't re-fetched per render.
+ */
+function FindingTrailView({
+  trailQ,
+  findingId,
+}: {
+  readonly trailQ: ReturnType<
+    typeof trpc.agentStudio.graphQuality.getFindingAuditTrail.useQuery
+  >;
+  readonly findingId: number;
+}) {
+  if (trailQ.isLoading) {
+    return (
+      <p
+        className="text-muted-foreground italic"
+        data-testid={`graph-quality-finding-trail-loading-${findingId}`}
+      >
+        Loading trail…
+      </p>
+    );
+  }
+  if (trailQ.error) {
+    return (
+      <p
+        className="text-destructive"
+        data-testid={`graph-quality-finding-trail-error-${findingId}`}
+      >
+        Failed to load trail: {trailQ.error.message}
+      </p>
+    );
+  }
+  if (!trailQ.data) {
+    return (
+      <p
+        className="text-muted-foreground italic"
+        data-testid={`graph-quality-finding-trail-unavailable-${findingId}`}
+      >
+        Trail history unavailable.
+      </p>
+    );
+  }
+  const { finding, proposal, auditEvents } = trailQ.data;
+  return (
+    <div
+      className="space-y-3"
+      data-testid={`graph-quality-finding-trail-${findingId}`}
+    >
+      <div>
+        <p className="font-medium">Finding</p>
+        <p className="text-muted-foreground">
+          created {new Date(finding.createdAt).toISOString()} ·{" "}
+          {finding.sourceTypeKey ?? "—"}
+          {finding.sourceId ? `: ${finding.sourceId}` : ""}
+        </p>
+        {finding.details ? (
+          <pre
+            className="mt-1 max-h-40 overflow-auto rounded bg-background/50 p-2 font-mono text-[10px]"
+            data-testid={`graph-quality-finding-trail-details-${findingId}`}
+          >
+            {JSON.stringify(finding.details, null, 2)}
+          </pre>
+        ) : null}
+      </div>
+      <div>
+        <p className="font-medium">Proposal</p>
+        {proposal ? (
+          <ul
+            className="ml-3 list-disc text-muted-foreground"
+            data-testid={`graph-quality-finding-trail-proposal-${findingId}`}
+          >
+            <li>kind: {proposal.proposalKind}</li>
+            <li>status: {proposal.status}</li>
+            {proposal.confidence ? (
+              <li>confidence: {proposal.confidence}</li>
+            ) : null}
+            {proposal.rationale ? <li>rationale: {proposal.rationale}</li> : null}
+            <li>
+              proposedBy:{" "}
+              {proposal.proposedByUserId
+                ? `user#${proposal.proposedByUserId}`
+                : proposal.proposedByAgentId
+                  ? `agent#${proposal.proposedByAgentId}`
+                  : "—"}
+            </li>
+            <li>created: {new Date(proposal.createdAt).toISOString()}</li>
+          </ul>
+        ) : (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`graph-quality-finding-trail-proposal-empty-${findingId}`}
+          >
+            No proposal yet — finding has not been triaged.
+          </p>
+        )}
+      </div>
+      <div>
+        <p className="font-medium">
+          Audit events ({auditEvents.length})
+        </p>
+        {auditEvents.length === 0 ? (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`graph-quality-finding-trail-audit-empty-${findingId}`}
+          >
+            No audit events.
+          </p>
+        ) : (
+          <ul
+            className="ml-3 list-disc text-muted-foreground"
+            data-testid={`graph-quality-finding-trail-audit-${findingId}`}
+          >
+            {auditEvents.map((ev) => (
+              <li key={ev.id}>
+                {new Date(ev.createdAt).toISOString()} —{" "}
+                <span className="font-mono">{ev.eventKind}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
