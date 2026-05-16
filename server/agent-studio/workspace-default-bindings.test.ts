@@ -17,8 +17,19 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// `getAsDb` (legacy alias) and `getAsDbForWorkspace` (the V1+ MR-3 phase-1
+// workspace-aware shim — see comments in `workspace-default-bindings.ts`)
+// route to the same fake so existing test ergonomics survive the migration.
+// Without this dual export the impl calls `getAsDbForWorkspace` and vitest
+// fails with "No 'getAsDbForWorkspace' export is defined on the
+// './db/connection' mock".
+//
+// `vi.hoisted` is required because `vi.mock` factories are hoisted to the
+// top of the module before any plain `const` declarations.
+const dbMocks = vi.hoisted(() => ({ getAsDb: vi.fn() }));
 vi.mock("./db/connection", () => ({
-  getAsDb: vi.fn(),
+  getAsDb: dbMocks.getAsDb,
+  getAsDbForWorkspace: dbMocks.getAsDb,
 }));
 
 vi.mock("../provider-connections/public-api", () => ({
