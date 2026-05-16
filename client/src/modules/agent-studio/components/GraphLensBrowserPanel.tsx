@@ -57,6 +57,15 @@ const CROSS_LENS_TYPEKEY_TARGETS: Readonly<Record<string, string>> = {
   runtime_run: "runtime",
 };
 
+/**
+ * T-F.77 cap — the SVG graph viz uses circular positioning, so it
+ * gets visually unusable as N grows. 50 is the practical ceiling
+ * for hover/select interactions; beyond that the table preview
+ * stays the better operator surface. The toggle button is
+ * disabled when filteredNodes exceeds this cap and explains why.
+ */
+const GRAPH_VIZ_NODE_CAP = 50;
+
 export function GraphLensBrowserPanel() {
   const [workspaceId, setWorkspaceId] = useState<number>(1);
   const [selectedLensId, setSelectedLensId] = useState<string | null>(null);
@@ -78,9 +87,16 @@ export function GraphLensBrowserPanel() {
   // client-side, case-insensitive, no debounce (the snapshot is
   // already in memory). Composes with the other two narrowers.
   const [searchQuery, setSearchQuery] = useState<string>("");
+  // T-F.77: viewMode toggle — switch between the table view (default,
+  // works for any node count) and a circular SVG graph viz (capped
+  // at GRAPH_VIZ_NODE_CAP filtered nodes). Toggling resets when the
+  // operator picks a new lens — snapshot shape differs, viz fitness
+  // may change.
+  const [viewMode, setViewMode] = useState<"table" | "graph">("table");
   function selectLens(lensId: string) {
     setSelectedLensId(lensId);
     clearAllFilters();
+    setViewMode("table");
   }
   // T-F.75: one-click reset for all three drill-in axes. Mirrors
   // T-I.68's "Clear all filters" button on the events card —
@@ -282,8 +298,11 @@ export function GraphLensBrowserPanel() {
                 setTypeKeyFilter(null);
                 setVisibilityFilter("all");
                 setSearchQuery(prefilledSearch);
+                setViewMode("table");
               }}
               lensList={listQ.data ?? null}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
             />
           ) : null}
         </CardContent>
@@ -335,6 +354,8 @@ interface RenderEnvelopeViewProps {
         hasRunner: boolean;
       }>
     | null;
+  readonly viewMode: "table" | "graph";
+  readonly onViewModeChange: (next: "table" | "graph") => void;
 }
 
 function RenderEnvelopeView({
@@ -348,6 +369,8 @@ function RenderEnvelopeView({
   onClearAllFilters,
   onJumpToLens,
   lensList,
+  viewMode,
+  onViewModeChange,
 }: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
@@ -507,6 +530,39 @@ function RenderEnvelopeView({
                 Clear all filters
               </button>
             ) : null}
+            <div
+              className={`${hasAnyFilter ? "" : "ml-auto "}flex items-center gap-2`}
+              data-testid="graph-lens-view-mode-group"
+            >
+              <span className="text-muted-foreground">View:</span>
+              {(["table", "graph"] as const).map((mode) => {
+                const isActive = viewMode === mode;
+                const overCap =
+                  mode === "graph" && filteredNodes.length > GRAPH_VIZ_NODE_CAP;
+                const disabled = overCap;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`rounded border px-2 py-0.5 ${
+                      isActive
+                        ? "bg-muted/50 border-border"
+                        : "border-transparent hover:underline"
+                    } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                    data-testid={`graph-lens-view-mode-${mode}`}
+                    disabled={disabled}
+                    title={
+                      overCap
+                        ? `Graph viz disabled when filtered node count > ${GRAPH_VIZ_NODE_CAP}`
+                        : undefined
+                    }
+                    onClick={() => onViewModeChange(mode)}
+                  >
+                    {mode === "table" ? "Table" : "Graph"}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <SectionLabel>By typeKey</SectionLabel>
@@ -570,6 +626,13 @@ function RenderEnvelopeView({
               </div>
             ) : null}
           </div>
+          {viewMode === "graph" ? (
+            <SnapshotGraphViz
+              nodes={filteredNodes}
+              edges={snapshot.edges}
+            />
+          ) : (
+            <>
           <div>
             <SectionLabel>
               Nodes{" "}
@@ -679,8 +742,121 @@ function RenderEnvelopeView({
               </table>
             </div>
           ) : null}
+            </>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * T-F.77 SnapshotGraphViz — circular-positioning SVG graph viz.
+ *
+ * Capped at GRAPH_VIZ_NODE_CAP filtered nodes (the parent's toggle
+ * disables "Graph" mode when the cap is exceeded). Layout is
+ * deterministic and layout-agnostic — every node gets an angle
+ * `2π × index / N` and a radius based on the SVG viewport. Edges
+ * are straight lines between their source/target node positions.
+ * Hidden nodes get a muted color + dashed stroke; visible nodes get
+ * the foreground color.
+ *
+ * Why circular: no force-simulation dependency, no animation, fully
+ * deterministic for a given input order. Layout-specific renderers
+ * (timeline, matrix, dependency-path) can land as follow-up slices
+ * that branch on `snapshot.layout`.
+ */
+function SnapshotGraphViz({
+  nodes,
+  edges,
+}: {
+  readonly nodes: ReadonlyArray<{
+    typeKey: string;
+    id: string;
+    visible: boolean;
+    label?: string;
+  }>;
+  readonly edges: ReadonlyArray<{
+    typeKey: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    visible: boolean;
+  }>;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground italic"
+        data-testid="graph-lens-graph-viz-empty"
+      >
+        No nodes to render.
+      </p>
+    );
+  }
+  const size = 320;
+  const radius = size / 2 - 20;
+  const cx = size / 2;
+  const cy = size / 2;
+  const positions = new Map<string, { x: number; y: number }>();
+  for (let i = 0; i < nodes.length; i += 1) {
+    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+    positions.set(nodes[i].id, {
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+    });
+  }
+  // Only render edges whose BOTH endpoints are in the filtered node
+  // set — same dangling-suppression discipline as the runner builders.
+  const renderableEdges = edges.filter(
+    (e) => positions.has(e.sourceNodeId) && positions.has(e.targetNodeId),
+  );
+  return (
+    <div data-testid="graph-lens-graph-viz">
+      <SectionLabel>
+        Graph ({nodes.length} nodes, {renderableEdges.length} edges)
+      </SectionLabel>
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="w-full max-w-md border border-border rounded"
+        data-testid="graph-lens-graph-viz-svg"
+      >
+        {renderableEdges.map((e, i) => {
+          const s = positions.get(e.sourceNodeId)!;
+          const t = positions.get(e.targetNodeId)!;
+          return (
+            <line
+              key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
+              x1={s.x}
+              y1={s.y}
+              x2={t.x}
+              y2={t.y}
+              stroke="currentColor"
+              strokeOpacity={e.visible ? 0.4 : 0.15}
+              strokeWidth={1}
+            />
+          );
+        })}
+        {nodes.map((n) => {
+          const p = positions.get(n.id)!;
+          return (
+            <g key={n.id} data-testid={`graph-lens-graph-viz-node-${n.id}`}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={5}
+                fill={n.visible ? "currentColor" : "transparent"}
+                stroke="currentColor"
+                strokeDasharray={n.visible ? undefined : "2 2"}
+              />
+              <title>
+                {n.visible
+                  ? `${n.typeKey}: ${n.label ?? n.id}`
+                  : `${n.typeKey}: (hidden)`}
+              </title>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }
