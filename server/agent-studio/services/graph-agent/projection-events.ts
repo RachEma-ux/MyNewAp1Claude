@@ -51,7 +51,54 @@ export class ProjectionEventNotFoundError extends Error {
   }
 }
 
-export type RuntimeGraphEventKind = "runtime_trace" | "decision_trace";
+/**
+ * Closed-taxonomy runtime graph event kind. Promoted to a tuple at
+ * T-G.55 so the metadata table + lockstep tests can be authored.
+ */
+export const RUNTIME_GRAPH_EVENT_KINDS = [
+  "runtime_trace",
+  "decision_trace",
+] as const;
+export type RuntimeGraphEventKind = (typeof RUNTIME_GRAPH_EVENT_KINDS)[number];
+
+// ============================================================================
+// Per-event-kind operator-facing metadata (T-G.55)
+// ============================================================================
+
+export interface RuntimeGraphEventKindMetadata {
+  /** Display label rendered in the projection-events admin panel. */
+  readonly label: string;
+  /** Short operator-facing description of what this event kind
+   *  carries on its payload and when the projector emits it. */
+  readonly description: string;
+  /** Whether the event records an agent decision (true for
+   *  `decision_trace`; false for `runtime_trace` which captures the
+   *  ambient runtime context around the decision). */
+  readonly isDecision: boolean;
+}
+
+export const RUNTIME_GRAPH_EVENT_KIND_METADATA: Readonly<
+  Record<RuntimeGraphEventKind, RuntimeGraphEventKindMetadata>
+> = {
+  runtime_trace: {
+    label: "Runtime Trace",
+    description:
+      "Captures ambient runtime context — token usage, latency budgets, retrieval planner state, dispatcher receipts. Sets the scene for the decision.",
+    isDecision: false,
+  },
+  decision_trace: {
+    label: "Decision Trace",
+    description:
+      "Captures the agent's chosen action — selected planner mode, tool call, refusal, or terminal answer. The decision itself, distinct from its surrounding runtime context.",
+    isDecision: true,
+  },
+};
+
+export function getRuntimeGraphEventKindMetadata(
+  kind: RuntimeGraphEventKind,
+): RuntimeGraphEventKindMetadata {
+  return RUNTIME_GRAPH_EVENT_KIND_METADATA[kind];
+}
 
 export interface RuntimeGraphEvent {
   readonly id: number;

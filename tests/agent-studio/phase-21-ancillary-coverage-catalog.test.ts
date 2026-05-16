@@ -176,6 +176,7 @@ const ANCILLARY_TESTS = [
   "graph-quality-agent-run-status-metadata.test.ts",
   "rac-trace-feedback-verdict-metadata.test.ts",
   "pii-severity-metadata.test.ts",
+  "runtime-graph-event-kind-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
