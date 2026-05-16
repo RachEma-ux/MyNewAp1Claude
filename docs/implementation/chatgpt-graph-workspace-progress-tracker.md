@@ -10,13 +10,13 @@
 
 ## 1. Tracker metadata
 
-- Last updated: 2026-05-16 (post 100-table per-kind metadata canonization milestone on main)
+- Last updated: 2026-05-16 (post T-I.51 sibling-emit + CI recovery — Phase 22 coverage 17/25)
 - Repository: `RachEma-ux/MyNewAp1Claude`
 - Branch: `main`
-- Latest merged PR: `#1173` (T-A.2 continuation-state "Next material work" refresh) at `8b006123`
-- Latest milestone PR: `#1169` (T-G.56 RUNTIME_VALIDATION_VERDICT_METADATA — **100th per-kind metadata table**) at `092ed201`
+- Latest merged PR: `#1229` (typecheck bundle — clears all 12 pre-existing tsc errors blocking build / ci) at `06e448bb`
+- Latest milestone PR: `#1227` (T-I.51 — kind #10 `graph_query_timeout` closed via 1-PR sibling-emit; Phase 22 emission coverage 16/25 → 17/25)
 - Phase 13.5 trio on main: `#731` (contract) + `#732` `ffb4eba9` (engine wiring + RoundRobinPlanner) + `#737` `a8f5c634` (model-driven planner)
-- Post-Phase-13.5 burst (#984–#1171): ~188-PR continuous autonomous execution opening all 7 tracks of the remaining-execution-plan, completing Phase 22 closed-taxonomy emission rollout (11/25 failure-state kinds emitted), and saturating the per-kind UI metadata canonization arc at 100 tables. See V1+ plan §6.1.bis (added by #1172) for the 4-sub-arc summary; memory file `project_v1_plus_session_2026_05_15.md` (lessons 1–28) for per-PR detail.
+- Post-Phase-13.5 burst (#984–#1229): ~245-PR continuous autonomous execution opening all 7 tracks of the remaining-execution-plan, completing Phase 22 closed-taxonomy emission rollout to **17/25 failure-state kinds emitted** (kind #7 via 5-PR new-detection ladder + kind #10 via 1-PR sibling-emit; only detection-gap kind #6 remains), and saturating per-kind UI metadata canonization at 100 tables. See V1+ plan §6.1.bis for the per-row summary; memory file `project_v1_plus_session_2026_05_15.md` (lessons 1–28) for per-PR detail through #1171.
 - Authoritative classification: see `agent-studio-native-graph-workspace-strict-audit-2026-05-13.md`
 
 ## 2. Current overall verdict
@@ -203,6 +203,8 @@ Four sub-arcs delivered under the standing /goal mandate continuous autonomous e
 | #1091–#1135 | Per-kind UI metadata canonization — first wave | 45 | 44 metadata tables across G/I/D/F/A/B/C/E/H/L/V/X tracks. Pattern: `X_METADATA: Readonly<Record<XKind, XMetadata>>` with `label` + `description` + 1–3 closed-classification fields + lockstep tests + ancillary catalog row + docs §7 table row. |
 | #1136–#1171 | Per-kind UI metadata canonization — post-compaction continuation reaching 100-table milestone at #1169 / T-G.56 | 36 | T-S.19–22, T-E.5–6, T-A.11–14, T-D.13–15, T-X.4, T-G.37–G.58. Every closed-taxonomy `as const` array AND every 2+-member literal union in `server/agent-studio/services/` and `shared/` now has an operator-facing metadata table OR is documented as having no reasonable UI mapping. |
 | #1172–#1176 | Remaining-plan T-A doc-drift sweep — closes T-A acceptance criteria | 5 | T-A.1 V1+ exec plan §6.1.bis; T-A.2 continuation-state "Next material work" refresh; T-A.3 chatgpt tracker §1 latest-pointer refresh; T-A.4 chatgpt tracker §7 post-#983 summary (this section, added by #1175); T-A.5 V1+ exec plan §6.1.bis self-reference fix. T-A is fully closed; 3 main planning docs aligned with main. |
+| #1177–#1224 | Aggregator-pair saturation (30 surfaces / 15 variants) + Phase 22 batch-B 15/25 + projection-staleness 5-PR new-detection sub-arc | 48 | Lesson-30 saturation; 3 corrected-premise wirings (T-I.38 / T-I.40 / T-I.41); kind #7 `neo4j_projection_stale` closed via 5-PR ladder (T-I.43-T-I.47) + audit promotion + boot wiring (T-I.48 / T-I.49); GraphHealthAdminPanel projection-staleness card (T-I.50 / #1226). Phase 22 coverage: 11/25 → 16/25 (64%). |
+| **#1227–#1229** | **T-I.51 sibling-emit closure of kind #10 + 2 CI-recovery slices** | **3** | **#1227 / T-I.51**: `executeRetrieval` parallel fan-out timeout → bridge — one event per executor call (NOT per source); closes kind #10 `graph_query_timeout` via 1-PR sibling-emit (detection already existed at `runWithTimeout` → `errorReason: "timeout"`, only emission was missing). **#1228**: `workspace-default-bindings.test.ts` mock fix — `vi.hoisted()` + `getAsDbForWorkspace` re-export turning the `test` job green. **#1229**: typecheck bundle — 5 sourceId number→string coercions matching the T-I.51 shape, 5 `z.record(z.string(), z.unknown())` zod-4 migrations, 1 health-alert `errorMessage` swap, 1 lens runner-contract literal-widening — turning `build` / `ci` jobs green. **Phase 22 coverage: 16/25 → 17/25 (68%)**; remaining detection-gap is kind #6 alone (5-PR ladder still required because Cypher-query timeout enforcement doesn't exist yet). |
 
 Doc-side detail in V1+ plan §6.1.bis (added by #1172). Per-PR ledger in `~/.claude/projects/-root/memory/project_v1_plus_session_2026_05_15.md` (lessons 1–28).
 
