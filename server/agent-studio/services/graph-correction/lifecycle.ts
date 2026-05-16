@@ -84,12 +84,20 @@ export class ProposalAlreadyDecidedError extends Error {
   }
 }
 
-export type ProposalStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "revision_requested"
-  | "withdrawn";
+export const PROPOSAL_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+  "revision_requested",
+  "withdrawn",
+] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+export const TERMINAL_PROPOSAL_STATUSES = new Set<ProposalStatus>([
+  "approved",
+  "rejected",
+  "withdrawn",
+]);
 
 export interface SubmitProposalInput {
   readonly proposalKind: string;
