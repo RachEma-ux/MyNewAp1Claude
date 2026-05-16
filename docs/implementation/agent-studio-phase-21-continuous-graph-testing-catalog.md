@@ -278,6 +278,7 @@ runtime catches up.
 | `cag-governance-verdict-metadata.test.ts` | `services/cag/types` — `CAG_GOVERNANCE_VERDICT_METADATA` (3-entry per-verdict label + description + allowsDispatch + hasSignal booleans for cleared/warn/blocked; also promotes `CAG_GOVERNANCE_VERDICTS` closed-tuple) | T-G.45 / #1154 |
 | `tool-risk-class-metadata.test.ts` | `services/cag/types` — `TOOL_RISK_CLASS_METADATA` (8-entry per-class label + description + requiresApproval + mutatesExternalState booleans for read_only/write/external_side_effect/destructive/credential_sensitive/code_execution/governance_sensitive/quarantined; also promotes `TOOL_RISK_CLASSES` closed-tuple) | T-G.46 / #1155 |
 | `promotion-status-metadata.test.ts` | `services/promotion/lifecycle` — `PROMOTION_STATUS_METADATA` (6-entry per-status label + description + terminal + producedActiveVersion booleans for pending/validating/in_review/approved/rejected/rolled_back; also promotes `PROMOTION_STATUSES` closed-tuple) | T-G.47 / #1156 |
+| `proposed-tool-call-risk-level-metadata.test.ts` | `services/mcp/proposed-tool-call` — `PROPOSED_TOOL_CALL_RISK_LEVEL_METADATA` (4-entry per-level label + description + rank (0..3) + requiresApproval booleans for low/medium/high/critical; also promotes `PROPOSED_TOOL_CALL_RISK_LEVELS` closed-tuple) | T-G.48 / #1157 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

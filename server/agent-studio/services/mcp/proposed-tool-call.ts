@@ -20,7 +20,76 @@ import type { ToolRiskClass } from "../cag/types";
 
 // ── Contract ──────────────────────────────────────────────────────────
 
-export type ProposedToolCallRiskLevel = "low" | "medium" | "high" | "critical";
+/**
+ * Closed-taxonomy risk level for a proposed tool call. Promoted to a
+ * tuple at T-G.48 so the metadata table + lockstep tests can be
+ * authored.
+ */
+export const PROPOSED_TOOL_CALL_RISK_LEVELS = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+] as const;
+export type ProposedToolCallRiskLevel =
+  (typeof PROPOSED_TOOL_CALL_RISK_LEVELS)[number];
+
+// ============================================================================
+// Per-risk-level operator-facing metadata (T-G.48)
+// ============================================================================
+
+export interface ProposedToolCallRiskLevelMetadata {
+  /** Display label rendered in the proposed-tool-call review card. */
+  readonly label: string;
+  /** Short operator-facing description of what this risk level means
+   *  for the approval flow. */
+  readonly description: string;
+  /** Stable rank 0-3 for risk comparison (0=low → 3=critical). */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether the proposed call routes through the approval gate at
+   *  this risk level (true for `high` + `critical`; false for `low`
+   *  + `medium` which dispatch without operator approval). */
+  readonly requiresApproval: boolean;
+}
+
+export const PROPOSED_TOOL_CALL_RISK_LEVEL_METADATA: Readonly<
+  Record<ProposedToolCallRiskLevel, ProposedToolCallRiskLevelMetadata>
+> = {
+  low: {
+    label: "Low",
+    description:
+      "Routine tool call — read-only or trivially reversible. Dispatches without operator approval.",
+    rank: 0,
+    requiresApproval: false,
+  },
+  medium: {
+    label: "Medium",
+    description:
+      "Mild side effect — workspace-local writes, in-platform records. Dispatches without operator approval but surfaces a trace banner.",
+    rank: 1,
+    requiresApproval: false,
+  },
+  high: {
+    label: "High",
+    description:
+      "Significant side effect — external API calls, credential touches, code execution. Requires operator approval before dispatch.",
+    rank: 2,
+    requiresApproval: true,
+  },
+  critical: {
+    label: "Critical",
+    description:
+      "Irrecoverable side effect — destructive operations, governance state changes. Requires high-confidence operator approval; logged with elevated audit.",
+    rank: 3,
+    requiresApproval: true,
+  },
+};
+
+export function getProposedToolCallRiskLevelMetadata(
+  level: ProposedToolCallRiskLevel,
+): ProposedToolCallRiskLevelMetadata {
+  return PROPOSED_TOOL_CALL_RISK_LEVEL_METADATA[level];
+}
 
 export interface ProposedToolCall {
   /** Canonical MCP server id from agsMcpServers (NOT the connection id). */
