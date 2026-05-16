@@ -89,6 +89,11 @@ const EXPECTED_WIRINGS: ReadonlyArray<ExpectedWiring> = [
     kind: "runtime_reference_hidden_by_permission",
     sliceId: "T-I.5.B.5",
   },
+  {
+    file: "server/agent-studio/services/rac/retrieval-executor.ts",
+    kind: "graph_query_timeout",
+    sliceId: "T-I.51",
+  },
 ];
 
 function readRepoFile(file: string): string {
