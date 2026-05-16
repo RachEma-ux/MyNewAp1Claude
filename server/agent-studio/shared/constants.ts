@@ -986,6 +986,62 @@ export type AgsProviderKey = (typeof AGS_PROVIDER_KEYS)[number];
 export const AGS_EFFORT_LEVELS = ["low", "medium", "high", "max"] as const;
 export type AgsEffortLevel = (typeof AGS_EFFORT_LEVELS)[number];
 
+// ============================================================================
+// Per-effort-level operator-facing metadata (T-S.13)
+// ============================================================================
+
+export interface AgsEffortLevelMetadata {
+  /** Display label rendered in the agent reasoning-effort picker. */
+  readonly label: string;
+  /** Short operator-facing description of what this effort level
+   *  buys the agent. */
+  readonly description: string;
+  /** Stable rank 0-3 for effort comparison (0=low / 3=max). */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether this level expects to invoke higher-cost reasoning
+   *  modes (true for high / max). */
+  readonly highCost: boolean;
+}
+
+export const AGS_EFFORT_LEVEL_METADATA: Readonly<
+  Record<AgsEffortLevel, AgsEffortLevelMetadata>
+> = {
+  low: {
+    label: "Low",
+    description:
+      "Fast, cheap reasoning — short chain of thought, minimal exploration. Best for quick lookups.",
+    rank: 0,
+    highCost: false,
+  },
+  medium: {
+    label: "Medium",
+    description:
+      "Balanced reasoning — moderate exploration with reasonable budget. Default for typical agent tasks.",
+    rank: 1,
+    highCost: false,
+  },
+  high: {
+    label: "High",
+    description:
+      "Deep reasoning — extended chain of thought, multi-step exploration. Used for complex analysis.",
+    rank: 2,
+    highCost: true,
+  },
+  max: {
+    label: "Max",
+    description:
+      "Maximum reasoning effort — full budget, deep exploration, longest latency. Used for the hardest questions.",
+    rank: 3,
+    highCost: true,
+  },
+};
+
+export function getAgsEffortLevelMetadata(
+  level: AgsEffortLevel,
+): AgsEffortLevelMetadata {
+  return AGS_EFFORT_LEVEL_METADATA[level];
+}
+
 /** Memory scope (filesystem-based, per openllm `AgentDefinition.memory`). */
 export const AGS_MEMORY_SCOPES = ["user", "project", "local"] as const;
 export type AgsMemoryScope = (typeof AGS_MEMORY_SCOPES)[number];
