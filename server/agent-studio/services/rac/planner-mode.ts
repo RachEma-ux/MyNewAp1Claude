@@ -226,6 +226,84 @@ export const RAC_PLANNER_MODE_FAMILIES = [
 
 export type RacPlannerModeFamily = (typeof RAC_PLANNER_MODE_FAMILIES)[number];
 
+// ============================================================================
+// Per-planner-mode-family operator-facing metadata (T-A.11)
+// ============================================================================
+
+export type RacPlannerModeFamilyRetrievalKind =
+  | "none"
+  | "cag"
+  | "knowledge"
+  | "graph"
+  | "hybrid";
+
+export interface RacPlannerModeFamilyMetadata {
+  /** Display label rendered in the family-level planner-mode picker. */
+  readonly label: string;
+  /** Short operator-facing description of what this family does at
+   *  a high level. */
+  readonly description: string;
+  /** Closed-taxonomy retrieval kind classification — drives the
+   *  family-level filter chips. */
+  readonly retrievalKind: RacPlannerModeFamilyRetrievalKind;
+  /** Whether any mode in this family invokes graph retrieval (true
+   *  for graphrag_pure + graphrag_hybrid; false for the rest). */
+  readonly usesGraph: boolean;
+}
+
+export const RAC_PLANNER_MODE_FAMILY_METADATA: Readonly<
+  Record<RacPlannerModeFamily, RacPlannerModeFamilyMetadata>
+> = {
+  no_retrieval: {
+    label: "No Retrieval",
+    description:
+      "Plain prompt path — agent answers from model parametric knowledge alone, no CAG / RAG / graph / tools.",
+    retrievalKind: "none",
+    usesGraph: false,
+  },
+  cag_only: {
+    label: "CAG Only",
+    description:
+      "Capability-pack only — agent runs against a pinned CAG block with no live retrieval.",
+    retrievalKind: "cag",
+    usesGraph: false,
+  },
+  knowledge_retrieval: {
+    label: "Knowledge Retrieval",
+    description:
+      "RAG path — planner queries the knowledge base for governed evidence before composition.",
+    retrievalKind: "knowledge",
+    usesGraph: false,
+  },
+  hybrid_cag: {
+    label: "Hybrid CAG",
+    description:
+      "Mix of CAG block + live knowledge retrieval — picks up runtime facts on top of a pinned capability pack.",
+    retrievalKind: "hybrid",
+    usesGraph: false,
+  },
+  graphrag_pure: {
+    label: "GraphRAG Pure",
+    description:
+      "Pure graph retrieval — planner traverses the Native Graph Workspace to source evidence; no knowledge-base or CAG involvement.",
+    retrievalKind: "graph",
+    usesGraph: true,
+  },
+  graphrag_hybrid: {
+    label: "GraphRAG Hybrid",
+    description:
+      "Graph + knowledge or CAG mix — planner blends graph traversal with classical retrieval for cross-cut evidence.",
+    retrievalKind: "hybrid",
+    usesGraph: true,
+  },
+};
+
+export function getRacPlannerModeFamilyMetadata(
+  family: RacPlannerModeFamily,
+): RacPlannerModeFamilyMetadata {
+  return RAC_PLANNER_MODE_FAMILY_METADATA[family];
+}
+
 export interface RacPlannerModeMetadata {
   /** Display label rendered in the operator UI's planner-mode picker. */
   readonly label: string;
