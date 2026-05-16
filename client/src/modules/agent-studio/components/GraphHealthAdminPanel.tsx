@@ -43,6 +43,13 @@
  * table aggregated client-side from `rows` (no server change).
  * Answers "which emitter is loudest right now" alongside the
  * "which kind is most common" question the by-kind table answers.
+ *
+ * T-I.62 added a "Latest rows" table to the T-I.60 card rendering
+ * the most-recent 15 rows of the 50-row sample from T-I.59. The
+ * `failure_state:` prefix is stripped from the errorClass for
+ * readability so operators see the closed kind directly. Closes
+ * the gap that left the raw rows unrendered after T-I.60 + T-I.61
+ * surfaced summary + drilldowns but not the individual events.
  */
 
 import { useState } from "react";
@@ -813,6 +820,65 @@ export function GraphHealthAdminPanel() {
                             </td>
                             <td className="py-1 pr-3 font-mono text-xs">
                               {n as number}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {/* T-I.62: latest rows table. T-I.59 fetches up to 50
+                  rows; this section renders the most-recent 15 so
+                  operators can investigate specific failures
+                  without a separate "see all events" page. Sort
+                  is server-side descending-by-id (matches
+                  listErrorEvents default), so we just slice the
+                  prefix here.
+
+                  Truncation note: 15 is empirically the row count
+                  that fits a typical operator monitor without
+                  scrolling; the underlying tRPC limit is operator-
+                  tunable (default 50, max 500) so heavier triage
+                  can re-query with a higher limit. */}
+              {failureStateEventsQ.data.rows.length > 0 ? (
+                <div className="overflow-x-auto pt-2 border-t">
+                  <p className="text-xs text-muted-foreground pb-1">
+                    Latest rows (most-recent{" "}
+                    {Math.min(15, failureStateEventsQ.data.rows.length)} of{" "}
+                    {failureStateEventsQ.data.rows.length} sampled)
+                  </p>
+                  <table
+                    className="w-full text-sm border-collapse"
+                    data-testid="graph-health-failure-state-events-latest-rows-table"
+                  >
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="py-1 pr-3">Created</th>
+                        <th className="py-1 pr-3">Kind</th>
+                        <th className="py-1 pr-3">Source kind</th>
+                        <th className="py-1 pr-3">Message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {failureStateEventsQ.data.rows
+                        .slice(0, 15)
+                        .map((r) => (
+                          <tr key={r.id} className="border-t">
+                            <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
+                              {fmtTs(r.createdAt)}
+                            </td>
+                            <td className="py-1 pr-3 font-mono text-xs">
+                              {r.errorClass.startsWith("failure_state:")
+                                ? r.errorClass.slice(
+                                    "failure_state:".length,
+                                  )
+                                : r.errorClass}
+                            </td>
+                            <td className="py-1 pr-3 font-mono text-xs">
+                              {r.sourceKind}
+                            </td>
+                            <td className="py-1 pr-3 font-mono text-xs truncate max-w-[40ch]">
+                              {r.errorMessage}
                             </td>
                           </tr>
                         ))}
