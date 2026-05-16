@@ -153,6 +153,7 @@ const ANCILLARY_TESTS = [
   "export-candidate-key-metadata.test.ts",
   "forbidden-export-candidate-key-metadata.test.ts",
   "rac-planner-mode-family-metadata.test.ts",
+  "rac-source-retrieval-mechanism-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

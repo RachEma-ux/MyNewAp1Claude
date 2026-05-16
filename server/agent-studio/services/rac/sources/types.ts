@@ -55,6 +55,74 @@ export const RAC_SOURCE_RETRIEVAL_MECHANISMS = [
 export type RacSourceRetrievalMechanism =
   (typeof RAC_SOURCE_RETRIEVAL_MECHANISMS)[number];
 
+// ============================================================================
+// Per-retrieval-mechanism operator-facing metadata (T-A.12)
+// ============================================================================
+
+export interface RacSourceRetrievalMechanismMetadata {
+  /** Display label rendered in the planner-trace mechanism filter. */
+  readonly label: string;
+  /** Short operator-facing description of how this mechanism actually
+   *  retrieves evidence at execution time. */
+  readonly description: string;
+  /** Whether this mechanism needs embedding configuration to function
+   *  (true for `vector` only). */
+  readonly requiresEmbeddings: boolean;
+  /** Whether this mechanism reaches outside the Agent Studio process
+   *  for evidence (true for `external_api`; false for the rest which
+   *  stay in-platform). */
+  readonly callsExternal: boolean;
+}
+
+export const RAC_SOURCE_RETRIEVAL_MECHANISM_METADATA: Readonly<
+  Record<
+    RacSourceRetrievalMechanism,
+    RacSourceRetrievalMechanismMetadata
+  >
+> = {
+  precompiled: {
+    label: "Precompiled",
+    description:
+      "Source serves a pre-baked CAG block — no live retrieval; the block is selected by capability key and emitted whole.",
+    requiresEmbeddings: false,
+    callsExternal: false,
+  },
+  vector: {
+    label: "Vector",
+    description:
+      "Source uses embedding-vector similarity to find evidence — runs an embedding model and searches the workspace vector index.",
+    requiresEmbeddings: true,
+    callsExternal: false,
+  },
+  graph: {
+    label: "Graph",
+    description:
+      "Source traverses the Native Graph Workspace through GraphRepository — read-only Cypher templates with policy filters.",
+    requiresEmbeddings: false,
+    callsExternal: false,
+  },
+  external_api: {
+    label: "External API",
+    description:
+      "Source calls out to an external HTTP API for evidence — gated by network egress policy and per-source rate limits.",
+    requiresEmbeddings: false,
+    callsExternal: true,
+  },
+  structured: {
+    label: "Structured",
+    description:
+      "Source pulls from a typed structured store (Postgres / ASDB table) — exact match / filter queries, no fuzzy search.",
+    requiresEmbeddings: false,
+    callsExternal: false,
+  },
+};
+
+export function getRacSourceRetrievalMechanismMetadata(
+  mechanism: RacSourceRetrievalMechanism,
+): RacSourceRetrievalMechanismMetadata {
+  return RAC_SOURCE_RETRIEVAL_MECHANISM_METADATA[mechanism];
+}
+
 export interface RacSourceTypeMetadata {
   /** Display label rendered in the source picker / source-registry UI. */
   readonly label: string;
