@@ -824,6 +824,55 @@ export function getAgsPermissionModeMetadata(
 export const AGS_PERMISSION_BEHAVIORS = ["allow", "deny", "ask"] as const;
 export type AgsPermissionBehavior = (typeof AGS_PERMISSION_BEHAVIORS)[number];
 
+// ============================================================================
+// Per-permission-behavior operator-facing metadata (T-S.12)
+// ============================================================================
+
+export interface AgsPermissionBehaviorMetadata {
+  /** Display label rendered in the permission rule editor. */
+  readonly label: string;
+  /** Short operator-facing description of the behavior. */
+  readonly description: string;
+  /** Whether the matching tool invocation proceeds (true for `allow`
+   *  only). */
+  readonly proceeds: boolean;
+  /** Whether the matching invocation prompts the user (true for
+   *  `ask` only). */
+  readonly prompts: boolean;
+}
+
+export const AGS_PERMISSION_BEHAVIOR_METADATA: Readonly<
+  Record<AgsPermissionBehavior, AgsPermissionBehaviorMetadata>
+> = {
+  allow: {
+    label: "Allow",
+    description:
+      "Matching tool invocation proceeds without further checks — operator has pre-authorized this pattern.",
+    proceeds: true,
+    prompts: false,
+  },
+  deny: {
+    label: "Deny",
+    description:
+      "Matching tool invocation is refused — execution aborts with a permission-denied error.",
+    proceeds: false,
+    prompts: false,
+  },
+  ask: {
+    label: "Ask",
+    description:
+      "Matching tool invocation prompts the user before proceeding — operator decides per-call.",
+    proceeds: false,
+    prompts: true,
+  },
+};
+
+export function getAgsPermissionBehaviorMetadata(
+  behavior: AgsPermissionBehavior,
+): AgsPermissionBehaviorMetadata {
+  return AGS_PERMISSION_BEHAVIOR_METADATA[behavior];
+}
+
 /** Permission rule source — where the rule originated from. */
 export const AGS_PERMISSION_SOURCES = [
   "userSettings",
