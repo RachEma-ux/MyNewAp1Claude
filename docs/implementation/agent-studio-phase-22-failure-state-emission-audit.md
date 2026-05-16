@@ -13,17 +13,17 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 ---
 
-## 1. Audit summary (batch-B target HIT post #1216)
+## 1. Audit summary (post #1222 — kind #7 sub-arc closure)
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **15** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
+| 🟢 LIVE via closed-taxonomy bridge | **16** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #7, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written (kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
-| 🟡 Detection state exists in DB but no observability surface | 3 | A status column / audit table carries the state; emission deferred (kinds #6, #7, #10) |
+| 🟡 Detection state exists in DB but no observability surface | 2 | A status column / audit table carries the state; emission deferred (kinds #6, #10) |
 | ❌ No detection yet — phase-gated | 5 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 15/25 closed kinds (60%).** **Batch-B target met (15/25).** T-I.38 (#1213) corrected the premise of #22 — `runLiveEvaluation` was already callable from server runtime. T-I.40 (#1215) corrected the premise of #23 — `rejectCorrectionProposal` was already shipped; just needed the bridge call. T-I.41 (#1216) corrected the premise of #2 — `repository-asdb.ts` optimistic-lock branch was already detecting and persisting conflicts; just needed the bridge call. Sum: 15 + 1 + 3 + 5 + 1 = 25 ✓.
+**Live coverage: 16/25 closed kinds (64%).** **Batch-B target met (15/25); first post-batch-B kind closure is #7.** T-I.38 (#1213) corrected the premise of #22. T-I.40 (#1215) corrected the premise of #23. T-I.41 (#1216) corrected the premise of #2. **T-I.43 → T-I.47 (#1218-#1222) is the first NEW-detection sub-arc** — kind #7 didn't have a freshness-lag computation; the 5-PR ladder built one from scratch (detector → orchestrator → DB fetcher → admin tRPC → scheduled cron). Sum: 16 + 1 + 2 + 5 + 1 = 25 ✓.
 
 ---
 
@@ -39,7 +39,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 4 | `neo4j_unavailable` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Health-alert scanner | `services/graph/health-alert.ts` |
 | 5 | `neo4j_degraded` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Same scanner (latency-high collapsed into degraded) | `services/graph/health-alert.ts` |
 | 6 | `neo4j_query_timeout` | infrastructure | 🟡 | Cypher timeout configured at executor; no event on per-query timeout | Adapter in `services/graph/repository/*` (deferred — needs timeout enforcement, not SLO warning) |
-| 7 | `neo4j_projection_stale` | infrastructure | 🟡 | Freshness lag detected in projection-sync cron; no event | Adapter in `services/graph-projection/sync-cron.ts` (deferred) |
+| 7 | `neo4j_projection_stale` | infrastructure | 🟢 **LIVE @ T-I.43 → T-I.47 (#1218-#1222)** | 5-PR sub-arc shipped detector + emitter + orchestrator + DB fetcher + admin tRPC + scheduled cron at 04:15 UTC; emits one event per stale projection (lag > 1h default) | `services/graph/projection/staleness-detector.ts` + `staleness-cron.ts` |
 | 8 | `neo4j_projection_drift_detected` | infrastructure | 🟢 **LIVE @ #1015 (T-I.5.A.2)** | Drift cron emits when driftCount > 0 | `services/graph/projection/drift-cron.ts` |
 | 9 | `projection_sync_failed` | infrastructure | 🟢 **LIVE @ #1025 (T-I.5.B.2)** | Sync worker `status === "failed"` (includes partial-success) | `services/graph/projection/sync-worker.ts` |
 | 10 | `graph_query_timeout` | retrieval | 🟡 | GraphRAG router timeout configured; no per-query event | Adapter in `services/rac/retrieval-executor.ts` (deferred) |
@@ -129,7 +129,7 @@ This shape:
 
 The original ordering speculated detection-state per kind. As the wirings landed, several speculative premises proved wrong (the audit assumed detection didn't exist where it actually did — see §1 corrections). This refreshed view groups by actual current state, not original ordering.
 
-### Done — 15 wirings shipped (batch-B 15/25 60% target met)
+### Done — 16 wirings shipped (one past batch-B; kind #7 closure begins post-batch-B push)
 
 | # | Kind | PR / Slice | Notes |
 |---|---|---|---|
@@ -138,6 +138,7 @@ The original ordering speculated detection-state per kind. As the wirings landed
 | #3 | `entity_resolution_conflict` | T-I.5.B.3 / #1026 | Quality-agent run per-scan when `duplicate_entity` findingsCount > 0 |
 | #4 | `neo4j_unavailable` | T-I.5.A.1 / #1014 | Health-alert scanner |
 | #5 | `neo4j_degraded` | T-I.5.A.1 / #1014 | Same scanner (latency-high collapsed into degraded) |
+| #7 | `neo4j_projection_stale` | T-I.43-T-I.47 / #1218-#1222 | 5-PR new-detection sub-arc: detector → orchestrator → DB fetcher → admin tRPC → scheduled cron |
 | #8 | `neo4j_projection_drift_detected` | T-I.5.A.2 / #1015 | Drift cron when driftCount > 0 |
 | #9 | `projection_sync_failed` | T-I.5.B.2 / #1025 | Sync worker `status === "failed"` |
 | #12 | `runtime_reference_hidden_by_permission` | T-I.5.B.5 / #1030 | Permission-denied subset of safety-filter events |
@@ -153,11 +154,10 @@ The original ordering speculated detection-state per kind. As the wirings landed
 
 - #25 `background_job_failed` — locked by count-pinned tests (lesson 22). Closure requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice after operator-dashboard query migration.
 
-### Detection-gap — 3 🟡
+### Detection-gap — 2 🟡 (remaining)
 
-- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first.
-- #7 `neo4j_projection_stale` — **FULLY CLOSED @ T-I.43 → T-I.47 (5-PR sub-arc)**: pure detector + emitter pair #1218; `runStalenessCheck` orchestrator #1219; `loadStalenessRowsFromAsDb` DB fetcher #1220; admin tRPC `agentStudio.graphProjection.runStalenessCheck` #1221; `makeRetentionCron`-wrapped scheduled cron at 04:15 UTC daily + status surface `agentStudio.graphProjection.getStalenessCronStatus` #1222. Status promotion to 🟢 LIVE in next §1/§2 audit refresh.
-- #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts.
+- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first. The kind-#7 5-PR ladder (#1218-#1222) is the reference pattern: pure detector → orchestrator → DB fetcher → admin tRPC → scheduled cron.
+- #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts. Same 5-PR ladder applies.
 
 ### Phase-gated — 5 ❌ + 1 🔒
 
