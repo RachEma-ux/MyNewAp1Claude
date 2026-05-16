@@ -46,6 +46,88 @@ export const ALLOWED_PROCEDURE_NAMESPACES = [
   "gds.pageRank",
 ];
 
+/**
+ * Closed-taxonomy validation failure reasons. Promoted to a typed
+ * tuple so the per-reason metadata table (T-G.37) can lockstep against
+ * it.
+ */
+export const TEXT2CYPHER_VALIDATION_FAILURE_REASONS = [
+  "empty_query",
+  "forbidden_token",
+  "forbidden_procedure",
+  "disallowed_procedure",
+] as const;
+export type Text2CypherValidationFailureReason =
+  (typeof TEXT2CYPHER_VALIDATION_FAILURE_REASONS)[number];
+
+// ============================================================================
+// Per-failure-reason operator-facing metadata (T-G.37)
+// ============================================================================
+
+export type Text2CypherValidationFailureCategory =
+  | "structural"
+  | "security"
+  | "policy";
+
+export interface Text2CypherValidationFailureReasonMetadata {
+  /** Display label rendered in the query-builder validation toast. */
+  readonly label: string;
+  /** Short operator-facing description of why this query was rejected
+   *  and what the operator should do next. */
+  readonly description: string;
+  /** Closed-taxonomy category: `structural` (empty / malformed input),
+   *  `security` (would mutate the graph), or `policy` (read-only but
+   *  outside the allowlist). */
+  readonly category: Text2CypherValidationFailureCategory;
+  /** Whether this is a hard security violation that MUST never reach
+   *  the executor (true for forbidden_token + forbidden_procedure;
+   *  false for structural / policy failures which can be retried with
+   *  a corrected query). */
+  readonly isHardSecurityViolation: boolean;
+}
+
+export const TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA: Readonly<
+  Record<
+    Text2CypherValidationFailureReason,
+    Text2CypherValidationFailureReasonMetadata
+  >
+> = {
+  empty_query: {
+    label: "Empty Query",
+    description:
+      "The submitted Cypher was empty after trimming. The operator should type a non-empty query.",
+    category: "structural",
+    isHardSecurityViolation: false,
+  },
+  forbidden_token: {
+    label: "Forbidden Token",
+    description:
+      "The query contains a write keyword (CREATE / MERGE / SET / DELETE / DETACH / REMOVE / DROP / LOAD CSV). Mutations route through Phase 11.5 graph change proposals.",
+    category: "security",
+    isHardSecurityViolation: true,
+  },
+  forbidden_procedure: {
+    label: "Forbidden Procedure",
+    description:
+      "The query calls a mutating APOC procedure (apoc.create / apoc.merge / apoc.refactor). Mutations route through Phase 11.5 graph change proposals.",
+    category: "security",
+    isHardSecurityViolation: true,
+  },
+  disallowed_procedure: {
+    label: "Disallowed Procedure",
+    description:
+      "The query calls a procedure outside the read-only allowlist. Use a procedure under db.schema / apoc.path / apoc.coll / gds.shortestPath / gds.betweenness / gds.degree / gds.pageRank.",
+    category: "policy",
+    isHardSecurityViolation: false,
+  },
+};
+
+export function getText2CypherValidationFailureReasonMetadata(
+  reason: Text2CypherValidationFailureReason,
+): Text2CypherValidationFailureReasonMetadata {
+  return TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA[reason];
+}
+
 export type ValidationOutcome =
   | { ok: true }
   | { ok: false; reason: "forbidden_token"; token: string }
