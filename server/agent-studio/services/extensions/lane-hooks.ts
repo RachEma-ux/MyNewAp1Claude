@@ -32,10 +32,11 @@
  *     stays scoped to `runtime.ts`). Source-scan tested.
  */
 
-import type {
-  ExtensionCapabilityLane,
-  ExtensionRecord,
-  InvokeFromExtensionInput,
+import {
+  EXTENSION_CAPABILITY_LANES,
+  type ExtensionCapabilityLane,
+  type ExtensionRecord,
+  type InvokeFromExtensionInput,
 } from "./contracts.js";
 
 /**
@@ -118,4 +119,85 @@ export function __resetExtensionLaneHooksForTests(): void {
  */
 export function listRegisteredLaneHookLanes(): ExtensionCapabilityLane[] {
   return [...hooksByLane.keys()];
+}
+
+// ============================================================================
+// Registry aggregator (T-X.5)
+// ============================================================================
+
+/**
+ * Lanes that the registry accepts. `tool` is intentionally excluded —
+ * it throws in `registerLaneHook`, so it can never be registered and
+ * is reported separately on the summary's `notRegisterable` axis.
+ */
+export const REGISTERABLE_LANE_HOOK_LANES: readonly ExtensionCapabilityLane[] =
+  EXTENSION_CAPABILITY_LANES.filter((l) => l !== "tool");
+
+/**
+ * Stable-shape summary of the lane-hook registry. Operator dashboards
+ * + boot-time observability consume this to answer "which extension
+ * lanes are wired" at a glance.
+ *
+ * Stable-shape guarantees (mirrors `summarizeLensRunnerRegistry` from
+ * T-F.12 / #1068):
+ *   - `registered[lane]` is a boolean for every registerable lane,
+ *     even if zero hooks are registered (cold-boot stable shape).
+ *   - `notRegisterable` lists the lanes the registry refuses by
+ *     contract — currently `["tool"]`. The field exists even when
+ *     empty (future-proofing).
+ *   - `coveragePercent` is rounded to 1 decimal place; 0 on empty.
+ *   - Iteration order follows `REGISTERABLE_LANE_HOOK_LANES`.
+ */
+export interface LaneHookRegistrySummary {
+  /** Total count of lanes with a registered hook. */
+  readonly totalRegistered: number;
+  /** Total count of lanes that accept registration (currently 3). */
+  readonly totalRegisterable: number;
+  /** Per-registerable-lane boolean indicating whether a hook is
+   *  registered. Iteration order matches `REGISTERABLE_LANE_HOOK_LANES`. */
+  readonly registered: Readonly<Record<ExtensionCapabilityLane, boolean>>;
+  /** Registerable lanes with no hook registered. Preserves declared
+   *  order. */
+  readonly missingLanes: readonly ExtensionCapabilityLane[];
+  /** Lanes the registry refuses by contract (currently `["tool"]`). */
+  readonly notRegisterable: readonly ExtensionCapabilityLane[];
+  /** `totalRegistered / totalRegisterable * 100`, rounded to 1
+   *  decimal. 0 when `totalRegisterable === 0` (defensive — the
+   *  registerable set is fixed at 3 by the contract). */
+  readonly coveragePercent: number;
+}
+
+/**
+ * Build a `LaneHookRegistrySummary` from the current registry state.
+ * Pure read; does not mutate. Safe to call on cold boot (returns
+ * stable-shape "0% / all missing").
+ */
+export function summarizeLaneHookRegistry(): LaneHookRegistrySummary {
+  const registered: Record<string, boolean> = {};
+  const missingLanes: ExtensionCapabilityLane[] = [];
+  let totalRegistered = 0;
+  for (const lane of REGISTERABLE_LANE_HOOK_LANES) {
+    const has = hooksByLane.has(lane);
+    registered[lane] = has;
+    if (has) {
+      totalRegistered += 1;
+    } else {
+      missingLanes.push(lane);
+    }
+  }
+  const totalRegisterable = REGISTERABLE_LANE_HOOK_LANES.length;
+  const coveragePercent =
+    totalRegisterable === 0
+      ? 0
+      : Math.round((totalRegistered / totalRegisterable) * 1000) / 10;
+  return {
+    totalRegistered,
+    totalRegisterable,
+    registered: registered as Readonly<
+      Record<ExtensionCapabilityLane, boolean>
+    >,
+    missingLanes,
+    notRegisterable: EXTENSION_CAPABILITY_LANES.filter((l) => l === "tool"),
+    coveragePercent,
+  };
 }
