@@ -178,6 +178,7 @@ const ANCILLARY_TESTS = [
   "pii-severity-metadata.test.ts",
   "runtime-graph-event-kind-metadata.test.ts",
   "runtime-validation-verdict-metadata.test.ts",
+  "graph-skill-risk-level-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

@@ -68,7 +68,62 @@ export class SourceNoteVersionNotFoundError extends Error {
   }
 }
 
-export type RiskLevel = "low" | "medium" | "high";
+/**
+ * Closed-taxonomy graph-skill pack risk level. Promoted to a tuple at
+ * T-G.57 so the metadata table + lockstep tests can be authored.
+ */
+export const GRAPH_SKILL_RISK_LEVELS = ["low", "medium", "high"] as const;
+export type RiskLevel = (typeof GRAPH_SKILL_RISK_LEVELS)[number];
+
+// ============================================================================
+// Per-risk-level operator-facing metadata (T-G.57)
+// ============================================================================
+
+export interface GraphSkillRiskLevelMetadata {
+  /** Display label rendered in the graph-skill pack admin card. */
+  readonly label: string;
+  /** Short operator-facing description of what this risk level
+   *  implies for pack invocation. */
+  readonly description: string;
+  /** Stable rank 0-2 for risk comparison (0=low → 2=high). */
+  readonly rank: 0 | 1 | 2;
+  /** Whether invoking this pack routes through the approval gate
+   *  (true for `high` only; low + medium dispatch without operator
+   *  approval). */
+  readonly requiresApproval: boolean;
+}
+
+export const GRAPH_SKILL_RISK_LEVEL_METADATA: Readonly<
+  Record<RiskLevel, GraphSkillRiskLevelMetadata>
+> = {
+  low: {
+    label: "Low",
+    description:
+      "Pack performs read-only graph traversals or trivially reversible mutations. Dispatch proceeds without operator approval.",
+    rank: 0,
+    requiresApproval: false,
+  },
+  medium: {
+    label: "Medium",
+    description:
+      "Pack performs reversible graph mutations with workspace-local effect. Dispatch proceeds; surfaces a banner.",
+    rank: 1,
+    requiresApproval: false,
+  },
+  high: {
+    label: "High",
+    description:
+      "Pack performs significant graph mutations — schema changes, bulk edits, cross-source rewires. Requires operator approval before dispatch.",
+    rank: 2,
+    requiresApproval: true,
+  },
+};
+
+export function getGraphSkillRiskLevelMetadata(
+  level: RiskLevel,
+): GraphSkillRiskLevelMetadata {
+  return GRAPH_SKILL_RISK_LEVEL_METADATA[level];
+}
 
 export interface CreatePackInput {
   readonly skillKey: string;
