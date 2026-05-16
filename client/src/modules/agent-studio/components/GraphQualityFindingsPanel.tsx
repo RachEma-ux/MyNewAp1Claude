@@ -21,10 +21,24 @@
  * tRPC procedures are already in place).
  */
 
+import { useState } from "react";
+
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SectionLabel } from "./ui";
+
+/**
+ * T-F.84 (T-F.4-γ): server-side drill-in filters on the findings
+ * list. Mirrors the lens-browser T-F.72/T-F.73 visibility/typeKey
+ * filter shape but server-side because the `listFindings` LIMIT cap
+ * would silently filter to zero rows under client-side narrowing
+ * once the dataset grows past 50.
+ */
+const SEVERITY_VALUES = ["low", "medium", "high", "critical"] as const;
+const STATUS_VALUES = ["open", "triaged", "applied", "dismissed"] as const;
+type SeverityFilter = (typeof SEVERITY_VALUES)[number] | null;
+type StatusFilter = (typeof STATUS_VALUES)[number] | null;
 
 interface Bucket {
   readonly value: string;
@@ -56,11 +70,23 @@ function renderBucketList(buckets: ReadonlyArray<Bucket>, emptyHint: string) {
 const FINDINGS_LIST_LIMIT = 50;
 
 export function GraphQualityFindingsPanel() {
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+  const hasAnyFilter = severityFilter !== null || statusFilter !== null;
+  function clearAllFilters() {
+    setSeverityFilter(null);
+    setStatusFilter(null);
+  }
+
   const statsQ = trpc.agentStudio.graphQuality.getStats.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
   const findingsQ = trpc.agentStudio.graphQuality.listFindings.useQuery(
-    { limit: FINDINGS_LIST_LIMIT },
+    {
+      limit: FINDINGS_LIST_LIMIT,
+      ...(severityFilter ? { severity: severityFilter } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+    },
     { refetchOnWindowFocus: false },
   );
 
@@ -151,10 +177,80 @@ export function GraphQualityFindingsPanel() {
             Recent findings
             {findingsQ.data
               ? findingsQ.data.length === FINDINGS_LIST_LIMIT
-                ? ` (first ${FINDINGS_LIST_LIMIT}, newest first)`
-                : ` (${findingsQ.data.length}, newest first)`
+                ? hasAnyFilter
+                  ? ` (first ${FINDINGS_LIST_LIMIT} matching filters, newest first)`
+                  : ` (first ${FINDINGS_LIST_LIMIT}, newest first)`
+                : hasAnyFilter
+                  ? ` (${findingsQ.data.length} matching filters, newest first)`
+                  : ` (${findingsQ.data.length}, newest first)`
               : ""}
           </SectionLabel>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div
+              className="flex items-center gap-2"
+              data-testid="graph-quality-severity-filter-group"
+            >
+              <span className="text-muted-foreground">severity:</span>
+              {(["all", ...SEVERITY_VALUES] as const).map((mode) => {
+                const isActive =
+                  mode === "all" ? severityFilter === null : severityFilter === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    data-testid={`graph-quality-severity-filter-${mode}`}
+                    onClick={() =>
+                      setSeverityFilter(mode === "all" ? null : mode)
+                    }
+                    className={`rounded px-2 py-0.5 font-mono ${
+                      isActive
+                        ? "bg-muted/50 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/30"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              className="flex items-center gap-2"
+              data-testid="graph-quality-status-filter-group"
+            >
+              <span className="text-muted-foreground">status:</span>
+              {(["all", ...STATUS_VALUES] as const).map((mode) => {
+                const isActive =
+                  mode === "all" ? statusFilter === null : statusFilter === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    data-testid={`graph-quality-status-filter-${mode}`}
+                    onClick={() =>
+                      setStatusFilter(mode === "all" ? null : mode)
+                    }
+                    className={`rounded px-2 py-0.5 font-mono ${
+                      isActive
+                        ? "bg-muted/50 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/30"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+            {hasAnyFilter ? (
+              <button
+                type="button"
+                className="ml-auto underline text-muted-foreground"
+                data-testid="graph-quality-clear-all-filters"
+                onClick={clearAllFilters}
+              >
+                Clear all filters
+              </button>
+            ) : null}
+          </div>
           {findingsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading findings…</p>
           ) : findingsQ.error ? (
@@ -169,7 +265,21 @@ export function GraphQualityFindingsPanel() {
               className="text-sm text-muted-foreground italic"
               data-testid="graph-quality-findings-list-empty"
             >
-              No findings yet — scans haven&apos;t produced any quality alerts.
+              {hasAnyFilter ? (
+                <>
+                  No findings match the active filters.{" "}
+                  <button
+                    type="button"
+                    className="underline not-italic"
+                    data-testid="graph-quality-empty-state-clear-all"
+                    onClick={clearAllFilters}
+                  >
+                    Clear all filters
+                  </button>
+                </>
+              ) : (
+                <>No findings yet — scans haven&apos;t produced any quality alerts.</>
+              )}
             </p>
           ) : (
             <table
