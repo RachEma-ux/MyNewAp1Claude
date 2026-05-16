@@ -182,6 +182,7 @@ const ANCILLARY_TESTS = [
   "runtime-dispatch-result-metadata.test.ts",
   "saved-views-default-lens-kind.test.ts",
   "static-fact-retrieve-hook.test.ts",
+  "static-chunk-assemble-hook.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
