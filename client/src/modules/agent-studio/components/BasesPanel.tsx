@@ -17,7 +17,7 @@
  * Phase 16 saved-view CRUD + sharing model carries over).
  */
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,14 @@ export function BasesPanel() {
   });
   const vaults = useMemo(() => vaultsQuery.data ?? [], [vaultsQuery.data]);
   const [selectedVaultId, setSelectedVaultId] = useState<number | null>(null);
+  // T-F.92 (T-F.2-β): per-row expand-to-detail. Only one row's
+  // detail is open at a time (mirrors the Quality Lens θ trail
+  // expansion shape, lesson 56's mutual-exclusion pattern). The
+  // detail rows are rendered from already-fetched data — no new
+  // tRPC query, no DB hit. Saved-view rows from
+  // `listVisibleSavedViews` already carry filters / sort / columns
+  // JSON.
+  const [expandedBaseId, setExpandedBaseId] = useState<number | null>(null);
   const effectiveVaultId =
     selectedVaultId !== null
       ? selectedVaultId
@@ -163,31 +171,163 @@ export function BasesPanel() {
                   <th className="py-1">visibility</th>
                   <th className="py-1">version</th>
                   <th className="py-1">updated</th>
+                  <th className="py-1"></th>
                 </tr>
               </thead>
               <tbody>
-                {bases.map((b) => (
-                  <tr
-                    key={b.id}
-                    className="border-t border-border"
-                    data-testid={`bases-row-${b.id}`}
-                  >
-                    <td className="py-1 font-mono">{b.id}</td>
-                    <td className="py-1">{b.name}</td>
-                    <td className="py-1 font-mono text-muted-foreground">
-                      {b.visibility}
-                    </td>
-                    <td className="py-1 font-mono">v{b.version}</td>
-                    <td className="py-1 font-mono text-muted-foreground">
-                      {new Date(b.updatedAt).toISOString()}
-                    </td>
-                  </tr>
-                ))}
+                {bases.map((b) => {
+                  const isExpanded = expandedBaseId === b.id;
+                  return (
+                    <Fragment key={b.id}>
+                      <tr
+                        className="border-t border-border"
+                        data-testid={`bases-row-${b.id}`}
+                      >
+                        <td className="py-1 font-mono">{b.id}</td>
+                        <td className="py-1">{b.name}</td>
+                        <td className="py-1 font-mono text-muted-foreground">
+                          {b.visibility}
+                        </td>
+                        <td className="py-1 font-mono">v{b.version}</td>
+                        <td className="py-1 font-mono text-muted-foreground">
+                          {new Date(b.updatedAt).toISOString()}
+                        </td>
+                        <td className="py-1">
+                          <button
+                            type="button"
+                            className="underline text-muted-foreground"
+                            data-testid={`bases-row-toggle-${b.id}`}
+                            onClick={() =>
+                              setExpandedBaseId(isExpanded ? null : b.id)
+                            }
+                          >
+                            {isExpanded ? "Hide details" : "View details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr data-testid={`bases-row-detail-${b.id}`}>
+                          <td colSpan={6} className="bg-muted/20 px-3 py-2 text-xs">
+                            <BaseRowDetail base={b} />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * T-F.92 (T-F.2-β) BaseRowDetail — inline detail expansion for a
+ * bases-list row. Renders the base's filters / sort / columns /
+ * metadata from already-fetched `SavedViewRow` data (no new
+ * tRPC query, no DB hit).
+ */
+function BaseRowDetail({
+  base,
+}: {
+  readonly base: {
+    readonly id: number;
+    readonly viewKind: string;
+    readonly filters: Record<string, unknown> | null;
+    readonly sort: Record<string, unknown> | null;
+    readonly columns: readonly string[] | null;
+    readonly createdAt: string | Date;
+    readonly ownerUserId: number | null;
+    readonly parentSavedViewId: number | null;
+  };
+}) {
+  return (
+    <div
+      className="space-y-3"
+      data-testid={`bases-row-detail-body-${base.id}`}
+    >
+      <div>
+        <p className="font-medium">Metadata</p>
+        <ul
+          className="ml-3 list-disc text-muted-foreground"
+          data-testid={`bases-row-detail-meta-${base.id}`}
+        >
+          <li>viewKind: {base.viewKind}</li>
+          <li>
+            createdAt: {new Date(base.createdAt).toISOString()}
+          </li>
+          <li>
+            ownerUserId:{" "}
+            {base.ownerUserId !== null ? `user#${base.ownerUserId}` : "—"}
+          </li>
+          {base.parentSavedViewId !== null ? (
+            <li>parentSavedViewId: {base.parentSavedViewId}</li>
+          ) : null}
+        </ul>
+      </div>
+      <div>
+        <p className="font-medium">Filters</p>
+        {base.filters && Object.keys(base.filters).length > 0 ? (
+          <pre
+            className="mt-1 max-h-40 overflow-auto rounded bg-background/50 p-2 font-mono text-[10px]"
+            data-testid={`bases-row-detail-filters-${base.id}`}
+          >
+            {JSON.stringify(base.filters, null, 2)}
+          </pre>
+        ) : (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`bases-row-detail-filters-empty-${base.id}`}
+          >
+            No filters — base matches all notes in the vault.
+          </p>
+        )}
+      </div>
+      <div>
+        <p className="font-medium">Sort</p>
+        {base.sort && Object.keys(base.sort).length > 0 ? (
+          <pre
+            className="mt-1 max-h-32 overflow-auto rounded bg-background/50 p-2 font-mono text-[10px]"
+            data-testid={`bases-row-detail-sort-${base.id}`}
+          >
+            {JSON.stringify(base.sort, null, 2)}
+          </pre>
+        ) : (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`bases-row-detail-sort-empty-${base.id}`}
+          >
+            No sort — default order.
+          </p>
+        )}
+      </div>
+      <div>
+        <p className="font-medium">
+          Columns ({base.columns?.length ?? 0})
+        </p>
+        {base.columns && base.columns.length > 0 ? (
+          <ul
+            className="ml-3 list-disc text-muted-foreground"
+            data-testid={`bases-row-detail-columns-${base.id}`}
+          >
+            {base.columns.map((c) => (
+              <li key={c} className="font-mono">
+                {c}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`bases-row-detail-columns-empty-${base.id}`}
+          >
+            No columns selected — base renders the view-kind defaults.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
