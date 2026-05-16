@@ -1249,6 +1249,63 @@ export const AGS_TOOL_INVOCATION_KINDS = [
 ] as const;
 export type AgsToolInvocationKind = (typeof AGS_TOOL_INVOCATION_KINDS)[number];
 
+// ============================================================================
+// Per-invocation-kind operator-facing metadata (T-S.17)
+// ============================================================================
+
+export interface AgsToolInvocationKindMetadata {
+  /** Display label rendered in the tool catalog. */
+  readonly label: string;
+  /** Short operator-facing description of how the kind invokes. */
+  readonly description: string;
+  /** Whether this kind is user-creatable via the catalog API
+   *  (true for shell/http/mcp_ref; false for `builtin`). */
+  readonly userCreatable: boolean;
+  /** Whether the invocation crosses a network/process boundary
+   *  (true for shell/http; false for mcp_ref/builtin which stay in
+   *  the existing MCP dispatcher path / in-process). */
+  readonly crossesNetworkBoundary: boolean;
+}
+
+export const AGS_TOOL_INVOCATION_KIND_METADATA: Readonly<
+  Record<AgsToolInvocationKind, AgsToolInvocationKindMetadata>
+> = {
+  shell: {
+    label: "Shell",
+    description:
+      "Spawns argv via child_process.spawn — sandboxed env, hard timeout, refuses to run without a working directory.",
+    userCreatable: true,
+    crossesNetworkBoundary: true,
+  },
+  http: {
+    label: "HTTP",
+    description:
+      "Fetch POST/GET against a URL with headers from invocationConfig — outbound HTTP call.",
+    userCreatable: true,
+    crossesNetworkBoundary: true,
+  },
+  mcp_ref: {
+    label: "MCP Reference",
+    description:
+      "Proxy to an existing MCP-discovered tool (serverId + toolName) — useful for renaming or wrapping an MCP tool.",
+    userCreatable: true,
+    crossesNetworkBoundary: false,
+  },
+  builtin: {
+    label: "Builtin",
+    description:
+      "Reserved — refers to one of the static built-in tools. Used by the merged catalog adapter; not user-creatable via the API.",
+    userCreatable: false,
+    crossesNetworkBoundary: false,
+  },
+};
+
+export function getAgsToolInvocationKindMetadata(
+  kind: AgsToolInvocationKind,
+): AgsToolInvocationKindMetadata {
+  return AGS_TOOL_INVOCATION_KIND_METADATA[kind];
+}
+
 /**
  * Where a catalog skill came from. Drives merge logic in
  * skill-catalog-adapter.ts and the source-filter chip on the UI.
