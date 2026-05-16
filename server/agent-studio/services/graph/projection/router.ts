@@ -19,7 +19,10 @@
 
 import { z } from "zod";
 import { router, adminProcedure } from "../../../../_core/trpc.js";
-import { getProjectionDriftCronStatus } from "./drift-cron.js";
+import {
+  getProjectionDriftCronStatus,
+  runProjectionDriftScan,
+} from "./drift-cron.js";
 import {
   loadStalenessRowsFromAsDb,
   runStalenessCheck,
@@ -72,4 +75,20 @@ export const graphProjectionRouter = router({
         thresholdMs: input?.thresholdMs,
       });
     }),
+
+  /**
+   * T-I.58 — operator-triggered ad-hoc projection-drift scan. Mirrors
+   * `runStalenessCheck` (T-I.46) and `runAlertScan` (T-I.57): runs the
+   * same `runProjectionDriftScan` the cron wrapper invokes, without
+   * waiting for the next cron tick (default `30 4 * * *`). Useful for
+   * confirming a Neo4j re-projection after promotion / post-migration
+   * smoke-tests.
+   *
+   * Pinned to default scope (matches the cron's
+   * `formatStartupLogTail: "scope=default"`); per-workspace scoping
+   * lands with multi-region V1.5 work.
+   */
+  runDriftScan: adminProcedure.mutation(async () => {
+    return runProjectionDriftScan({});
+  }),
 });

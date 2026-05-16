@@ -22,6 +22,15 @@
  * T-I.55's shape — runs the same `runHealthAlertScan` the cron
  * wrapper invokes, useful for confirming threshold changes or
  * triaging backend issues without waiting for the 5-min cron tick.
+ *
+ * T-I.58 added a Run-now button for the projection-drift scan
+ * (admin tRPC `agentStudio.graphProjection.runDriftScan`). The
+ * inline `runSweep` body was factored into a standalone
+ * `runProjectionDriftScan()` so the operator path bypasses the cron-
+ * expression + minute-dedupe gate that `tickProjectionDriftCron`
+ * enforces. Useful for confirming a Neo4j re-projection after
+ * promotion / post-migration smoke-tests without waiting for the
+ * 04:30 UTC daily cron tick.
  */
 
 import { useState } from "react";
@@ -118,6 +127,25 @@ export function GraphHealthAdminPanel() {
       },
       onError: (err) =>
         setAlertScanFeedback(`Alert scan failed: ${err.message}`),
+    });
+
+  // T-I.58: operator-triggered ad-hoc projection-drift scan. Mirrors
+  // T-I.55 (staleness) + T-I.57 (alert) Run-now shapes. Useful for
+  // confirming a Neo4j re-projection after promotion / post-migration
+  // smoke-tests without waiting for the 04:30 UTC daily cron tick.
+  const [driftScanFeedback, setDriftScanFeedback] = useState<string | null>(
+    null,
+  );
+  const runDriftScanMutation =
+    trpc.agentStudio.graphProjection.runDriftScan.useMutation({
+      onSuccess: (data) => {
+        setDriftScanFeedback(
+          `Scan complete: ${data.totalScanned} scanned / ${data.driftCount} drifts / ${data.permissionLeakCount} permission-leaks / ${data.persistedEvents} persisted.`,
+        );
+        void utils.agentStudio.graphProjection.getDriftCronStatus.invalidate();
+      },
+      onError: (err) =>
+        setDriftScanFeedback(`Drift scan failed: ${err.message}`),
     });
 
   // T-I.55: operator-triggered ad-hoc staleness check. Mirrors the
@@ -364,6 +392,25 @@ export function GraphHealthAdminPanel() {
               ) : null}
             </div>
           )}
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="text-sm underline"
+              disabled={runDriftScanMutation.isPending}
+              onClick={() => runDriftScanMutation.mutate()}
+              data-testid="graph-projection-drift-scan-run-now-button"
+            >
+              {runDriftScanMutation.isPending ? "Scanning…" : "Run drift scan now"}
+            </button>
+            {driftScanFeedback ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="graph-projection-drift-scan-run-now-feedback"
+              >
+                {driftScanFeedback}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
