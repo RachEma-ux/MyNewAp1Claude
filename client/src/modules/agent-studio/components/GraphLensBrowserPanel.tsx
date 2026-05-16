@@ -632,6 +632,11 @@ function RenderEnvelopeView({
                 nodes={filteredNodes}
                 edges={snapshot.edges}
               />
+            ) : snapshot.layout === "matrix" ? (
+              <MatrixGraphViz
+                nodes={filteredNodes}
+                edges={snapshot.edges}
+              />
             ) : (
               <SnapshotGraphViz
                 nodes={filteredNodes}
@@ -1007,6 +1012,132 @@ function TimelineGraphViz({
                   : `${n.typeKey}: (hidden)`}
               </title>
             </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * T-F.79 MatrixGraphViz — second layout-specific renderer.
+ *
+ * Selected when `snapshot.layout === "matrix"` (CAG Pack View is the
+ * canonical caller — block → source-note-version reference matrix).
+ * Renders an N×N grid: every filtered node is both a row AND a
+ * column, and cell (rowNode, colNode) is filled iff an edge
+ * rowNode → colNode exists in the filtered set. Hidden edges get the
+ * muted opacity used elsewhere; the diagonal cells stay empty unless
+ * a self-edge exists.
+ *
+ * Why N×N (not source-typeKey × target-typeKey): node identity is
+ * preserved so cell-level inspection lands on a specific edge, which
+ * is the operator's actual debugging question for matrix lenses
+ * (which block links to which source-note-version).
+ */
+function MatrixGraphViz({
+  nodes,
+  edges,
+}: {
+  readonly nodes: ReadonlyArray<{
+    typeKey: string;
+    id: string;
+    visible: boolean;
+    label?: string;
+  }>;
+  readonly edges: ReadonlyArray<{
+    typeKey: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    visible: boolean;
+  }>;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground italic"
+        data-testid="graph-lens-matrix-viz-empty"
+      >
+        No nodes to render.
+      </p>
+    );
+  }
+  const cellSize = 14;
+  const labelGutter = 64;
+  const size = labelGutter + nodes.length * cellSize + 8;
+  // Pre-compute the canonical edge key set so cell lookup is O(1)
+  // across the N² render. Visible flag is folded into the value so
+  // a visible edge wins over a hidden duplicate on the same pair.
+  const edgeKeys = new Set<string>();
+  const edgeVisibility = new Map<string, boolean>();
+  for (const e of edges) {
+    const key = `${e.sourceNodeId}|${e.targetNodeId}`;
+    edgeKeys.add(key);
+    edgeVisibility.set(key, edgeVisibility.get(key) === true || e.visible);
+  }
+  return (
+    <div data-testid="graph-lens-matrix-viz">
+      <SectionLabel>
+        Matrix ({nodes.length}×{nodes.length}, {edgeKeys.size} edges)
+      </SectionLabel>
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="w-full max-w-2xl border border-border rounded"
+        data-testid="graph-lens-matrix-viz-svg"
+      >
+        {nodes.map((rowNode, rowIdx) => {
+          const y = labelGutter + rowIdx * cellSize;
+          return (
+            <g key={`row-${rowNode.id}`}>
+              <text
+                x={labelGutter - 4}
+                y={y + cellSize - 4}
+                fontSize={8}
+                textAnchor="end"
+                fill="currentColor"
+                fillOpacity={0.6}
+              >
+                {rowNode.label ?? rowNode.id}
+              </text>
+              {nodes.map((colNode, colIdx) => {
+                const x = labelGutter + colIdx * cellSize;
+                const key = `${rowNode.id}|${colNode.id}`;
+                const present = edgeKeys.has(key);
+                const visible = edgeVisibility.get(key) === true;
+                return (
+                  <rect
+                    key={`cell-${rowNode.id}-${colNode.id}`}
+                    data-testid={`graph-lens-matrix-viz-cell-${rowNode.id}-${colNode.id}`}
+                    x={x}
+                    y={y}
+                    width={cellSize - 2}
+                    height={cellSize - 2}
+                    fill={present ? "currentColor" : "transparent"}
+                    fillOpacity={present ? (visible ? 0.7 : 0.25) : 0}
+                    stroke="currentColor"
+                    strokeOpacity={0.15}
+                    strokeWidth={0.5}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+        {nodes.map((colNode, colIdx) => {
+          const x = labelGutter + colIdx * cellSize;
+          return (
+            <text
+              key={`col-${colNode.id}`}
+              x={x + cellSize / 2}
+              y={labelGutter - 4}
+              fontSize={8}
+              textAnchor="end"
+              fill="currentColor"
+              fillOpacity={0.6}
+              transform={`rotate(-60 ${x + cellSize / 2} ${labelGutter - 4})`}
+            >
+              {colNode.label ?? colNode.id}
+            </text>
           );
         })}
       </svg>
