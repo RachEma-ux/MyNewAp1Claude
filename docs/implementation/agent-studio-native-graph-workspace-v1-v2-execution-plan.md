@@ -592,6 +592,19 @@ All 9 first-slice PRs landed on main on 2026-05-13. Each carries:
 | #982 (PR-V1-231) | Phase 13 admin — graph-agent explain slowest step gauge | Why-This-Answer header shows total duration and step count. For perf investigations the follow-up is "which step ate the most time" — already in the steps array. Inline `Slowest: #i kind (Xms)` gauge in the header. Max-by-durationMs reduction in-render. Null durationMs treated as -1 in compare; all-null detected via `slowest.durationMs == null` → render nothing (engine ran without timing adapter). Reuses existing `formatDuration` helper. Testid `graph-agent-explain-slowest-step`. 4-test source-scan. | merged |
 | #983 (PR-V1-232) | Phase 13 admin — graph-agent explain step-kind distribution | Per-step ledger shows each step's `stepKind` row-by-row but no aggregated shape. A 50-step run that's 90% one kind hints at a loop or fallback chain; a balanced distribution is healthy. Adds `By kind: N kind / N kind ...` distribution line above the step ledger. `Map<string, number>` + sort-by-count desc (reuses the pin-distribution shape from #969). Render-gated on `steps.length > 0`. Testid `graph-agent-explain-step-kind-distribution`. 3-test source-scan. | merged |
 
+### 6.1.bis Post-#983 burst summary (2026-05-15 to 2026-05-16)
+
+The first-slice ledger above stops at #983 (the closing slice of the admin-saturation arc). The remaining-execution-plan at `/sdcard/Download/agent-studio-native-graph-workspace-remaining-execution-plan.md` then opened tracks T-A through T-I. Continuous autonomous execution under the standing /goal mandate has shipped #984–#1171 (~188 PRs) across 4 sub-arcs. Per-PR detail is preserved in the auto-memory file `~/.claude/projects/-root/memory/project_v1_plus_session_2026_05_15.md` (lessons 1–28); this section is the doc-side summary so future readers of this ledger don't need to read the memory file to understand what's on main.
+
+| PR range | Arc | Count | Notes |
+|---|---|---|---|
+| #984–#1011 | Remaining-plan track openings (T-A / T-C / T-D / T-E / T-F / T-G / T-I first slices) + validator-extension mini-arc | 28 | All 7 autonomous tracks of the remaining-execution-plan have ≥1 PR landed. Lens-stack boot-wired @ #1006 = `4d36b89`. PR #1000 milestone. |
+| #1012–#1090 | Phase 22 closed-taxonomy emission rollout (T-I.4 audit + bridge + 11 emitter wirings) + bridge coverage guard + sub-arc closures | 79 | `recordFailureStateEvent` bridge live; 11/25 failure-state kinds emitted via the closed-taxonomy contract; 14 retention mini-arcs / dashboard panels / docs SOUs. |
+| #1091–#1135 | Per-kind UI metadata canonization — first wave | 45 | 44 metadata tables (T-G.30–T-G.36, T-D.12, T-E.1–4, T-X.1–3, T-V.1–3, T-B.1–2, T-C.1–2, T-R.1, T-I.33, T-L.1–3, T-S.1–18, T-A.6–10, T-H.1). Pattern canonized: per-kind `X_METADATA: Readonly<Record<XKind, XMetadata>>` with `label` + `description` + 1–3 closed-classification fields + lockstep tests + ancillary catalog row + docs §7 table row. |
+| #1136–#1171 | Per-kind UI metadata canonization — post-compaction continuation (reached 100-table milestone at #1169 / T-G.56) | 36 | T-S.19–22, T-E.5–6, T-A.11–14, T-D.13–15, T-X.4, T-G.37–G.58. Coverage saturation: every closed-taxonomy `as const` array AND every 2+-member literal union in `server/agent-studio/services/` and `shared/` now has an operator-facing metadata table or is documented as having no reasonable UI mapping. |
+
+**Main head post-#1171**: `cd491835` → `cd491835` (sync after each merge). The per-kind metadata canonization arc is **saturated**; the next slice category in this plan's scope is either (a) opening T-B.4 concrete extension lane hooks (retrieve/assemble/compose), (b) advancing T-D / T-E / T-F / T-G / T-H runtime work, or (c) the explicit doc-drift sweep this addendum is the first slice of.
+
 ---
 
 ## 7. Connection back to MVP 0–4 closure
