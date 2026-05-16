@@ -91,14 +91,35 @@ export function GraphQualityFindingsPanel() {
   // trail expansion and vice-versa.
   const [reasonFindingId, setReasonFindingId] = useState<number | null>(null);
   const [reasonDraft, setReasonDraft] = useState<string>("");
+  // T-F.88: per-row triage / convert-to-proposal inline editor —
+  // mirrors the η dismiss editor shape but routes the rationale
+  // field through convertFindingToProposal. Parallel state slices
+  // keep the two editors mutually exclusive: opening triage closes
+  // dismiss (and vice-versa), and both close the trail expansion.
+  const [triageFindingId, setTriageFindingId] = useState<number | null>(null);
+  const [triageDraft, setTriageDraft] = useState<string>("");
+  const [triageError, setTriageError] = useState<string | null>(null);
   function openReasonEditor(findingId: number) {
     setReasonFindingId(findingId);
     setReasonDraft("");
+    setTriageFindingId(null);
+    setTriageDraft("");
     setExpandedFindingId(null);
   }
   function closeReasonEditor() {
     setReasonFindingId(null);
     setReasonDraft("");
+  }
+  function openTriageEditor(findingId: number) {
+    setTriageFindingId(findingId);
+    setTriageDraft("");
+    setReasonFindingId(null);
+    setReasonDraft("");
+    setExpandedFindingId(null);
+  }
+  function closeTriageEditor() {
+    setTriageFindingId(null);
+    setTriageDraft("");
   }
   const hasAnyFilter = severityFilter !== null || statusFilter !== null;
   function clearAllFilters() {
@@ -129,6 +150,16 @@ export function GraphQualityFindingsPanel() {
       onError: (err) => setDismissError(err.message),
     },
   );
+  const triageMutation =
+    trpc.agentStudio.graphQuality.convertFindingToProposal.useMutation({
+      onSuccess: () => {
+        setTriageError(null);
+        closeTriageEditor();
+        void utils.agentStudio.graphQuality.listFindings.invalidate();
+        void utils.agentStudio.graphQuality.getStats.invalidate();
+      },
+      onError: (err) => setTriageError(err.message),
+    });
   const trailQ = trpc.agentStudio.graphQuality.getFindingAuditTrail.useQuery(
     { findingId: expandedFindingId ?? 0 },
     {
@@ -338,6 +369,14 @@ export function GraphQualityFindingsPanel() {
                   Dismiss failed: {dismissError}
                 </p>
               ) : null}
+              {triageError ? (
+                <p
+                  className="text-xs text-destructive"
+                  data-testid="graph-quality-triage-error"
+                >
+                  Triage failed: {triageError}
+                </p>
+              ) : null}
               <table
                 className="w-full text-xs"
                 data-testid="graph-quality-findings-list"
@@ -355,11 +394,16 @@ export function GraphQualityFindingsPanel() {
                 <tbody>
                   {findingsQ.data.map((f) => {
                     const isDismissable = f.status === "open";
+                    const isTriageable = f.status === "open";
                     const isPending =
                       dismissMutation.isPending &&
                       dismissMutation.variables?.findingId === f.id;
+                    const isTriagePending =
+                      triageMutation.isPending &&
+                      triageMutation.variables?.findingId === f.id;
                     const isExpanded = expandedFindingId === f.id;
                     const isReasonOpen = reasonFindingId === f.id;
+                    const isTriageOpen = triageFindingId === f.id;
                     return (
                       <Fragment key={f.id}>
                         <tr
@@ -396,6 +440,17 @@ export function GraphQualityFindingsPanel() {
                                 Dismiss…
                               </button>
                             ) : null}
+                            {isTriageable && !isTriageOpen ? (
+                              <button
+                                type="button"
+                                disabled={isTriagePending}
+                                className="underline text-muted-foreground disabled:opacity-50"
+                                data-testid={`graph-quality-finding-triage-${f.id}`}
+                                onClick={() => openTriageEditor(f.id)}
+                              >
+                                Triage…
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                         {isExpanded ? (
@@ -410,6 +465,71 @@ export function GraphQualityFindingsPanel() {
                                 trailQ={trailQ}
                                 findingId={f.id}
                               />
+                            </td>
+                          </tr>
+                        ) : null}
+                        {isTriageOpen ? (
+                          <tr
+                            data-testid={`graph-quality-finding-triage-row-${f.id}`}
+                          >
+                            <td
+                              colSpan={6}
+                              className="bg-muted/20 px-3 py-2 text-xs"
+                            >
+                              <div className="space-y-2">
+                                <label
+                                  className="block text-muted-foreground"
+                                  htmlFor={`graph-quality-triage-textarea-${f.id}`}
+                                >
+                                  Triage rationale (optional, max 2000
+                                  chars):
+                                </label>
+                                <textarea
+                                  id={`graph-quality-triage-textarea-${f.id}`}
+                                  data-testid={`graph-quality-finding-triage-textarea-${f.id}`}
+                                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+                                  rows={3}
+                                  maxLength={2000}
+                                  value={triageDraft}
+                                  onChange={(e) =>
+                                    setTriageDraft(e.target.value)
+                                  }
+                                  disabled={isTriagePending}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={isTriagePending}
+                                    className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                                    data-testid={`graph-quality-finding-triage-confirm-${f.id}`}
+                                    onClick={() => {
+                                      const trimmed = triageDraft.trim();
+                                      triageMutation.mutate({
+                                        findingId: f.id,
+                                        ...(trimmed !== ""
+                                          ? { rationale: trimmed }
+                                          : {}),
+                                      });
+                                    }}
+                                  >
+                                    {isTriagePending
+                                      ? "Triaging…"
+                                      : "Confirm triage"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isTriagePending}
+                                    className="underline text-muted-foreground disabled:opacity-50"
+                                    data-testid={`graph-quality-finding-triage-cancel-${f.id}`}
+                                    onClick={closeTriageEditor}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <span className="ml-auto text-muted-foreground">
+                                    {triageDraft.length} / 2000
+                                  </span>
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         ) : null}
