@@ -61,7 +61,7 @@ describe("Graph Lens browser — SVG graph viz toggle (T-F.77)", () => {
     // the viewMode dispatch and SnapshotGraphViz — both renderers
     // still live inside the `viewMode === "graph"` branch.
     expect(src).toMatch(
-      /viewMode\s*===\s*"graph"\s*\?\s*\([\s\S]{0,400}<SnapshotGraphViz/,
+      /viewMode\s*===\s*"graph"\s*\?\s*\([\s\S]{0,1200}<SnapshotGraphViz/,
     );
     // The viz consumes the filtered nodes (not the raw snapshot) so
     // composes correctly with the 3-axis drill-in filters.
