@@ -660,15 +660,40 @@ export const workspaceObservabilityRouter = router({
           limit: z.number().int().min(1).max(500).optional(),
           /** Optional `createdAt >=` filter, e.g. last-24h dashboards. */
           createdSince: z.coerce.date().optional(),
+          /**
+           * T-I.63 — Optional closed-taxonomy kind filter. When present,
+           * only events whose `errorClass` decodes to one of these kinds
+           * are returned. Omit to get all 25 kinds (default behavior).
+           *
+           * Operator use: drill into a specific kind without the 200-row
+           * buffer being dominated by louder neighbors.
+           */
+          kind: z.enum(FAILURE_STATES).array().min(1).max(25).optional(),
+          /**
+           * T-I.63 — Optional sourceKind filter (pass-through to
+           * `listErrorEvents`). Mirrors that procedure's shape: a single
+           * string OR an array up to 20.
+           *
+           * Operator use: "show me only events from staleness-detector"
+           * without re-aggregating client-side.
+           */
+          sourceKind: z
+            .union([
+              z.string().min(1).max(100),
+              z.array(z.string().min(1).max(100)).max(20),
+            ])
+            .optional(),
         })
         .optional(),
     )
     .query(async ({ input }) => {
       try {
+        const kinds = input?.kind ?? FAILURE_STATES;
         const rows = await listErrorEvents({
-          errorClass: FAILURE_STATES.map(failureStateErrorClass),
+          errorClass: kinds.map(failureStateErrorClass),
           limit: input?.limit ?? 200,
           createdSince: input?.createdSince,
+          sourceKind: input?.sourceKind,
         });
         return {
           rows,
