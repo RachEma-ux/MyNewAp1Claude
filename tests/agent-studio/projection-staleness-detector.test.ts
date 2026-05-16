@@ -276,3 +276,79 @@ describe("runStalenessCheck — orchestrator", () => {
     // Null emitter does not throw, no bridge call attempted.
   });
 });
+
+describe("loadStalenessRowsFromAsDb — DB fetcher", () => {
+  it("returns empty array when ASDB is null (fail-soft)", async () => {
+    // Lazy import to avoid hoisting the export check above.
+    const mod = await import(
+      "../../server/agent-studio/services/graph/projection/staleness-detector.js"
+    );
+    const rows = await mod.loadStalenessRowsFromAsDb({
+      getDb: () => null,
+    });
+    expect(rows).toEqual([]);
+  });
+
+  it("maps Drizzle rows to ProjectionSyncJobRow shape", async () => {
+    const completedAt = new Date("2026-05-15T10:00:00Z");
+    // Minimal Drizzle-like stub: db.select(...).from(...).orderBy(...).limit(...) is awaitable.
+    const stubDb = {
+      select: () => ({
+        from: () => ({
+          orderBy: () => ({
+            limit: async () => [
+              {
+                id: 42,
+                projectionKey: "default",
+                status: "succeeded",
+                completedAt,
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+    const mod = await import(
+      "../../server/agent-studio/services/graph/projection/staleness-detector.js"
+    );
+    const rows = await mod.loadStalenessRowsFromAsDb({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getDb: () => stubDb as any,
+    });
+    expect(rows).toEqual([
+      {
+        id: 42,
+        projectionKey: "default",
+        status: "succeeded",
+        completedAt,
+      },
+    ]);
+  });
+
+  it("normalizes null completedAt", async () => {
+    const stubDb = {
+      select: () => ({
+        from: () => ({
+          orderBy: () => ({
+            limit: async () => [
+              {
+                id: 1,
+                projectionKey: "stuck",
+                status: "failed",
+                completedAt: null,
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+    const mod = await import(
+      "../../server/agent-studio/services/graph/projection/staleness-detector.js"
+    );
+    const rows = await mod.loadStalenessRowsFromAsDb({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getDb: () => stubDb as any,
+    });
+    expect(rows[0].completedAt).toBeNull();
+  });
+});
