@@ -43,9 +43,18 @@ export function GraphLensBrowserPanel() {
   // (snapshot shape differs across lens kinds, so a stale filter
   // would silently filter to zero rows).
   const [typeKeyFilter, setTypeKeyFilter] = useState<string | null>(null);
+  // T-F.73: visibility drill-in. `"all"` shows every node (default);
+  // `"visible_only"` hides permission-redacted nodes; `"hidden_only"`
+  // surfaces only the redacted set (useful for spotting permission
+  // gaps in an audit). Composes with typeKeyFilter — both narrowers
+  // apply against the same filteredNodes list.
+  const [visibilityFilter, setVisibilityFilter] = useState<
+    "all" | "visible_only" | "hidden_only"
+  >("all");
   function selectLens(lensId: string) {
     setSelectedLensId(lensId);
     setTypeKeyFilter(null);
+    setVisibilityFilter("all");
   }
 
   const listQ = trpc.agentStudio.graphLens.list.useQuery(undefined, {
@@ -226,6 +235,8 @@ export function GraphLensBrowserPanel() {
               data={renderQ.data}
               typeKeyFilter={typeKeyFilter}
               onTypeKeyFilterChange={setTypeKeyFilter}
+              visibilityFilter={visibilityFilter}
+              onVisibilityFilterChange={setVisibilityFilter}
             />
           ) : null}
         </CardContent>
@@ -263,12 +274,18 @@ interface RenderEnvelopeViewProps {
     | { status: "not_found"; lensId: string };
   readonly typeKeyFilter: string | null;
   readonly onTypeKeyFilterChange: (next: string | null) => void;
+  readonly visibilityFilter: "all" | "visible_only" | "hidden_only";
+  readonly onVisibilityFilterChange: (
+    next: "all" | "visible_only" | "hidden_only",
+  ) => void;
 }
 
 function RenderEnvelopeView({
   data,
   typeKeyFilter,
   onTypeKeyFilterChange,
+  visibilityFilter,
+  onVisibilityFilterChange,
 }: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
@@ -298,16 +315,20 @@ function RenderEnvelopeView({
   for (const n of snapshot.nodes) {
     nodesByTypeKey.set(n.typeKey, (nodesByTypeKey.get(n.typeKey) ?? 0) + 1);
   }
-  // T-F.72: apply the typeKey drill-in filter to the nodes preview
-  // (and re-slice the first-15 cap from the filtered subset). Edges
-  // remain unfiltered — the typeKey axis is about NODE narrowing, not
-  // edge narrowing. If the filter doesn't match any node typeKey, the
-  // filtered list is empty; the operator can click another row in the
-  // rollup or use the Clear chip below the rollup.
-  const filteredNodes =
-    typeKeyFilter == null
-      ? snapshot.nodes
-      : snapshot.nodes.filter((n) => n.typeKey === typeKeyFilter);
+  // T-F.72 + T-F.73: apply the typeKey drill-in filter AND the
+  // visibility drill-in filter to the nodes preview (and re-slice
+  // the first-15 cap from the filtered subset). Edges remain
+  // unfiltered — the typeKey + visibility axes are about NODE
+  // narrowing, not edge narrowing. Both narrowers compose: if both
+  // are active, only nodes matching BOTH are shown.
+  const filteredNodes = snapshot.nodes.filter((n) => {
+    if (typeKeyFilter != null && n.typeKey !== typeKeyFilter) return false;
+    if (visibilityFilter === "visible_only" && !n.visible) return false;
+    if (visibilityFilter === "hidden_only" && n.visible) return false;
+    return true;
+  });
+  const hasAnyFilter =
+    typeKeyFilter != null || visibilityFilter !== "all";
   return (
     <div className="space-y-3" data-testid="graph-lens-render-ok">
       <div className="text-xs text-muted-foreground space-y-0.5">
@@ -346,6 +367,36 @@ function RenderEnvelopeView({
         </p>
       ) : (
         <>
+          <div
+            className="flex items-center gap-2 text-xs"
+            data-testid="graph-lens-visibility-filter-group"
+          >
+            <span className="text-muted-foreground">Show:</span>
+            {(["all", "visible_only", "hidden_only"] as const).map((mode) => {
+              const isActive = visibilityFilter === mode;
+              const label =
+                mode === "all"
+                  ? "All"
+                  : mode === "visible_only"
+                  ? "Visible only"
+                  : "Hidden only";
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`rounded border px-2 py-0.5 ${
+                    isActive
+                      ? "bg-muted/50 border-border"
+                      : "border-transparent hover:underline"
+                  }`}
+                  data-testid={`graph-lens-visibility-filter-${mode}`}
+                  onClick={() => onVisibilityFilterChange(mode)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <div>
             <SectionLabel>By typeKey</SectionLabel>
             <table
@@ -411,8 +462,8 @@ function RenderEnvelopeView({
           <div>
             <SectionLabel>
               Nodes{" "}
-              {typeKeyFilter != null
-                ? `(first 15 of ${filteredNodes.length} matching ${typeKeyFilter})`
+              {hasAnyFilter
+                ? `(first 15 of ${filteredNodes.length} matching filters)`
                 : `(first 15 of ${snapshot.nodes.length})`}
             </SectionLabel>
             <table
@@ -435,7 +486,7 @@ function RenderEnvelopeView({
                       className="py-2 text-center text-muted-foreground italic"
                       data-testid="graph-lens-render-nodes-empty-after-filter"
                     >
-                      No nodes match the active typeKey filter.
+                      No nodes match the active filters.
                     </td>
                   </tr>
                 ) : (

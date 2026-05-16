@@ -59,7 +59,13 @@ describe("Graph Lens browser — typeKey drill-in filter (T-F.72)", () => {
   it("filteredNodes uses the typeKey filter and feeds the nodes preview", () => {
     const src = readPanel();
     expect(src).toMatch(/const\s+filteredNodes\s*=/);
-    expect(src).toMatch(/snapshot\.nodes\.filter\(\(n\)\s*=>\s*n\.typeKey\s*===\s*typeKeyFilter\)/);
+    // After T-F.73, filteredNodes composes typeKey + visibility
+    // filters into a single predicate. The typeKey arm of that
+    // predicate is what this test guards — using a non-greedy
+    // regex so the composition is allowed.
+    expect(src).toMatch(
+      /typeKeyFilter\s*!=\s*null\s*&&\s*n\.typeKey\s*!==\s*typeKeyFilter/,
+    );
     // The preview slices the FILTERED set, not the raw snapshot.
     expect(src).toMatch(/filteredNodes\.slice\(0,\s*15\)/);
   });
