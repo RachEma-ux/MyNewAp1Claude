@@ -354,9 +354,11 @@ export function BasesPanel() {
       refetchOnWindowFocus: false,
     },
   );
-  // Apply remaining typed conditions client-side, then cap to
-  // PREVIEW_LIMIT for display.
-  const previewNotes: readonly (FilterableNote & {
+  // Apply remaining typed conditions client-side. T-F.103
+  // (a.1-narrow) splits this into "all matches in the fetched
+  // sample" + "display slice (first PREVIEW_LIMIT)" so the banner
+  // can report total + truncation state honestly.
+  const previewMatchedAll: readonly (FilterableNote & {
     readonly id: number;
     readonly slug: string;
     readonly title: string;
@@ -374,8 +376,20 @@ export function BasesPanel() {
           }
         >,
         previewDoc,
-      ).slice(0, PREVIEW_LIMIT)
+      )
     : [];
+  const previewNotes = previewMatchedAll.slice(0, PREVIEW_LIMIT);
+  const previewTotalMatchCount = previewMatchedAll.length;
+  const previewTruncatedByDisplay =
+    previewTotalMatchCount > PREVIEW_LIMIT;
+  // The over-sample fetch may itself have been capped by the
+  // server-side `limit ≤ 200` Zod input — that means matches BEYOND
+  // the first 200 rows in the vault are NOT considered. The banner
+  // names this honestly so operators know to narrow filters or
+  // visit the underlying list page.
+  const previewTruncatedByFetchCap =
+    previewQuery.data !== undefined &&
+    previewQuery.data.length === PREVIEW_FETCH_OVER_SAMPLE;
 
   return (
     <div className="space-y-4" data-testid="bases-panel">
@@ -901,6 +915,9 @@ export function BasesPanel() {
                               conditionCount={previewDoc?.conditions.length ?? 0}
                               previewQuery={previewQuery}
                               previewNotes={previewNotes}
+                              totalMatchCount={previewTotalMatchCount}
+                              truncatedByDisplay={previewTruncatedByDisplay}
+                              truncatedByFetchCap={previewTruncatedByFetchCap}
                             />
                           </td>
                         </tr>
@@ -1129,6 +1146,9 @@ function BasePreview({
   conditionCount,
   previewQuery,
   previewNotes,
+  totalMatchCount,
+  truncatedByDisplay,
+  truncatedByFetchCap,
 }: {
   readonly base: { readonly id: number; readonly name: string };
   readonly folderId: number | undefined;
@@ -1161,6 +1181,17 @@ function BasePreview({
     readonly governanceStatus: string;
     readonly updatedAt: string | Date;
   }>;
+  /**
+   * T-F.103 (a.1-narrow): row-count metadata. `totalMatchCount` is
+   * matches in the fetched sample (post-narrow but pre-display
+   * slice). `truncatedByDisplay` is true when totalMatchCount >
+   * PREVIEW_LIMIT (display cap hit). `truncatedByFetchCap` is true
+   * when the server-side over-sample maxed out — matches beyond the
+   * first PREVIEW_FETCH_OVER_SAMPLE vault rows may be missed.
+   */
+  readonly totalMatchCount: number;
+  readonly truncatedByDisplay: boolean;
+  readonly truncatedByFetchCap: boolean;
 }) {
   return (
     <div
@@ -1218,6 +1249,34 @@ function BasePreview({
               enforced keys only.
             </li>
           ) : null}
+          <li data-testid={`bases-row-preview-match-count-${base.id}`}>
+            Matches: <span className="font-mono">{totalMatchCount}</span>
+            {truncatedByDisplay ? (
+              <>
+                {" "}
+                <span
+                  className="text-muted-foreground"
+                  data-testid={`bases-row-preview-truncated-display-${base.id}`}
+                >
+                  (showing first {previewNotes.length} after narrowing;
+                  remaining rows omitted for display).
+                </span>
+              </>
+            ) : null}
+            {truncatedByFetchCap ? (
+              <>
+                {" "}
+                <span
+                  className="text-destructive"
+                  data-testid={`bases-row-preview-truncated-fetch-${base.id}`}
+                >
+                  (fetch over-sample at server cap — matches beyond the
+                  first {200} vault rows may be missed. Narrow filters
+                  or visit the vault list page directly.)
+                </span>
+              </>
+            ) : null}
+          </li>
         </ul>
       </div>
       <div>

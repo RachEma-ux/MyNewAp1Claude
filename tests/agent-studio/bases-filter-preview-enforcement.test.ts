@@ -79,10 +79,16 @@ describe("Bases ζ-preview typed filter enforcement δ-slice (T-F.102 / T-F.2-fi
     );
   });
 
-  it("previewNotes derived from applyFilterDocument(query.data, previewDoc).slice(0, PREVIEW_LIMIT)", () => {
+  it("previewNotes derived from applyFilterDocument(query.data, previewDoc) sliced to PREVIEW_LIMIT (T-F.103 split the single previewNotes into previewMatchedAll + display slice for row-count metadata; previewNotes is the slice)", () => {
     const src = readPanel();
+    // T-F.103 (a.1-narrow) introduced `previewMatchedAll` (full
+    // post-narrow set) + `previewNotes = previewMatchedAll.slice(...)`.
+    // Both expressions exist in the file; assert both.
     expect(src).toMatch(
-      /const\s+previewNotes[\s\S]{0,1000}applyFilterDocument\([\s\S]{0,400}previewQuery\.data[\s\S]{0,400}previewDoc[\s\S]{0,200}\.slice\(0,\s*PREVIEW_LIMIT\)/,
+      /const\s+previewMatchedAll[\s\S]{0,800}applyFilterDocument\([\s\S]{0,400}previewQuery\.data[\s\S]{0,400}previewDoc/,
+    );
+    expect(src).toMatch(
+      /const\s+previewNotes\s*=\s*previewMatchedAll\.slice\(0,\s*PREVIEW_LIMIT\)/,
     );
   });
 
