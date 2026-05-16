@@ -165,3 +165,31 @@ export {
   type MaybeInstallGovernanceLensRunnerResult,
   type MaybeInstallGovernanceLensRunnerWithAsdbOptions,
 } from "./install-governance-lens-runner.js";
+
+export {
+  buildMcpLensSnapshot,
+  clampMcpLensLimit,
+  createMcpLensRunner,
+  isMcpNodeVisibleToViewer,
+  MCP_LENS_ABSOLUTE_LIMIT,
+  MCP_LENS_DEFAULT_LIMIT,
+  type BuildMcpLensSnapshotInput,
+  type CreateMcpLensRunnerDeps,
+  type McpLensReadFn,
+  type McpLensReadParams,
+  type McpLensReadResult,
+  type McpLensToolCallRow,
+} from "./runners/mcp-lens-runner.js";
+
+export {
+  createMcpLensAsdbReader,
+  type CreateMcpLensAsdbReaderOptions,
+} from "./runners/mcp-lens-asdb-reader.js";
+
+export {
+  maybeInstallMcpLensRunner,
+  maybeInstallMcpLensRunnerWithAsdb,
+  type MaybeInstallMcpLensRunnerOptions,
+  type MaybeInstallMcpLensRunnerResult,
+  type MaybeInstallMcpLensRunnerWithAsdbOptions,
+} from "./install-mcp-lens-runner.js";
