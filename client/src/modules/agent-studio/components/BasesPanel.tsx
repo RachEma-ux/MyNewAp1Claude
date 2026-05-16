@@ -31,6 +31,14 @@ import { SectionLabel } from "./ui";
  */
 const BASE_VIEW_KIND = "base" as const;
 const BASES_LIST_LIMIT = 50;
+/**
+ * Closed taxonomy for the bases ownerScope drill-in. Mirrors the
+ * server-side `listVisibleSavedViews` Zod enum
+ * (`ownerScope: z.enum(["mine", "all"]).optional()`). T-F.93 ships
+ * UI surfacing of this existing server input — no server change.
+ */
+const OWNER_SCOPE_VALUES = ["mine", "all"] as const;
+type OwnerScopeFilter = (typeof OWNER_SCOPE_VALUES)[number];
 
 export function BasesPanel() {
   const vaultsQuery = trpc.agentStudio.vault.listMyVaults.useQuery(undefined, {
@@ -46,6 +54,16 @@ export function BasesPanel() {
   // `listVisibleSavedViews` already carry filters / sort / columns
   // JSON.
   const [expandedBaseId, setExpandedBaseId] = useState<number | null>(null);
+  // T-F.93 (T-F.2-γ): ownerScope drill-in — server-side narrowing
+  // through the existing `ownerScope` Zod input. Default is "all"
+  // (no narrowing); operator toggles to "mine" to scope to bases
+  // they own (workspace_shared bases from others drop off).
+  const [ownerScopeFilter, setOwnerScopeFilter] =
+    useState<OwnerScopeFilter>("all");
+  const hasOwnerScopeFilter = ownerScopeFilter !== "all";
+  function clearOwnerScopeFilter() {
+    setOwnerScopeFilter("all");
+  }
   const effectiveVaultId =
     selectedVaultId !== null
       ? selectedVaultId
@@ -59,6 +77,9 @@ export function BasesPanel() {
           vaultId: effectiveVaultId,
           viewKind: BASE_VIEW_KIND,
           limit: BASES_LIST_LIMIT,
+          ...(ownerScopeFilter !== "all"
+            ? { ownerScope: ownerScopeFilter }
+            : {}),
         }
       : (undefined as never),
     {
@@ -141,10 +162,50 @@ export function BasesPanel() {
             Recent bases
             {basesQuery.data
               ? reachedLimit
-                ? ` (first ${BASES_LIST_LIMIT}, newest first)`
-                : ` (${bases.length}, newest first)`
+                ? hasOwnerScopeFilter
+                  ? ` (first ${BASES_LIST_LIMIT} matching scope, newest first)`
+                  : ` (first ${BASES_LIST_LIMIT}, newest first)`
+                : hasOwnerScopeFilter
+                  ? ` (${bases.length} matching scope, newest first)`
+                  : ` (${bases.length}, newest first)`
               : ""}
           </SectionLabel>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div
+              className="flex items-center gap-2"
+              data-testid="bases-owner-scope-filter-group"
+            >
+              <span className="text-muted-foreground">scope:</span>
+              {OWNER_SCOPE_VALUES.map((mode) => {
+                const isActive = ownerScopeFilter === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    data-testid={`bases-owner-scope-filter-${mode}`}
+                    onClick={() => setOwnerScopeFilter(mode)}
+                    className={`rounded px-2 py-0.5 font-mono ${
+                      isActive
+                        ? "bg-muted/50 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/30"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+            {hasOwnerScopeFilter ? (
+              <button
+                type="button"
+                className="ml-auto underline text-muted-foreground"
+                data-testid="bases-clear-owner-scope-filter"
+                onClick={clearOwnerScopeFilter}
+              >
+                Clear filter
+              </button>
+            ) : null}
+          </div>
           {basesQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading bases…</p>
           ) : basesQuery.error ? (
@@ -159,8 +220,24 @@ export function BasesPanel() {
               className="text-sm text-muted-foreground italic"
               data-testid="bases-list-empty"
             >
-              No bases yet in this vault — the create flow lands in a
-              follow-up slice.
+              {hasOwnerScopeFilter ? (
+                <>
+                  No bases match the active scope filter.{" "}
+                  <button
+                    type="button"
+                    className="underline not-italic"
+                    data-testid="bases-empty-state-clear-owner-scope"
+                    onClick={clearOwnerScopeFilter}
+                  >
+                    Clear filter
+                  </button>
+                </>
+              ) : (
+                <>
+                  No bases yet in this vault — the create flow lands in a
+                  follow-up slice.
+                </>
+              )}
             </p>
           ) : (
             <table className="w-full text-xs" data-testid="bases-list">
