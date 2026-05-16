@@ -431,7 +431,63 @@ export interface CagCapabilityPack {
 }
 
 /** Retrofit P5 compile-result enum. */
-export type CagCompileResult = "ok" | "warn" | "error";
+/**
+ * Closed-taxonomy CAG compile result. Promoted to a tuple at T-G.44
+ * so the metadata table + lockstep tests can be authored.
+ */
+export const CAG_COMPILE_RESULTS = ["ok", "warn", "error"] as const;
+export type CagCompileResult = (typeof CAG_COMPILE_RESULTS)[number];
+
+// ============================================================================
+// Per-compile-result operator-facing metadata (T-G.44)
+// ============================================================================
+
+export interface CagCompileResultMetadata {
+  /** Display label rendered in the compile-trace result column. */
+  readonly label: string;
+  /** Short operator-facing description of what this compile result
+   *  implies for the produced block. */
+  readonly description: string;
+  /** Whether a runtime block was successfully produced (true for `ok`
+   *  + `warn`; false for `error`). */
+  readonly producedBlock: boolean;
+  /** Whether the compile process surfaced any operator-actionable
+   *  signal — true for `warn` + `error`; false for `ok` (the clean
+   *  case operators don't need to read). */
+  readonly hasSignal: boolean;
+}
+
+export const CAG_COMPILE_RESULT_METADATA: Readonly<
+  Record<CagCompileResult, CagCompileResultMetadata>
+> = {
+  ok: {
+    label: "Clean",
+    description:
+      "Compile succeeded cleanly — block produced and ready for runtime use. No operator action required.",
+    producedBlock: true,
+    hasSignal: false,
+  },
+  warn: {
+    label: "Warn",
+    description:
+      "Compile succeeded but surfaced warnings — block produced but with caveats (drift, soft-policy hits). Operator should glance.",
+    producedBlock: true,
+    hasSignal: true,
+  },
+  error: {
+    label: "Error",
+    description:
+      "Compile failed — no block produced. Runtime falls back per CAG-required policy. Operator must remediate the pack.",
+    producedBlock: false,
+    hasSignal: true,
+  },
+};
+
+export function getCagCompileResultMetadata(
+  result: CagCompileResult,
+): CagCompileResultMetadata {
+  return CAG_COMPILE_RESULT_METADATA[result];
+}
 
 /** Retrofit P5 governance-verdict enum (D-CAG-RECON-5). */
 export type CagGovernanceVerdict = "cleared" | "warn" | "blocked";
