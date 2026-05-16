@@ -32,6 +32,13 @@ import { SectionLabel } from "./ui";
 const BASE_VIEW_KIND = "base" as const;
 const BASES_LIST_LIMIT = 50;
 /**
+ * T-F.98 (T-F.2-ζ): cap on the apply-filter preview. Smaller than
+ * the bases list cap because the preview is "show me what the base
+ * would render" — operators don't need all 200 notes inline, just a
+ * confidence-check sample.
+ */
+const PREVIEW_LIMIT = 25;
+/**
  * Closed taxonomy for the bases ownerScope drill-in. Mirrors the
  * server-side `listVisibleSavedViews` Zod enum
  * (`ownerScope: z.enum(["mine", "all"]).optional()`). T-F.93 ships
@@ -156,6 +163,17 @@ export function BasesPanel() {
   const [shareErrorBaseId, setShareErrorBaseId] = useState<number | null>(
     null,
   );
+  // T-F.98 (T-F.2-ζ): apply-filter preview. INDEPENDENT of detail /
+  // rename / delete-confirm slices — preview is read-only inspection,
+  // not row mutation. Operator can preview a base while renaming it
+  // (the rename editor lives above the preview row). Only one
+  // preview open at a time across rows (single-id state).
+  //
+  // Filter-language gap is honest: only `filters.folderId` is
+  // enforced today (the one input `vault.listNotes` accepts);
+  // other JSON keys in `filters` are surfaced in the β detail view
+  // but not yet narrowed. The preview banner names this gap.
+  const [previewBaseId, setPreviewBaseId] = useState<number | null>(null);
   const shareMutation =
     trpc.agentStudio.vault.updateSavedView.useMutation({
       onSuccess: () => {
@@ -222,6 +240,54 @@ export function BasesPanel() {
 
   const bases = basesQuery.data ?? [];
   const reachedLimit = bases.length === BASES_LIST_LIMIT;
+  // T-F.98 (T-F.2-ζ): resolve the previewing base's row from the
+  // already-fetched list so we can extract `filters.folderId`. Uses
+  // `find` on the in-memory list — no extra round-trip.
+  const previewBase =
+    previewBaseId !== null
+      ? bases.find((b) => b.id === previewBaseId) ?? null
+      : null;
+  // Parse `filters.folderId` defensively: opaque JSON could carry any
+  // shape; only accept `number` (positive int) to match the server's
+  // `vault.listNotes` Zod input.
+  const previewFolderId: number | undefined =
+    previewBase &&
+    typeof previewBase.filters === "object" &&
+    previewBase.filters !== null &&
+    typeof (previewBase.filters as Record<string, unknown>).folderId ===
+      "number" &&
+    Number.isInteger(
+      (previewBase.filters as Record<string, unknown>).folderId,
+    ) &&
+    ((previewBase.filters as Record<string, unknown>).folderId as number) > 0
+      ? ((previewBase.filters as Record<string, unknown>).folderId as number)
+      : undefined;
+  // Track which non-folderId filter keys are present so the honesty
+  // banner can name them ("base also filters by tag — not yet
+  // enforced in this preview").
+  const unenforcedFilterKeys: readonly string[] =
+    previewBase &&
+    typeof previewBase.filters === "object" &&
+    previewBase.filters !== null
+      ? Object.keys(previewBase.filters as Record<string, unknown>).filter(
+          (k) => k !== "folderId",
+        )
+      : [];
+  const previewQuery = trpc.agentStudio.vault.listNotes.useQuery(
+    previewBaseId !== null && effectiveVaultId !== null
+      ? {
+          vaultId: effectiveVaultId,
+          limit: PREVIEW_LIMIT,
+          ...(previewFolderId !== undefined
+            ? { folderId: previewFolderId }
+            : {}),
+        }
+      : (undefined as never),
+    {
+      enabled: previewBaseId !== null && effectiveVaultId !== null,
+      refetchOnWindowFocus: false,
+    },
+  );
 
   return (
     <div className="space-y-4" data-testid="bases-panel">
@@ -455,6 +521,7 @@ export function BasesPanel() {
                   const isShared = b.visibility === "workspace_shared";
                   const nextShareVisibility: "personal" | "workspace_shared" =
                     isShared ? "personal" : "workspace_shared";
+                  const isPreviewing = previewBaseId === b.id;
                   return (
                     <Fragment key={b.id}>
                       <tr
@@ -520,6 +587,16 @@ export function BasesPanel() {
                               : isShared
                                 ? "Make personal"
                                 : "Share with workspace"}
+                          </button>
+                          <button
+                            type="button"
+                            className="underline text-muted-foreground"
+                            data-testid={`bases-row-preview-${b.id}`}
+                            onClick={() =>
+                              setPreviewBaseId(isPreviewing ? null : b.id)
+                            }
+                          >
+                            {isPreviewing ? "Hide preview" : "Use base"}
                           </button>
                         </td>
                       </tr>
@@ -672,6 +749,21 @@ export function BasesPanel() {
                           </td>
                         </tr>
                       ) : null}
+                      {isPreviewing ? (
+                        <tr data-testid={`bases-row-preview-row-${b.id}`}>
+                          <td
+                            colSpan={6}
+                            className="bg-muted/20 px-3 py-2 text-xs"
+                          >
+                            <BasePreview
+                              base={b}
+                              folderId={previewFolderId}
+                              unenforcedKeys={unenforcedFilterKeys}
+                              previewQuery={previewQuery}
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
                     </Fragment>
                   );
                 })}
@@ -786,6 +878,145 @@ function BaseRowDetail({
           >
             No columns selected — base renders the view-kind defaults.
           </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * T-F.98 (T-F.2-ζ) BasePreview — first "use the base" operator
+ * path. Calls `vault.listNotes` with the base's `filters.folderId`
+ * (the one filter the server understands today) and renders the
+ * matching notes table.
+ *
+ * Honest about the filter-language gap: a banner above the table
+ * names which JSON keys in `filters` are vs aren't enforced. When
+ * the base has `folderId` set, the preview narrows to that folder;
+ * other keys (tag, title-substring, etc.) are listed as "not yet
+ * enforced — preview shows all matches for the enforced keys only".
+ *
+ * Renders a 5-column notes table (id / title / slug / governance /
+ * updated) capped at PREVIEW_LIMIT=25 rows.
+ */
+function BasePreview({
+  base,
+  folderId,
+  unenforcedKeys,
+  previewQuery,
+}: {
+  readonly base: { readonly id: number; readonly name: string };
+  readonly folderId: number | undefined;
+  readonly unenforcedKeys: readonly string[];
+  readonly previewQuery: ReturnType<
+    typeof trpc.agentStudio.vault.listNotes.useQuery
+  >;
+}) {
+  return (
+    <div
+      className="space-y-3"
+      data-testid={`bases-row-preview-body-${base.id}`}
+    >
+      <div data-testid={`bases-row-preview-banner-${base.id}`}>
+        <p className="font-medium">
+          Preview: applying base{" "}
+          <span className="font-mono">{base.name}</span>
+        </p>
+        <ul className="ml-3 list-disc text-muted-foreground">
+          <li>
+            folderId:{" "}
+            {folderId !== undefined ? (
+              <span
+                className="font-mono"
+                data-testid={`bases-row-preview-folder-id-${base.id}`}
+              >
+                {folderId} (enforced)
+              </span>
+            ) : (
+              <span
+                className="font-mono italic"
+                data-testid={`bases-row-preview-folder-id-empty-${base.id}`}
+              >
+                (not set — preview shows all notes in vault)
+              </span>
+            )}
+          </li>
+          {unenforcedKeys.length > 0 ? (
+            <li
+              data-testid={`bases-row-preview-unenforced-${base.id}`}
+            >
+              Other filter keys (
+              <span className="font-mono">
+                {unenforcedKeys.join(", ")}
+              </span>
+              ) — not yet enforced; preview shows matches for the
+              enforced keys only.
+            </li>
+          ) : null}
+        </ul>
+      </div>
+      <div>
+        <p className="font-medium">
+          Matching notes (first {25}, newest first)
+        </p>
+        {previewQuery.isLoading ? (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`bases-row-preview-loading-${base.id}`}
+          >
+            Loading notes…
+          </p>
+        ) : previewQuery.error ? (
+          <p
+            className="text-destructive"
+            data-testid={`bases-row-preview-error-${base.id}`}
+          >
+            Failed to load preview: {previewQuery.error.message}
+          </p>
+        ) : !previewQuery.data || previewQuery.data.length === 0 ? (
+          <p
+            className="text-muted-foreground italic"
+            data-testid={`bases-row-preview-empty-${base.id}`}
+          >
+            No matching notes — the base&apos;s filters narrow to an
+            empty result set in this vault.
+          </p>
+        ) : (
+          <table
+            className="w-full text-xs"
+            data-testid={`bases-row-preview-notes-${base.id}`}
+          >
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <th className="py-1">id</th>
+                <th className="py-1">title</th>
+                <th className="py-1">slug</th>
+                <th className="py-1">governance</th>
+                <th className="py-1">updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previewQuery.data.map((n) => (
+                <tr
+                  key={n.id}
+                  className="border-t border-border"
+                  data-testid={`bases-row-preview-note-${base.id}-${n.id}`}
+                >
+                  <td className="py-1 font-mono">{n.id}</td>
+                  <td className="py-1">{n.title}</td>
+                  <td className="py-1 font-mono text-muted-foreground">
+                    {n.slug}
+                  </td>
+                  <td className="py-1 font-mono text-muted-foreground">
+                    {n.governanceStatus}
+                  </td>
+                  <td className="py-1 font-mono text-muted-foreground">
+                    {new Date(n.updatedAt).toISOString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
