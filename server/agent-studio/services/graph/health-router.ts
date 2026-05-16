@@ -16,6 +16,7 @@ import { getHealthAlertCronStatus } from "./health-alert-cron.js";
 import {
   listOpenHealthAlerts,
   resolveHealthAlertById,
+  runHealthAlertScan,
 } from "./health-alert.js";
 
 const ResolveAlertInput = z.object({
@@ -59,4 +60,20 @@ export const graphHealthRouter = router({
     .mutation(async ({ input }) => {
       return resolveHealthAlertById(input.alertId, "default");
     }),
+
+  /**
+   * T-I.57 — operator-triggered ad-hoc health alert scan. Mirrors
+   * the staleness-check Run-now mutation (T-I.46): runs the same
+   * `runHealthAlertScan` the cron wrapper invokes, without waiting
+   * for the next cron tick. Useful for confirming a freshly-deployed
+   * threshold change or triaging a suspected backend issue.
+   *
+   * Returns the structured scan result so the UI can surface
+   * `decisions.length`, `persisted.raised`, `persisted.resolved`
+   * for the operator-feedback line. Scope pinned to "default" to
+   * match the cron's single-global-scope assumption.
+   */
+  runAlertScan: adminProcedure.mutation(async () => {
+    return runHealthAlertScan({ scope: "default" });
+  }),
 });

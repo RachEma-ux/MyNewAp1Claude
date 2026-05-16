@@ -52,16 +52,19 @@ describe("PR-V1-190 — graph-health admin UI (first consumer)", () => {
       true,
     );
     expect(/case\s+"warning":[\s\S]{0,80}text-amber/.test(src)).toBe(true);
-    // T-I.56: the panel now exposes a single graphHealth mutation
-    // (`resolveAlert` for per-row alert dismissal). Earlier PR-V1-190
-    // shipped read-only and the original assertion pinned that. The
-    // updated invariant pins exactly that one mutation reference so a
-    // regression that re-introduces broader writes still trips.
+    // T-I.56 + T-I.57: the panel now exposes exactly two graphHealth
+    // mutations (`resolveAlert` for per-row alert dismissal, and
+    // `runAlertScan` for the operator-triggered scan). PR-V1-190 shipped
+    // read-only; this invariant pins the exact set so a regression that
+    // re-introduces broader writes still trips.
     const graphHealthMutationCalls =
       src.match(/trpc\.agentStudio\.graphHealth\.[a-zA-Z]+\.useMutation/g) ?? [];
-    expect(graphHealthMutationCalls).toEqual([
-      "trpc.agentStudio.graphHealth.resolveAlert.useMutation",
-    ]);
+    expect(graphHealthMutationCalls.sort()).toEqual(
+      [
+        "trpc.agentStudio.graphHealth.resolveAlert.useMutation",
+        "trpc.agentStudio.graphHealth.runAlertScan.useMutation",
+      ].sort(),
+    );
   });
 
   it("GraphHealthAdminPage mounts the panel", () => {
