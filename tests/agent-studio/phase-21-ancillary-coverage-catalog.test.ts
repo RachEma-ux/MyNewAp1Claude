@@ -200,6 +200,7 @@ const ANCILLARY_TESTS = [
   "summarize-tool-call-traces.test.ts",
   "summarize-canvas-nodes.test.ts",
   "summarize-runtime-runs.test.ts",
+  "summarize-ingestion-jobs.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

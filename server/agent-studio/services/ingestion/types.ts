@@ -182,6 +182,85 @@ export interface IngestionJobRequest {
   requestedBy: number;
 }
 
+/**
+ * Closed-taxonomy ingestion-job status — covers the full row lifecycle
+ * stored in `agsIngestionJobs.status`. The IngestionJobResult union
+ * below is a SUBSET (terminal-only). Promoted to a tuple-derived
+ * constant at T-G.65 so metadata + lockstep + aggregator can iterate.
+ */
+export const INGESTION_JOB_STATUSES = [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "unsupported_type",
+] as const;
+export type IngestionJobStatus =
+  (typeof INGESTION_JOB_STATUSES)[number];
+
+// ============================================================================
+// Per-status operator-facing metadata (T-G.65)
+// ============================================================================
+
+export interface IngestionJobStatusMetadata {
+  /** Display label rendered in the ingestion-jobs ledger UI. */
+  readonly label: string;
+  /** Short operator-facing description of what the status indicates. */
+  readonly description: string;
+  /** Whether the status is terminal (true for succeeded / failed /
+   *  unsupported_type; false for pending / running). */
+  readonly terminal: boolean;
+  /** Whether the status represents a successful ingestion (true for
+   *  `succeeded` only; false for the other 4). */
+  readonly successful: boolean;
+}
+
+export const INGESTION_JOB_STATUS_METADATA: Readonly<
+  Record<IngestionJobStatus, IngestionJobStatusMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Ingestion job is enqueued but the worker has not started parsing — earliest in-flight state.",
+    terminal: false,
+    successful: false,
+  },
+  running: {
+    label: "Running",
+    description:
+      "Worker is actively parsing the source artifact and normalizing extracted units — counters increment during this phase.",
+    terminal: false,
+    successful: false,
+  },
+  succeeded: {
+    label: "Succeeded",
+    description:
+      "Job completed cleanly — artifacts/units/chunks/extractions counters are final and the source is queryable.",
+    terminal: true,
+    successful: true,
+  },
+  failed: {
+    label: "Failed",
+    description:
+      "Job errored during parsing / normalization / extraction — failure_reason captures the diagnostic. Operator may retry.",
+    terminal: true,
+    successful: false,
+  },
+  unsupported_type: {
+    label: "Unsupported Type",
+    description:
+      "Source content-type does not match any registered parser — distinct from `failed` because no parser was actually invoked. Surface to operator to register a new parser.",
+    terminal: true,
+    successful: false,
+  },
+};
+
+export function getIngestionJobStatusMetadata(
+  status: IngestionJobStatus,
+): IngestionJobStatusMetadata {
+  return INGESTION_JOB_STATUS_METADATA[status];
+}
+
 export interface IngestionJobResult {
   jobId: number;
   status: "succeeded" | "failed" | "unsupported_type";
