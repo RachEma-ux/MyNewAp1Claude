@@ -179,6 +179,7 @@ const ANCILLARY_TESTS = [
   "runtime-graph-event-kind-metadata.test.ts",
   "runtime-validation-verdict-metadata.test.ts",
   "graph-skill-risk-level-metadata.test.ts",
+  "runtime-dispatch-result-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
