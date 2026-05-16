@@ -83,17 +83,21 @@ The earlier closure-mission addendum framed all 21 items as "Implemented / Workf
 
 **2026-05-15 session — 54-PR admin-saturation burst (#930–#983):** unrendered-fields audit + aggregate-summary mini-arc + rate/age/distinct-count gauges arc shipped across extensions/region/publish-targets/graph-health/canvas-drain/approval-bus/graph-skill-usage/graph-agent-explain admin surfaces. Main @ `7d97d10c`. Full ledger in V1+ plan §6.1 (rows #930–#983) and tracker §7.
 
-**Next material work (post-2026-05-15):** Executing the remaining execution plan at `/sdcard/Download/agent-studio-native-graph-workspace-remaining-execution-plan.md` (and committed under `docs/implementation/` once T-A.1 is merged). Track sequence:
-- **T-A** — doc-drift reconciliation (this PR)
-- **T-C** — CLAUDE.md Non-Build List reconciliation
-- **T-B** — V1+ saturation finish-out (G3 evidence, MR caller tail, concrete lane hooks, OL bootstrap call site)
-- **T-D** — Phase 23 Graph Quality Agent + Semantic Enrichment + self-correction loop (12–18 PRs)
-- **T-E** — Phase 20.5 Code Graph Parser Spike (3–4 PRs)
-- **T-F** — Phase 24 Bases MVP + Lens registry + Impact Analysis (14–20 PRs)
-- **T-G** — Phase 25 Institutional/Code/Security/Recommendation graphs (18–25 PRs, gated on T-E)
-- **T-H** — V2 advanced + Aura migration (operator approval required)
+**2026-05-15 → 2026-05-16 continuation — ~188-PR burst (#984–#1171):** four-sub-arc continuous-execution burst opened all 7 tracks of the remaining-execution-plan and reached the **100-table per-kind metadata canonization milestone** at PR #1169 (T-G.56). Sub-arc breakdown:
 
-Previously listed "next material work" items (MR caller-migration sub-arc, concrete lane hooks, App.tsx/main.tsx OL bootstrap call site, y-protocols framing) now belong to T-B saturation finish-out.
+1. **#984–#1011 (28 PRs)** — Remaining-plan track openings: T-A / T-C / T-D / T-E / T-F / T-G / T-I all received first slices. Lens-stack boot-wired @ #1006 = `4d36b89`. PR #1000 milestone.
+2. **#1012–#1090 (79 PRs)** — Phase 22 closed-taxonomy emission rollout: T-I.4 audit + `recordFailureStateEvent` bridge live + 11/25 failure-state kinds emitted via the closed-taxonomy contract + 14 retention mini-arcs / dashboard panels / docs SOUs.
+3. **#1091–#1135 (45 PRs)** — Per-kind UI metadata canonization first wave: 44 metadata tables across G/I/D/F/A/B/C/E/H/L/V/X tracks. Pattern canonized as `X_METADATA: Readonly<Record<XKind, XMetadata>>` with `label` + `description` + 1–3 closed-classification fields + lockstep tests + ancillary catalog row + docs §7 table row.
+4. **#1136–#1171 (36 PRs)** — Post-compaction continuation reaching 100-table milestone at #1169 / T-G.56 — T-S.19–22, T-E.5–6, T-A.11–14, T-D.13–15, T-X.4, T-G.37–G.58. Every closed-taxonomy `as const` array AND every 2+-member literal union in `server/agent-studio/services/` and `shared/` now has an operator-facing metadata table OR is documented as having no reasonable UI mapping.
+
+Full sub-arc summary in V1+ plan §6.1.bis (added by T-A.1 / PR #1172). Per-PR ledger in `~/.claude/projects/-root/memory/project_v1_plus_session_2026_05_15.md` (lessons 1–28).
+
+**Next material work (post-#1171):** The per-kind metadata arc is **saturated**. Remaining-plan candidate next slices are:
+- **T-B.4** — Concrete extension lane hooks (retrieve / assemble / compose) — 3-PR ship, real implementation work (each lane plugs into RAC retrieval / assembler / composer).
+- **T-D / T-E / T-F / T-G runtime work** — runtime slices that move past the now-saturated contract / metadata layer into actual lens / scanner / parser execution. Each requires DB I/O, operator gating, or external integration (per the §201 "pause-and-surface" deferral memo).
+- **T-A / T-C continued doc sweep** — refresh chatgpt-graph-workspace-progress-tracker, CLAUDE.md Non-Build List reconciliation, additional plan-doc updates.
+
+Historical "next material work" items (MR caller-migration sub-arc, concrete lane hooks, App.tsx/main.tsx OL bootstrap call site, y-protocols framing) have either landed in the burst above or remain assigned to T-B.
 
 The historical (pre-strict-audit) recovery context follows.
 
