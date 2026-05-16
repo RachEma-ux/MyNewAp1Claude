@@ -285,6 +285,7 @@ runtime catches up.
 | `rac-readiness-status-metadata.test.ts` | `shared/export-candidate` — `RAC_READINESS_STATUS_METADATA` (3-entry per-status label + description + allowsExport + requiresInvestigation booleans for ready/degraded/blocked; also promotes `RAC_READINESS_STATUSES` closed-tuple) | T-A.13 / #1161 |
 | `marketplace-item-source-metadata.test.ts` | `services/marketplace` — `MARKETPLACE_ITEM_SOURCE_METADATA` (3-entry per-source label + description + isFirstParty + isAdvertised booleans for local/imported/published; also promotes `MARKETPLACE_ITEM_SOURCES` closed-tuple) | T-G.52 / #1162 |
 | `conflict-behavior-metadata.test.ts` | `services/marketplace-installer` — `CONFLICT_BEHAVIOR_METADATA` (3-entry per-behavior label + description + producesNewRecord + preservesExisting booleans for skip/overwrite/rename; also promotes `CONFLICT_BEHAVIORS` closed-tuple) | T-G.53 / #1163 |
+| `http-method-metadata.test.ts` | `services/publish-targets/http-pusher` — `HTTP_METHOD_METADATA` (3-entry per-method label + description + isCreate + isIdempotent booleans for POST/PUT/PATCH; also promotes `HTTP_METHODS` closed-tuple) | T-G.54 / #1164 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
