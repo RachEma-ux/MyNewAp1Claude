@@ -80,14 +80,100 @@ import {
   agsCagBlockRuntimeUsages,
 } from "../../../drizzle/tables/agent-studio-graph-promotion.js";
 
-export type RuntimeRunStatus =
-  | "queued"
-  | "pending"
-  | "running"
-  | "awaiting_approval"
-  | "completed"
-  | "failed"
-  | "cancelled";
+/**
+ * Closed-taxonomy `agsRuntimeRuns.status` ladder. Promoted from a
+ * literal union to a tuple-derived constant at T-G.64 so the
+ * metadata table + lockstep tests + aggregator can iterate the
+ * values without re-declaring them.
+ */
+export const RUNTIME_RUN_STATUSES = [
+  "queued",
+  "pending",
+  "running",
+  "awaiting_approval",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+export type RuntimeRunStatus = (typeof RUNTIME_RUN_STATUSES)[number];
+
+// ============================================================================
+// Per-status operator-facing metadata (T-G.64)
+// ============================================================================
+
+export interface RuntimeRunStatusMetadata {
+  /** Display label rendered in the runtime-runs ledger UI. */
+  readonly label: string;
+  /** Short operator-facing description of what the status means. */
+  readonly description: string;
+  /** Whether the status is terminal (true for completed / failed /
+   *  cancelled — sweep-eligible; false for queued / pending /
+   *  running / awaiting_approval — in-flight). */
+  readonly terminal: boolean;
+  /** Whether the run reached a successful outcome (true for
+   *  `completed` only). */
+  readonly successful: boolean;
+}
+
+export const RUNTIME_RUN_STATUS_METADATA: Readonly<
+  Record<RuntimeRunStatus, RuntimeRunStatusMetadata>
+> = {
+  queued: {
+    label: "Queued",
+    description:
+      "Run is enqueued but the runtime worker has not picked it up yet — earliest in-flight state.",
+    terminal: false,
+    successful: false,
+  },
+  pending: {
+    label: "Pending",
+    description:
+      "Run is initializing — context assembly / pre-flight checks in progress. No tool dispatches yet.",
+    terminal: false,
+    successful: false,
+  },
+  running: {
+    label: "Running",
+    description:
+      "Run is actively dispatching tool calls / streaming model responses — the lion's share of runtime wall-clock lives here.",
+    terminal: false,
+    successful: false,
+  },
+  awaiting_approval: {
+    label: "Awaiting Approval",
+    description:
+      "Run paused at a critical-approval gate. Resumes once an approver acts; counts against approval-aging telemetry.",
+    terminal: false,
+    successful: false,
+  },
+  completed: {
+    label: "Completed",
+    description:
+      "Run finished cleanly — terminal success. Trace is preserved through retention window; runtime artifacts garbage-collected after.",
+    terminal: true,
+    successful: true,
+  },
+  failed: {
+    label: "Failed",
+    description:
+      "Run terminated with an error — trace row carries the failure reason. Operator may retry or inspect the stack.",
+    terminal: true,
+    successful: false,
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "Run was cancelled by the operator or upstream system before completion. Terminal but distinct from `failed`.",
+    terminal: true,
+    successful: false,
+  },
+};
+
+export function getRuntimeRunStatusMetadata(
+  status: RuntimeRunStatus,
+): RuntimeRunStatusMetadata {
+  return RUNTIME_RUN_STATUS_METADATA[status];
+}
 
 /** Default terminal statuses pruned by a sweep. */
 const DEFAULT_TERMINAL_STATUSES: readonly RuntimeRunStatus[] = [
