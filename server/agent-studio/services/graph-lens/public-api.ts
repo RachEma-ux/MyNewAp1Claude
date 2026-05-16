@@ -305,3 +305,31 @@ export {
   type MaybeInstallGraphSkillLensRunnerResult,
   type MaybeInstallGraphSkillLensRunnerWithAsdbOptions,
 } from "./install-graph-skill-lens-runner.js";
+
+export {
+  buildInstitutionalMemoryLensSnapshot,
+  clampInstitutionalMemoryLensLimit,
+  createInstitutionalMemoryLensRunner,
+  isInstitutionalMemoryNodeVisibleToViewer,
+  INSTITUTIONAL_MEMORY_LENS_ABSOLUTE_LIMIT,
+  INSTITUTIONAL_MEMORY_LENS_DEFAULT_LIMIT,
+  type BuildInstitutionalMemoryLensSnapshotInput,
+  type CreateInstitutionalMemoryLensRunnerDeps,
+  type InstitutionalMemoryLensAgentRow,
+  type InstitutionalMemoryLensReadFn,
+  type InstitutionalMemoryLensReadParams,
+  type InstitutionalMemoryLensReadResult,
+} from "./runners/institutional-memory-lens-runner.js";
+
+export {
+  createInstitutionalMemoryLensAsdbReader,
+  type CreateInstitutionalMemoryLensAsdbReaderOptions,
+} from "./runners/institutional-memory-lens-asdb-reader.js";
+
+export {
+  maybeInstallInstitutionalMemoryLensRunner,
+  maybeInstallInstitutionalMemoryLensRunnerWithAsdb,
+  type MaybeInstallInstitutionalMemoryLensRunnerOptions,
+  type MaybeInstallInstitutionalMemoryLensRunnerResult,
+  type MaybeInstallInstitutionalMemoryLensRunnerWithAsdbOptions,
+} from "./install-institutional-memory-lens-runner.js";
