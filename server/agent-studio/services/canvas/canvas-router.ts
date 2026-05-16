@@ -52,7 +52,7 @@ const CreateCanvasInputSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().optional(),
   createdByUserId: z.number().int().positive().optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 const CreateCanvasNodeInputSchema = z.object({
@@ -63,7 +63,7 @@ const CreateCanvasNodeInputSchema = z.object({
   y: z.number().optional(),
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 const UpdateCanvasNodeInputSchema = z.object({
@@ -74,7 +74,7 @@ const UpdateCanvasNodeInputSchema = z.object({
   y: z.number().optional(),
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  data: z.record(z.unknown()).nullable().optional(),
+  data: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 const CreateCanvasEdgeInputSchema = z.object({
@@ -82,7 +82,7 @@ const CreateCanvasEdgeInputSchema = z.object({
   sourceCanvasNodeId: z.number().int().positive(),
   targetCanvasNodeId: z.number().int().positive(),
   relationshipKind: z.string().min(1).max(80).optional(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const canvasRouter = router({
