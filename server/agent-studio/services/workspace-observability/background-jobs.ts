@@ -42,12 +42,27 @@ export class JobNotFoundError extends Error {
   }
 }
 
-export type JobStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
+/**
+ * Closed-taxonomy background-job status. Promoted from literal union
+ * to tuple-derived constant at T-I.35 so the aggregator + lockstep
+ * tests can iterate.
+ */
+export const BACKGROUND_JOB_STATUSES = [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+export type JobStatus = (typeof BACKGROUND_JOB_STATUSES)[number];
+
+/**
+ * Terminal statuses (sweep-eligible). Mirrors the metadata `.terminal`
+ * field that would live on a per-status metadata table — kept inline
+ * because the metadata table itself is deferred.
+ */
+export const TERMINAL_BACKGROUND_JOB_STATUSES: ReadonlySet<JobStatus> =
+  new Set(["completed", "failed", "cancelled"]);
 
 export interface EnqueueJobInput {
   readonly jobKind: string;
