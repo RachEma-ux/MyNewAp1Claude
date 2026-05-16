@@ -67,25 +67,26 @@ describe("Bases apply-filter preview ζ-slice (T-F.98 / T-F.2-ζ)", () => {
     );
   });
 
-  it("folderId is defensively parsed — only accept positive int from opaque JSON", () => {
+  it("folderId is extracted from the typed FilterDocument (T-F.102 δ moved from raw JSON parsing to extractFolderIdConstraint)", () => {
     const src = readPanel();
+    // T-F.102 (δ) replaced the raw-JSON typeof/Number.isInteger
+    // defensive parsing with the shared/ helper. The defensive
+    // checks now live in `parseFilterDocument` itself (covered by
+    // `vault-filter-language.test.ts`). Here we assert the new
+    // extraction path.
     expect(src).toMatch(
-      /previewFolderId[\s\S]{0,200}typeof\s+previewBase\.filters\s*===\s*"object"/,
-    );
-    expect(src).toMatch(
-      /typeof\s+\(previewBase\.filters\s+as\s+Record<string,\s*unknown>\)\.folderId\s*===\s*"number"/,
-    );
-    expect(src).toMatch(/Number\.isInteger/);
-  });
-
-  it("unenforced filter keys are derived (Object.keys minus folderId) for the honesty banner", () => {
-    const src = readPanel();
-    expect(src).toMatch(
-      /unenforcedFilterKeys[\s\S]{0,300}Object\.keys\(previewBase\.filters[\s\S]{0,80}\.filter\(\s*\(k\)\s*=>\s*k\s*!==\s*"folderId"/,
+      /const\s+previewFolderId[\s\S]{0,200}extractFolderIdConstraint\(previewDoc\)/,
     );
   });
 
-  it("previewQuery uses vault.listNotes with conditional folderId spread + gating predicate", () => {
+  it("unenforced filter keys gate on docParsed: empty when V1-doc parses (δ enforces all conditions); falls back to Object.keys when doc is un-parsable", () => {
+    const src = readPanel();
+    expect(src).toMatch(
+      /const\s+unenforcedFilterKeys[\s\S]{0,400}previewDoc\s*!==\s*null\s*\?\s*\[\][\s\S]{0,400}Object\.keys\(previewBase\.filters/,
+    );
+  });
+
+  it("previewQuery uses vault.listNotes with conditional folderId spread + gating predicate (limit cap bumped to PREVIEW_FETCH_OVER_SAMPLE in δ for client-side narrowing room)", () => {
     const src = readPanel();
     expect(src).toMatch(
       /previewQuery\s*=\s*trpc\.agentStudio\.vault\.listNotes\.useQuery/,
@@ -112,7 +113,7 @@ describe("Bases apply-filter preview ζ-slice (T-F.98 / T-F.2-ζ)", () => {
       /isPreviewing\s*\?\s*\([\s\S]{0,400}data-testid=\{`bases-row-preview-row-\$\{b\.id\}`\}/,
     );
     expect(src).toMatch(
-      /<BasePreview[\s\S]{0,300}base=\{b\}[\s\S]{0,200}folderId=\{previewFolderId\}[\s\S]{0,200}unenforcedKeys=\{unenforcedFilterKeys\}[\s\S]{0,200}previewQuery=\{previewQuery\}/,
+      /<BasePreview[\s\S]{0,600}base=\{b\}[\s\S]{0,200}folderId=\{previewFolderId\}[\s\S]{0,200}unenforcedKeys=\{unenforcedFilterKeys\}[\s\S]{0,400}previewQuery=\{previewQuery\}/,
     );
   });
 

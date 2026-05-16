@@ -23,7 +23,14 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SectionLabel } from "./ui";
-import { FilterDocumentSchema } from "@shared/bases-filter-language";
+import {
+  FilterDocumentSchema,
+  parseFilterDocument,
+  applyFilterDocument,
+  extractFolderIdConstraint,
+  type FilterDocument,
+  type FilterableNote,
+} from "@shared/bases-filter-language";
 
 /**
  * Discriminator for the `agsVaultSavedViews.viewKind` column. Kept
@@ -39,6 +46,22 @@ const BASES_LIST_LIMIT = 50;
  * confidence-check sample.
  */
 const PREVIEW_LIMIT = 25;
+/**
+ * T-F.102 (T-F.2-filter-δ): server-side fetch over-sample for the
+ * preview path. The server-side `vault.listNotes` can enforce
+ * `folderId` only; remaining V1 conditions narrow client-side. To
+ * avoid the "first 25 then narrow to N" pathological case (which
+ * would silently drop matches), fetch up to the server's max
+ * (`vault.listNotes` accepts `limit ≤ 200`), apply the typed
+ * conditions client-side, then slice to PREVIEW_LIMIT for display.
+ *
+ * The over-sample is honest: if the matching set exceeds 200 even
+ * after server-side folderId narrowing, the operator sees the
+ * first 200's narrow result, NOT a randomly-sampled subset. A
+ * future server-side query builder (V1.5) eliminates the
+ * over-sample by pushing all conditions to the DB.
+ */
+const PREVIEW_FETCH_OVER_SAMPLE = 200;
 /**
  * Closed taxonomy for the bases ownerScope drill-in. Mirrors the
  * server-side `listVisibleSavedViews` Zod enum
@@ -287,37 +310,40 @@ export function BasesPanel() {
     previewBaseId !== null
       ? bases.find((b) => b.id === previewBaseId) ?? null
       : null;
-  // Parse `filters.folderId` defensively: opaque JSON could carry any
-  // shape; only accept `number` (positive int) to match the server's
-  // `vault.listNotes` Zod input.
+  // T-F.102 (T-F.2-filter-δ): parse the previewing base's filters
+  // into a typed FilterDocument once per render. Null means
+  // "couldn't validate against V1 schema (or legacy folderId
+  // fallback)"; consumers treat null as match-all.
+  const previewDoc: FilterDocument | null = previewBase
+    ? parseFilterDocument(previewBase.filters)
+    : null;
+  // folderId is the only condition the server can enforce. Pulled
+  // from the typed doc so legacy `{ folderId: N }` and typed
+  // `{ version: 1, conditions: [...] }` both project transparently.
   const previewFolderId: number | undefined =
-    previewBase &&
-    typeof previewBase.filters === "object" &&
-    previewBase.filters !== null &&
-    typeof (previewBase.filters as Record<string, unknown>).folderId ===
-      "number" &&
-    Number.isInteger(
-      (previewBase.filters as Record<string, unknown>).folderId,
-    ) &&
-    ((previewBase.filters as Record<string, unknown>).folderId as number) > 0
-      ? ((previewBase.filters as Record<string, unknown>).folderId as number)
-      : undefined;
-  // Track which non-folderId filter keys are present so the honesty
-  // banner can name them ("base also filters by tag — not yet
-  // enforced in this preview").
+    extractFolderIdConstraint(previewDoc) ?? undefined;
+  // When the doc parses, ALL V1 keys are enforced client-side via
+  // `applyFilterDocument` — the unenforced-keys list shrinks to
+  // zero. When the doc DOESN'T parse (operator wrote invalid JSON
+  // into the filters column), fall back to T-F.98 behavior: list
+  // the unparseable keys so the operator sees the gap.
   const unenforcedFilterKeys: readonly string[] =
-    previewBase &&
-    typeof previewBase.filters === "object" &&
-    previewBase.filters !== null
-      ? Object.keys(previewBase.filters as Record<string, unknown>).filter(
-          (k) => k !== "folderId",
-        )
-      : [];
+    previewDoc !== null
+      ? []
+      : previewBase &&
+          typeof previewBase.filters === "object" &&
+          previewBase.filters !== null
+        ? Object.keys(previewBase.filters as Record<string, unknown>).filter(
+            (k) => k !== "folderId",
+          )
+        : [];
   const previewQuery = trpc.agentStudio.vault.listNotes.useQuery(
     previewBaseId !== null && effectiveVaultId !== null
       ? {
           vaultId: effectiveVaultId,
-          limit: PREVIEW_LIMIT,
+          // Over-sample server-side so client-side narrowing has
+          // room to work; final display caps at PREVIEW_LIMIT.
+          limit: PREVIEW_FETCH_OVER_SAMPLE,
           ...(previewFolderId !== undefined
             ? { folderId: previewFolderId }
             : {}),
@@ -328,6 +354,28 @@ export function BasesPanel() {
       refetchOnWindowFocus: false,
     },
   );
+  // Apply remaining typed conditions client-side, then cap to
+  // PREVIEW_LIMIT for display.
+  const previewNotes: readonly (FilterableNote & {
+    readonly id: number;
+    readonly slug: string;
+    readonly title: string;
+    readonly governanceStatus: string;
+    readonly updatedAt: string | Date;
+  })[] = previewQuery.data
+    ? applyFilterDocument(
+        previewQuery.data as ReadonlyArray<
+          FilterableNote & {
+            readonly id: number;
+            readonly slug: string;
+            readonly title: string;
+            readonly governanceStatus: string;
+            readonly updatedAt: string | Date;
+          }
+        >,
+        previewDoc,
+      ).slice(0, PREVIEW_LIMIT)
+    : [];
 
   return (
     <div className="space-y-4" data-testid="bases-panel">
@@ -849,7 +897,10 @@ export function BasesPanel() {
                               base={b}
                               folderId={previewFolderId}
                               unenforcedKeys={unenforcedFilterKeys}
+                              docParsed={previewDoc !== null}
+                              conditionCount={previewDoc?.conditions.length ?? 0}
                               previewQuery={previewQuery}
+                              previewNotes={previewNotes}
                             />
                           </td>
                         </tr>
@@ -1074,14 +1125,42 @@ function BasePreview({
   base,
   folderId,
   unenforcedKeys,
+  docParsed,
+  conditionCount,
   previewQuery,
+  previewNotes,
 }: {
   readonly base: { readonly id: number; readonly name: string };
   readonly folderId: number | undefined;
   readonly unenforcedKeys: readonly string[];
+  /**
+   * T-F.102 (T-F.2-filter-δ): `true` when the previewing base's
+   * `filters` JSON parses against the V1 FilterDocumentSchema (or
+   * the legacy `{ folderId }` shape). When `true`, ALL V1
+   * conditions are enforced client-side via `applyFilterDocument`,
+   * so `unenforcedKeys` is empty and the banner copy reflects
+   * "applying V1 filter document" rather than "only folderId
+   * enforced".
+   */
+  readonly docParsed: boolean;
+  /** Number of conditions in the parsed V1 doc (0 when un-parsed). */
+  readonly conditionCount: number;
   readonly previewQuery: ReturnType<
     typeof trpc.agentStudio.vault.listNotes.useQuery
   >;
+  /**
+   * T-F.102 (T-F.2-filter-δ): client-side-narrowed result.
+   * Distinct from `previewQuery.data` (which is the over-sample
+   * fetch BEFORE narrowing). The notes table renders from this
+   * post-narrow list, capped at PREVIEW_LIMIT.
+   */
+  readonly previewNotes: ReadonlyArray<{
+    readonly id: number;
+    readonly slug: string;
+    readonly title: string;
+    readonly governanceStatus: string;
+    readonly updatedAt: string | Date;
+  }>;
 }) {
   return (
     <div
@@ -1094,6 +1173,21 @@ function BasePreview({
           <span className="font-mono">{base.name}</span>
         </p>
         <ul className="ml-3 list-disc text-muted-foreground">
+          {docParsed ? (
+            <li data-testid={`bases-row-preview-doc-parsed-${base.id}`}>
+              V1 filter document: {conditionCount} condition
+              {conditionCount === 1 ? "" : "s"} (all enforced — folder
+              narrowing server-side, remaining conditions narrowed
+              client-side after the {`${"vault.listNotes"}`} fetch).
+            </li>
+          ) : (
+            <li data-testid={`bases-row-preview-doc-unparsed-${base.id}`}>
+              Filters could NOT be parsed against the V1 schema —
+              preview falls back to legacy folderId-only narrowing.
+              Edit the base&apos;s filters to a V1 document for
+              full enforcement.
+            </li>
+          )}
           <li>
             folderId:{" "}
             {folderId !== undefined ? (
@@ -1144,7 +1238,7 @@ function BasePreview({
           >
             Failed to load preview: {previewQuery.error.message}
           </p>
-        ) : !previewQuery.data || previewQuery.data.length === 0 ? (
+        ) : previewNotes.length === 0 ? (
           <p
             className="text-muted-foreground italic"
             data-testid={`bases-row-preview-empty-${base.id}`}
@@ -1167,7 +1261,7 @@ function BasePreview({
               </tr>
             </thead>
             <tbody>
-              {previewQuery.data.map((n) => (
+              {previewNotes.map((n) => (
                 <tr
                   key={n.id}
                   className="border-t border-border"
