@@ -303,15 +303,110 @@ export function getCagPackActorTypeMetadata(
  *
  * READ from the MCP manifest (D-TOOL-2). Never derived inside CAG.
  */
-export type ToolRiskClass =
-  | "read_only"
-  | "write"
-  | "external_side_effect"
-  | "destructive"
-  | "credential_sensitive"
-  | "code_execution"
-  | "governance_sensitive"
-  | "quarantined";
+/**
+ * Closed-taxonomy tool risk class. Promoted to a tuple at T-G.46 so
+ * the metadata table + lockstep tests can be authored.
+ */
+export const TOOL_RISK_CLASSES = [
+  "read_only",
+  "write",
+  "external_side_effect",
+  "destructive",
+  "credential_sensitive",
+  "code_execution",
+  "governance_sensitive",
+  "quarantined",
+] as const;
+export type ToolRiskClass = (typeof TOOL_RISK_CLASSES)[number];
+
+// ============================================================================
+// Per-risk-class operator-facing metadata (T-G.46)
+// ============================================================================
+
+export interface ToolRiskClassMetadata {
+  /** Display label rendered in the tool catalog risk-class chip. */
+  readonly label: string;
+  /** Short operator-facing description of what this risk class means
+   *  for dispatch policy. */
+  readonly description: string;
+  /** Whether dispatch typically routes through the approval gate at
+   *  this risk class (true for everything except `read_only`; the
+   *  read-only class is always permitted without operator approval). */
+  readonly requiresApproval: boolean;
+  /** Whether tools in this class mutate state outside the agent's
+   *  in-memory world (true for `write` / `external_side_effect` /
+   *  `destructive`; false for read-only / code-execution /
+   *  credential-sensitive / governance-sensitive / quarantined which
+   *  are gated for other reasons). */
+  readonly mutatesExternalState: boolean;
+}
+
+export const TOOL_RISK_CLASS_METADATA: Readonly<
+  Record<ToolRiskClass, ToolRiskClassMetadata>
+> = {
+  read_only: {
+    label: "Read-only",
+    description:
+      "Tool only reads state — no mutation, no side effect. Always permitted; never routes through the approval gate.",
+    requiresApproval: false,
+    mutatesExternalState: false,
+  },
+  write: {
+    label: "Write",
+    description:
+      "Tool writes local workspace state — files, drafts, in-platform records. Requires approval; reversible at the source.",
+    requiresApproval: true,
+    mutatesExternalState: true,
+  },
+  external_side_effect: {
+    label: "External Side Effect",
+    description:
+      "Tool calls outward — emails, third-party APIs, webhooks. Requires approval; effects may not be reversible.",
+    requiresApproval: true,
+    mutatesExternalState: true,
+  },
+  destructive: {
+    label: "Destructive",
+    description:
+      "Tool deletes or hard-overrides — file removal, account deletion, database drops. Requires approval; irrecoverable.",
+    requiresApproval: true,
+    mutatesExternalState: true,
+  },
+  credential_sensitive: {
+    label: "Credential Sensitive",
+    description:
+      "Tool touches credentials — reads / rotates / installs secrets. Requires approval to avoid covert credential exposure.",
+    requiresApproval: true,
+    mutatesExternalState: false,
+  },
+  code_execution: {
+    label: "Code Execution",
+    description:
+      "Tool executes arbitrary code — sandboxed per D-SBX-3 (`node:vm`). Requires approval before the sandbox runs.",
+    requiresApproval: true,
+    mutatesExternalState: false,
+  },
+  governance_sensitive: {
+    label: "Governance Sensitive",
+    description:
+      "Tool touches governance state — approval records, policy decisions, audit trails. Requires approval to prevent self-modification.",
+    requiresApproval: true,
+    mutatesExternalState: false,
+  },
+  quarantined: {
+    label: "Quarantined",
+    description:
+      "Tool's risk class is not yet classified — refused at dispatch until an operator promotes it to a known class.",
+    requiresApproval: true,
+    mutatesExternalState: false,
+  },
+};
+
+export function getToolRiskClassMetadata(
+  c: ToolRiskClass,
+): ToolRiskClassMetadata {
+  return TOOL_RISK_CLASS_METADATA[c];
+}
 
 /**
  * Capability pack content — the JSON written to
