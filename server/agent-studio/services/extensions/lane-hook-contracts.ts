@@ -38,6 +38,59 @@ export type ContractedExtensionLane =
   (typeof CONTRACTED_EXTENSION_LANES)[number];
 
 // ============================================================================
+// Per-contracted-lane operator-facing metadata (T-X.4)
+// ============================================================================
+
+export interface ContractedExtensionLaneMetadata {
+  /** Display label rendered in the extension-manifest contract-detail
+   *  pane. */
+  readonly label: string;
+  /** Short operator-facing description of what the typed contract for
+   *  this lane enforces on extension authors. */
+  readonly description: string;
+  /** Stable RAC pipeline order index — mirrors
+   *  `EXTENSION_CAPABILITY_LANE_METADATA[lane].pipelineOrder` for the
+   *  contracted subset (retrieve=1 → assemble=2 → compose=3). */
+  readonly pipelineOrder: 1 | 2 | 3;
+  /** Whether this lane produces extension-contributed chunks that
+   *  must carry `ContractedChunkProvenance` (true for `retrieve` only;
+   *  `assemble` / `compose` reshape existing chunks). */
+  readonly producesContributedChunks: boolean;
+}
+
+export const CONTRACTED_EXTENSION_LANE_METADATA: Readonly<
+  Record<ContractedExtensionLane, ContractedExtensionLaneMetadata>
+> = {
+  retrieve: {
+    label: "Retrieve",
+    description:
+      "Typed contract: extension yields ContractedChunkProvenance-shaped retrieval chunks that the existing retrieval-filter governs without special-casing.",
+    pipelineOrder: 1,
+    producesContributedChunks: true,
+  },
+  assemble: {
+    label: "Assemble",
+    description:
+      "Typed contract: extension receives the assembled prompt block and yields a transformed block — text-in / text-out reshape only.",
+    pipelineOrder: 2,
+    producesContributedChunks: false,
+  },
+  compose: {
+    label: "Compose",
+    description:
+      "Typed contract: extension receives the model's composed answer and yields a post-processed answer (citation rewrites, redactions, formatters).",
+    pipelineOrder: 3,
+    producesContributedChunks: false,
+  },
+};
+
+export function getContractedExtensionLaneMetadata(
+  lane: ContractedExtensionLane,
+): ContractedExtensionLaneMetadata {
+  return CONTRACTED_EXTENSION_LANE_METADATA[lane];
+}
+
+// ============================================================================
 // Retrieve lane contract
 // ============================================================================
 

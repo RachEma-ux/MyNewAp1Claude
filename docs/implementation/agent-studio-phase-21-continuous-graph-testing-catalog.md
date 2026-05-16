@@ -267,6 +267,7 @@ runtime catches up.
 | `forbidden-export-candidate-key-metadata.test.ts` | `shared/export-candidate` — `FORBIDDEN_EXPORT_CANDIDATE_KEY_METADATA` (14-entry per-forbidden-key label + description + leakClass (agent_studio_internal/release_internal/draft_internal/env_handoff) + isCredentialDirect booleans for providerConfig/apiKey/apiKeyEnvVar/secret/secrets/credentials/bearerToken/releaseNotes/approvalStateJson/systemInstructions/roleInstructions/envVar/env/process; also promotes `ForbiddenExportCandidateKey` type alias) | T-E.6 / #1143 |
 | `rac-planner-mode-family-metadata.test.ts` | `services/rac/planner-mode` — `RAC_PLANNER_MODE_FAMILY_METADATA` (6-entry per-family label + description + retrievalKind (none/cag/knowledge/graph/hybrid) + usesGraph booleans for no_retrieval/cag_only/knowledge_retrieval/hybrid_cag/graphrag_pure/graphrag_hybrid) | T-A.11 / #1144 |
 | `rac-source-retrieval-mechanism-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_RETRIEVAL_MECHANISM_METADATA` (5-entry per-mechanism label + description + requiresEmbeddings + callsExternal booleans for precompiled/vector/graph/external_api/structured) | T-A.12 / #1145 |
+| `contracted-extension-lane-metadata.test.ts` | `services/extensions/lane-hook-contracts` — `CONTRACTED_EXTENSION_LANE_METADATA` (3-entry per-contracted-lane label + description + pipelineOrder (1..3) + producesContributedChunks booleans for retrieve/assemble/compose) | T-X.4 / #1146 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
