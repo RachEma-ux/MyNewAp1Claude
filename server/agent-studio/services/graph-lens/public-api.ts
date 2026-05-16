@@ -221,3 +221,31 @@ export {
   type MaybeInstallCagLensRunnerResult,
   type MaybeInstallCagLensRunnerWithAsdbOptions,
 } from "./install-cag-lens-runner.js";
+
+export {
+  buildRagLensSnapshot,
+  clampRagLensLimit,
+  createRagLensRunner,
+  isRagNodeVisibleToViewer,
+  RAG_LENS_ABSOLUTE_LIMIT,
+  RAG_LENS_DEFAULT_LIMIT,
+  type BuildRagLensSnapshotInput,
+  type CreateRagLensRunnerDeps,
+  type RagLensReadFn,
+  type RagLensReadParams,
+  type RagLensReadResult,
+  type RagLensSourceRow,
+} from "./runners/rag-lens-runner.js";
+
+export {
+  createRagLensAsdbReader,
+  type CreateRagLensAsdbReaderOptions,
+} from "./runners/rag-lens-asdb-reader.js";
+
+export {
+  maybeInstallRagLensRunner,
+  maybeInstallRagLensRunnerWithAsdb,
+  type MaybeInstallRagLensRunnerOptions,
+  type MaybeInstallRagLensRunnerResult,
+  type MaybeInstallRagLensRunnerWithAsdbOptions,
+} from "./install-rag-lens-runner.js";
