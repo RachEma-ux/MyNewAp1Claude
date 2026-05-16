@@ -894,6 +894,69 @@ export const AGS_MCP_TRANSPORTS = [
 ] as const;
 export type AgsMcpTransport = (typeof AGS_MCP_TRANSPORTS)[number];
 
+// ============================================================================
+// Per-MCP-transport operator-facing metadata (T-S.14)
+// ============================================================================
+
+export interface AgsMcpTransportMetadata {
+  /** Display label rendered in the MCP server config picker. */
+  readonly label: string;
+  /** Short operator-facing description of the transport. */
+  readonly description: string;
+  /** Whether the transport is bidirectional/streaming (true for sse,
+   *  sdk, websocket) vs. request/response (false for stdio, http). */
+  readonly streaming: boolean;
+  /** Whether the transport runs in-process (true for sdk) vs. across
+   *  a network/process boundary (false for stdio/sse/http/websocket). */
+  readonly inProcess: boolean;
+}
+
+export const AGS_MCP_TRANSPORT_METADATA: Readonly<
+  Record<AgsMcpTransport, AgsMcpTransportMetadata>
+> = {
+  stdio: {
+    label: "stdio",
+    description:
+      "Standard-input/output transport — MCP server runs as a subprocess; messages exchanged over stdin/stdout pipes.",
+    streaming: false,
+    inProcess: false,
+  },
+  sse: {
+    label: "Server-Sent Events",
+    description:
+      "Long-lived HTTP connection with server→client streaming via SSE — useful for low-latency tool result delivery.",
+    streaming: true,
+    inProcess: false,
+  },
+  http: {
+    label: "HTTP",
+    description:
+      "Plain request/response HTTP — most compatible transport but no server-push capability.",
+    streaming: false,
+    inProcess: false,
+  },
+  sdk: {
+    label: "SDK",
+    description:
+      "In-process SDK integration — MCP server runs in the same Node.js process; lowest-latency option.",
+    streaming: true,
+    inProcess: true,
+  },
+  websocket: {
+    label: "WebSocket",
+    description:
+      "Full-duplex WebSocket transport — bidirectional streaming over a single persistent connection.",
+    streaming: true,
+    inProcess: false,
+  },
+};
+
+export function getAgsMcpTransportMetadata(
+  transport: AgsMcpTransport,
+): AgsMcpTransportMetadata {
+  return AGS_MCP_TRANSPORT_METADATA[transport];
+}
+
 /** MCP server connection status. */
 export const AGS_MCP_STATUSES = [
   "pending",
