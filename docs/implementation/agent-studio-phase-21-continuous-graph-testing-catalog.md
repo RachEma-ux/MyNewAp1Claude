@@ -253,6 +253,7 @@ runtime catches up.
 | `ags-permission-behavior-metadata.test.ts` | `shared/constants` — `AGS_PERMISSION_BEHAVIOR_METADATA` (3-entry per-behavior label + description + proceeds + prompts booleans for allow/deny/ask) | T-S.12 / #1129 |
 | `ags-effort-level-metadata.test.ts` | `shared/constants` — `AGS_EFFORT_LEVEL_METADATA` (4-entry per-level label + description + rank 0-3 + highCost boolean for low/medium/high/max) | T-S.13 / #1130 |
 | `ags-mcp-transport-metadata.test.ts` | `shared/constants` — `AGS_MCP_TRANSPORT_METADATA` (5-entry per-transport label + description + streaming + inProcess booleans for stdio/sse/http/sdk/websocket) | T-S.14 / #1131 |
+| `ags-permission-source-metadata.test.ts` | `shared/constants` — `AGS_PERMISSION_SOURCE_METADATA` (5-entry per-source label + description + precedence 0-4 + persistent boolean for userSettings/projectSettings/localSettings/cliArg/session) | T-S.15 / #1132 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
