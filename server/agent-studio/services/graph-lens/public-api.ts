@@ -277,3 +277,31 @@ export {
   type MaybeInstallRacLensRunnerResult,
   type MaybeInstallRacLensRunnerWithAsdbOptions,
 } from "./install-rac-lens-runner.js";
+
+export {
+  buildGraphSkillLensSnapshot,
+  clampGraphSkillLensLimit,
+  createGraphSkillLensRunner,
+  isGraphSkillNodeVisibleToViewer,
+  GRAPH_SKILL_LENS_ABSOLUTE_LIMIT,
+  GRAPH_SKILL_LENS_DEFAULT_LIMIT,
+  type BuildGraphSkillLensSnapshotInput,
+  type CreateGraphSkillLensRunnerDeps,
+  type GraphSkillLensPackRow,
+  type GraphSkillLensReadFn,
+  type GraphSkillLensReadParams,
+  type GraphSkillLensReadResult,
+} from "./runners/graph-skill-lens-runner.js";
+
+export {
+  createGraphSkillLensAsdbReader,
+  type CreateGraphSkillLensAsdbReaderOptions,
+} from "./runners/graph-skill-lens-asdb-reader.js";
+
+export {
+  maybeInstallGraphSkillLensRunner,
+  maybeInstallGraphSkillLensRunnerWithAsdb,
+  type MaybeInstallGraphSkillLensRunnerOptions,
+  type MaybeInstallGraphSkillLensRunnerResult,
+  type MaybeInstallGraphSkillLensRunnerWithAsdbOptions,
+} from "./install-graph-skill-lens-runner.js";
