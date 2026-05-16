@@ -256,6 +256,7 @@ runtime catches up.
 | `ags-permission-source-metadata.test.ts` | `shared/constants` — `AGS_PERMISSION_SOURCE_METADATA` (5-entry per-source label + description + precedence 0-4 + persistent boolean for userSettings/projectSettings/localSettings/cliArg/session) | T-S.15 / #1132 |
 | `ags-memory-scope-metadata.test.ts` | `shared/constants` — `AGS_MEMORY_SCOPE_METADATA` (3-entry per-scope label + description + crossProject + survivesClone booleans for user/project/local) | T-S.16 / #1133 |
 | `ags-tool-invocation-kind-metadata.test.ts` | `shared/constants` — `AGS_TOOL_INVOCATION_KIND_METADATA` (4-entry per-kind label + description + userCreatable + crossesNetworkBoundary booleans for shell/http/mcp_ref/builtin) | T-S.17 / #1134 |
+| `ags-skill-source-metadata.test.ts` | `shared/constants` — `AGS_SKILL_SOURCE_METADATA` (5-entry per-source label + description + editable + external booleans for db/imported/vendored/marketplace/mcp_prompt) | T-S.18 / #1135 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

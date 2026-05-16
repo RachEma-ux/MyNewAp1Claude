@@ -1319,6 +1319,69 @@ export const AGS_SKILL_SOURCES = [
 ] as const;
 export type AgsSkillSource = (typeof AGS_SKILL_SOURCES)[number];
 
+// ============================================================================
+// Per-skill-source operator-facing metadata (T-S.18)
+// ============================================================================
+
+export interface AgsSkillSourceMetadata {
+  /** Display label rendered in the skill catalog source filter. */
+  readonly label: string;
+  /** Short operator-facing description of where the skill came from. */
+  readonly description: string;
+  /** Whether the skill row is user-editable from the catalog UI
+   *  (true for `db` only — the others are read-only). */
+  readonly editable: boolean;
+  /** Whether the skill is sourced from outside the local DB (true for
+   *  imported/vendored/marketplace/mcp_prompt; false for `db`). */
+  readonly external: boolean;
+}
+
+export const AGS_SKILL_SOURCE_METADATA: Readonly<
+  Record<AgsSkillSource, AgsSkillSourceMetadata>
+> = {
+  db: {
+    label: "Database",
+    description:
+      "User-authored skill stored in the local database — fully editable via the catalog UI.",
+    editable: true,
+    external: false,
+  },
+  imported: {
+    label: "Imported",
+    description:
+      "Skill imported from a file or upstream source — read-only mirror; edit the upstream source to update.",
+    editable: false,
+    external: true,
+  },
+  vendored: {
+    label: "Vendored",
+    description:
+      "Skill packaged with the application binary — read-only; updates require a redeploy.",
+    editable: false,
+    external: true,
+  },
+  marketplace: {
+    label: "Marketplace",
+    description:
+      "Skill installed from the marketplace — read-only; updates flow through marketplace publish.",
+    editable: false,
+    external: true,
+  },
+  mcp_prompt: {
+    label: "MCP Prompt",
+    description:
+      "Prompt-style skill exposed by an attached MCP server — read-only; the MCP server owns the content.",
+    editable: false,
+    external: true,
+  },
+};
+
+export function getAgsSkillSourceMetadata(
+  source: AgsSkillSource,
+): AgsSkillSourceMetadata {
+  return AGS_SKILL_SOURCE_METADATA[source];
+}
+
 /**
  * Categories for catalog tools — kept open-ended via "custom" so users
  * can add new domains without a schema change.
