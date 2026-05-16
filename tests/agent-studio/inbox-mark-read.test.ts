@@ -72,12 +72,13 @@ describe("Inbox mark-read β-slice (T-F.108 / T-F.6-β)", () => {
     expect(src).toMatch(/Mark-read failed:/);
   });
 
-  it("banner refreshed from α copy to β copy naming live mark-read + deferred dismiss/bulk", () => {
+  it("banner removed α copy and names live mark-read", () => {
+    // β named "Inbox β"; γ extends to "Inbox γ". Both must include
+    // mark-read as live. The α "read-only first surface" copy must
+    // be gone in any post-α banner.
     const src = readPanel();
-    expect(src).toMatch(/Inbox β:/);
-    expect(src).toMatch(
-      /mark-read\s+live[\s\S]{0,200}dismiss[\s\S]{0,200}mark-all-by-kind[\s\S]{0,200}dismiss-all-by-kind[\s\S]{0,200}follow-up/,
-    );
+    expect(src).toMatch(/Inbox\s+(β|γ):/);
+    expect(src).toMatch(/mark-read[\s\S]{0,80}live/);
     expect(src).not.toMatch(/Inbox α-shell:/);
   });
 
