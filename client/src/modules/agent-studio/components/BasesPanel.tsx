@@ -64,6 +64,24 @@ export function BasesPanel() {
   function clearOwnerScopeFilter() {
     setOwnerScopeFilter("all");
   }
+  // T-F.95 (T-F.2-ε): per-row rename inline editor. Parallel state
+  // slices (rather than discriminated) per lesson 55, mirroring the
+  // Quality Lens η/ε editor pattern. Mutual exclusion with the
+  // row-detail-expand toggle: opening rename clears expandedBaseId
+  // so the row's state is always one of {none / detail / rename}.
+  const [renameBaseId, setRenameBaseId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string>("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  function openRenameEditor(baseId: number, currentName: string) {
+    setRenameBaseId(baseId);
+    setRenameDraft(currentName);
+    setRenameError(null);
+    setExpandedBaseId(null);
+  }
+  function closeRenameEditor() {
+    setRenameBaseId(null);
+    setRenameDraft("");
+  }
   // T-F.94 (T-F.2-δ): first mutation — create base. The form is
   // inline (no modal); shows on "New base" click and collapses on
   // Create-success or Cancel. The δ-slice ships name-only to unblock
@@ -98,6 +116,15 @@ export function BasesPanel() {
         void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
       },
       onError: (err) => setCreateError(err.message),
+    });
+  const renameMutation =
+    trpc.agentStudio.vault.updateSavedView.useMutation({
+      onSuccess: () => {
+        setRenameError(null);
+        closeRenameEditor();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setRenameError(err.message),
     });
   const basesQuery = trpc.agentStudio.vault.listVisibleSavedViews.useQuery(
     effectiveVaultId !== null
@@ -363,6 +390,10 @@ export function BasesPanel() {
               <tbody>
                 {bases.map((b) => {
                   const isExpanded = expandedBaseId === b.id;
+                  const isRenaming = renameBaseId === b.id;
+                  const isRenamePending =
+                    renameMutation.isPending &&
+                    renameMutation.variables?.id === b.id;
                   return (
                     <Fragment key={b.id}>
                       <tr
@@ -378,7 +409,7 @@ export function BasesPanel() {
                         <td className="py-1 font-mono text-muted-foreground">
                           {new Date(b.updatedAt).toISOString()}
                         </td>
-                        <td className="py-1">
+                        <td className="py-1 space-x-2">
                           <button
                             type="button"
                             className="underline text-muted-foreground"
@@ -389,12 +420,98 @@ export function BasesPanel() {
                           >
                             {isExpanded ? "Hide details" : "View details"}
                           </button>
+                          {!isRenaming ? (
+                            <button
+                              type="button"
+                              disabled={isRenamePending}
+                              className="underline text-muted-foreground disabled:opacity-50"
+                              data-testid={`bases-row-rename-${b.id}`}
+                              onClick={() => openRenameEditor(b.id, b.name)}
+                            >
+                              Rename…
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                       {isExpanded ? (
                         <tr data-testid={`bases-row-detail-${b.id}`}>
                           <td colSpan={6} className="bg-muted/20 px-3 py-2 text-xs">
                             <BaseRowDetail base={b} />
+                          </td>
+                        </tr>
+                      ) : null}
+                      {isRenaming ? (
+                        <tr data-testid={`bases-row-rename-row-${b.id}`}>
+                          <td
+                            colSpan={6}
+                            className="bg-muted/20 px-3 py-2 text-xs"
+                          >
+                            <div className="space-y-2">
+                              <label
+                                className="block text-muted-foreground"
+                                htmlFor={`bases-row-rename-input-${b.id}`}
+                              >
+                                Rename base (max 255 chars):
+                              </label>
+                              <input
+                                id={`bases-row-rename-input-${b.id}`}
+                                data-testid={`bases-row-rename-input-${b.id}`}
+                                type="text"
+                                className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+                                maxLength={255}
+                                value={renameDraft}
+                                onChange={(e) =>
+                                  setRenameDraft(e.target.value)
+                                }
+                                disabled={isRenamePending}
+                                autoFocus
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={
+                                    isRenamePending ||
+                                    renameDraft.trim() === "" ||
+                                    renameDraft.trim() === b.name
+                                  }
+                                  className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                                  data-testid={`bases-row-rename-confirm-${b.id}`}
+                                  onClick={() => {
+                                    const trimmed = renameDraft.trim();
+                                    if (trimmed === "" || trimmed === b.name)
+                                      return;
+                                    renameMutation.mutate({
+                                      id: b.id,
+                                      name: trimmed,
+                                    });
+                                  }}
+                                >
+                                  {isRenamePending
+                                    ? "Renaming…"
+                                    : "Confirm rename"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isRenamePending}
+                                  className="underline text-muted-foreground disabled:opacity-50"
+                                  data-testid={`bases-row-rename-cancel-${b.id}`}
+                                  onClick={closeRenameEditor}
+                                >
+                                  Cancel
+                                </button>
+                                <span className="ml-auto text-muted-foreground">
+                                  {renameDraft.length} / 255
+                                </span>
+                              </div>
+                              {renameError ? (
+                                <p
+                                  className="text-destructive"
+                                  data-testid={`bases-row-rename-error-${b.id}`}
+                                >
+                                  Rename failed: {renameError}
+                                </p>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       ) : null}
