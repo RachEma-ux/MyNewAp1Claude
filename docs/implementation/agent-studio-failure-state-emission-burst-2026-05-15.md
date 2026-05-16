@@ -88,7 +88,7 @@ Five batch-B wirings with bundled guard-extensions (pattern shift from #1024's s
 | `entity_resolution_conflict` | 🟢 LIVE | #1026 | `services/graph-quality/agent-run.ts` |
 | `neo4j_unavailable` | 🟢 LIVE | #1014 | `services/graph/health-alert.ts` |
 | `neo4j_degraded` | 🟢 LIVE | #1014 | (same) |
-| `neo4j_query_timeout` | 🟡 | — | (deferred — needs timeout enforcement) |
+| `neo4j_query_timeout` | ❌ | — | (phase-gated on Phase 7.5 production Neo4j adapter; reclassified from 🟡 at T-I.54) |
 | `neo4j_projection_stale` | 🟡 | — | (deferred) |
 | `neo4j_projection_drift_detected` | 🟢 LIVE | #1015 | `services/graph/projection/drift-cron.ts` |
 | `projection_sync_failed` | 🟢 LIVE | #1025 | `services/graph/projection/sync-worker.ts` |
@@ -134,7 +134,7 @@ Lessons 14-22 in `~/.claude/projects/-root/memory/project_v1_plus_session_2026_0
 | Track | Description | Blocker |
 |---|---|---|
 | T-I.5.B.6 (deferred) | Wire `background_job_failed` sibling | Count-pin: requires test-update slice (#1034 records the analysis) |
-| T-I.5.B.7 (future) | Wire `neo4j_query_timeout` | Needs timeout enforcement (not just SLO warning) at the graph repository level |
+| T-I.5.B.7 (phase-gated on Phase 7.5) | Wire `neo4j_query_timeout` | No Cypher executes today — both `Neo4jCommunityGraphRepository.executeTemplate` and `Neo4jKgiaAdapter.runQuery` are skeletons. (Reclassified from 🟡 to ❌ at T-I.54.) |
 | T-I.5.B.8 (future) | Wire `golden_question_failed` | Evaluator currently script-only; move into server runtime first |
 | T-I.5.C (phase-gated) | Wire detection-first kinds (note_conflict, cag/skill_reference_invalidated, etc.) | Underlying detection runtimes don't exist yet |
 | T-I.5.D (phase-gated) | Wire `semantic_enrichment_rejected` | T-D.3 (semantic enrichment agent) |
@@ -178,11 +178,11 @@ following slices landed on top, raising live coverage to **17/25
 |---|---|---|
 | 🟢 LIVE via closed-taxonomy bridge | **17** | #1, #2, #3, #4, #5, #7, #8, #9, #10, #12, #15, #18, #19, #20, #21, #22, #23 |
 | ⚠️ Has detection code, partial emission | 1 | #25 background_job_failed (count-pin blocker) |
-| 🟡 Detection state exists in DB but no observability surface | **1** | #6 neo4j_query_timeout (down from 2; #10 closed via T-I.51) |
-| ❌ No detection yet — phase-gated | 5 | #11, #13, #14, #16, #17 |
+| 🟡 Detection state exists in DB but no observability surface | **0** | (was 1 in the §7.2 first cut; T-I.54 reclassified kind #6 to ❌ after verifying no production Cypher path exists yet) |
+| ❌ No detection yet — phase-gated | **6** | #6, #11, #13, #14, #16, #17 |
 | 🔒 Phase-gated on T-D.3 | 1 | #24 |
 
-Sum: 17 + 1 + 1 + 5 + 1 = 25 ✓.
+Sum: 17 + 1 + 0 + 6 + 1 = 25 ✓.
 
 ### 7.3 — New closure patterns named in this addendum
 
@@ -209,17 +209,23 @@ The choice between P-LADDER and P-SIBLING is determined by whether
 detection already exists in the runtime, not by the kind's category
 or severity.
 
-### 7.4 — Forward work after this addendum
+### 7.4 — Forward work after this addendum (updated post T-I.54)
 
 | Track | Description | Remaining |
 |---|---|---|
 | T-I.5.B.6 (deferred) | Wire `background_job_failed` sibling | Count-pin blocker; needs test-update slice (#1034 records the analysis) |
-| **T-I.??** | **Wire `neo4j_query_timeout` (kind #6)** | **Only detection-gap kind remaining.** Needs per-Cypher-query timeout enforcement in `services/graph/repository/**` first (P-LADDER applies because no current branch throws `GraphTimeoutError`). |
+| **T-I.5.B.7 (phase-gated)** | **Wire `neo4j_query_timeout` (kind #6)** | **Gated on Phase 7.5 production Neo4j adapter.** Both `Neo4jCommunityGraphRepository.executeTemplate` and `Neo4jKgiaAdapter.runQuery` are skeletons — no `session.run()` actually executes today, so no Cypher can time out. Once the production adapter wires the real Bolt driver, a 1-PR P-SIBLING slice inside `executeTemplateAudited`'s catch closes the gap (`executeErr instanceof GraphTimeoutError`). Reclassified from 🟡 detection-gap to ❌ phase-gated at T-I.54. |
 | T-I.5.D (phase-gated) | Wire `semantic_enrichment_rejected` (kind #24) | T-D.3 (semantic enrichment agent runtime) |
 | T-I.5.C (phase-gated) | Wire remaining ❌ kinds (#11, #13, #14, #16, #17) | Underlying detection runtimes don't exist yet |
 
-After kind #6 closes, Phase 22 live coverage reaches 18/25 — the
-ceiling for what's reachable without opening new runtime phases.
+**Phase 22 live-coverage ceiling at current code state: 17/25 (68%).**
+Further closures require new runtime phases — Phase 7.5 production
+Neo4j adapter (closes #6), T-D.3 semantic enrichment agent (closes
+#24), Phase 11-style backlink/CAG/skill invalidation runtimes
+(closes #11/#13/#14), search-index module (closes #16),
+graph-query-cache module (closes #17). The §7.2 first-cut claim of
+"18/25 after kind #6" was incorrect — kind #6 closure now
+co-requires Phase 7.5, not a standalone ladder slice.
 
 ### 7.5 — Self-reference + 4-slice cycle reminder
 
