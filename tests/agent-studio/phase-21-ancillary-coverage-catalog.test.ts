@@ -143,6 +143,7 @@ const ANCILLARY_TESTS = [
   "ags-permission-source-metadata.test.ts",
   "ags-memory-scope-metadata.test.ts",
   "ags-tool-invocation-kind-metadata.test.ts",
+  "ags-skill-source-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
