@@ -910,9 +910,30 @@ export function GraphHealthAdminPanel() {
                             (b as number) - (a as number),
                         )
                         .map(([kind, n]) => (
-                          <tr key={kind} className="border-t">
+                          <tr
+                            key={kind}
+                            className={`border-t ${kindFilter === kind ? "bg-muted/50" : ""}`}
+                            data-testid={`graph-health-failure-state-events-by-kind-row-${kind}`}
+                          >
                             <td className="py-1 pr-3 font-mono text-xs">
-                              {kind}
+                              {/* T-I.65: clickable kind cell — sets
+                                  the T-I.64 kindFilter so the operator
+                                  can drill from the rollup table into
+                                  the kind-narrowed buffer with one
+                                  click. Selecting the already-active
+                                  kind toggles it off. */}
+                              <button
+                                type="button"
+                                className="underline decoration-dotted hover:decoration-solid"
+                                onClick={() =>
+                                  setKindFilter(
+                                    kindFilter === kind ? null : kind,
+                                  )
+                                }
+                                data-testid={`graph-health-failure-state-events-by-kind-filter-${kind}`}
+                              >
+                                {kind}
+                              </button>
                             </td>
                             <td className="py-1 pr-3 font-mono text-xs">
                               {n as number}
