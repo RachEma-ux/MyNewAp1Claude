@@ -19,11 +19,11 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 |---|---|---|
 | 🟢 LIVE via closed-taxonomy bridge | **17** | Emission shipped through `recordFailureStateEvent` (kinds #1, #2, #3, #4, #5, #7, #8, #9, #10, #12, #15, #18, #19, #20, #21, #22, #23) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written (kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
-| 🟡 Detection state exists in DB but no observability surface | 1 | A status column / audit table carries the state; emission deferred (kind #6) |
-| ❌ No detection yet — phase-gated | 5 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17) |
+| 🟡 Detection state exists in DB but no observability surface | 0 | (was 1; kind #6 reclassified to ❌ at T-I.54 — see below) |
+| ❌ No detection yet — phase-gated | 6 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #6, #11, #13, #14, #16, #17) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 17/25 closed kinds (68%).** **Batch-B target met (15/25); kind #7 closed via 5-PR new-detection ladder; kind #10 closed via 1-PR sibling-emit at T-I.51.** T-I.38 (#1213) corrected the premise of #22. T-I.40 (#1215) corrected the premise of #23. T-I.41 (#1216) corrected the premise of #2. **T-I.43 → T-I.47 (#1218-#1222) is the first NEW-detection sub-arc** — kind #7 didn't have a freshness-lag computation; the 5-PR ladder built one from scratch. T-I.51 took the simpler 1-PR path for kind #10 because the detection already existed (`runWithTimeout` → `errorReason: "timeout"` branch in `runItem`); only the emission was missing. Sum: 17 + 1 + 1 + 5 + 1 = 25 ✓.
+**Live coverage: 17/25 closed kinds (68%).** **Batch-B target met (15/25); kind #7 closed via 5-PR new-detection ladder; kind #10 closed via 1-PR sibling-emit at T-I.51.** T-I.38 (#1213) corrected the premise of #22. T-I.40 (#1215) corrected the premise of #23. T-I.41 (#1216) corrected the premise of #2. **T-I.43 → T-I.47 (#1218-#1222) is the first NEW-detection sub-arc** — kind #7 didn't have a freshness-lag computation; the 5-PR ladder built one from scratch. T-I.51 took the simpler 1-PR path for kind #10 because the detection already existed (`runWithTimeout` → `errorReason: "timeout"` branch in `runItem`); only the emission was missing. **T-I.54 reclassified kind #6 from 🟡 to ❌** after verifying that no production Cypher execution path exists yet — both `Neo4jCommunityGraphRepository.executeTemplate` (line 98) and `Neo4jKgiaAdapter.runQuery` (line 60-something) are skeletons with the actual `session.run()` calls commented out; kind #6 is gated on Phase 7.5 production Neo4j adapter implementation, NOT on a 5-PR ladder slice. Sum: 17 + 1 + 0 + 6 + 1 = 25 ✓.
 
 ---
 
@@ -38,7 +38,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 3 | `entity_resolution_conflict` | governance | 🟢 **LIVE @ #1026 (T-I.5.B.3)** | `graph-quality-agent-run` per-scan when scanKind === "duplicate_entity" + findingsCount > 0 | `services/graph-quality/agent-run.ts` |
 | 4 | `neo4j_unavailable` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Health-alert scanner | `services/graph/health-alert.ts` |
 | 5 | `neo4j_degraded` | infrastructure | 🟢 **LIVE @ #1014 (T-I.5.A.1)** | Same scanner (latency-high collapsed into degraded) | `services/graph/health-alert.ts` |
-| 6 | `neo4j_query_timeout` | infrastructure | 🟡 | Cypher timeout configured at executor; no event on per-query timeout | Adapter in `services/graph/repository/*` (deferred — needs timeout enforcement, not SLO warning) |
+| 6 | `neo4j_query_timeout` | infrastructure | ❌ **Phase-gated on Phase 7.5** | `GraphTimeoutError` class declared @ `repository/types.ts:443` but never thrown. Both `Neo4jCommunityGraphRepository.executeTemplate` (line 98) and `Neo4jKgiaAdapter` (line 60+) are skeletons with `session.run()` commented out — no Cypher actually runs against Neo4j CE today. Gated on Phase 7.5 production Neo4j adapter implementation, NOT a 5-PR ladder. (Reclassified from 🟡 at T-I.54 / 2026-05-16.) | Wiring follows once the production adapter throws `GraphTimeoutError` from inside `session.run` race; then a P-SIBLING discriminator inside `executeTemplateAudited`'s catch (`executeErr instanceof GraphTimeoutError ? "neo4j_query_timeout" : "cypher_query_template_failed"`) closes the gap in 1 PR. |
 | 7 | `neo4j_projection_stale` | infrastructure | 🟢 **LIVE @ T-I.43 → T-I.47 (#1218-#1222)** | 5-PR sub-arc shipped detector + emitter + orchestrator + DB fetcher + admin tRPC + scheduled cron at 04:15 UTC; emits one event per stale projection (lag > 1h default) | `services/graph/projection/staleness-detector.ts` + `staleness-cron.ts` |
 | 8 | `neo4j_projection_drift_detected` | infrastructure | 🟢 **LIVE @ #1015 (T-I.5.A.2)** | Drift cron emits when driftCount > 0 | `services/graph/projection/drift-cron.ts` |
 | 9 | `projection_sync_failed` | infrastructure | 🟢 **LIVE @ #1025 (T-I.5.B.2)** | Sync worker `status === "failed"` (includes partial-success) | `services/graph/projection/sync-worker.ts` |
@@ -155,12 +155,13 @@ The original ordering speculated detection-state per kind. As the wirings landed
 
 - #25 `background_job_failed` — locked by count-pinned tests (lesson 22). Closure requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice after operator-dashboard query migration.
 
-### Detection-gap — 1 🟡 (remaining)
+### Detection-gap — 0 🟡 (saturated at current code state)
 
-- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first. The kind-#7 5-PR ladder (#1218-#1222) is the reference pattern: pure detector → orchestrator → DB fetcher → admin tRPC → scheduled cron. Distinct from kind #10 (closed @ T-I.51) because that one only needed a sibling-emit at the existing executor timeout branch; #6 needs to introduce the per-Cypher-query timeout enforcement first.
+The detection-gap category is empty as of T-I.54. The single previous occupant (kind #6 `neo4j_query_timeout`) was reclassified to ❌ phase-gated after verifying that no production Cypher execution path exists today — both the active backend adapter (`Neo4jCommunityGraphRepository.executeTemplate`) and the legacy KGIA adapter (`Neo4jKgiaAdapter.runQuery`) are skeletons. Until Phase 7.5 wires the production adapter, no Cypher can time out, so no event can fire. See the §2 row for the closure shape once the gate lifts.
 
-### Phase-gated — 5 ❌ + 1 🔒
+### Phase-gated — 6 ❌ + 1 🔒
 
+- **#6 `neo4j_query_timeout` — gated on Phase 7.5 production Neo4j adapter (T-I.54 reclassification).** `GraphTimeoutError` class exists but is never thrown because no actual `session.run()` call runs today.
 - #11 `backlink_refresh_failed` — no backlink-refresh module exists yet.
 - #13 `cag_reference_invalidated` — CAG invalidation runtime does not exist; only docblock comments.
 - #14 `graph_skill_reference_invalidated` — skill-pack invalidation runtime does not exist.
