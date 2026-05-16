@@ -64,6 +64,24 @@ export function BasesPanel() {
   function clearOwnerScopeFilter() {
     setOwnerScopeFilter("all");
   }
+  // T-F.94 (T-F.2-δ): first mutation — create base. The form is
+  // inline (no modal); shows on "New base" click and collapses on
+  // Create-success or Cancel. The δ-slice ships name-only to unblock
+  // the page for first-use; filters / columns / visibility editing
+  // land in follow-up slices (β-detail-view already renders these
+  // when populated).
+  const [createOpen, setCreateOpen] = useState<boolean>(false);
+  const [createNameDraft, setCreateNameDraft] = useState<string>("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  function openCreateForm() {
+    setCreateOpen(true);
+    setCreateNameDraft("");
+    setCreateError(null);
+  }
+  function closeCreateForm() {
+    setCreateOpen(false);
+    setCreateNameDraft("");
+  }
   const effectiveVaultId =
     selectedVaultId !== null
       ? selectedVaultId
@@ -71,6 +89,16 @@ export function BasesPanel() {
         ? vaults[0].id
         : null;
 
+  const utils = trpc.useUtils();
+  const createMutation =
+    trpc.agentStudio.vault.createSavedView.useMutation({
+      onSuccess: () => {
+        setCreateError(null);
+        closeCreateForm();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setCreateError(err.message),
+    });
   const basesQuery = trpc.agentStudio.vault.listVisibleSavedViews.useQuery(
     effectiveVaultId !== null
       ? {
@@ -158,6 +186,87 @@ export function BasesPanel() {
 
       <Card>
         <CardContent className="space-y-3 p-4">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Bases in this vault</SectionLabel>
+            {!createOpen ? (
+              <button
+                type="button"
+                className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground disabled:opacity-50"
+                data-testid="bases-create-button"
+                disabled={createMutation.isPending}
+                onClick={openCreateForm}
+              >
+                New base…
+              </button>
+            ) : null}
+          </div>
+          {createOpen ? (
+            <div
+              className="space-y-2 rounded border border-border bg-muted/20 p-2 text-xs"
+              data-testid="bases-create-form"
+            >
+              <label
+                className="block text-muted-foreground"
+                htmlFor="bases-create-name-input"
+              >
+                Base name (max 255 chars):
+              </label>
+              <input
+                id="bases-create-name-input"
+                data-testid="bases-create-name-input"
+                type="text"
+                className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+                maxLength={255}
+                value={createNameDraft}
+                onChange={(e) => setCreateNameDraft(e.target.value)}
+                disabled={createMutation.isPending}
+                autoFocus
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    createMutation.isPending ||
+                    createNameDraft.trim() === "" ||
+                    effectiveVaultId === null
+                  }
+                  className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                  data-testid="bases-create-confirm"
+                  onClick={() => {
+                    const trimmed = createNameDraft.trim();
+                    if (trimmed === "" || effectiveVaultId === null) return;
+                    createMutation.mutate({
+                      vaultId: effectiveVaultId,
+                      name: trimmed,
+                      viewKind: BASE_VIEW_KIND,
+                    });
+                  }}
+                >
+                  {createMutation.isPending ? "Creating…" : "Create base"}
+                </button>
+                <button
+                  type="button"
+                  disabled={createMutation.isPending}
+                  className="underline text-muted-foreground disabled:opacity-50"
+                  data-testid="bases-create-cancel"
+                  onClick={closeCreateForm}
+                >
+                  Cancel
+                </button>
+                <span className="ml-auto text-muted-foreground">
+                  {createNameDraft.length} / 255
+                </span>
+              </div>
+              {createError ? (
+                <p
+                  className="text-destructive"
+                  data-testid="bases-create-error"
+                >
+                  Create failed: {createError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <SectionLabel>
             Recent bases
             {basesQuery.data
