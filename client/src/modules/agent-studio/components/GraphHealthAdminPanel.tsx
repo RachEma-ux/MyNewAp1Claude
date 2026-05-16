@@ -12,6 +12,7 @@
  * comes later.
  */
 
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -63,6 +64,7 @@ function severityClass(severity: string): string {
 }
 
 export function GraphHealthAdminPanel() {
+  const utils = trpc.useUtils();
   const cronQ = trpc.agentStudio.graphHealth.getAlertCronStatus.useQuery(
     undefined,
     { refetchOnWindowFocus: false },
@@ -84,6 +86,25 @@ export function GraphHealthAdminPanel() {
   const stalenessCronQ =
     trpc.agentStudio.graphProjection.getStalenessCronStatus.useQuery(undefined, {
       refetchOnWindowFocus: false,
+    });
+
+  // T-I.55: operator-triggered ad-hoc staleness check. Mirrors the
+  // `forceRewarm` pattern on RegionAdminPanel — button + mutation +
+  // invalidation + feedback line. Useful for triaging a suspected
+  // stuck projection without waiting for the daily 04:15 UTC cron.
+  const [stalenessRunFeedback, setStalenessRunFeedback] = useState<
+    string | null
+  >(null);
+  const runStalenessCheckMutation =
+    trpc.agentStudio.graphProjection.runStalenessCheck.useMutation({
+      onSuccess: (data) => {
+        setStalenessRunFeedback(
+          `Scan complete: ${data.distinctProjectionCount} projections / ${data.staleCount} stale / ${data.neverSucceededCount} never-succeeded / ${data.freshCount} fresh.`,
+        );
+        void utils.agentStudio.graphProjection.getStalenessCronStatus.invalidate();
+      },
+      onError: (err) =>
+        setStalenessRunFeedback(`Staleness scan failed: ${err.message}`),
     });
 
   return (
@@ -343,6 +364,27 @@ export function GraphHealthAdminPanel() {
               ) : null}
             </div>
           )}
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="text-sm underline"
+              disabled={runStalenessCheckMutation.isPending}
+              onClick={() => runStalenessCheckMutation.mutate({})}
+              data-testid="graph-projection-staleness-run-now-button"
+            >
+              {runStalenessCheckMutation.isPending
+                ? "Scanning…"
+                : "Run staleness check now"}
+            </button>
+            {stalenessRunFeedback ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="graph-projection-staleness-run-now-feedback"
+              >
+                {stalenessRunFeedback}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
