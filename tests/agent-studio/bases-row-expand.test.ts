@@ -97,16 +97,17 @@ describe("Bases per-row expand β-slice (T-F.92 / T-F.2-β)", () => {
   it("β slice itself introduces NO new tRPC query (detail uses already-fetched row data); ceiling relaxed post-ζ to admit legitimately-new queries", () => {
     const src = readPanel();
     // β's contract: row-detail uses already-fetched `SavedViewRow`
-    // data — NO new query at the β slice. Later slices (ζ) add their
-    // own queries; this ceiling is "panel as a whole" (vaults + bases
-    // + ζ preview = 3 useQuery() call sites, plus 1 `typeof
-    // X.useQuery` *type* reference inside the BasePreview prop type
-    // = 4 textual `.useQuery` matches), not a hard β invariant. The
-    // point of the assertion is to catch a future slice that
-    // needlessly re-fetches a row's detail data, not to forbid all
-    // new useQuery references.
+    // data — NO new query at the β slice. Later slices add their
+    // own queries; this ceiling is "panel as a whole" (vaults +
+    // bases + ζ preview + a.2 open-note = 4 useQuery() call sites,
+    // plus 2 `typeof X.useQuery` *type* references inside the
+    // BasePreview / NoteContentInline prop types = 6 textual
+    // `.useQuery` matches), not a hard β invariant. The point of
+    // the assertion is to catch a future slice that needlessly
+    // re-fetches a row's detail data, not to forbid all new
+    // useQuery references.
     const queryMatches = src.match(/\.useQuery\b/g);
     expect(queryMatches).not.toBeNull();
-    expect(queryMatches!.length).toBeLessThanOrEqual(4);
+    expect(queryMatches!.length).toBeLessThanOrEqual(7);
   });
 });

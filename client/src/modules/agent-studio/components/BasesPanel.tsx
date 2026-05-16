@@ -202,6 +202,15 @@ export function BasesPanel() {
   // other JSON keys in `filters` are surfaced in the β detail view
   // but not yet narrowed. The preview banner names this gap.
   const [previewBaseId, setPreviewBaseId] = useState<number | null>(null);
+  // T-F.104 (T-F.2-a.2-narrow): drill-into-note jump affordance. A
+  // single noteId state slice; only one note's content panel is
+  // expanded at a time within the preview. Independent of all
+  // row-mutation slices (rename / delete / filter-edit) because the
+  // open-note action is read-only inspection nested INSIDE the
+  // preview (which is itself an inspection state — lesson 69).
+  const [openPreviewNoteId, setOpenPreviewNoteId] = useState<number | null>(
+    null,
+  );
   // T-F.101 (T-F.2-filter-γ): inline filter editor on the β detail
   // row. Operator opens "Edit filters", textarea pre-populated with
   // the current JSON; Save validates against FilterDocumentSchema
@@ -390,6 +399,19 @@ export function BasesPanel() {
   const previewTruncatedByFetchCap =
     previewQuery.data !== undefined &&
     previewQuery.data.length === PREVIEW_FETCH_OVER_SAMPLE;
+  // T-F.104 (a.2-narrow): gated note-content fetch. Only fires when
+  // an operator clicks "Open" on a preview row. Returns
+  // `{ note, latestVersion }` — `latestVersion.contentMd` is the
+  // markdown source rendered as plain text in the inline panel.
+  const openNoteQuery = trpc.agentStudio.vault.getNote.useQuery(
+    openPreviewNoteId !== null
+      ? { noteId: openPreviewNoteId }
+      : (undefined as never),
+    {
+      enabled: openPreviewNoteId !== null,
+      refetchOnWindowFocus: false,
+    },
+  );
 
   return (
     <div className="space-y-4" data-testid="bases-panel">
@@ -918,6 +940,9 @@ export function BasesPanel() {
                               totalMatchCount={previewTotalMatchCount}
                               truncatedByDisplay={previewTruncatedByDisplay}
                               truncatedByFetchCap={previewTruncatedByFetchCap}
+                              openPreviewNoteId={openPreviewNoteId}
+                              setOpenPreviewNoteId={setOpenPreviewNoteId}
+                              openNoteQuery={openNoteQuery}
                             />
                           </td>
                         </tr>
@@ -1192,6 +1217,17 @@ function BasePreview({
   readonly totalMatchCount: number;
   readonly truncatedByDisplay: boolean;
   readonly truncatedByFetchCap: boolean;
+  /**
+   * T-F.104 (T-F.2-a.2-narrow): drill-into-note state. Single id
+   * (one note open at a time). `setOpenPreviewNoteId(null)` to
+   * collapse. The `openNoteQuery` is gated by the parent on
+   * `openPreviewNoteId !== null`.
+   */
+  readonly openPreviewNoteId: number | null;
+  readonly setOpenPreviewNoteId: (id: number | null) => void;
+  readonly openNoteQuery: ReturnType<
+    typeof trpc.agentStudio.vault.getNote.useQuery
+  >;
 }) {
   return (
     <div
@@ -1317,32 +1353,154 @@ function BasePreview({
                 <th className="py-1">slug</th>
                 <th className="py-1">governance</th>
                 <th className="py-1">updated</th>
+                <th className="py-1"></th>
               </tr>
             </thead>
             <tbody>
-              {previewNotes.map((n) => (
-                <tr
-                  key={n.id}
-                  className="border-t border-border"
-                  data-testid={`bases-row-preview-note-${base.id}-${n.id}`}
-                >
-                  <td className="py-1 font-mono">{n.id}</td>
-                  <td className="py-1">{n.title}</td>
-                  <td className="py-1 font-mono text-muted-foreground">
-                    {n.slug}
-                  </td>
-                  <td className="py-1 font-mono text-muted-foreground">
-                    {n.governanceStatus}
-                  </td>
-                  <td className="py-1 font-mono text-muted-foreground">
-                    {new Date(n.updatedAt).toISOString()}
-                  </td>
-                </tr>
-              ))}
+              {previewNotes.map((n) => {
+                const isOpen = openPreviewNoteId === n.id;
+                return (
+                  <Fragment key={n.id}>
+                    <tr
+                      className="border-t border-border"
+                      data-testid={`bases-row-preview-note-${base.id}-${n.id}`}
+                    >
+                      <td className="py-1 font-mono">{n.id}</td>
+                      <td className="py-1">{n.title}</td>
+                      <td className="py-1 font-mono text-muted-foreground">
+                        {n.slug}
+                      </td>
+                      <td className="py-1 font-mono text-muted-foreground">
+                        {n.governanceStatus}
+                      </td>
+                      <td className="py-1 font-mono text-muted-foreground">
+                        {new Date(n.updatedAt).toISOString()}
+                      </td>
+                      <td className="py-1">
+                        <button
+                          type="button"
+                          className="underline text-muted-foreground"
+                          data-testid={`bases-row-preview-note-open-${base.id}-${n.id}`}
+                          onClick={() =>
+                            setOpenPreviewNoteId(isOpen ? null : n.id)
+                          }
+                        >
+                          {isOpen ? "Close" : "Open"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen ? (
+                      <tr
+                        data-testid={`bases-row-preview-note-content-row-${base.id}-${n.id}`}
+                      >
+                        <td
+                          colSpan={6}
+                          className="bg-background/50 px-3 py-2 text-[10px]"
+                        >
+                          <NoteContentInline
+                            baseId={base.id}
+                            noteId={n.id}
+                            noteQuery={openNoteQuery}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * T-F.104 (T-F.2-a.2-narrow) NoteContentInline — drill-into-note
+ * content panel rendered inside the ζ-preview row. Consumes the
+ * parent-gated `vault.getNote` query (returns `{ note, latestVersion }`)
+ * and renders the markdown source as plain text in a scrollable
+ * <pre>. Loading / error / empty states all testid-tagged. Markdown
+ * rendering (paragraph-formatted text, syntax-highlighted code
+ * blocks) is deferred — operators can read the raw markdown as a
+ * confidence check; the full rendered view is the vault note page
+ * (out of scope for the within-Bases NARROW arc).
+ */
+function NoteContentInline({
+  baseId,
+  noteId,
+  noteQuery,
+}: {
+  readonly baseId: number;
+  readonly noteId: number;
+  readonly noteQuery: ReturnType<
+    typeof trpc.agentStudio.vault.getNote.useQuery
+  >;
+}) {
+  if (noteQuery.isLoading) {
+    return (
+      <p
+        className="text-muted-foreground italic"
+        data-testid={`bases-row-preview-note-content-loading-${baseId}-${noteId}`}
+      >
+        Loading note content…
+      </p>
+    );
+  }
+  if (noteQuery.error) {
+    return (
+      <p
+        className="text-destructive"
+        data-testid={`bases-row-preview-note-content-error-${baseId}-${noteId}`}
+      >
+        Failed to load note: {noteQuery.error.message}
+      </p>
+    );
+  }
+  if (!noteQuery.data) {
+    return (
+      <p
+        className="text-muted-foreground italic"
+        data-testid={`bases-row-preview-note-content-unavailable-${baseId}-${noteId}`}
+      >
+        Note content unavailable.
+      </p>
+    );
+  }
+  const { note, latestVersion } = noteQuery.data;
+  if (!latestVersion) {
+    return (
+      <p
+        className="text-muted-foreground italic"
+        data-testid={`bases-row-preview-note-content-no-version-${baseId}-${noteId}`}
+      >
+        Note has no versions yet — content is empty.
+      </p>
+    );
+  }
+  return (
+    <div
+      className="space-y-2"
+      data-testid={`bases-row-preview-note-content-${baseId}-${noteId}`}
+    >
+      <p
+        className="text-muted-foreground"
+        data-testid={`bases-row-preview-note-content-meta-${baseId}-${noteId}`}
+      >
+        v{latestVersion.version} · {new Date(latestVersion.createdAt).toISOString()}
+        {latestVersion.authorUserId !== null ? (
+          <> · author user#{latestVersion.authorUserId}</>
+        ) : null}
+        {" · "}
+        <span className="font-mono">{note.governanceStatus}</span>
+      </p>
+      <pre
+        className="max-h-64 overflow-auto rounded bg-background/70 p-2 font-mono text-[10px] whitespace-pre-wrap"
+        data-testid={`bases-row-preview-note-content-md-${baseId}-${noteId}`}
+      >
+        {latestVersion.contentMd}
+      </pre>
     </div>
   );
 }
