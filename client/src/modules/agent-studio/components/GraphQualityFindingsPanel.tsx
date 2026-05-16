@@ -68,6 +68,13 @@ function renderBucketList(buckets: ReadonlyArray<Bucket>, emptyHint: string) {
 }
 
 const FINDINGS_LIST_LIMIT = 50;
+/**
+ * Server-side cap on the `bulkDismissFindings` input
+ * (`router.ts:281`: `findingIds: z.array(...).min(1).max(500)`).
+ * Mirrored in the UI so the operator sees a clear warning + the
+ * Confirm button disables instead of getting a Zod rejection.
+ */
+const BULK_DISMISS_MAX = 500;
 
 export function GraphQualityFindingsPanel() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(null);
@@ -108,6 +115,23 @@ export function GraphQualityFindingsPanel() {
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<number>>(
     () => new Set(),
   );
+  // T-F.90 (T-F.4-ζ.2): bulk-confirm editor state. The bar starts in
+  // "summary" mode (count + Clear-selection + Dismiss…); clicking
+  // Dismiss… expands it inline with an optional shared-reason
+  // textarea + Confirm/Cancel. Errors surface inside the bar; the
+  // dismissed/skipped result from the server surfaces above the
+  // table after a successful round-trip so the operator can see
+  // how many findings were actually flipped (vs how many were
+  // already-resolved / not-found skips).
+  const [bulkEditorOpen, setBulkEditorOpen] = useState<boolean>(false);
+  const [bulkReasonDraft, setBulkReasonDraft] = useState<string>("");
+  const [bulkDismissError, setBulkDismissError] = useState<string | null>(
+    null,
+  );
+  const [bulkDismissResult, setBulkDismissResult] = useState<{
+    readonly dismissed: number;
+    readonly skipped: number;
+  } | null>(null);
   function openReasonEditor(findingId: number) {
     setReasonFindingId(findingId);
     setReasonDraft("");
@@ -145,6 +169,19 @@ export function GraphQualityFindingsPanel() {
   }
   function clearSelection() {
     setSelectedFindingIds(new Set());
+    setBulkEditorOpen(false);
+    setBulkReasonDraft("");
+    setBulkDismissError(null);
+  }
+  function openBulkEditor() {
+    setBulkEditorOpen(true);
+    setBulkReasonDraft("");
+    setBulkDismissError(null);
+    setBulkDismissResult(null);
+  }
+  function closeBulkEditor() {
+    setBulkEditorOpen(false);
+    setBulkReasonDraft("");
   }
 
   const utils = trpc.useUtils();
@@ -179,6 +216,22 @@ export function GraphQualityFindingsPanel() {
         void utils.agentStudio.graphQuality.getStats.invalidate();
       },
       onError: (err) => setTriageError(err.message),
+    });
+  const bulkDismissMutation =
+    trpc.agentStudio.graphQuality.bulkDismissFindings.useMutation({
+      onSuccess: (data) => {
+        setBulkDismissError(null);
+        setBulkDismissResult({
+          dismissed: data?.dismissed?.length ?? 0,
+          skipped: data?.skipped?.length ?? 0,
+        });
+        setSelectedFindingIds(new Set());
+        setBulkEditorOpen(false);
+        setBulkReasonDraft("");
+        void utils.agentStudio.graphQuality.listFindings.invalidate();
+        void utils.agentStudio.graphQuality.getStats.invalidate();
+      },
+      onError: (err) => setBulkDismissError(err.message),
     });
   const trailQ = trpc.agentStudio.graphQuality.getFindingAuditTrail.useQuery(
     { findingId: expandedFindingId ?? 0 },
@@ -421,24 +474,128 @@ export function GraphQualityFindingsPanel() {
                   <>
                     {selectedFindingIds.size > 0 ? (
                       <div
-                        className="flex flex-wrap items-center gap-3 text-xs"
+                        className="space-y-2 rounded border border-border bg-muted/20 p-2 text-xs"
                         data-testid="graph-quality-bulk-selection-bar"
                       >
-                        <span
-                          className="font-medium"
-                          data-testid="graph-quality-bulk-selection-count"
-                        >
-                          {selectedFindingIds.size} selected
-                        </span>
-                        <button
-                          type="button"
-                          className="underline text-muted-foreground"
-                          data-testid="graph-quality-bulk-clear-selection"
-                          onClick={clearSelection}
-                        >
-                          Clear selection
-                        </button>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            className="font-medium"
+                            data-testid="graph-quality-bulk-selection-count"
+                          >
+                            {selectedFindingIds.size} selected
+                          </span>
+                          {!bulkEditorOpen ? (
+                            <button
+                              type="button"
+                              className="rounded bg-destructive px-2 py-0.5 text-destructive-foreground disabled:opacity-50"
+                              data-testid="graph-quality-bulk-dismiss-button"
+                              disabled={bulkDismissMutation.isPending}
+                              onClick={openBulkEditor}
+                            >
+                              Dismiss {selectedFindingIds.size}…
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="underline text-muted-foreground disabled:opacity-50"
+                            data-testid="graph-quality-bulk-clear-selection"
+                            disabled={bulkDismissMutation.isPending}
+                            onClick={clearSelection}
+                          >
+                            Clear selection
+                          </button>
+                        </div>
+                        {selectedFindingIds.size > BULK_DISMISS_MAX ? (
+                          <p
+                            className="text-destructive"
+                            data-testid="graph-quality-bulk-dismiss-overflow"
+                          >
+                            Selection exceeds the {BULK_DISMISS_MAX}-finding
+                            bulk-dismiss limit. Narrow the selection to
+                            continue.
+                          </p>
+                        ) : null}
+                        {bulkEditorOpen ? (
+                          <div
+                            className="space-y-2"
+                            data-testid="graph-quality-bulk-dismiss-editor"
+                          >
+                            <label
+                              className="block text-muted-foreground"
+                              htmlFor="graph-quality-bulk-dismiss-textarea"
+                            >
+                              Bulk dismiss reason (optional, applied to all
+                              selected, max 2000 chars):
+                            </label>
+                            <textarea
+                              id="graph-quality-bulk-dismiss-textarea"
+                              data-testid="graph-quality-bulk-dismiss-textarea"
+                              className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+                              rows={3}
+                              maxLength={2000}
+                              value={bulkReasonDraft}
+                              onChange={(e) =>
+                                setBulkReasonDraft(e.target.value)
+                              }
+                              disabled={bulkDismissMutation.isPending}
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={
+                                  bulkDismissMutation.isPending ||
+                                  selectedFindingIds.size > BULK_DISMISS_MAX
+                                }
+                                className="rounded bg-destructive px-2 py-0.5 text-destructive-foreground disabled:opacity-50"
+                                data-testid="graph-quality-bulk-dismiss-confirm"
+                                onClick={() => {
+                                  const trimmed = bulkReasonDraft.trim();
+                                  bulkDismissMutation.mutate({
+                                    findingIds: Array.from(selectedFindingIds),
+                                    ...(trimmed !== ""
+                                      ? { reason: trimmed }
+                                      : {}),
+                                  });
+                                }}
+                              >
+                                {bulkDismissMutation.isPending
+                                  ? "Dismissing…"
+                                  : `Confirm dismiss ${selectedFindingIds.size}`}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={bulkDismissMutation.isPending}
+                                className="underline text-muted-foreground disabled:opacity-50"
+                                data-testid="graph-quality-bulk-dismiss-cancel"
+                                onClick={closeBulkEditor}
+                              >
+                                Cancel
+                              </button>
+                              <span className="ml-auto text-muted-foreground">
+                                {bulkReasonDraft.length} / 2000
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
+                        {bulkDismissError ? (
+                          <p
+                            className="text-destructive"
+                            data-testid="graph-quality-bulk-dismiss-error"
+                          >
+                            Bulk dismiss failed: {bulkDismissError}
+                          </p>
+                        ) : null}
                       </div>
+                    ) : null}
+                    {bulkDismissResult ? (
+                      <p
+                        className="text-xs text-muted-foreground"
+                        data-testid="graph-quality-bulk-dismiss-result"
+                      >
+                        Bulk dismiss complete: {bulkDismissResult.dismissed}{" "}
+                        dismissed, {bulkDismissResult.skipped} skipped
+                        (already-resolved / not-found).
+                      </p>
                     ) : null}
                     <table
                       className="w-full text-xs"
