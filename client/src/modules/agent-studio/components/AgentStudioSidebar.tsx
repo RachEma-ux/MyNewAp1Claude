@@ -40,6 +40,7 @@ import {
   Radio,
   Send,
   HeartPulse,
+  Telescope,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -95,7 +96,9 @@ export type AgentStudioView =
   // ── PR-V1-186: publish-targets admin ──
   | "publish-targets-admin"
   // ── PR-V1-190: graph-health admin ──
-  | "graph-health-admin";
+  | "graph-health-admin"
+  // ── T-F.62: graph-lens browser ──
+  | "graph-lens-browser";
 
 interface SectionGroup {
   label: string;
@@ -197,6 +200,13 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Graph Health",
     items: [
       { key: "graph-health-admin", label: "Alerts + Cron", icon: HeartPulse },
+    ],
+  },
+  // ── T-F.62: graph-lens browser ──
+  {
+    label: "Lenses",
+    items: [
+      { key: "graph-lens-browser", label: "Lens Browser", icon: Telescope },
     ],
   },
 ];

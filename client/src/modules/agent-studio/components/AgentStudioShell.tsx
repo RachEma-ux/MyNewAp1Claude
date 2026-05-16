@@ -89,6 +89,9 @@ const PublishTargetsAdminPage = lazy(
 const GraphHealthAdminPage = lazy(
   () => import("../pages/GraphHealthAdminPage"),
 );
+const GraphLensBrowserPage = lazy(
+  () => import("../pages/GraphLensBrowserPage"),
+);
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -237,6 +240,14 @@ function parseRoute(path: string): ParsedRoute {
     return {
       ...empty,
       view: "graph-health-admin" as any,
+      homeMode: null,
+    };
+  }
+  // ── T-F.62: graph-lens browser (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-lens-browser")) {
+    return {
+      ...empty,
+      view: "graph-lens-browser" as any,
       homeMode: null,
     };
   }
@@ -425,6 +436,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-health-admin");
       return;
     }
+    // T-F.62: graph-lens browser sidebar entry.
+    if ((key as string) === "graph-lens-browser") {
+      navigate("/agent-studio/graph-lens-browser");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -514,6 +530,9 @@ export default function AgentStudioShell() {
         // ── PR-V1-190: graph-health admin ──
         case "graph-health-admin" as any:
           return <GraphHealthAdminPage />;
+        // ── T-F.62: graph-lens browser ──
+        case "graph-lens-browser" as any:
+          return <GraphLensBrowserPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }

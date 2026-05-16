@@ -44,6 +44,7 @@ export const agentStudioRoutes: AgentStudioRouteEntry[] = [
   { path: "/agent-studio/approval-bus-admin", component: AgentStudioShell, label: "Approval Bus Admin" },
   { path: "/agent-studio/publish-targets-admin", component: AgentStudioShell, label: "Publish Targets Admin" },
   { path: "/agent-studio/graph-health-admin", component: AgentStudioShell, label: "Graph Health Admin" },
+  { path: "/agent-studio/graph-lens-browser", component: AgentStudioShell, label: "Graph Lens Browser" },
   { path: "/agent-studio/:agentId/runs/:runId", component: AgentStudioShell, label: "Agent Run Detail" },
   { path: "/agent-studio/:agentId/versions/compare", component: AgentStudioShell, label: "Versions Compare" },
   { path: "/agent-studio/:agentId/:section", component: AgentStudioShell, label: "Agent Section" },
