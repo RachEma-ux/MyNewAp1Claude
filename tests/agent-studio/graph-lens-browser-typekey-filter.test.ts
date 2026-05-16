@@ -24,9 +24,12 @@ describe("Graph Lens browser — typeKey drill-in filter (T-F.72)", () => {
   it("panel holds typeKeyFilter state at the panel level (resets across lens switches)", () => {
     const src = readPanel();
     expect(src).toMatch(/const\s+\[typeKeyFilter,\s*setTypeKeyFilter\]\s*=\s*useState<string\s*\|\s*null>/);
-    // The selectLens helper exists and resets the filter to null.
+    // The selectLens helper exists.
     expect(src).toMatch(/function\s+selectLens\(/);
-    expect(src).toMatch(/selectLens[\s\S]{0,200}setTypeKeyFilter\(null\)/);
+    // After T-F.75, selectLens routes through clearAllFilters which
+    // resets the typeKey filter. Assert via the helper body rather
+    // than a direct call inside selectLens.
+    expect(src).toMatch(/function\s+clearAllFilters[\s\S]{0,400}setTypeKeyFilter\(null\)/);
   });
 
   it("RenderEnvelopeView receives typeKeyFilter + onTypeKeyFilterChange props", () => {

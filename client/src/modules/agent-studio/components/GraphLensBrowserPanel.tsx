@@ -57,6 +57,15 @@ export function GraphLensBrowserPanel() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   function selectLens(lensId: string) {
     setSelectedLensId(lensId);
+    clearAllFilters();
+  }
+  // T-F.75: one-click reset for all three drill-in axes. Mirrors
+  // T-I.68's "Clear all filters" button on the events card —
+  // the natural saturation-completion close of a multi-axis
+  // drill-in arc per precedent (k). Used both by the top-level
+  // affordance (gated on hasAnyFilter) and by the empty-state row
+  // when filters narrow to zero results.
+  function clearAllFilters() {
     setTypeKeyFilter(null);
     setVisibilityFilter("all");
     setSearchQuery("");
@@ -244,6 +253,7 @@ export function GraphLensBrowserPanel() {
               onVisibilityFilterChange={setVisibilityFilter}
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
+              onClearAllFilters={clearAllFilters}
             />
           ) : null}
         </CardContent>
@@ -287,6 +297,7 @@ interface RenderEnvelopeViewProps {
   ) => void;
   readonly searchQuery: string;
   readonly onSearchQueryChange: (next: string) => void;
+  readonly onClearAllFilters: () => void;
 }
 
 function RenderEnvelopeView({
@@ -297,6 +308,7 @@ function RenderEnvelopeView({
   onVisibilityFilterChange,
   searchQuery,
   onSearchQueryChange,
+  onClearAllFilters,
 }: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
@@ -446,6 +458,16 @@ function RenderEnvelopeView({
                 </button>
               ) : null}
             </div>
+            {hasAnyFilter ? (
+              <button
+                type="button"
+                className="ml-auto rounded border border-border px-2 py-0.5 underline text-muted-foreground"
+                data-testid="graph-lens-clear-all-filters"
+                onClick={onClearAllFilters}
+              >
+                Clear all filters
+              </button>
+            ) : null}
           </div>
           <div>
             <SectionLabel>By typeKey</SectionLabel>
@@ -536,7 +558,15 @@ function RenderEnvelopeView({
                       className="py-2 text-center text-muted-foreground italic"
                       data-testid="graph-lens-render-nodes-empty-after-filter"
                     >
-                      No nodes match the active filters.
+                      No nodes match the active filters.{" "}
+                      <button
+                        type="button"
+                        className="underline not-italic"
+                        data-testid="graph-lens-empty-state-clear-all"
+                        onClick={onClearAllFilters}
+                      >
+                        Clear all filters
+                      </button>
                     </td>
                   </tr>
                 ) : (

@@ -29,9 +29,14 @@ describe("Graph Lens browser — visibility drill-in filter (T-F.73)", () => {
     expect(src).toMatch(/useState[\s\S]{0,200}\("all"\)/);
   });
 
-  it("selectLens resets the visibility filter back to 'all'", () => {
+  it("lens-switch resets the visibility filter back to 'all'", () => {
     const src = readPanel();
-    expect(src).toMatch(/function\s+selectLens[\s\S]{0,400}setVisibilityFilter\("all"\)/);
+    // After T-F.75, the per-filter reset lives in `clearAllFilters`
+    // and `selectLens` delegates. Assert the helper body resets
+    // visibility regardless of which path selectLens takes.
+    expect(src).toMatch(
+      /function\s+clearAllFilters[\s\S]{0,400}setVisibilityFilter\("all"\)/,
+    );
   });
 
   it("RenderEnvelopeView receives visibilityFilter + onVisibilityFilterChange props", () => {

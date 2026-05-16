@@ -26,9 +26,14 @@ describe("Graph Lens browser — substring search drill-in (T-F.74)", () => {
     expect(src).toMatch(/const\s+\[searchQuery,\s*setSearchQuery\]\s*=\s*useState<string>\(""\)/);
   });
 
-  it("selectLens resets searchQuery to empty string", () => {
+  it("lens-switch resets searchQuery to empty string", () => {
     const src = readPanel();
-    expect(src).toMatch(/function\s+selectLens[\s\S]{0,500}setSearchQuery\(""\)/);
+    // After T-F.75, the per-filter reset lives in `clearAllFilters`
+    // and `selectLens` delegates. Assert the helper body clears the
+    // search query.
+    expect(src).toMatch(
+      /function\s+clearAllFilters[\s\S]{0,500}setSearchQuery\(""\)/,
+    );
   });
 
   it("RenderEnvelopeView receives searchQuery + onSearchQueryChange props", () => {
