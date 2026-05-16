@@ -193,3 +193,31 @@ export {
   type MaybeInstallMcpLensRunnerResult,
   type MaybeInstallMcpLensRunnerWithAsdbOptions,
 } from "./install-mcp-lens-runner.js";
+
+export {
+  buildCagLensSnapshot,
+  clampCagLensLimit,
+  createCagLensRunner,
+  isCagNodeVisibleToViewer,
+  CAG_LENS_ABSOLUTE_LIMIT,
+  CAG_LENS_DEFAULT_LIMIT,
+  type BuildCagLensSnapshotInput,
+  type CagLensPackRow,
+  type CagLensReadFn,
+  type CagLensReadParams,
+  type CagLensReadResult,
+  type CreateCagLensRunnerDeps,
+} from "./runners/cag-lens-runner.js";
+
+export {
+  createCagLensAsdbReader,
+  type CreateCagLensAsdbReaderOptions,
+} from "./runners/cag-lens-asdb-reader.js";
+
+export {
+  maybeInstallCagLensRunner,
+  maybeInstallCagLensRunnerWithAsdb,
+  type MaybeInstallCagLensRunnerOptions,
+  type MaybeInstallCagLensRunnerResult,
+  type MaybeInstallCagLensRunnerWithAsdbOptions,
+} from "./install-cag-lens-runner.js";
