@@ -79,7 +79,67 @@ export interface AgentStudioReadinessSnapshot {
  * MCP tool registry; this DTO only carries the resolved verdict and
  * the small `toolRisk` summary the UI renders.
  */
-export type RacReadinessStatus = "ready" | "degraded" | "blocked";
+/**
+ * Closed-taxonomy RAC readiness status. Promoted to a tuple at T-A.13
+ * so the metadata table + lockstep tests can be authored.
+ */
+export const RAC_READINESS_STATUSES = [
+  "ready",
+  "degraded",
+  "blocked",
+] as const;
+export type RacReadinessStatus = (typeof RAC_READINESS_STATUSES)[number];
+
+// ============================================================================
+// Per-readiness-status operator-facing metadata (T-A.13)
+// ============================================================================
+
+export interface RacReadinessStatusMetadata {
+  /** Display label rendered in the export-readiness banner. */
+  readonly label: string;
+  /** Short operator-facing description of what this readiness status
+   *  means for downstream export / dispatch. */
+  readonly description: string;
+  /** Whether export may proceed at this status (true for `ready` +
+   *  `degraded`; false for `blocked` which hard-stops the export). */
+  readonly allowsExport: boolean;
+  /** Whether the operator should investigate at this status (true
+   *  for `degraded` + `blocked`; false for `ready` which is the
+   *  no-action baseline). */
+  readonly requiresInvestigation: boolean;
+}
+
+export const RAC_READINESS_STATUS_METADATA: Readonly<
+  Record<RacReadinessStatus, RacReadinessStatusMetadata>
+> = {
+  ready: {
+    label: "Ready",
+    description:
+      "RAC readiness checks all passed — sources fresh, planner healthy, sandbox precondition met. Export proceeds normally.",
+    allowsExport: true,
+    requiresInvestigation: false,
+  },
+  degraded: {
+    label: "Degraded",
+    description:
+      "RAC readiness checks passed with caveats — soft warnings (source staleness, optional dependency unhealthy). Export proceeds; operator should glance.",
+    allowsExport: true,
+    requiresInvestigation: true,
+  },
+  blocked: {
+    label: "Blocked",
+    description:
+      "RAC readiness checks hard-failed — required source missing, sandbox prerequisite unmet for a code_execution tool, planner error. Export refuses.",
+    allowsExport: false,
+    requiresInvestigation: true,
+  },
+};
+
+export function getRacReadinessStatusMetadata(
+  status: RacReadinessStatus,
+): RacReadinessStatusMetadata {
+  return RAC_READINESS_STATUS_METADATA[status];
+}
 
 /**
  * Snapshot of the tool-sandbox health at the moment readiness was

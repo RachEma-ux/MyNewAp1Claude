@@ -169,6 +169,7 @@ const ANCILLARY_TESTS = [
   "command-scope-metadata.test.ts",
   "graph-backend-health-status-metadata.test.ts",
   "composer-mode-metadata.test.ts",
+  "rac-readiness-status-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

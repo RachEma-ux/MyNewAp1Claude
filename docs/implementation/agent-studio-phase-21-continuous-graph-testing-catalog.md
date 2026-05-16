@@ -282,6 +282,7 @@ runtime catches up.
 | `command-scope-metadata.test.ts` | `services/command-registry/command-registry` — `COMMAND_SCOPE_METADATA` (3-entry per-scope label + description + rank (0..2) + requiresExtraConfirmation booleans for read/write/destructive; also promotes `COMMAND_SCOPES` closed-tuple) | T-G.49 / #1158 |
 | `graph-backend-health-status-metadata.test.ts` | `services/graph/repository/types` — `GRAPH_BACKEND_HEALTH_STATUS_METADATA` (3-entry per-status label + description + servesReads + requiresInvestigation booleans for healthy/degraded/unavailable; also promotes `GRAPH_BACKEND_HEALTH_STATUSES` closed-tuple) | T-G.50 / #1159 |
 | `composer-mode-metadata.test.ts` | `services/runtime/system-prompt-composer` — `COMPOSER_MODE_METADATA` (3-entry per-mode label + description + composes + throwsOnMissingPack booleans for disabled/safe_degraded/strict; also promotes `COMPOSER_MODES` closed-tuple) | T-G.51 / #1160 |
+| `rac-readiness-status-metadata.test.ts` | `shared/export-candidate` — `RAC_READINESS_STATUS_METADATA` (3-entry per-status label + description + allowsExport + requiresInvestigation booleans for ready/degraded/blocked; also promotes `RAC_READINESS_STATUSES` closed-tuple) | T-A.13 / #1161 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
