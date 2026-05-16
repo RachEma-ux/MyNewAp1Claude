@@ -104,3 +104,25 @@ export {
   type MaybeInstallDefaultLensStackOptions,
   type MaybeInstallDefaultLensStackResult,
 } from "./install-default-lens-stack.js";
+
+export {
+  buildRuntimeLensSnapshot,
+  clampRuntimeLensLimit,
+  createRuntimeLensRunner,
+  isRuntimeRunVisibleToViewer,
+  RUNTIME_LENS_ABSOLUTE_LIMIT,
+  RUNTIME_LENS_DEFAULT_LIMIT,
+  type BuildRuntimeLensSnapshotInput,
+  type CreateRuntimeLensRunnerDeps,
+  type RuntimeLensAgentRow,
+  type RuntimeLensReadFn,
+  type RuntimeLensReadParams,
+  type RuntimeLensReadResult,
+  type RuntimeLensRunRow,
+} from "./runners/runtime-lens-runner.js";
+
+export {
+  maybeInstallRuntimeLensRunner,
+  type MaybeInstallRuntimeLensRunnerOptions,
+  type MaybeInstallRuntimeLensRunnerResult,
+} from "./install-runtime-lens-runner.js";
