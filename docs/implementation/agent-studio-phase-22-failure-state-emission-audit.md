@@ -13,17 +13,17 @@ Today the recorder accepts free-form `errorClass: string`. The wiring slices (T-
 
 ---
 
-## 1. Audit summary (post batch-A + first 4 batch-B + T-I.38 golden-question wiring)
+## 1. Audit summary (post batch-A + first 4 batch-B + T-I.38 golden-question wiring + T-I.40 graph-correction-rejected wiring)
 
 | Status | Count | Description |
 |---|---|---|
-| 🟢 LIVE via closed-taxonomy bridge | **13** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21, #22) |
+| 🟢 LIVE via closed-taxonomy bridge | **14** | Emission shipped through `recordFailureStateEvent` (kinds #1, #3, #4, #5, #8, #9, #12, #15, #18, #19, #20, #21, #22, #23) |
 | ⚠️ Has detection code, partial emission | 1 | Free-form `errorClass` written (kind #25 background-job-failed locked by count-pinned tests — see lesson 22) |
 | 🟡 Detection state exists in DB but no observability surface | 4 | A status column / audit table carries the state; emission deferred (kinds #2, #6, #7, #10) |
-| ❌ No detection yet — phase-gated | 6 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17, #23) |
+| ❌ No detection yet — phase-gated | 5 | Underlying runtime doesn't exist; gated on a downstream phase (kinds #11, #13, #14, #16, #17) |
 | 🔒 Phase-gated on T-D.3 | 1 | Semantic Enrichment Agent runtime (#24) |
 
-**Live coverage: 13/25 closed kinds (52%).** Batch-B target: 15/25 (60%) once `note_conflict` / `neo4j_projection_stale` / additional follow-ups close. T-I.38 (#1213) corrected the premise of the prior audit row for #22 — `runLiveEvaluation` was already callable from server runtime; the evaluator just needed the emitter wired in-process rather than gated on a runtime move. Sum: 13 + 1 + 4 + 6 + 1 = 25 ✓.
+**Live coverage: 14/25 closed kinds (56%).** Batch-B target: 15/25 (60%) one more wiring away. T-I.38 (#1213) corrected the premise of the prior audit row for #22 — `runLiveEvaluation` was already callable from server runtime. T-I.40 (#1215) corrected the premise of #23 — `rejectCorrectionProposal` was already shipped in initial Phase 23 lifecycle work, just needed the bridge call wired in. Sum: 14 + 1 + 4 + 5 + 1 = 25 ✓.
 
 ---
 
@@ -55,7 +55,7 @@ Legend: 🟢 LIVE — emission shipped via the closed-taxonomy bridge | 🟡 det
 | 20 | `retrieval_safety_filter_blocked_content` | retrieval | 🟢 **LIVE @ #1016 (T-I.5.A.3)** | Safety filter post-step; one event per retrieval call with reasonCounts aggregation | `services/graph/retrieval/retrieval-router.ts` |
 | 21 | `graph_agent_answer_incomplete` | agent | 🟢 **LIVE @ #1023 (T-I.5.B.1)** | Engine agentic loop budget exhaustion (max_iterations / wall_clock_budget only) | `services/graph-agent/engine.ts` |
 | 22 | `golden_question_failed` | agent | 🟢 **LIVE @ #1213 (T-I.38)** | `runLiveEvaluation` fires `recordFailureStateEvent` per failed question; emitter override via `LiveEvaluationOptions.recordFailureStateEvent` for test injection | `services/graph-skill/golden-questions/live-evaluator.ts` |
-| 23 | `graph_correction_rejected` | governance | ❌ | No reject path exists in `services/graph-quality/` — only approve + dismiss | Phase-gated on graph-quality reject runtime |
+| 23 | `graph_correction_rejected` | governance | 🟢 **LIVE @ #1215 (T-I.40)** | `services/graph-correction/lifecycle.ts` reject path — emits on the `decide({decision: "rejected"})` branch (approve / revision_requested / withdrawn do not emit; reject is the only failure-bearing reviewer signal). Audit's prior premise ("No reject path exists") was incorrect — `rejectCorrectionProposal` was shipped in the initial Phase 23 lifecycle work | `services/graph-correction/lifecycle.ts` |
 | 24 | `semantic_enrichment_rejected` | governance | 🔒 | Semantic enrichment agent does not exist yet | Gated on T-D.3 (semantic enrichment agent runtime) |
 | 25 | `background_job_failed` | runtime | ⚠️ | `background-jobs.ts:868,954` writes free-form `errorClass: "BackgroundJobFailed"` — locked by 20+ test/dashboard assertions | **Sibling-emit attempt found a stronger blocker** — 3 pre-existing tests pin EXACTLY 1 row written / 1 spy call per failed job. A second `recordFailureStateEvent` call breaks those tests. Closing this kind requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice (T-I.13.b future) AFTER operator dashboard query migration completes. See lesson 22 in `project_v1_plus_session_2026_05_15.md`. |
 
