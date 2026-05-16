@@ -287,6 +287,7 @@ runtime catches up.
 | `conflict-behavior-metadata.test.ts` | `services/marketplace-installer` — `CONFLICT_BEHAVIOR_METADATA` (3-entry per-behavior label + description + producesNewRecord + preservesExisting booleans for skip/overwrite/rename; also promotes `CONFLICT_BEHAVIORS` closed-tuple) | T-G.53 / #1163 |
 | `http-method-metadata.test.ts` | `services/publish-targets/http-pusher` — `HTTP_METHOD_METADATA` (3-entry per-method label + description + isCreate + isIdempotent booleans for POST/PUT/PATCH; also promotes `HTTP_METHODS` closed-tuple) | T-G.54 / #1164 |
 | `graph-quality-agent-run-status-metadata.test.ts` | `services/graph-quality-agent-runs-retention` — `GRAPH_QUALITY_AGENT_RUN_STATUS_METADATA` (3-entry per-status label + description + terminal + successful booleans for running/completed/failed; also promotes `GRAPH_QUALITY_AGENT_RUN_STATUSES` closed-tuple) | T-D.14 / #1165 |
+| `rac-trace-feedback-verdict-metadata.test.ts` | `services/rac/trace/store` — `RAC_TRACE_FEEDBACK_VERDICT_METADATA` (2-entry per-verdict label + description + isPositive boolean for thumbs_up/thumbs_down; also promotes `RAC_TRACE_FEEDBACK_VERDICTS` closed-tuple) | T-A.14 / #1166 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
