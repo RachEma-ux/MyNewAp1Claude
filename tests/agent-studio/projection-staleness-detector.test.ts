@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   detectStaleProjections,
   emitStaleProjections,
+  runStalenessCheck,
   type ProjectionSyncJobRow,
 } from "../../server/agent-studio/services/graph/projection/staleness-detector.js";
 
@@ -220,5 +221,58 @@ describe("emitStaleProjections", () => {
     await Promise.resolve();
     expect(emitter).toHaveBeenCalledTimes(1);
     expect(emitter.mock.calls[0][0].metadata?.thresholdMs).toBe(30 * 60 * 1000);
+  });
+});
+
+describe("runStalenessCheck — orchestrator", () => {
+  it("composes fetchRows → detect → emit and returns the summary", async () => {
+    const old = new Date(FROZEN_NOW.getTime() - 4 * 60 * 60 * 1000);
+    const fetchRows = vi.fn(async () => [
+      makeRow({ projectionKey: "a", status: "succeeded", completedAt: old }),
+      makeRow({ projectionKey: "b", status: "failed", completedAt: null }),
+    ]);
+    const emitter = vi.fn(async () => null);
+    const summary = await runStalenessCheck({
+      fetchRows,
+      now: FROZEN_NOW,
+      recordFailureStateEvent: emitter,
+    });
+    expect(fetchRows).toHaveBeenCalledTimes(1);
+    expect(summary.stale).toHaveLength(1);
+    expect(summary.neverSucceeded).toHaveLength(1);
+    await Promise.resolve();
+    expect(emitter).toHaveBeenCalledTimes(1);
+    expect(emitter.mock.calls[0][0].failureState).toBe("neo4j_projection_stale");
+  });
+
+  it("passes thresholdMs through to detector and emitter", async () => {
+    const old = new Date(FROZEN_NOW.getTime() - 90 * 60 * 1000);
+    const fetchRows = vi.fn(async () => [
+      makeRow({ projectionKey: "a", status: "succeeded", completedAt: old }),
+    ]);
+    const emitter = vi.fn(async () => null);
+    const summary = await runStalenessCheck({
+      fetchRows,
+      now: FROZEN_NOW,
+      thresholdMs: 30 * 60 * 1000,
+      recordFailureStateEvent: emitter,
+    });
+    expect(summary.stale).toHaveLength(1);
+    await Promise.resolve();
+    expect(emitter.mock.calls[0][0].metadata?.thresholdMs).toBe(30 * 60 * 1000);
+  });
+
+  it("propagates null emitter suppression", async () => {
+    const old = new Date(FROZEN_NOW.getTime() - 4 * 60 * 60 * 1000);
+    const fetchRows = vi.fn(async () => [
+      makeRow({ projectionKey: "a", status: "succeeded", completedAt: old }),
+    ]);
+    const summary = await runStalenessCheck({
+      fetchRows,
+      now: FROZEN_NOW,
+      recordFailureStateEvent: null,
+    });
+    expect(summary.stale).toHaveLength(1);
+    // Null emitter does not throw, no bridge call attempted.
   });
 });
