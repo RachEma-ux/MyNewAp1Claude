@@ -64,6 +64,18 @@ export interface CreateSavedViewInput {
   readonly parentSavedViewId?: number | null;
 }
 
+/**
+ * Closed-taxonomy saved-view visibility values. Promoted to a
+ * tuple-derived constant at T-B.7 so the aggregator + downstream UI
+ * can iterate.
+ */
+export const SAVED_VIEW_VISIBILITIES = [
+  "personal",
+  "workspace_shared",
+] as const;
+export type SavedViewVisibility =
+  (typeof SAVED_VIEW_VISIBILITIES)[number];
+
 export interface SavedViewRow {
   readonly id: number;
   readonly vaultId: number;
@@ -73,7 +85,7 @@ export interface SavedViewRow {
   readonly filters: Record<string, unknown> | null;
   readonly sort: Record<string, unknown> | null;
   readonly columns: string[] | null;
-  readonly visibility: "personal" | "workspace_shared";
+  readonly visibility: SavedViewVisibility;
   readonly version: number;
   readonly parentSavedViewId: number | null;
   readonly createdAt: Date;
