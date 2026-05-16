@@ -146,6 +146,7 @@ const ANCILLARY_TESTS = [
   "ags-skill-source-metadata.test.ts",
   "ags-tool-category-metadata.test.ts",
   "ags-provider-key-metadata.test.ts",
+  "ags-hook-event-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

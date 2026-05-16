@@ -732,6 +732,230 @@ export const AGS_HOOK_EVENTS = [
 ] as const;
 export type AgsHookEvent = (typeof AGS_HOOK_EVENTS)[number];
 
+// ============================================================================
+// Per-hook-event operator-facing metadata (T-S.21)
+// ============================================================================
+
+export type AgsHookEventCategory =
+  | "session"
+  | "tool"
+  | "user"
+  | "task"
+  | "filesystem";
+
+export interface AgsHookEventMetadata {
+  /** Display label rendered in the hook-event picker. */
+  readonly label: string;
+  /** Short operator-facing description of when this hook fires. */
+  readonly description: string;
+  /** Closed-taxonomy category for grouping hooks in the picker. */
+  readonly category: AgsHookEventCategory;
+  /** Whether this event has a sibling counterpart that pairs with it
+   *  (e.g. PreToolUse↔PostToolUse, SessionStart↔SessionEnd,
+   *  TaskCreated↔TaskCompleted). Unpaired events fire standalone. */
+  readonly isPaired: boolean;
+}
+
+export const AGS_HOOK_EVENT_METADATA: Readonly<
+  Record<AgsHookEvent, AgsHookEventMetadata>
+> = {
+  PreToolUse: {
+    label: "Pre-Tool-Use",
+    description:
+      "Fires before a tool call is dispatched. Can deny or modify the call before MCP execution.",
+    category: "tool",
+    isPaired: true,
+  },
+  PostToolUse: {
+    label: "Post-Tool-Use",
+    description:
+      "Fires after a tool call returns successfully. Read-only observation point.",
+    category: "tool",
+    isPaired: true,
+  },
+  PostToolUseFailure: {
+    label: "Post-Tool-Use Failure",
+    description:
+      "Fires after a tool call errors out. Read-only observation point for failure handling.",
+    category: "tool",
+    isPaired: false,
+  },
+  Notification: {
+    label: "Notification",
+    description:
+      "Fires when the agent sends a foreground notification (idle, waiting, request for input).",
+    category: "session",
+    isPaired: false,
+  },
+  UserPromptSubmit: {
+    label: "User Prompt Submit",
+    description:
+      "Fires when the user submits a prompt. Can deny or rewrite the prompt before model dispatch.",
+    category: "user",
+    isPaired: false,
+  },
+  SessionStart: {
+    label: "Session Start",
+    description:
+      "Fires once at the start of a session. Useful for loading session-scoped context.",
+    category: "session",
+    isPaired: true,
+  },
+  SessionEnd: {
+    label: "Session End",
+    description:
+      "Fires once at the end of a session. Useful for flushing session-scoped state.",
+    category: "session",
+    isPaired: true,
+  },
+  Stop: {
+    label: "Stop",
+    description:
+      "Fires when the agent's main turn loop is about to stop. Can ask the loop to continue.",
+    category: "session",
+    isPaired: false,
+  },
+  StopFailure: {
+    label: "Stop Failure",
+    description:
+      "Fires when the stop hook itself errors out. Read-only observation point.",
+    category: "session",
+    isPaired: false,
+  },
+  SubagentStart: {
+    label: "Subagent Start",
+    description:
+      "Fires when a subagent is about to launch. Useful for injecting subagent-scoped context.",
+    category: "session",
+    isPaired: true,
+  },
+  SubagentStop: {
+    label: "Subagent Stop",
+    description:
+      "Fires when a subagent's turn loop is about to stop. Useful for capturing subagent receipts.",
+    category: "session",
+    isPaired: true,
+  },
+  PreCompact: {
+    label: "Pre-Compact",
+    description:
+      "Fires before conversation compaction. Can deny or modify the compaction strategy.",
+    category: "session",
+    isPaired: true,
+  },
+  PostCompact: {
+    label: "Post-Compact",
+    description:
+      "Fires after conversation compaction completes. Useful for logging compaction summaries.",
+    category: "session",
+    isPaired: true,
+  },
+  PermissionRequest: {
+    label: "Permission Request",
+    description:
+      "Fires when a tool needs an approval decision. Useful for routing to external approval systems.",
+    category: "user",
+    isPaired: false,
+  },
+  PermissionDenied: {
+    label: "Permission Denied",
+    description:
+      "Fires after the permission system denies a tool call. Read-only observation point.",
+    category: "user",
+    isPaired: false,
+  },
+  Setup: {
+    label: "Setup",
+    description:
+      "Fires once during agent setup, before the first model call. Useful for one-time initialization.",
+    category: "session",
+    isPaired: false,
+  },
+  TeammateIdle: {
+    label: "Teammate Idle",
+    description:
+      "Fires when a paired teammate agent goes idle. Useful for handoff signaling.",
+    category: "session",
+    isPaired: false,
+  },
+  TaskCreated: {
+    label: "Task Created",
+    description:
+      "Fires when an internal task is created by the agent. Useful for external task tracking.",
+    category: "task",
+    isPaired: true,
+  },
+  TaskCompleted: {
+    label: "Task Completed",
+    description:
+      "Fires when an internal task is marked completed. Useful for external task tracking.",
+    category: "task",
+    isPaired: true,
+  },
+  Elicitation: {
+    label: "Elicitation",
+    description:
+      "Fires when a structured elicitation request is opened. Useful for routing to external form UIs.",
+    category: "user",
+    isPaired: true,
+  },
+  ElicitationResult: {
+    label: "Elicitation Result",
+    description:
+      "Fires when an elicitation request resolves with user-provided data.",
+    category: "user",
+    isPaired: true,
+  },
+  ConfigChange: {
+    label: "Config Change",
+    description:
+      "Fires when an in-scope config file changes on disk during a session.",
+    category: "filesystem",
+    isPaired: false,
+  },
+  WorktreeCreate: {
+    label: "Worktree Create",
+    description:
+      "Fires when an isolated worktree is created for a subagent. Useful for prepping the working copy.",
+    category: "filesystem",
+    isPaired: true,
+  },
+  WorktreeRemove: {
+    label: "Worktree Remove",
+    description:
+      "Fires when an isolated worktree is removed. Useful for cleanup or auditing.",
+    category: "filesystem",
+    isPaired: true,
+  },
+  InstructionsLoaded: {
+    label: "Instructions Loaded",
+    description:
+      "Fires after CLAUDE.md / AGENTS.md / system-prompt fragments are loaded.",
+    category: "session",
+    isPaired: false,
+  },
+  CwdChanged: {
+    label: "Cwd Changed",
+    description:
+      "Fires when the agent's working directory changes during a session.",
+    category: "filesystem",
+    isPaired: false,
+  },
+  FileChanged: {
+    label: "File Changed",
+    description:
+      "Fires when a tracked file is modified by the agent or an external watcher.",
+    category: "filesystem",
+    isPaired: false,
+  },
+};
+
+export function getAgsHookEventMetadata(
+  event: AgsHookEvent,
+): AgsHookEventMetadata {
+  return AGS_HOOK_EVENT_METADATA[event];
+}
+
 /**
  * Permission modes from openllm-agent2's `PermissionModeSchema`.
  *  - default: prompts for dangerous operations
