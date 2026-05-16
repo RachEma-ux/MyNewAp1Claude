@@ -173,55 +173,65 @@ export async function persistDriftReport(report: DriftReport): Promise<number> {
   return report.events.length;
 }
 
+/**
+ * T-I.58 — standalone drift-scan sweep, callable both by the cron
+ * wrapper (default schedule) AND by the admin tRPC mutation for
+ * operator-triggered ad-hoc invocation. Extracted from the inline
+ * `runSweep` body of `makeRetentionCron` so the operator path can
+ * bypass the cron-expression + minute-dedupe gate that
+ * `tickProjectionDriftCron` enforces.
+ *
+ * Same closed-taxonomy bridge emission semantics as before: emit
+ * `neo4j_projection_drift_detected` only when `driftCount > 0`;
+ * fire-and-forget; observability writes never propagate.
+ */
+export async function runProjectionDriftScan(
+  input: DriftCronInput = {},
+): Promise<DriftCronResult> {
+  const scope = input.scope ?? "default";
+  const samplePerType = input.samplePerType ?? SAMPLE_PER_TYPE_DEFAULT;
+  const detectorInput =
+    input.precomputedInput ??
+    (await loadDriftDetectorInputFromAsDb({ scope, samplePerType }));
+  const runScan =
+    input.runScan ??
+    ((di) => new DriftDetector(getGraphRepository()).scan(di));
+  const persist = input.persist ?? persistDriftReport;
+  const report = await runScan(detectorInput);
+  const persisted = await persist(report);
+  if (report.summary.driftCount > 0) {
+    void recordFailureStateEvent({
+      failureState: "neo4j_projection_drift_detected",
+      sourceKind: "projection-drift-cron",
+      sourceId: report.scope,
+      errorMessage: `Projection drift detected — ${report.summary.driftCount} event(s) across ${report.summary.totalScanned} scanned`,
+      metadata: {
+        scope: report.scope,
+        totalScanned: report.summary.totalScanned,
+        driftCount: report.summary.driftCount,
+        permissionLeakCount: report.summary.permissionLeakCount,
+      },
+    }).catch(() => {
+      // Fail-soft.
+    });
+  }
+  return {
+    scope: report.scope,
+    scannedAt: report.scannedAt,
+    totalScanned: report.summary.totalScanned,
+    driftCount: report.summary.driftCount,
+    permissionLeakCount: report.summary.permissionLeakCount,
+    persistedEvents: persisted,
+  };
+}
+
 const cron = makeRetentionCron<DriftCronInput, DriftCronResult>({
   logPrefix: "ags-projection-drift-cron",
   envPrefix: "AGS_PROJECTION_DRIFT",
   defaultCronExpr: "30 4 * * *",
   defaultRetentionDays: null,
   buildSweepInput: ({ sweepInput }) => sweepInput ?? {},
-  runSweep: async (input) => {
-    const scope = input.scope ?? "default";
-    const samplePerType = input.samplePerType ?? SAMPLE_PER_TYPE_DEFAULT;
-    const detectorInput =
-      input.precomputedInput ??
-      (await loadDriftDetectorInputFromAsDb({ scope, samplePerType }));
-    const runScan =
-      input.runScan ??
-      ((di) => new DriftDetector(getGraphRepository()).scan(di));
-    const persist = input.persist ?? persistDriftReport;
-    const report = await runScan(detectorInput);
-    const persisted = await persist(report);
-    // T-I.5 batch A — bridge drift detection to the Phase 22 closed-
-    // taxonomy emission surface so operator dashboards can group
-    // `neo4j_projection_drift_detected` events alongside other failure
-    // states. Only emit when driftCount > 0 (zero-drift scans aren't
-    // a failure event); fire-and-forget — observability writes never
-    // propagate into the cron return path.
-    if (report.summary.driftCount > 0) {
-      void recordFailureStateEvent({
-        failureState: "neo4j_projection_drift_detected",
-        sourceKind: "projection-drift-cron",
-        sourceId: report.scope,
-        errorMessage: `Projection drift detected — ${report.summary.driftCount} event(s) across ${report.summary.totalScanned} scanned`,
-        metadata: {
-          scope: report.scope,
-          totalScanned: report.summary.totalScanned,
-          driftCount: report.summary.driftCount,
-          permissionLeakCount: report.summary.permissionLeakCount,
-        },
-      }).catch(() => {
-        // Fail-soft.
-      });
-    }
-    return {
-      scope: report.scope,
-      scannedAt: report.scannedAt,
-      totalScanned: report.summary.totalScanned,
-      driftCount: report.summary.driftCount,
-      permissionLeakCount: report.summary.permissionLeakCount,
-      persistedEvents: persisted,
-    };
-  },
+  runSweep: runProjectionDriftScan,
   formatSweepLogTail: (r) =>
     `scope=${r.scope} scanned=${r.totalScanned} drifts=${r.driftCount} leaks=${r.permissionLeakCount} persisted=${r.persistedEvents}`,
   formatStartupLogTail: () => "scope=default",
