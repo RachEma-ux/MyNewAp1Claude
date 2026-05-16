@@ -37,7 +37,65 @@ import type {
   PublishTargetRecord,
 } from "./types.js";
 
-export type HttpMethod = "POST" | "PUT" | "PATCH";
+/**
+ * Closed-taxonomy HTTP method allowed for publish-target push. Promoted
+ * to a tuple at T-G.54 so the metadata table + lockstep tests can be
+ * authored. Read-only methods (GET/HEAD/OPTIONS) are excluded because
+ * publish-push is by definition a write operation.
+ */
+export const HTTP_METHODS = ["POST", "PUT", "PATCH"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+
+// ============================================================================
+// Per-HTTP-method operator-facing metadata (T-G.54)
+// ============================================================================
+
+export interface HttpMethodMetadata {
+  /** Display label rendered in the publish-target HTTP method picker. */
+  readonly label: string;
+  /** Short operator-facing description of when to use this method in
+   *  a publish-target context. */
+  readonly description: string;
+  /** Whether the receiving endpoint expects to create a new resource
+   *  per request (true for `POST`; false for `PUT` + `PATCH` which
+   *  address an existing resource by URL). */
+  readonly isCreate: boolean;
+  /** Whether the method is idempotent per HTTP semantics (true for
+   *  `PUT` only — `POST` is non-idempotent by spec; `PATCH` is non-
+   *  idempotent unless the patch document is itself idempotent, which
+   *  we conservatively model as `false`). */
+  readonly isIdempotent: boolean;
+}
+
+export const HTTP_METHOD_METADATA: Readonly<
+  Record<HttpMethod, HttpMethodMetadata>
+> = {
+  POST: {
+    label: "POST",
+    description:
+      "Create — the receiving endpoint allocates a new resource per request. Non-idempotent; safe to retry only when the payload carries a client-side dedup key.",
+    isCreate: true,
+    isIdempotent: false,
+  },
+  PUT: {
+    label: "PUT",
+    description:
+      "Upsert — the receiving endpoint addresses an existing resource by URL and replaces its representation. Idempotent; safe to retry.",
+    isCreate: false,
+    isIdempotent: true,
+  },
+  PATCH: {
+    label: "PATCH",
+    description:
+      "Partial update — the receiving endpoint applies a delta to an existing resource. Non-idempotent unless the patch document is itself idempotent.",
+    isCreate: false,
+    isIdempotent: false,
+  },
+};
+
+export function getHttpMethodMetadata(method: HttpMethod): HttpMethodMetadata {
+  return HTTP_METHOD_METADATA[method];
+}
 
 export interface MakeHttpPusherOptions {
   /** HTTP method. Default `"POST"`. */
