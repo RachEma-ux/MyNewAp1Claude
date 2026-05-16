@@ -44,7 +44,93 @@ export const ALLOWED_PROCEDURE_NAMESPACES = [
   "gds.betweenness",
   "gds.degree",
   "gds.pageRank",
-];
+] as const;
+export type AllowedProcedureNamespace =
+  (typeof ALLOWED_PROCEDURE_NAMESPACES)[number];
+
+// ============================================================================
+// Per-allowed-namespace operator-facing metadata (T-G.38)
+// ============================================================================
+
+export type AllowedProcedureNamespaceProviderBucket =
+  | "neo4j"
+  | "apoc"
+  | "gds";
+
+export interface AllowedProcedureNamespaceMetadata {
+  /** Display label rendered in the query-builder's namespace picker. */
+  readonly label: string;
+  /** Short operator-facing description of what procedures under this
+   *  namespace do and when to reach for them. */
+  readonly description: string;
+  /** Closed-taxonomy provider bucket — drives namespace grouping in
+   *  the picker (Neo4j core vs. APOC library vs. GDS algorithms). */
+  readonly providerBucket: AllowedProcedureNamespaceProviderBucket;
+  /** Whether procedures under this namespace expect a projected graph
+   *  cataloged via `gds.graph.project` before they will run (true for
+   *  every `gds.*` entry; false for db.schema / apoc.*). */
+  readonly expectsGraphProjection: boolean;
+}
+
+export const ALLOWED_PROCEDURE_NAMESPACE_METADATA: Readonly<
+  Record<AllowedProcedureNamespace, AllowedProcedureNamespaceMetadata>
+> = {
+  "db.schema.": {
+    label: "db.schema.*",
+    description:
+      "Neo4j core schema introspection — list labels, relationship types, properties, and constraints.",
+    providerBucket: "neo4j",
+    expectsGraphProjection: false,
+  },
+  "apoc.path.": {
+    label: "apoc.path.*",
+    description:
+      "APOC path-expansion procedures — bounded BFS/DFS traversals with relationship-type / direction filters.",
+    providerBucket: "apoc",
+    expectsGraphProjection: false,
+  },
+  "apoc.coll.": {
+    label: "apoc.coll.*",
+    description:
+      "APOC collection helpers — list manipulation, set operations, sorting, deduplication.",
+    providerBucket: "apoc",
+    expectsGraphProjection: false,
+  },
+  "gds.shortestPath": {
+    label: "gds.shortestPath.*",
+    description:
+      "GDS shortest-path algorithms (Dijkstra / A* / Yens) over a projected graph.",
+    providerBucket: "gds",
+    expectsGraphProjection: true,
+  },
+  "gds.betweenness": {
+    label: "gds.betweenness.*",
+    description:
+      "GDS betweenness-centrality algorithm — ranks nodes by how many shortest paths pass through them.",
+    providerBucket: "gds",
+    expectsGraphProjection: true,
+  },
+  "gds.degree": {
+    label: "gds.degree.*",
+    description:
+      "GDS degree-centrality algorithm — ranks nodes by direct relationship count.",
+    providerBucket: "gds",
+    expectsGraphProjection: true,
+  },
+  "gds.pageRank": {
+    label: "gds.pageRank.*",
+    description:
+      "GDS PageRank algorithm — ranks nodes by iterative random-walk steady-state probability.",
+    providerBucket: "gds",
+    expectsGraphProjection: true,
+  },
+};
+
+export function getAllowedProcedureNamespaceMetadata(
+  ns: AllowedProcedureNamespace,
+): AllowedProcedureNamespaceMetadata {
+  return ALLOWED_PROCEDURE_NAMESPACE_METADATA[ns];
+}
 
 /**
  * Closed-taxonomy validation failure reasons. Promoted to a typed

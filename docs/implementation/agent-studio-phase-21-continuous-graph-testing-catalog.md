@@ -268,6 +268,7 @@ runtime catches up.
 | `rac-planner-mode-family-metadata.test.ts` | `services/rac/planner-mode` — `RAC_PLANNER_MODE_FAMILY_METADATA` (6-entry per-family label + description + retrievalKind (none/cag/knowledge/graph/hybrid) + usesGraph booleans for no_retrieval/cag_only/knowledge_retrieval/hybrid_cag/graphrag_pure/graphrag_hybrid) | T-A.11 / #1144 |
 | `rac-source-retrieval-mechanism-metadata.test.ts` | `services/rac/sources/types` — `RAC_SOURCE_RETRIEVAL_MECHANISM_METADATA` (5-entry per-mechanism label + description + requiresEmbeddings + callsExternal booleans for precompiled/vector/graph/external_api/structured) | T-A.12 / #1145 |
 | `contracted-extension-lane-metadata.test.ts` | `services/extensions/lane-hook-contracts` — `CONTRACTED_EXTENSION_LANE_METADATA` (3-entry per-contracted-lane label + description + pipelineOrder (1..3) + producesContributedChunks booleans for retrieve/assemble/compose) | T-X.4 / #1146 |
+| `allowed-procedure-namespace-metadata.test.ts` | `services/graph/retrieval/text2cypher-validator` — `ALLOWED_PROCEDURE_NAMESPACE_METADATA` (7-entry per-namespace label + description + providerBucket (neo4j/apoc/gds) + expectsGraphProjection booleans for db.schema./apoc.path./apoc.coll./gds.shortestPath/gds.betweenness/gds.degree/gds.pageRank; also promotes `AllowedProcedureNamespace` type alias) | T-G.38 / #1147 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
