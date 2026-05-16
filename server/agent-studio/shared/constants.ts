@@ -1109,6 +1109,139 @@ export const AGS_PROVIDER_KEYS = [
 ] as const;
 export type AgsProviderKey = (typeof AGS_PROVIDER_KEYS)[number];
 
+// ============================================================================
+// Per-provider operator-facing metadata (T-S.20)
+// ============================================================================
+
+export interface AgsProviderKeyMetadata {
+  /** Display label rendered in the provider picker. */
+  readonly label: string;
+  /** Short operator-facing description of the provider. */
+  readonly description: string;
+  /** Hosting mode: `local` runs on operator hardware; `cloud` is a
+   *  first-party hosted API; `aggregator` fronts multiple upstream
+   *  providers behind a single key. */
+  readonly hostingMode: "local" | "cloud" | "aggregator";
+  /** Whether this provider requires an API key / credential to call. */
+  readonly requiresApiKey: boolean;
+}
+
+export const AGS_PROVIDER_KEY_METADATA: Readonly<
+  Record<AgsProviderKey, AgsProviderKeyMetadata>
+> = {
+  ollama: {
+    label: "Ollama",
+    description:
+      "Local Ollama daemon — runs open-weight models on operator hardware with no remote calls.",
+    hostingMode: "local",
+    requiresApiKey: false,
+  },
+  openai: {
+    label: "OpenAI",
+    description:
+      "OpenAI's first-party hosted API — GPT-4 / GPT-4o / o-series models.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  anthropic: {
+    label: "Anthropic",
+    description:
+      "Anthropic's first-party hosted API — Claude model family.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  gemini: {
+    label: "Google Gemini",
+    description:
+      "Google's first-party Gemini API — flash / pro / ultra tiers.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  deepseek: {
+    label: "DeepSeek",
+    description:
+      "DeepSeek's first-party hosted API — chat + coder model lines.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  groq: {
+    label: "Groq",
+    description:
+      "Groq's first-party LPU-hosted API — low-latency inference for popular open-weight models.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  together: {
+    label: "Together AI",
+    description:
+      "Together AI's first-party hosted API — broad open-weight model catalog.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  fireworks: {
+    label: "Fireworks",
+    description:
+      "Fireworks's first-party hosted API — optimized open-weight inference.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  mistral: {
+    label: "Mistral",
+    description:
+      "Mistral's first-party hosted API — Mistral / Mixtral / Codestral models.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  openrouter: {
+    label: "OpenRouter",
+    description:
+      "OpenRouter aggregator — fronts dozens of upstream providers behind one key (the retrofit-bound model execution path).",
+    hostingMode: "aggregator",
+    requiresApiKey: true,
+  },
+  github_models: {
+    label: "GitHub Models",
+    description:
+      "GitHub Models marketplace — hosted catalog reachable through a GitHub token.",
+    hostingMode: "aggregator",
+    requiresApiKey: true,
+  },
+  lmstudio: {
+    label: "LM Studio",
+    description:
+      "Local LM Studio server — runs open-weight models on operator hardware with an OpenAI-compatible API.",
+    hostingMode: "local",
+    requiresApiKey: false,
+  },
+  bedrock: {
+    label: "AWS Bedrock",
+    description:
+      "AWS Bedrock — first-party hosted, fronts Anthropic / Mistral / Cohere / Amazon model lines under AWS credentials.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  vertex: {
+    label: "Google Vertex AI",
+    description:
+      "Google Vertex AI — first-party hosted, fronts Gemini and partner models under GCP credentials.",
+    hostingMode: "cloud",
+    requiresApiKey: true,
+  },
+  atomic_chat: {
+    label: "Atomic Chat",
+    description:
+      "Atomic Chat aggregator — fronts multiple upstream providers behind one workspace token.",
+    hostingMode: "aggregator",
+    requiresApiKey: true,
+  },
+};
+
+export function getAgsProviderKeyMetadata(
+  key: AgsProviderKey,
+): AgsProviderKeyMetadata {
+  return AGS_PROVIDER_KEY_METADATA[key];
+}
+
 /** Reasoning effort levels (per openllm `AgentDefinition.effort`). */
 export const AGS_EFFORT_LEVELS = ["low", "medium", "high", "max"] as const;
 export type AgsEffortLevel = (typeof AGS_EFFORT_LEVELS)[number];
