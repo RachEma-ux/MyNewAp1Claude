@@ -29,7 +29,67 @@ export type MarketplaceItemType =
   | "tool_pack"
   | "bundle";
 
-export type MarketplaceItemSource = "local" | "imported" | "published";
+/**
+ * Closed-taxonomy marketplace item source. Promoted to a tuple at
+ * T-G.52 so the metadata table + lockstep tests can be authored.
+ */
+export const MARKETPLACE_ITEM_SOURCES = [
+  "local",
+  "imported",
+  "published",
+] as const;
+export type MarketplaceItemSource = (typeof MARKETPLACE_ITEM_SOURCES)[number];
+
+// ============================================================================
+// Per-marketplace-source operator-facing metadata (T-G.52)
+// ============================================================================
+
+export interface MarketplaceItemSourceMetadata {
+  /** Display label rendered in the marketplace browser source chip. */
+  readonly label: string;
+  /** Short operator-facing description of where this item came from
+   *  and what trust assumptions apply. */
+  readonly description: string;
+  /** Whether the item is intrinsic to this workspace's own catalog
+   *  (true for `local` + `published` — produced inside; false for
+   *  `imported` which originates from another workspace). */
+  readonly isFirstParty: boolean;
+  /** Whether the item is currently advertised externally — visible to
+   *  other workspaces (true for `published` only). */
+  readonly isAdvertised: boolean;
+}
+
+export const MARKETPLACE_ITEM_SOURCE_METADATA: Readonly<
+  Record<MarketplaceItemSource, MarketplaceItemSourceMetadata>
+> = {
+  local: {
+    label: "Local",
+    description:
+      "Item authored inside this workspace and not advertised externally — first-party draft / private library.",
+    isFirstParty: true,
+    isAdvertised: false,
+  },
+  imported: {
+    label: "Imported",
+    description:
+      "Item brought in from another workspace's published catalog — third-party content; trust is inherited from the source.",
+    isFirstParty: false,
+    isAdvertised: false,
+  },
+  published: {
+    label: "Published",
+    description:
+      "Item authored inside this workspace and currently advertised in the marketplace — visible to other workspaces.",
+    isFirstParty: true,
+    isAdvertised: true,
+  },
+};
+
+export function getMarketplaceItemSourceMetadata(
+  source: MarketplaceItemSource,
+): MarketplaceItemSourceMetadata {
+  return MARKETPLACE_ITEM_SOURCE_METADATA[source];
+}
 
 /**
  * The payload shape inside agsMarketplaceItems.payload — discriminated
