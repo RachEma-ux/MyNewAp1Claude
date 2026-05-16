@@ -37,6 +37,16 @@ function fmtPercent(n: number): string {
 export function GraphLensBrowserPanel() {
   const [workspaceId, setWorkspaceId] = useState<number>(1);
   const [selectedLensId, setSelectedLensId] = useState<string | null>(null);
+  // T-F.72: typeKey drill-in filter. Pure client-side narrowing over
+  // the already-fetched snapshot — no server round-trip needed.
+  // Resets to null whenever the operator picks a different lens
+  // (snapshot shape differs across lens kinds, so a stale filter
+  // would silently filter to zero rows).
+  const [typeKeyFilter, setTypeKeyFilter] = useState<string | null>(null);
+  function selectLens(lensId: string) {
+    setSelectedLensId(lensId);
+    setTypeKeyFilter(null);
+  }
 
   const listQ = trpc.agentStudio.graphLens.list.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -166,7 +176,7 @@ export function GraphLensBrowserPanel() {
                             ? "default"
                             : "outline"
                         }
-                        onClick={() => setSelectedLensId(entry.definition.id)}
+                        onClick={() => selectLens(entry.definition.id)}
                         data-testid={`graph-lens-render-${entry.definition.id}`}
                       >
                         Render
@@ -212,7 +222,11 @@ export function GraphLensBrowserPanel() {
               Failed to render: {renderQ.error.message}
             </p>
           ) : renderQ.data ? (
-            <RenderEnvelopeView data={renderQ.data} />
+            <RenderEnvelopeView
+              data={renderQ.data}
+              typeKeyFilter={typeKeyFilter}
+              onTypeKeyFilterChange={setTypeKeyFilter}
+            />
           ) : null}
         </CardContent>
       </Card>
@@ -247,9 +261,15 @@ interface RenderEnvelopeViewProps {
       }
     | { status: "no_runner_for_kind"; kind: string }
     | { status: "not_found"; lensId: string };
+  readonly typeKeyFilter: string | null;
+  readonly onTypeKeyFilterChange: (next: string | null) => void;
 }
 
-function RenderEnvelopeView({ data }: RenderEnvelopeViewProps) {
+function RenderEnvelopeView({
+  data,
+  typeKeyFilter,
+  onTypeKeyFilterChange,
+}: RenderEnvelopeViewProps) {
   if (data.status === "not_found") {
     return (
       <p
@@ -278,6 +298,16 @@ function RenderEnvelopeView({ data }: RenderEnvelopeViewProps) {
   for (const n of snapshot.nodes) {
     nodesByTypeKey.set(n.typeKey, (nodesByTypeKey.get(n.typeKey) ?? 0) + 1);
   }
+  // T-F.72: apply the typeKey drill-in filter to the nodes preview
+  // (and re-slice the first-15 cap from the filtered subset). Edges
+  // remain unfiltered — the typeKey axis is about NODE narrowing, not
+  // edge narrowing. If the filter doesn't match any node typeKey, the
+  // filtered list is empty; the operator can click another row in the
+  // rollup or use the Clear chip below the rollup.
+  const filteredNodes =
+    typeKeyFilter == null
+      ? snapshot.nodes
+      : snapshot.nodes.filter((n) => n.typeKey === typeKeyFilter);
   return (
     <div className="space-y-3" data-testid="graph-lens-render-ok">
       <div className="text-xs text-muted-foreground space-y-0.5">
@@ -331,17 +361,60 @@ function RenderEnvelopeView({ data }: RenderEnvelopeViewProps) {
               <tbody>
                 {Array.from(nodesByTypeKey.entries())
                   .sort((a, b) => b[1] - a[1])
-                  .map(([typeKey, count]) => (
-                    <tr key={typeKey} className="border-t border-border">
-                      <td className="py-1 font-mono">{typeKey}</td>
-                      <td className="py-1 font-mono">{count}</td>
-                    </tr>
-                  ))}
+                  .map(([typeKey, count]) => {
+                    const isActive = typeKeyFilter === typeKey;
+                    return (
+                      <tr
+                        key={typeKey}
+                        className={`border-t border-border ${
+                          isActive ? "bg-muted/50" : ""
+                        }`}
+                      >
+                        <td className="py-1 font-mono">
+                          <button
+                            type="button"
+                            className="text-left hover:underline"
+                            data-testid={`graph-lens-typekey-filter-${typeKey}`}
+                            onClick={() =>
+                              onTypeKeyFilterChange(isActive ? null : typeKey)
+                            }
+                          >
+                            {typeKey}
+                          </button>
+                        </td>
+                        <td className="py-1 font-mono">{count}</td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
+            {typeKeyFilter != null ? (
+              <div
+                className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"
+                data-testid="graph-lens-typekey-filter-chip"
+              >
+                <span>
+                  Filtered to{" "}
+                  <span className="font-mono">{typeKeyFilter}</span>
+                </span>
+                <button
+                  type="button"
+                  className="underline"
+                  data-testid="graph-lens-typekey-filter-clear"
+                  onClick={() => onTypeKeyFilterChange(null)}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
           </div>
           <div>
-            <SectionLabel>Nodes (first 15)</SectionLabel>
+            <SectionLabel>
+              Nodes{" "}
+              {typeKeyFilter != null
+                ? `(first 15 of ${filteredNodes.length} matching ${typeKeyFilter})`
+                : `(first 15 of ${snapshot.nodes.length})`}
+            </SectionLabel>
             <table
               className="w-full text-xs"
               data-testid="graph-lens-render-nodes-preview"
@@ -355,16 +428,28 @@ function RenderEnvelopeView({ data }: RenderEnvelopeViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {snapshot.nodes.slice(0, 15).map((n) => (
-                  <tr key={n.id} className="border-t border-border">
-                    <td className="py-1 font-mono">{n.id}</td>
-                    <td className="py-1 font-mono">{n.typeKey}</td>
-                    <td className="py-1 font-mono">
-                      {n.visible ? "true" : "false"}
+                {filteredNodes.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="py-2 text-center text-muted-foreground italic"
+                      data-testid="graph-lens-render-nodes-empty-after-filter"
+                    >
+                      No nodes match the active typeKey filter.
                     </td>
-                    <td className="py-1">{n.label ?? "—"}</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredNodes.slice(0, 15).map((n) => (
+                    <tr key={n.id} className="border-t border-border">
+                      <td className="py-1 font-mono">{n.id}</td>
+                      <td className="py-1 font-mono">{n.typeKey}</td>
+                      <td className="py-1 font-mono">
+                        {n.visible ? "true" : "false"}
+                      </td>
+                      <td className="py-1">{n.label ?? "—"}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
