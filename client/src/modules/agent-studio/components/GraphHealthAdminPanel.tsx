@@ -1,15 +1,21 @@
 /**
- * Graph Health admin panel — PR-V1-190.
+ * Graph Health admin panel — PR-V1-190 + T-I.55 + T-I.56.
  *
  * Operator surface for the graph-health alert cron (J-1-β, #758).
  * The graphHealth router (`getAlertCronStatus` + `listOpen`) has
- * existed since J-1-β with no UI consumer; this slice closes that
+ * existed since J-1-β with no UI consumer; PR-V1-190 closed that
  * gap end-to-end, mirroring the ApprovalBusAdminPanel (#935) /
  * PublishTargetsAdminPanel (#937) shape.
  *
- * Read-only. Resolving alerts is operator-supplied via the existing
- * `health-alert.ts:resolveHealthAlert` server-side helper; surface
- * comes later.
+ * T-I.55 added a Run-now button for the projection-staleness cron
+ * (admin tRPC `agentStudio.graphProjection.runStalenessCheck`).
+ *
+ * T-I.56 added a per-row "Resolve" button on the open-alerts table
+ * (admin tRPC `agentStudio.graphHealth.resolveAlert`). Distinct from
+ * the auto-resolution path in `persistHealthAlertDecisions` (which
+ * resolves alerts when the next scan no longer observes the breach
+ * key); the operator path dismisses a specific alert id without
+ * waiting for the next scan.
  */
 
 import { useState } from "react";
@@ -105,6 +111,36 @@ export function GraphHealthAdminPanel() {
       },
       onError: (err) =>
         setStalenessRunFeedback(`Staleness scan failed: ${err.message}`),
+    });
+
+  // T-I.56: operator-triggered single-alert resolution. Distinct from
+  // the auto-resolution path in `persistHealthAlertDecisions` (which
+  // resolves alerts when the next scan no longer observes the breach
+  // key); this lets operators dismiss a specific alert id without
+  // waiting for the next scan. Tracks the in-flight alert id so the
+  // per-row button can flip between idle and pending without blocking
+  // sibling rows.
+  const [resolvingAlertId, setResolvingAlertId] = useState<number | null>(
+    null,
+  );
+  const [resolveAlertFeedback, setResolveAlertFeedback] = useState<
+    string | null
+  >(null);
+  const resolveAlertMutation =
+    trpc.agentStudio.graphHealth.resolveAlert.useMutation({
+      onSuccess: (data, vars) => {
+        setResolveAlertFeedback(
+          data.resolved
+            ? `Resolved alert #${vars.alertId}.`
+            : `Alert #${vars.alertId} was already resolved or not found.`,
+        );
+        setResolvingAlertId(null);
+        void utils.agentStudio.graphHealth.listOpen.invalidate();
+      },
+      onError: (err) => {
+        setResolveAlertFeedback(`Resolve failed: ${err.message}`);
+        setResolvingAlertId(null);
+      },
     });
 
   return (
@@ -507,6 +543,7 @@ export function GraphHealthAdminPanel() {
                     <th className="py-1 pr-3">Severity</th>
                     <th className="py-1 pr-3">Observed</th>
                     <th className="py-1 pr-3">Threshold</th>
+                    <th className="py-1 pr-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -535,10 +572,32 @@ export function GraphHealthAdminPanel() {
                       <td className="py-1 pr-3 font-mono text-xs truncate max-w-[30ch]">
                         {JSON.stringify(a.threshold)}
                       </td>
+                      <td className="py-1 pr-3 text-xs">
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          disabled={resolvingAlertId === a.id}
+                          onClick={() => {
+                            setResolvingAlertId(a.id);
+                            resolveAlertMutation.mutate({ alertId: a.id });
+                          }}
+                          data-testid={`graph-health-alert-resolve-button-${a.id}`}
+                        >
+                          {resolvingAlertId === a.id ? "Resolving…" : "Resolve"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {resolveAlertFeedback ? (
+                <p
+                  className="mt-2 text-xs text-muted-foreground"
+                  data-testid="graph-health-alert-resolve-feedback"
+                >
+                  {resolveAlertFeedback}
+                </p>
+              ) : null}
             </div>
           )}
         </CardContent>

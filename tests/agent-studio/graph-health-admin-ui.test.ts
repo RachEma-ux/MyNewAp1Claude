@@ -52,8 +52,16 @@ describe("PR-V1-190 — graph-health admin UI (first consumer)", () => {
       true,
     );
     expect(/case\s+"warning":[\s\S]{0,80}text-amber/.test(src)).toBe(true);
-    // Read-only — no useMutation calls on graphHealth surface.
-    expect(/graphHealth[\s\S]{0,200}useMutation/.test(src)).toBe(false);
+    // T-I.56: the panel now exposes a single graphHealth mutation
+    // (`resolveAlert` for per-row alert dismissal). Earlier PR-V1-190
+    // shipped read-only and the original assertion pinned that. The
+    // updated invariant pins exactly that one mutation reference so a
+    // regression that re-introduces broader writes still trips.
+    const graphHealthMutationCalls =
+      src.match(/trpc\.agentStudio\.graphHealth\.[a-zA-Z]+\.useMutation/g) ?? [];
+    expect(graphHealthMutationCalls).toEqual([
+      "trpc.agentStudio.graphHealth.resolveAlert.useMutation",
+    ]);
   });
 
   it("GraphHealthAdminPage mounts the panel", () => {
