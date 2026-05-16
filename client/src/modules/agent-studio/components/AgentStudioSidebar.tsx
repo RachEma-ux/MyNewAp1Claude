@@ -41,6 +41,7 @@ import {
   Send,
   HeartPulse,
   Telescope,
+  ShieldAlert,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -98,7 +99,9 @@ export type AgentStudioView =
   // ── PR-V1-190: graph-health admin ──
   | "graph-health-admin"
   // ── T-F.62: graph-lens browser ──
-  | "graph-lens-browser";
+  | "graph-lens-browser"
+  // ── T-F.82 (T-F.4-α): graph-quality findings ──
+  | "graph-quality-findings";
 
 interface SectionGroup {
   label: string;
@@ -207,6 +210,17 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Lenses",
     items: [
       { key: "graph-lens-browser", label: "Lens Browser", icon: Telescope },
+    ],
+  },
+  // ── T-F.82 (T-F.4-α): graph-quality findings ──
+  {
+    label: "Quality",
+    items: [
+      {
+        key: "graph-quality-findings",
+        label: "Findings",
+        icon: ShieldAlert,
+      },
     ],
   },
 ];
