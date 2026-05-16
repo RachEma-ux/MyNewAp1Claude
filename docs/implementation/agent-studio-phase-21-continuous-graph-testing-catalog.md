@@ -275,6 +275,7 @@ runtime catches up.
 | `cag-pack-actor-type-metadata.test.ts` | `services/cag/types` — `CAG_PACK_ACTOR_TYPE_METADATA` (4-entry per-actor label + description + requiresUserId + isAutomated booleans for system/user/scheduler/runtime; also promotes `CAG_PACK_ACTOR_TYPES` closed-tuple) | T-G.42 / #1151 |
 | `cag-pack-event-type-metadata.test.ts` | `services/cag/types` — `CAG_PACK_EVENT_TYPE_METADATA` (7-entry per-event-type label + description + defaultSeverity (info/warn/error) + isLifecycleTransition booleans for pack_created/pack_marked_stale/pack_archived/pack_used/pack_validation_failed/pack_refresh_skipped/pack_refresh_forced; also promotes `CAG_PACK_EVENT_TYPES` closed-tuple) | T-G.43 / #1152 |
 | `cag-compile-result-metadata.test.ts` | `services/cag/types` — `CAG_COMPILE_RESULT_METADATA` (3-entry per-result label + description + producedBlock + hasSignal booleans for ok/warn/error; also promotes `CAG_COMPILE_RESULTS` closed-tuple) | T-G.44 / #1153 |
+| `cag-governance-verdict-metadata.test.ts` | `services/cag/types` — `CAG_GOVERNANCE_VERDICT_METADATA` (3-entry per-verdict label + description + allowsDispatch + hasSignal booleans for cleared/warn/blocked; also promotes `CAG_GOVERNANCE_VERDICTS` closed-tuple) | T-G.45 / #1154 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

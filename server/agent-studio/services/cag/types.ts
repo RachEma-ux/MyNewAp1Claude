@@ -490,7 +490,67 @@ export function getCagCompileResultMetadata(
 }
 
 /** Retrofit P5 governance-verdict enum (D-CAG-RECON-5). */
-export type CagGovernanceVerdict = "cleared" | "warn" | "blocked";
+/**
+ * Closed-taxonomy CAG governance verdict. Promoted to a tuple at
+ * T-G.45 so the metadata table + lockstep tests can be authored.
+ */
+export const CAG_GOVERNANCE_VERDICTS = [
+  "cleared",
+  "warn",
+  "blocked",
+] as const;
+export type CagGovernanceVerdict = (typeof CAG_GOVERNANCE_VERDICTS)[number];
+
+// ============================================================================
+// Per-governance-verdict operator-facing metadata (T-G.45)
+// ============================================================================
+
+export interface CagGovernanceVerdictMetadata {
+  /** Display label rendered in the governance-trace verdict column. */
+  readonly label: string;
+  /** Short operator-facing description of what this verdict implies
+   *  for downstream dispatch. */
+  readonly description: string;
+  /** Whether dispatch may proceed at this verdict (true for `cleared`
+   *  + `warn`; false for `blocked` which hard-stops the chain). */
+  readonly allowsDispatch: boolean;
+  /** Whether the verdict surfaces an operator-actionable signal
+   *  (true for `warn` + `blocked`; false for `cleared` — the clean
+   *  case operators don't need to read). */
+  readonly hasSignal: boolean;
+}
+
+export const CAG_GOVERNANCE_VERDICT_METADATA: Readonly<
+  Record<CagGovernanceVerdict, CagGovernanceVerdictMetadata>
+> = {
+  cleared: {
+    label: "Cleared",
+    description:
+      "Governance cleared the block — no policy hits, no warnings. Dispatch proceeds normally.",
+    allowsDispatch: true,
+    hasSignal: false,
+  },
+  warn: {
+    label: "Warn",
+    description:
+      "Governance cleared the block but surfaced soft policy / freshness warnings. Dispatch proceeds; operator should glance.",
+    allowsDispatch: true,
+    hasSignal: true,
+  },
+  blocked: {
+    label: "Blocked",
+    description:
+      "Governance hard-blocked the block — hard policy violation, missing required citation, expired credential. Dispatch refuses.",
+    allowsDispatch: false,
+    hasSignal: true,
+  },
+};
+
+export function getCagGovernanceVerdictMetadata(
+  verdict: CagGovernanceVerdict,
+): CagGovernanceVerdictMetadata {
+  return CAG_GOVERNANCE_VERDICT_METADATA[verdict];
+}
 
 export interface CreatePackInput {
   workspaceId: number;
