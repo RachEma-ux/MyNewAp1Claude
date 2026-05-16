@@ -22,16 +22,42 @@
  * server but aren't yet wired into the UI.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 const INBOX_LIMIT = 50;
 
 export function InboxPanel() {
+  const utils = trpc.useUtils();
   const inboxQuery = trpc.agentStudio.workspaceObservability.getMyInbox.useQuery(
     { limit: INBOX_LIMIT },
     { staleTime: 15_000 },
   );
+
+  // ── T-F.108 (T-F.6-β): mark-read mutation ──
+  // Per-row error scoping per lesson 67 (errorId companion slice):
+  // multiple rows can fire the mutation in parallel, so a single
+  // top-level error surface would conflate them.
+  const [markReadError, setMarkReadError] = useState<string | null>(null);
+  const [markReadErrorRowId, setMarkReadErrorRowId] = useState<number | null>(
+    null,
+  );
+
+  const markReadMutation =
+    trpc.agentStudio.workspaceObservability.markNotificationRead.useMutation({
+      onSuccess: () => {
+        // Invalidate the composite so unread total + by-kind + row list
+        // all refresh together (lesson 58: onSuccess invalidate-list-AND-stats
+        // — here both live on the same composite).
+        utils.agentStudio.workspaceObservability.getMyInbox.invalidate();
+        setMarkReadError(null);
+        setMarkReadErrorRowId(null);
+      },
+      onError: (err, vars) => {
+        setMarkReadError(err.message);
+        setMarkReadErrorRowId(vars.notificationId);
+      },
+    });
 
   const notifications = inboxQuery.data?.notifications ?? [];
   const unreadCount = inboxQuery.data?.unreadCount ?? {
@@ -66,10 +92,10 @@ export function InboxPanel() {
         data-testid="inbox-banner"
       >
         <div>
-          <span className="font-medium text-foreground">Inbox α-shell:</span>{" "}
-          read-only first surface for personal workspace notifications. The
-          server already supports mark-read, dismiss, and bulk-by-kind actions —
-          those land in follow-up slices.
+          <span className="font-medium text-foreground">Inbox β:</span>{" "}
+          mark-read live (per-row). The server also supports dismiss,
+          mark-all-by-kind, and dismiss-all-by-kind — those land in follow-up
+          slices.
         </div>
       </div>
 
@@ -167,6 +193,37 @@ export function InboxPanel() {
                     >
                       {JSON.stringify(n.payload, null, 2)}
                     </pre>
+                  ) : null}
+                  {!n.read ? (
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-0.5 text-xs hover:bg-muted disabled:opacity-50"
+                        disabled={
+                          markReadMutation.isPending &&
+                          markReadMutation.variables?.notificationId === n.id
+                        }
+                        onClick={() => {
+                          setMarkReadError(null);
+                          setMarkReadErrorRowId(null);
+                          markReadMutation.mutate({ notificationId: n.id });
+                        }}
+                        data-testid={`inbox-row-mark-read-${n.id}`}
+                      >
+                        {markReadMutation.isPending &&
+                        markReadMutation.variables?.notificationId === n.id
+                          ? "Marking…"
+                          : "Mark read"}
+                      </button>
+                    </div>
+                  ) : null}
+                  {markReadError != null && markReadErrorRowId === n.id ? (
+                    <div
+                      className="mt-1 text-xs text-destructive"
+                      data-testid={`inbox-row-mark-read-error-${n.id}`}
+                    >
+                      Mark-read failed: {markReadError}
+                    </div>
                   ) : null}
                 </div>
               </li>

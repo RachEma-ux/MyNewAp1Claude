@@ -68,7 +68,7 @@ describe("Inbox α-shell (T-F.107 / T-F.6-α)", () => {
     );
     expect(src).toMatch(/data-testid=["']inbox-banner["']/);
     expect(src).toMatch(
-      /mark-read[\s\S]{0,200}dismiss[\s\S]{0,300}follow-up slices/,
+      /mark-read[\s\S]{0,200}dismiss[\s\S]{0,300}follow-up\s+slices/,
     );
   });
 
