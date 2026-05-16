@@ -280,6 +280,7 @@ runtime catches up.
 | `promotion-status-metadata.test.ts` | `services/promotion/lifecycle` — `PROMOTION_STATUS_METADATA` (6-entry per-status label + description + terminal + producedActiveVersion booleans for pending/validating/in_review/approved/rejected/rolled_back; also promotes `PROMOTION_STATUSES` closed-tuple) | T-G.47 / #1156 |
 | `proposed-tool-call-risk-level-metadata.test.ts` | `services/mcp/proposed-tool-call` — `PROPOSED_TOOL_CALL_RISK_LEVEL_METADATA` (4-entry per-level label + description + rank (0..3) + requiresApproval booleans for low/medium/high/critical; also promotes `PROPOSED_TOOL_CALL_RISK_LEVELS` closed-tuple) | T-G.48 / #1157 |
 | `command-scope-metadata.test.ts` | `services/command-registry/command-registry` — `COMMAND_SCOPE_METADATA` (3-entry per-scope label + description + rank (0..2) + requiresExtraConfirmation booleans for read/write/destructive; also promotes `COMMAND_SCOPES` closed-tuple) | T-G.49 / #1158 |
+| `graph-backend-health-status-metadata.test.ts` | `services/graph/repository/types` — `GRAPH_BACKEND_HEALTH_STATUS_METADATA` (3-entry per-status label + description + servesReads + requiresInvestigation booleans for healthy/degraded/unavailable; also promotes `GRAPH_BACKEND_HEALTH_STATUSES` closed-tuple) | T-G.50 / #1159 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
