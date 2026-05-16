@@ -192,6 +192,19 @@ three use a shared `makeHttpPusher` factory configured per
 Credential acquisition flows through a registrant-supplied
 `credentialFn` closure — Plan v3 D2 clean.
 
+**Post-#983 burst — 2026-05-15 → 2026-05-16 (~188 PRs #984–#1171):**
+
+Four sub-arcs delivered under the standing /goal mandate continuous autonomous execution:
+
+| PR range | Arc | Count | Notes |
+|---|---|---|---|
+| #984–#1011 | Remaining-execution-plan track openings (T-A / T-C / T-D / T-E / T-F / T-G / T-I first slices) + validator-extension mini-arc | 28 | All 7 autonomous tracks have ≥1 PR landed. Lens-stack boot-wired @ #1006 = `4d36b89`. PR #1000 milestone. |
+| #1012–#1090 | Phase 22 closed-taxonomy emission rollout (T-I.4 audit + `recordFailureStateEvent` bridge + 11 emitter wirings) + retention mini-arcs + dashboard panels + SOU docs | 79 | 11/25 failure-state kinds emit through the closed-taxonomy contract. |
+| #1091–#1135 | Per-kind UI metadata canonization — first wave | 45 | 44 metadata tables across G/I/D/F/A/B/C/E/H/L/V/X tracks. Pattern: `X_METADATA: Readonly<Record<XKind, XMetadata>>` with `label` + `description` + 1–3 closed-classification fields + lockstep tests + ancillary catalog row + docs §7 table row. |
+| #1136–#1171 | Per-kind UI metadata canonization — post-compaction continuation reaching 100-table milestone at #1169 / T-G.56 | 36 | T-S.19–22, T-E.5–6, T-A.11–14, T-D.13–15, T-X.4, T-G.37–G.58. Every closed-taxonomy `as const` array AND every 2+-member literal union in `server/agent-studio/services/` and `shared/` now has an operator-facing metadata table OR is documented as having no reasonable UI mapping. |
+
+Doc-side detail in V1+ plan §6.1.bis (added by #1172). Per-PR ledger in `~/.claude/projects/-root/memory/project_v1_plus_session_2026_05_15.md` (lessons 1–28).
+
 ## 8. Why this tracker was rewritten
 
 The earlier version of this file rolled up *plan-ready* + *runbook-
