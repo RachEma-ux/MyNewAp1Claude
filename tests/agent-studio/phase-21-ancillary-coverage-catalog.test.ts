@@ -207,6 +207,7 @@ const ANCILLARY_TESTS = [
   "summarize-background-jobs.test.ts",
   "summarize-pending-permission-requests.test.ts",
   "summarize-projection-drift-events.test.ts",
+  "summarize-rac-sources.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
