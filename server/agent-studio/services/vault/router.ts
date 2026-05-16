@@ -666,6 +666,12 @@ export const vaultRouter = router({
         filters: z.record(z.string(), z.unknown()).optional(),
         sort: z.record(z.string(), z.unknown()).optional(),
         columns: z.array(z.string()).optional(),
+        // T-F.97 (T-F.2-θ): operator-facing visibility flip. The
+        // service-level `updateSavedView()` has accepted `visibility`
+        // since Phase 16-α; only the tRPC Zod schema was missing it.
+        visibility: z
+          .enum(["personal", "workspace_shared"])
+          .optional(),
       }),
     )
     .mutation(async ({ input }) => {
