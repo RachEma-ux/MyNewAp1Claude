@@ -125,42 +125,48 @@ This shape:
 
 ---
 
-## 5. Wiring slice ordering
+## 5. Wiring slice ordering — post-batch-B reality refresh
 
-The 23 ⚠️/🟡/❌ states are ordered by emitter-callsite proximity. Reading down the list, slices 1–6 are 1-callsite touch-ups; 7–15 are multi-callsite; 16–23 need new detection paths first.
+The original ordering speculated detection-state per kind. As the wirings landed, several speculative premises proved wrong (the audit assumed detection didn't exist where it actually did — see §1 corrections). This refreshed view groups by actual current state, not original ordering.
 
-### Cheap (1-callsite wiring) — T-I.5 batch A
+### Done — 15 wirings shipped (batch-B 15/25 60% target met)
 
-1. #25 `background_job_failed` — wrap the existing `recordErrorEvent` calls in `background-jobs.ts:868,954`. **Pre-existing emitter**, no detection work.
-2. #18 `text2cypher_rejected` — wrap the existing rejection logger.
-3. #4/#5 `neo4j_unavailable` / `neo4j_degraded` — health-alert cron already raises alerts; add a 2-line bridge.
-4. #8 `neo4j_projection_drift_detected` — drift cron already writes findings; add 1-line bridge.
-5. #19 `cypher_query_template_failed` — template executor already catches; add 1-line bridge.
-6. #20 `retrieval_safety_filter_blocked_content` — safety filter already prunes; add 1-line bridge.
+| # | Kind | PR / Slice | Notes |
+|---|---|---|---|
+| #1 | `promotion_failed` | T-I.5.B.4 / #1027 | Two emit sites distinguished by `rejectionStage` |
+| #2 | `note_conflict` | T-I.41 / #1216 | Vault repo optimistic-lock branch — corrected "UI-only" premise |
+| #3 | `entity_resolution_conflict` | T-I.5.B.3 / #1026 | Quality-agent run per-scan when `duplicate_entity` findingsCount > 0 |
+| #4 | `neo4j_unavailable` | T-I.5.A.1 / #1014 | Health-alert scanner |
+| #5 | `neo4j_degraded` | T-I.5.A.1 / #1014 | Same scanner (latency-high collapsed into degraded) |
+| #8 | `neo4j_projection_drift_detected` | T-I.5.A.2 / #1015 | Drift cron when driftCount > 0 |
+| #9 | `projection_sync_failed` | T-I.5.B.2 / #1025 | Sync worker `status === "failed"` |
+| #12 | `runtime_reference_hidden_by_permission` | T-I.5.B.5 / #1030 | Permission-denied subset of safety-filter events |
+| #15 | `tool_schema_changed` | T-I.5.A.4 / #1017 | MCP auto-sync diff |
+| #18 | `text2cypher_rejected` | T-I.5.A.5 / #1018 | Cypher validator rejection inside retrieval router |
+| #19 | `cypher_query_template_failed` | T-I.5.A.6 / #1019 | `executeTemplateAudited` catch block |
+| #20 | `retrieval_safety_filter_blocked_content` | T-I.5.A.3 / #1016 | Safety filter post-step; one event per call |
+| #21 | `graph_agent_answer_incomplete` | T-I.5.B.1 / #1023 | Engine agentic loop budget exhaustion |
+| #22 | `golden_question_failed` | T-I.38 / #1213 | `runLiveEvaluation` per failed question — corrected "needs runtime move" premise |
+| #23 | `graph_correction_rejected` | T-I.40 / #1215 | `decide({decision: "rejected"})` branch only — corrected "no reject path exists" premise |
 
-### Medium — T-I.5 batch B
+### Detection-only blocker — 1 ⚠️
 
-7. #6 `neo4j_query_timeout` — per-query timer in graph repo; add timing-band bridge.
-8. #7/#9 `neo4j_projection_stale` / `projection_sync_failed` — projection-sync cron; add 2-bridge in sync paths.
-9. #11 `backlink_refresh_failed` — backlink refresh cron.
-10. #12 `runtime_reference_hidden_by_permission` — permission post-filter; add per-redaction emission.
-11. #13/#14 `cag_reference_invalidated` / `graph_skill_reference_invalidated` — invalidation paths in compile.ts / skill-pack versioner.
-12. #16/#17 `search_index_stale` / `query_cache_stale` — staleness detection paths.
-13. #21 `graph_agent_answer_incomplete` — engine iteration-budget exhaustion path.
-14. #22 `golden_question_failed` — evaluator failure path.
-15. #23 `graph_correction_rejected` — approval rejection path.
+- #25 `background_job_failed` — locked by count-pinned tests (lesson 22). Closure requires either (a) updating 3 pre-existing tests to expect 2 calls/rows, or (b) re-tagging the existing emission's `errorClass` (breaks 20+ literal-pin tests). Defer to a dedicated count-update slice after operator-dashboard query migration.
 
-### Detection-first — T-I.5 batch C
+### Detection-gap — 3 🟡
 
-16. #1 `promotion_failed` — new promotion failure adapter (no detection today).
-17. #2 `note_conflict` — conflict UI emits but no event.
-18. #3 `entity_resolution_conflict` — scanners write findings rows but no event.
-19. #15 `tool_schema_changed` — MCP auto-sync needs schema-diff detection added.
-20. #10 `graph_query_timeout` — needs per-plan-item timing instrumentation.
+- #6 `neo4j_query_timeout` — `GraphTimeoutError` is declared but never thrown; needs per-query timeout instrumentation in `services/graph/repository/**` first.
+- #7 `neo4j_projection_stale` — projection-sync worker writes status but no `stale` lag detection (would need a freshness-lag computation against last-projection-timestamp).
+- #10 `graph_query_timeout` — needs per-plan-item timing instrumentation; the retrieval executor doesn't currently track per-plan-item timeouts as distinct from total-call timeouts.
 
-### Phase-gated
+### Phase-gated — 5 ❌ + 1 🔒
 
-21. #24 `semantic_enrichment_rejected` — gated on T-D.3 (semantic enrichment agent runtime).
+- #11 `backlink_refresh_failed` — no backlink-refresh module exists yet.
+- #13 `cag_reference_invalidated` — CAG invalidation runtime does not exist; only docblock comments.
+- #14 `graph_skill_reference_invalidated` — skill-pack invalidation runtime does not exist.
+- #16 `search_index_stale` — no search-index module exists yet.
+- #17 `query_cache_stale` — no graph-query-cache module exists yet.
+- #24 `semantic_enrichment_rejected` — 🔒 gated on T-D.3 (semantic enrichment agent runtime).
 
 ---
 
