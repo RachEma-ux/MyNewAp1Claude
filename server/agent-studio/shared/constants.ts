@@ -1395,3 +1395,74 @@ export const AGS_TOOL_CATEGORIES = [
   "custom",
 ] as const;
 export type AgsToolCategory = (typeof AGS_TOOL_CATEGORIES)[number];
+
+// ============================================================================
+// Per-tool-category operator-facing metadata (T-S.19)
+// ============================================================================
+
+export interface AgsToolCategoryMetadata {
+  /** Display label rendered in the tool catalog category filter. */
+  readonly label: string;
+  /** Short operator-facing description of what tools belong here. */
+  readonly description: string;
+  /** Whether tools in this category typically mutate system state
+   *  (true for filesystem/communication/network; false for
+   *  compute/search/custom which read or process). */
+  readonly mutatesState: boolean;
+  /** Whether the category is open-ended (true for `custom`; false
+   *  for the 5 closed categories). */
+  readonly openEnded: boolean;
+}
+
+export const AGS_TOOL_CATEGORY_METADATA: Readonly<
+  Record<AgsToolCategory, AgsToolCategoryMetadata>
+> = {
+  filesystem: {
+    label: "Filesystem",
+    description:
+      "Tools that read, write, or modify files — Read/Edit/Write/Glob and shell file operations.",
+    mutatesState: true,
+    openEnded: false,
+  },
+  compute: {
+    label: "Compute",
+    description:
+      "Pure-computation tools — calculators, formatters, transformers. Do not touch external state.",
+    mutatesState: false,
+    openEnded: false,
+  },
+  communication: {
+    label: "Communication",
+    description:
+      "Tools that send messages or interact with external services — Slack, email, GitHub PR comments.",
+    mutatesState: true,
+    openEnded: false,
+  },
+  network: {
+    label: "Network",
+    description:
+      "Tools that issue network calls — HTTP fetches, gRPC clients, third-party API integrations.",
+    mutatesState: true,
+    openEnded: false,
+  },
+  search: {
+    label: "Search",
+    description:
+      "Read-only tools that surface results from a backing index — search APIs, vector retrievers.",
+    mutatesState: false,
+    openEnded: false,
+  },
+  custom: {
+    label: "Custom",
+    description:
+      "Catch-all category for user-authored tools that don't fit the closed taxonomy. Open-ended.",
+    mutatesState: false,
+    openEnded: true,
+  },
+};
+
+export function getAgsToolCategoryMetadata(
+  category: AgsToolCategory,
+): AgsToolCategoryMetadata {
+  return AGS_TOOL_CATEGORY_METADATA[category];
+}
