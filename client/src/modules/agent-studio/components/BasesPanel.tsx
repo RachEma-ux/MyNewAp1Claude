@@ -111,6 +111,10 @@ export function BasesPanel() {
     setConfirmDeleteBaseId(null);
     setFilterEditBaseId(null);
     setFilterEditDraft("");
+    setSortEditBaseId(null);
+    setSortEditDraft("");
+    setColumnsEditBaseId(null);
+    setColumnsEditDraft("");
   }
   function closeRenameEditor() {
     setRenameBaseId(null);
@@ -134,6 +138,10 @@ export function BasesPanel() {
     setExpandedBaseId(null);
     setFilterEditBaseId(null);
     setFilterEditDraft("");
+    setSortEditBaseId(null);
+    setSortEditDraft("");
+    setColumnsEditBaseId(null);
+    setColumnsEditDraft("");
   }
   function closeDeleteConfirm() {
     setConfirmDeleteBaseId(null);
@@ -231,11 +239,68 @@ export function BasesPanel() {
     setRenameBaseId(null);
     setRenameDraft("");
     setConfirmDeleteBaseId(null);
+    setSortEditBaseId(null);
+    setSortEditDraft("");
+    setColumnsEditBaseId(null);
+    setColumnsEditDraft("");
   }
   function closeFilterEditor() {
     setFilterEditBaseId(null);
     setFilterEditDraft("");
     setFilterEditError(null);
+  }
+  // T-F.105 (T-F.2-a.3-narrow): typed-JSON editors for Sort +
+  // Columns sections of the β detail view. Mirrors the γ
+  // filter-edit pattern; per-stage Save validation
+  // (JSON.parse → shape check → updateSavedView). At N=5
+  // row-mutation slices, the cross-clear lists in each open*
+  // helper grew long enough that a `closeAllRowEdits()` helper
+  // would be a natural extraction (lesson 65) — deferred to a
+  // separate refactor PR to keep this slice's diff focused on
+  // the new editors.
+  const [sortEditBaseId, setSortEditBaseId] = useState<number | null>(null);
+  const [sortEditDraft, setSortEditDraft] = useState<string>("");
+  const [sortEditError, setSortEditError] = useState<string | null>(null);
+  const [columnsEditBaseId, setColumnsEditBaseId] = useState<number | null>(
+    null,
+  );
+  const [columnsEditDraft, setColumnsEditDraft] = useState<string>("");
+  const [columnsEditError, setColumnsEditError] = useState<string | null>(
+    null,
+  );
+  function openSortEditor(baseId: number, currentJson: string) {
+    setSortEditBaseId(baseId);
+    setSortEditDraft(currentJson);
+    setSortEditError(null);
+    setRenameBaseId(null);
+    setRenameDraft("");
+    setConfirmDeleteBaseId(null);
+    setFilterEditBaseId(null);
+    setFilterEditDraft("");
+    setColumnsEditBaseId(null);
+    setColumnsEditDraft("");
+  }
+  function closeSortEditor() {
+    setSortEditBaseId(null);
+    setSortEditDraft("");
+    setSortEditError(null);
+  }
+  function openColumnsEditor(baseId: number, currentJson: string) {
+    setColumnsEditBaseId(baseId);
+    setColumnsEditDraft(currentJson);
+    setColumnsEditError(null);
+    setRenameBaseId(null);
+    setRenameDraft("");
+    setConfirmDeleteBaseId(null);
+    setFilterEditBaseId(null);
+    setFilterEditDraft("");
+    setSortEditBaseId(null);
+    setSortEditDraft("");
+  }
+  function closeColumnsEditor() {
+    setColumnsEditBaseId(null);
+    setColumnsEditDraft("");
+    setColumnsEditError(null);
   }
   const shareMutation =
     trpc.agentStudio.vault.updateSavedView.useMutation({
@@ -257,6 +322,24 @@ export function BasesPanel() {
         void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
       },
       onError: (err) => setFilterEditError(err.message),
+    });
+  const sortEditMutation =
+    trpc.agentStudio.vault.updateSavedView.useMutation({
+      onSuccess: () => {
+        setSortEditError(null);
+        closeSortEditor();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setSortEditError(err.message),
+    });
+  const columnsEditMutation =
+    trpc.agentStudio.vault.updateSavedView.useMutation({
+      onSuccess: () => {
+        setColumnsEditError(null);
+        closeColumnsEditor();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setColumnsEditError(err.message),
     });
   const deleteMutation =
     trpc.agentStudio.vault.deleteSavedView.useMutation({
@@ -792,6 +875,98 @@ export function BasesPanel() {
                                 },
                                 onCancel: closeFilterEditor,
                               }}
+                              sortEdit={{
+                                isOpen: sortEditBaseId === b.id,
+                                draft: sortEditDraft,
+                                error: sortEditError,
+                                isPending:
+                                  sortEditMutation.isPending &&
+                                  sortEditMutation.variables?.id === b.id,
+                                onOpen: () =>
+                                  openSortEditor(
+                                    b.id,
+                                    JSON.stringify(b.sort ?? {}, null, 2),
+                                  ),
+                                onChange: setSortEditDraft,
+                                onSave: () => {
+                                  let parsed: unknown;
+                                  try {
+                                    parsed = JSON.parse(sortEditDraft);
+                                  } catch (e) {
+                                    setSortEditError(
+                                      `Invalid JSON: ${
+                                        e instanceof Error
+                                          ? e.message
+                                          : String(e)
+                                      }`,
+                                    );
+                                    return;
+                                  }
+                                  // Server's Zod input expects
+                                  // `Record<string, unknown>` — reject
+                                  // arrays / null / primitives client-side
+                                  // for a clearer error.
+                                  if (
+                                    parsed === null ||
+                                    typeof parsed !== "object" ||
+                                    Array.isArray(parsed)
+                                  ) {
+                                    setSortEditError(
+                                      "Sort must be a JSON object (e.g. {\"field\":\"updatedAt\",\"order\":\"desc\"}).",
+                                    );
+                                    return;
+                                  }
+                                  sortEditMutation.mutate({
+                                    id: b.id,
+                                    sort: parsed as Record<string, unknown>,
+                                  });
+                                },
+                                onCancel: closeSortEditor,
+                              }}
+                              columnsEdit={{
+                                isOpen: columnsEditBaseId === b.id,
+                                draft: columnsEditDraft,
+                                error: columnsEditError,
+                                isPending:
+                                  columnsEditMutation.isPending &&
+                                  columnsEditMutation.variables?.id === b.id,
+                                onOpen: () =>
+                                  openColumnsEditor(
+                                    b.id,
+                                    JSON.stringify(b.columns ?? [], null, 2),
+                                  ),
+                                onChange: setColumnsEditDraft,
+                                onSave: () => {
+                                  let parsed: unknown;
+                                  try {
+                                    parsed = JSON.parse(columnsEditDraft);
+                                  } catch (e) {
+                                    setColumnsEditError(
+                                      `Invalid JSON: ${
+                                        e instanceof Error
+                                          ? e.message
+                                          : String(e)
+                                      }`,
+                                    );
+                                    return;
+                                  }
+                                  // Columns must be string[].
+                                  if (
+                                    !Array.isArray(parsed) ||
+                                    !parsed.every((c) => typeof c === "string")
+                                  ) {
+                                    setColumnsEditError(
+                                      "Columns must be a JSON array of strings (e.g. [\"title\",\"tags\",\"updatedAt\"]).",
+                                    );
+                                    return;
+                                  }
+                                  columnsEditMutation.mutate({
+                                    id: b.id,
+                                    columns: parsed as string[],
+                                  });
+                                },
+                                onCancel: closeColumnsEditor,
+                              }}
                             />
                           </td>
                         </tr>
@@ -997,6 +1172,32 @@ function BaseRowDetail({
     readonly onSave: () => void;
     readonly onCancel: () => void;
   };
+  /**
+   * T-F.105 (T-F.2-a.3-narrow): sort/columns inline editors.
+   * Same prop shape as filterEdit so the inline-editor sub-render
+   * stays mechanical. Each editor wires its own per-stage Save
+   * validation in the parent.
+   */
+  readonly sortEdit: {
+    readonly isOpen: boolean;
+    readonly draft: string;
+    readonly error: string | null;
+    readonly isPending: boolean;
+    readonly onOpen: () => void;
+    readonly onChange: (value: string) => void;
+    readonly onSave: () => void;
+    readonly onCancel: () => void;
+  };
+  readonly columnsEdit: {
+    readonly isOpen: boolean;
+    readonly draft: string;
+    readonly error: string | null;
+    readonly isPending: boolean;
+    readonly onOpen: () => void;
+    readonly onChange: (value: string) => void;
+    readonly onSave: () => void;
+    readonly onCancel: () => void;
+  };
 }) {
   return (
     <div
@@ -1103,8 +1304,70 @@ function BaseRowDetail({
         )}
       </div>
       <div>
-        <p className="font-medium">Sort</p>
-        {base.sort && Object.keys(base.sort).length > 0 ? (
+        <div className="flex items-center justify-between">
+          <p className="font-medium">Sort</p>
+          {!sortEdit.isOpen ? (
+            <button
+              type="button"
+              className="underline text-muted-foreground"
+              data-testid={`bases-row-detail-sort-edit-${base.id}`}
+              onClick={sortEdit.onOpen}
+            >
+              Edit sort…
+            </button>
+          ) : null}
+        </div>
+        {sortEdit.isOpen ? (
+          <div
+            className="space-y-2"
+            data-testid={`bases-row-detail-sort-editor-${base.id}`}
+          >
+            <label
+              className="block text-muted-foreground"
+              htmlFor={`bases-row-detail-sort-textarea-${base.id}`}
+            >
+              Sort JSON object (e.g. {`{"field":"updatedAt","order":"desc"}`}):
+            </label>
+            <textarea
+              id={`bases-row-detail-sort-textarea-${base.id}`}
+              data-testid={`bases-row-detail-sort-textarea-${base.id}`}
+              className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[10px]"
+              rows={5}
+              value={sortEdit.draft}
+              onChange={(e) => sortEdit.onChange(e.target.value)}
+              disabled={sortEdit.isPending}
+              spellCheck={false}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={sortEdit.isPending}
+                className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-sort-save-${base.id}`}
+                onClick={sortEdit.onSave}
+              >
+                {sortEdit.isPending ? "Saving…" : "Save sort"}
+              </button>
+              <button
+                type="button"
+                disabled={sortEdit.isPending}
+                className="underline text-muted-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-sort-cancel-${base.id}`}
+                onClick={sortEdit.onCancel}
+              >
+                Cancel
+              </button>
+            </div>
+            {sortEdit.error ? (
+              <p
+                className="text-destructive"
+                data-testid={`bases-row-detail-sort-error-${base.id}`}
+              >
+                {sortEdit.error}
+              </p>
+            ) : null}
+          </div>
+        ) : base.sort && Object.keys(base.sort).length > 0 ? (
           <pre
             className="mt-1 max-h-32 overflow-auto rounded bg-background/50 p-2 font-mono text-[10px]"
             data-testid={`bases-row-detail-sort-${base.id}`}
@@ -1121,10 +1384,72 @@ function BaseRowDetail({
         )}
       </div>
       <div>
-        <p className="font-medium">
-          Columns ({base.columns?.length ?? 0})
-        </p>
-        {base.columns && base.columns.length > 0 ? (
+        <div className="flex items-center justify-between">
+          <p className="font-medium">
+            Columns ({base.columns?.length ?? 0})
+          </p>
+          {!columnsEdit.isOpen ? (
+            <button
+              type="button"
+              className="underline text-muted-foreground"
+              data-testid={`bases-row-detail-columns-edit-${base.id}`}
+              onClick={columnsEdit.onOpen}
+            >
+              Edit columns…
+            </button>
+          ) : null}
+        </div>
+        {columnsEdit.isOpen ? (
+          <div
+            className="space-y-2"
+            data-testid={`bases-row-detail-columns-editor-${base.id}`}
+          >
+            <label
+              className="block text-muted-foreground"
+              htmlFor={`bases-row-detail-columns-textarea-${base.id}`}
+            >
+              Columns JSON array of strings (e.g. {`["title","tags","updatedAt"]`}):
+            </label>
+            <textarea
+              id={`bases-row-detail-columns-textarea-${base.id}`}
+              data-testid={`bases-row-detail-columns-textarea-${base.id}`}
+              className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-[10px]"
+              rows={5}
+              value={columnsEdit.draft}
+              onChange={(e) => columnsEdit.onChange(e.target.value)}
+              disabled={columnsEdit.isPending}
+              spellCheck={false}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={columnsEdit.isPending}
+                className="rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-columns-save-${base.id}`}
+                onClick={columnsEdit.onSave}
+              >
+                {columnsEdit.isPending ? "Saving…" : "Save columns"}
+              </button>
+              <button
+                type="button"
+                disabled={columnsEdit.isPending}
+                className="underline text-muted-foreground disabled:opacity-50"
+                data-testid={`bases-row-detail-columns-cancel-${base.id}`}
+                onClick={columnsEdit.onCancel}
+              >
+                Cancel
+              </button>
+            </div>
+            {columnsEdit.error ? (
+              <p
+                className="text-destructive"
+                data-testid={`bases-row-detail-columns-error-${base.id}`}
+              >
+                {columnsEdit.error}
+              </p>
+            ) : null}
+          </div>
+        ) : base.columns && base.columns.length > 0 ? (
           <ul
             className="ml-3 list-disc text-muted-foreground"
             data-testid={`bases-row-detail-columns-${base.id}`}
