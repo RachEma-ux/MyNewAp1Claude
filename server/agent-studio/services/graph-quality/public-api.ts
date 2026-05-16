@@ -218,6 +218,7 @@ export {
   listScannerMetadata,
   getQualityScannerCategoryMetadata,
   summarizeQualityFindings,
+  summarizeQualityScannerRegistry,
   qualitySeverityRank,
   compareQualitySeverity,
   sortQualityFindingsBySeverityDesc,
@@ -229,4 +230,6 @@ export type {
   QualityScannerCategoryMetadata,
   QualityFindingSeverity,
   QualityFindingListSummary,
+  QualityScannerRegistrySummary,
+  ScannerRegistrationLike,
 } from "./scanner-metadata.js";

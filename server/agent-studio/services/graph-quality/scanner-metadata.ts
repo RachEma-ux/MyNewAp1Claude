@@ -378,3 +378,109 @@ export function summarizeQualityFindings<T>(
   };
 }
 
+// ============================================================================
+// Scanner-registry aggregator (T-D.16)
+// ============================================================================
+
+/**
+ * Stable-shape summary of the canonical scanner registry vs the
+ * canonical metadata table. Operator dashboards consume this to see
+ * "how many scanners are wired" + "is any kind missing on either
+ * side" at a glance.
+ *
+ * Companion to `summarizeQualityFindings` (T-D.8 / #1057). Where that
+ * one summarizes the FINDING rows persisted in ASDB, this one
+ * summarizes the in-process REGISTRY at boot. Together they answer
+ * "what's wired" + "what's been detected" — the
+ * registry-plus-row-state aggregator pair (lesson 30 of the V1+
+ * session memory).
+ *
+ * Stable-shape guarantees:
+ *   - `byCategory` is zero-filled across `QUALITY_SCANNER_CATEGORIES`.
+ *   - `byDefaultSeverity` is zero-filled across
+ *     `QUALITY_FINDING_SEVERITIES`.
+ *   - `missingFromRegistry` lists scan kinds present in
+ *     `QUALITY_SCANNER_METADATA` but absent from the input registry.
+ *   - `missingFromMetadata` lists scan kinds present in the input
+ *     registry but absent from `QUALITY_SCANNER_METADATA` — a drift
+ *     detector for the metadata table.
+ *   - `metadataCoveragePercent` rounded to 1 decimal; 0 on empty
+ *     metadata.
+ */
+export interface QualityScannerRegistrySummary {
+  /** Total scanners in the input registry. */
+  readonly totalRegistered: number;
+  /** Total scan kinds present in `QUALITY_SCANNER_METADATA`. */
+  readonly totalMetadataKinds: number;
+  /** Per-category count over registered scanners (zero-filled). */
+  readonly byCategory: Readonly<Record<QualityScannerCategory, number>>;
+  /** Per-default-severity count over registered scanners
+   *  (zero-filled). */
+  readonly byDefaultSeverity: Readonly<
+    Record<QualityFindingSeverity, number>
+  >;
+  /** Scan kinds in metadata but not registered. Empty in steady
+   *  state. */
+  readonly missingFromRegistry: readonly string[];
+  /** Scan kinds in registry but not in metadata. Empty in steady
+   *  state. */
+  readonly missingFromMetadata: readonly string[];
+  /** `totalRegistered / totalMetadataKinds * 100`, rounded to 1
+   *  decimal. 0 when metadata is empty. */
+  readonly metadataCoveragePercent: number;
+}
+
+/**
+ * The shape needed from a scanner registration for this summary.
+ * Avoids a hard import on `QualityScannerRegistration` (which lives
+ * in `scan-orchestrator.ts`) to keep this module side-effect-free
+ * and re-exportable from `public-api.ts` without cycles.
+ */
+export interface ScannerRegistrationLike {
+  readonly scanKind: string;
+}
+
+export function summarizeQualityScannerRegistry(
+  registry: readonly ScannerRegistrationLike[],
+): QualityScannerRegistrySummary {
+  const byCategory: Record<string, number> = {};
+  for (const c of QUALITY_SCANNER_CATEGORIES) byCategory[c] = 0;
+  const byDefaultSeverity: Record<string, number> = {};
+  for (const s of QUALITY_FINDING_SEVERITIES) byDefaultSeverity[s] = 0;
+
+  const registryKinds = new Set<string>();
+  const missingFromMetadata: string[] = [];
+  for (const r of registry) {
+    registryKinds.add(r.scanKind);
+    const meta = QUALITY_SCANNER_METADATA[r.scanKind];
+    if (!meta) {
+      missingFromMetadata.push(r.scanKind);
+      continue;
+    }
+    byCategory[meta.category] += 1;
+    byDefaultSeverity[meta.defaultSeverity] += 1;
+  }
+  const metadataKinds = Object.keys(QUALITY_SCANNER_METADATA);
+  const missingFromRegistry = metadataKinds.filter(
+    (k) => !registryKinds.has(k),
+  );
+  const totalMetadataKinds = metadataKinds.length;
+  const totalRegistered = registry.length;
+  const metadataCoveragePercent =
+    totalMetadataKinds === 0
+      ? 0
+      : Math.round((totalRegistered / totalMetadataKinds) * 1000) / 10;
+  return {
+    totalRegistered,
+    totalMetadataKinds,
+    byCategory: byCategory as Readonly<
+      Record<QualityScannerCategory, number>
+    >,
+    byDefaultSeverity: byDefaultSeverity as Readonly<
+      Record<QualityFindingSeverity, number>
+    >,
+    missingFromRegistry,
+    missingFromMetadata,
+    metadataCoveragePercent,
+  };
+}
