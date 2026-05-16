@@ -277,6 +277,7 @@ runtime catches up.
 | `cag-compile-result-metadata.test.ts` | `services/cag/types` — `CAG_COMPILE_RESULT_METADATA` (3-entry per-result label + description + producedBlock + hasSignal booleans for ok/warn/error; also promotes `CAG_COMPILE_RESULTS` closed-tuple) | T-G.44 / #1153 |
 | `cag-governance-verdict-metadata.test.ts` | `services/cag/types` — `CAG_GOVERNANCE_VERDICT_METADATA` (3-entry per-verdict label + description + allowsDispatch + hasSignal booleans for cleared/warn/blocked; also promotes `CAG_GOVERNANCE_VERDICTS` closed-tuple) | T-G.45 / #1154 |
 | `tool-risk-class-metadata.test.ts` | `services/cag/types` — `TOOL_RISK_CLASS_METADATA` (8-entry per-class label + description + requiresApproval + mutatesExternalState booleans for read_only/write/external_side_effect/destructive/credential_sensitive/code_execution/governance_sensitive/quarantined; also promotes `TOOL_RISK_CLASSES` closed-tuple) | T-G.46 / #1155 |
+| `promotion-status-metadata.test.ts` | `services/promotion/lifecycle` — `PROMOTION_STATUS_METADATA` (6-entry per-status label + description + terminal + producedActiveVersion booleans for pending/validating/in_review/approved/rejected/rolled_back; also promotes `PROMOTION_STATUSES` closed-tuple) | T-G.47 / #1156 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

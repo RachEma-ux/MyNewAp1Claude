@@ -164,6 +164,7 @@ const ANCILLARY_TESTS = [
   "cag-compile-result-metadata.test.ts",
   "cag-governance-verdict-metadata.test.ts",
   "tool-risk-class-metadata.test.ts",
+  "promotion-status-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {

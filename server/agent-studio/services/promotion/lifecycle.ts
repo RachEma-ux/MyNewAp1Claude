@@ -25,7 +25,92 @@ export type PromotionKind =
   | "graph_entity"
   | "temporal_observation";
 
-export type PromotionStatus = "pending" | "validating" | "in_review" | "approved" | "rejected" | "rolled_back";
+/**
+ * Closed-taxonomy promotion lifecycle status. Promoted to a tuple at
+ * T-G.47 so the metadata table + lockstep tests can be authored.
+ */
+export const PROMOTION_STATUSES = [
+  "pending",
+  "validating",
+  "in_review",
+  "approved",
+  "rejected",
+  "rolled_back",
+] as const;
+export type PromotionStatus = (typeof PROMOTION_STATUSES)[number];
+
+// ============================================================================
+// Per-promotion-status operator-facing metadata (T-G.47)
+// ============================================================================
+
+export interface PromotionStatusMetadata {
+  /** Display label rendered in the promotion-request admin panel. */
+  readonly label: string;
+  /** Short operator-facing description of what this status means
+   *  for the promotion's place in its lifecycle. */
+  readonly description: string;
+  /** Whether the status is terminal — no further lifecycle transitions
+   *  expected (true for `approved` / `rejected` / `rolled_back`;
+   *  false for the in-flight pending / validating / in_review). */
+  readonly terminal: boolean;
+  /** Whether the promotion materialized an activated version of the
+   *  target asset (true for `approved` only; rejection and rollback
+   *  leave the prior version active or no version active). */
+  readonly producedActiveVersion: boolean;
+}
+
+export const PROMOTION_STATUS_METADATA: Readonly<
+  Record<PromotionStatus, PromotionStatusMetadata>
+> = {
+  pending: {
+    label: "Pending",
+    description:
+      "Promotion request created but validation has not started yet. Waiting for the validation worker to pick it up.",
+    terminal: false,
+    producedActiveVersion: false,
+  },
+  validating: {
+    label: "Validating",
+    description:
+      "Validation in progress — schema, governance, and consistency checks running. No operator action yet.",
+    terminal: false,
+    producedActiveVersion: false,
+  },
+  in_review: {
+    label: "In Review",
+    description:
+      "Validation passed; promotion sits with reviewers waiting for governance decision. Operator action required.",
+    terminal: false,
+    producedActiveVersion: false,
+  },
+  approved: {
+    label: "Approved",
+    description:
+      "Reviewers approved the promotion and the target asset activated a new version. Terminal success state.",
+    terminal: true,
+    producedActiveVersion: true,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Reviewers rejected the promotion. No version was activated — prior version remains active (or none). Terminal failure state.",
+    terminal: true,
+    producedActiveVersion: false,
+  },
+  rolled_back: {
+    label: "Rolled Back",
+    description:
+      "Promotion was approved and activated but later rolled back to the previous version. Terminal-with-history state.",
+    terminal: true,
+    producedActiveVersion: false,
+  },
+};
+
+export function getPromotionStatusMetadata(
+  status: PromotionStatus,
+): PromotionStatusMetadata {
+  return PROMOTION_STATUS_METADATA[status];
+}
 
 export interface PromotionRequest {
   readonly noteId: number;
