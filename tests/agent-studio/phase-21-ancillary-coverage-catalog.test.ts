@@ -162,6 +162,7 @@ const ANCILLARY_TESTS = [
   "cag-pack-actor-type-metadata.test.ts",
   "cag-pack-event-type-metadata.test.ts",
   "cag-compile-result-metadata.test.ts",
+  "cag-governance-verdict-metadata.test.ts",
 ];
 
 describe("Phase 21 §7 ancillary coverage catalog", () => {
