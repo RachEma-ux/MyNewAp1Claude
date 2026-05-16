@@ -53,16 +53,21 @@ describe("Graph Quality Findings dismiss δ-slice (T-F.85 / T-F.4-δ)", () => {
     );
     // The cell is empty for non-dismissable rows (already triaged /
     // applied / dismissed) — guards against double-dismiss + keeps
-    // the table tidy.
-    expect(src).toMatch(/isDismissable\s*\?\s*\(/);
+    // the table tidy. After T-F.87 the predicate is
+    // `isDismissable && !isReasonOpen` so the button hides while the
+    // inline reason editor is open for the same row.
+    expect(src).toMatch(/isDismissable\s*(?:\?|&&)/);
   });
 
-  it("isPending UX: button disables + label flips to 'Dismissing…' for the row being mutated", () => {
+  it("isPending UX: per-row resolution + disabled binding (label flip moved to reason editor at T-F.87)", () => {
     const src = readPanel();
     expect(src).toMatch(
       /isPending\s*=[\s\S]{0,200}dismissMutation\.isPending\s*&&\s*dismissMutation\.variables\?\.findingId\s*===\s*f\.id/,
     );
-    expect(src).toMatch(/isPending\s*\?\s*"Dismissing…"\s*:\s*"Dismiss"/);
+    // After T-F.87 the inline dismiss button no longer carries the
+    // "Dismissing…" label (it now opens an editor); the label flip
+    // lives on the Confirm button inside the editor. Just assert
+    // `disabled={isPending}` is wired up.
     expect(src).toMatch(/disabled=\{isPending\}/);
   });
 
