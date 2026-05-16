@@ -259,6 +259,7 @@ runtime catches up.
 | `ags-skill-source-metadata.test.ts` | `shared/constants` — `AGS_SKILL_SOURCE_METADATA` (5-entry per-source label + description + editable + external booleans for db/imported/vendored/marketplace/mcp_prompt) | T-S.18 / #1135 |
 | `ags-tool-category-metadata.test.ts` | `shared/constants` — `AGS_TOOL_CATEGORY_METADATA` (6-entry per-category label + description + mutatesState + openEnded booleans for filesystem/compute/communication/network/search/custom) | T-S.19 / #1136 |
 | `ags-provider-key-metadata.test.ts` | `shared/constants` — `AGS_PROVIDER_KEY_METADATA` (15-entry per-provider label + description + hostingMode (local/cloud/aggregator) + requiresApiKey booleans for ollama/openai/anthropic/gemini/deepseek/groq/together/fireworks/mistral/openrouter/github_models/lmstudio/bedrock/vertex/atomic_chat) | T-S.20 / #1137 |
+| `ags-hook-event-metadata.test.ts` | `shared/constants` — `AGS_HOOK_EVENT_METADATA` (27-entry per-hook label + description + category (session/tool/user/task/filesystem) + isPaired booleans for PreToolUse/PostToolUse/PostToolUseFailure/Notification/UserPromptSubmit/SessionStart/SessionEnd/Stop/StopFailure/SubagentStart/SubagentStop/PreCompact/PostCompact/PermissionRequest/PermissionDenied/Setup/TeammateIdle/TaskCreated/TaskCompleted/Elicitation/ElicitationResult/ConfigChange/WorktreeCreate/WorktreeRemove/InstructionsLoaded/CwdChanged/FileChanged) | T-S.21 / #1138 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
