@@ -77,10 +77,31 @@ export function BasesPanel() {
     setRenameDraft(currentName);
     setRenameError(null);
     setExpandedBaseId(null);
+    setConfirmDeleteBaseId(null);
   }
   function closeRenameEditor() {
     setRenameBaseId(null);
     setRenameDraft("");
+  }
+  // T-F.96 (T-F.2-η): per-row delete two-step confirm. The Delete…
+  // button opens an inline confirmation prompt before the mutation
+  // fires so a single click can't lose data (precedent: legacy
+  // operator-runtime delete flows in this codebase). Single-row
+  // confirmId so the prompt is always one-of-three with
+  // expandedBaseId / renameBaseId.
+  const [confirmDeleteBaseId, setConfirmDeleteBaseId] = useState<
+    number | null
+  >(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  function openDeleteConfirm(baseId: number) {
+    setConfirmDeleteBaseId(baseId);
+    setDeleteError(null);
+    setRenameBaseId(null);
+    setRenameDraft("");
+    setExpandedBaseId(null);
+  }
+  function closeDeleteConfirm() {
+    setConfirmDeleteBaseId(null);
   }
   // T-F.94 (T-F.2-δ): first mutation — create base. The form is
   // inline (no modal); shows on "New base" click and collapses on
@@ -125,6 +146,15 @@ export function BasesPanel() {
         void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
       },
       onError: (err) => setRenameError(err.message),
+    });
+  const deleteMutation =
+    trpc.agentStudio.vault.deleteSavedView.useMutation({
+      onSuccess: () => {
+        setDeleteError(null);
+        closeDeleteConfirm();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => setDeleteError(err.message),
     });
   const basesQuery = trpc.agentStudio.vault.listVisibleSavedViews.useQuery(
     effectiveVaultId !== null
@@ -394,6 +424,10 @@ export function BasesPanel() {
                   const isRenamePending =
                     renameMutation.isPending &&
                     renameMutation.variables?.id === b.id;
+                  const isConfirmingDelete = confirmDeleteBaseId === b.id;
+                  const isDeletePending =
+                    deleteMutation.isPending &&
+                    deleteMutation.variables?.viewId === b.id;
                   return (
                     <Fragment key={b.id}>
                       <tr
@@ -429,6 +463,17 @@ export function BasesPanel() {
                               onClick={() => openRenameEditor(b.id, b.name)}
                             >
                               Rename…
+                            </button>
+                          ) : null}
+                          {!isConfirmingDelete ? (
+                            <button
+                              type="button"
+                              disabled={isDeletePending}
+                              className="underline text-destructive disabled:opacity-50"
+                              data-testid={`bases-row-delete-${b.id}`}
+                              onClick={() => openDeleteConfirm(b.id)}
+                            >
+                              Delete…
                             </button>
                           ) : null}
                         </td>
@@ -509,6 +554,58 @@ export function BasesPanel() {
                                   data-testid={`bases-row-rename-error-${b.id}`}
                                 >
                                   Rename failed: {renameError}
+                                </p>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                      {isConfirmingDelete ? (
+                        <tr
+                          data-testid={`bases-row-delete-row-${b.id}`}
+                        >
+                          <td
+                            colSpan={6}
+                            className="bg-destructive/10 px-3 py-2 text-xs"
+                          >
+                            <div className="space-y-2">
+                              <p
+                                className="text-destructive"
+                                data-testid={`bases-row-delete-prompt-${b.id}`}
+                              >
+                                Delete base <strong>{b.name}</strong> (id{" "}
+                                {b.id})? This cannot be undone.
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isDeletePending}
+                                  className="rounded bg-destructive px-2 py-0.5 text-destructive-foreground disabled:opacity-50"
+                                  data-testid={`bases-row-delete-confirm-${b.id}`}
+                                  onClick={() =>
+                                    deleteMutation.mutate({ viewId: b.id })
+                                  }
+                                >
+                                  {isDeletePending
+                                    ? "Deleting…"
+                                    : "Confirm delete"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isDeletePending}
+                                  className="underline text-muted-foreground disabled:opacity-50"
+                                  data-testid={`bases-row-delete-cancel-${b.id}`}
+                                  onClick={closeDeleteConfirm}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              {deleteError ? (
+                                <p
+                                  className="text-destructive"
+                                  data-testid={`bases-row-delete-error-${b.id}`}
+                                >
+                                  Delete failed: {deleteError}
                                 </p>
                               ) : null}
                             </div>
