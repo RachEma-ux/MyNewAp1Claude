@@ -250,6 +250,7 @@ runtime catches up.
 | `ags-test-verdict-metadata.test.ts` | `shared/constants` — `AGS_TEST_VERDICT_METADATA` (4-entry per-verdict label + description + countedAsPass + executed booleans for pass/fail/skipped/error) | T-S.9 / #1126 |
 | `ags-mcp-status-metadata.test.ts` | `shared/constants` — `AGS_MCP_STATUS_METADATA` (4-entry per-status label + description + dispatchable + errorState booleans for pending/connected/disconnected/error) | T-S.10 / #1127 |
 | `ags-permission-mode-metadata.test.ts` | `shared/constants` — `AGS_PERMISSION_MODE_METADATA` (5-entry per-mode label + description + allowsToolExecution + promptsOnDangerous + requiresBypassFlag booleans for default/acceptEdits/bypassPermissions/plan/dontAsk) | T-S.11 / #1128 |
+| `ags-permission-behavior-metadata.test.ts` | `shared/constants` — `AGS_PERMISSION_BEHAVIOR_METADATA` (3-entry per-behavior label + description + proceeds + prompts booleans for allow/deny/ask) | T-S.12 / #1129 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
