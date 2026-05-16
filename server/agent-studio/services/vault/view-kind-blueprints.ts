@@ -18,7 +18,16 @@
  * shape.
  *
  * ADR: docs/architecture/agent-studio-markdown-profile.md
+ *
+ * T-B.6 (saved-views Lens registry preview) — added `defaultLensKind`
+ * so the Phase 24 lens-registry preview pane knows which lens kind
+ * is the canonical projection for each view-kind. `null` means
+ * "no canonical lens preview" (the view is vault-content-only or
+ * spans multiple lens kinds — fall back to the generic table
+ * renderer).
  */
+
+import type { GraphLensKind } from "../graph-lens/contracts.js";
 
 export interface ViewKindBlueprint {
   readonly viewKind: string;
@@ -37,6 +46,13 @@ export interface ViewKindBlueprint {
     | "runtime_runs"
     | "graph_quality_findings"
     | "graph_projection_jobs";
+  /**
+   * Canonical Phase 24 lens kind whose preview pane renders this
+   * view's data. `null` when the view is vault-content-only (no
+   * graph projection) or genuinely cross-cutting. The preview UI
+   * uses this to pre-select the lens; operators can override.
+   */
+  readonly defaultLensKind: GraphLensKind | null;
 }
 
 export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
@@ -49,6 +65,7 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     defaultFilters: {},
     defaultSort: { field: "updatedAt", order: "desc" },
     dataSource: "vault_notes",
+    defaultLensKind: null,
   },
   {
     viewKind: "entity_list",
@@ -59,6 +76,7 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     defaultFilters: {},
     defaultSort: { field: "updatedAt", order: "desc" },
     dataSource: "graph_entities",
+    defaultLensKind: "institutional_memory",
   },
   {
     viewKind: "runtime_asset_list",
@@ -69,6 +87,7 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     defaultFilters: { statusFilter: "any" },
     defaultSort: { field: "startedAt", order: "desc" },
     dataSource: "runtime_runs",
+    defaultLensKind: "runtime",
   },
   {
     viewKind: "graph_quality",
@@ -84,6 +103,7 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     defaultFilters: { severity: ["high", "critical"] },
     defaultSort: { field: "createdAt", order: "desc" },
     dataSource: "graph_quality_findings",
+    defaultLensKind: "governance",
   },
   {
     viewKind: "projection_status",
@@ -94,6 +114,7 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     defaultFilters: {},
     defaultSort: { field: "lastSyncAt", order: "desc" },
     dataSource: "graph_projection_jobs",
+    defaultLensKind: "governance",
   },
 ];
 
@@ -113,4 +134,18 @@ export function getViewKindBlueprint(
 
 export function listViewKindBlueprints(): readonly ViewKindBlueprint[] {
   return VIEW_KIND_BLUEPRINTS;
+}
+
+/**
+ * Returns the canonical Phase 24 lens kind whose preview pane
+ * renders this view-kind's data, or `null` when the view is
+ * vault-content-only / genuinely cross-cutting. Wraps the
+ * blueprint lookup so the Phase 24 lens-registry-preview consumer
+ * doesn't have to know about blueprints.
+ */
+export function getDefaultLensKindForViewKind(
+  viewKind: string,
+): GraphLensKind | null {
+  const blueprint = getViewKindBlueprint(viewKind);
+  return blueprint?.defaultLensKind ?? null;
 }
