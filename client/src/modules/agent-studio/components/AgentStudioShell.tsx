@@ -92,6 +92,9 @@ const GraphHealthAdminPage = lazy(
 const GraphLensBrowserPage = lazy(
   () => import("../pages/GraphLensBrowserPage"),
 );
+const GraphQualityFindingsPage = lazy(
+  () => import("../pages/GraphQualityFindingsPage"),
+);
 const CanvasOperatorPage = lazy(
   () => import("../pages/CanvasOperatorPage"),
 );
@@ -248,6 +251,14 @@ function parseRoute(path: string): ParsedRoute {
     return {
       ...empty,
       view: "graph-lens-browser" as any,
+      homeMode: null,
+    };
+  }
+  // ── T-F.82 (T-F.4-α): graph-quality findings (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-quality-findings")) {
+    return {
+      ...empty,
+      view: "graph-quality-findings" as any,
       homeMode: null,
     };
   }
@@ -441,6 +452,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-lens-browser");
       return;
     }
+    // T-F.82 (T-F.4-α): graph-quality findings sidebar entry.
+    if ((key as string) === "graph-quality-findings") {
+      navigate("/agent-studio/graph-quality-findings");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -533,6 +549,9 @@ export default function AgentStudioShell() {
         // ── T-F.62: graph-lens browser ──
         case "graph-lens-browser" as any:
           return <GraphLensBrowserPage />;
+        // ── T-F.82 (T-F.4-α): graph-quality findings ──
+        case "graph-quality-findings" as any:
+          return <GraphQualityFindingsPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
