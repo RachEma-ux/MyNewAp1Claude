@@ -313,7 +313,68 @@ export interface GraphBenchmarkRepository {
 // Sub-interface: backend health
 // ============================================================================
 
-export type HealthStatus = "healthy" | "degraded" | "unavailable";
+/**
+ * Closed-taxonomy graph-backend health status. Promoted to a tuple at
+ * T-G.50 so the metadata table + lockstep tests can be authored.
+ */
+export const GRAPH_BACKEND_HEALTH_STATUSES = [
+  "healthy",
+  "degraded",
+  "unavailable",
+] as const;
+export type HealthStatus = (typeof GRAPH_BACKEND_HEALTH_STATUSES)[number];
+
+// ============================================================================
+// Per-health-status operator-facing metadata (T-G.50)
+// ============================================================================
+
+export interface GraphBackendHealthStatusMetadata {
+  /** Display label rendered in the backend-health admin badge. */
+  readonly label: string;
+  /** Short operator-facing description of what this status means
+   *  for the graph backend's serviceability. */
+  readonly description: string;
+  /** Whether the backend can serve graph reads at this status (true
+   *  for `healthy` + `degraded`; false for `unavailable` which
+   *  returns errors / serves cached fallbacks only). */
+  readonly servesReads: boolean;
+  /** Whether the operator should investigate at this status (true
+   *  for `degraded` + `unavailable`; false for `healthy` which is
+   *  the no-action baseline). */
+  readonly requiresInvestigation: boolean;
+}
+
+export const GRAPH_BACKEND_HEALTH_STATUS_METADATA: Readonly<
+  Record<HealthStatus, GraphBackendHealthStatusMetadata>
+> = {
+  healthy: {
+    label: "Healthy",
+    description:
+      "Graph backend is reachable, returning queries within latency budgets, no error rate elevated. No action required.",
+    servesReads: true,
+    requiresInvestigation: false,
+  },
+  degraded: {
+    label: "Degraded",
+    description:
+      "Backend reachable but with elevated latency or partial error rate. Reads still served; operator should investigate.",
+    servesReads: true,
+    requiresInvestigation: true,
+  },
+  unavailable: {
+    label: "Unavailable",
+    description:
+      "Backend unreachable or failing health probe. Reads return errors or fall back to cache. Page on-call.",
+    servesReads: false,
+    requiresInvestigation: true,
+  },
+};
+
+export function getGraphBackendHealthStatusMetadata(
+  status: HealthStatus,
+): GraphBackendHealthStatusMetadata {
+  return GRAPH_BACKEND_HEALTH_STATUS_METADATA[status];
+}
 
 export interface BackendHealth {
   readonly status: HealthStatus;
