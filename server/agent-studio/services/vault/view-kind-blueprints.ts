@@ -116,6 +116,23 @@ export const VIEW_KIND_BLUEPRINTS: readonly ViewKindBlueprint[] = [
     dataSource: "graph_projection_jobs",
     defaultLensKind: "governance",
   },
+  // T-F.91 (T-F.2-α): Bases MVP — database-view-style filtered note
+  // browser. Persisted as `agsVaultSavedViews` rows with
+  // `viewKind="base"` per the saved-view docblock that explicitly
+  // anticipates additional view kinds without DB churn. Distinct
+  // from `note_list` by intent (richer cell semantics in V2; α-shell
+  // ships with the same `vault_notes` data source as note_list).
+  {
+    viewKind: "base",
+    displayName: "Base",
+    description:
+      "Database-view-style filtered note browser. Operators triage and curate vault notes through a stable named filter + visible-column set.",
+    defaultColumns: ["title", "tags", "folderId", "updatedAt"],
+    defaultFilters: {},
+    defaultSort: { field: "updatedAt", order: "desc" },
+    dataSource: "vault_notes",
+    defaultLensKind: null,
+  },
 ];
 
 /**
