@@ -82,6 +82,24 @@ export function GraphQualityFindingsPanel() {
   const [expandedFindingId, setExpandedFindingId] = useState<number | null>(
     null,
   );
+  // T-F.87: per-row "dismiss with reason" textarea expansion. Only
+  // one row's reason editor is open at a time; the textarea content
+  // lives next to it so cancel discards cleanly and confirm submits
+  // the optional `reason` field through the existing dismissFinding
+  // mutation. Mirrors `expandedFindingId` shape so the two surfaces
+  // are mutually exclusive — opening the reason editor closes any
+  // trail expansion and vice-versa.
+  const [reasonFindingId, setReasonFindingId] = useState<number | null>(null);
+  const [reasonDraft, setReasonDraft] = useState<string>("");
+  function openReasonEditor(findingId: number) {
+    setReasonFindingId(findingId);
+    setReasonDraft("");
+    setExpandedFindingId(null);
+  }
+  function closeReasonEditor() {
+    setReasonFindingId(null);
+    setReasonDraft("");
+  }
   const hasAnyFilter = severityFilter !== null || statusFilter !== null;
   function clearAllFilters() {
     setSeverityFilter(null);
@@ -104,6 +122,7 @@ export function GraphQualityFindingsPanel() {
     {
       onSuccess: () => {
         setDismissError(null);
+        closeReasonEditor();
         void utils.agentStudio.graphQuality.listFindings.invalidate();
         void utils.agentStudio.graphQuality.getStats.invalidate();
       },
@@ -340,6 +359,7 @@ export function GraphQualityFindingsPanel() {
                       dismissMutation.isPending &&
                       dismissMutation.variables?.findingId === f.id;
                     const isExpanded = expandedFindingId === f.id;
+                    const isReasonOpen = reasonFindingId === f.id;
                     return (
                       <Fragment key={f.id}>
                         <tr
@@ -365,17 +385,15 @@ export function GraphQualityFindingsPanel() {
                             >
                               {isExpanded ? "Hide trail" : "View trail"}
                             </button>
-                            {isDismissable ? (
+                            {isDismissable && !isReasonOpen ? (
                               <button
                                 type="button"
                                 disabled={isPending}
                                 className="underline text-muted-foreground disabled:opacity-50"
                                 data-testid={`graph-quality-finding-dismiss-${f.id}`}
-                                onClick={() =>
-                                  dismissMutation.mutate({ findingId: f.id })
-                                }
+                                onClick={() => openReasonEditor(f.id)}
                               >
-                                {isPending ? "Dismissing…" : "Dismiss"}
+                                Dismiss…
                               </button>
                             ) : null}
                           </td>
@@ -392,6 +410,70 @@ export function GraphQualityFindingsPanel() {
                                 trailQ={trailQ}
                                 findingId={f.id}
                               />
+                            </td>
+                          </tr>
+                        ) : null}
+                        {isReasonOpen ? (
+                          <tr
+                            data-testid={`graph-quality-finding-reason-row-${f.id}`}
+                          >
+                            <td
+                              colSpan={6}
+                              className="bg-muted/20 px-3 py-2 text-xs"
+                            >
+                              <div className="space-y-2">
+                                <label
+                                  className="block text-muted-foreground"
+                                  htmlFor={`graph-quality-reason-textarea-${f.id}`}
+                                >
+                                  Dismiss reason (optional, max 2000 chars):
+                                </label>
+                                <textarea
+                                  id={`graph-quality-reason-textarea-${f.id}`}
+                                  data-testid={`graph-quality-finding-reason-textarea-${f.id}`}
+                                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+                                  rows={3}
+                                  maxLength={2000}
+                                  value={reasonDraft}
+                                  onChange={(e) =>
+                                    setReasonDraft(e.target.value)
+                                  }
+                                  disabled={isPending}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    className="rounded bg-destructive px-2 py-0.5 text-destructive-foreground disabled:opacity-50"
+                                    data-testid={`graph-quality-finding-reason-confirm-${f.id}`}
+                                    onClick={() => {
+                                      const trimmed = reasonDraft.trim();
+                                      dismissMutation.mutate({
+                                        findingId: f.id,
+                                        ...(trimmed !== ""
+                                          ? { reason: trimmed }
+                                          : {}),
+                                      });
+                                    }}
+                                  >
+                                    {isPending
+                                      ? "Dismissing…"
+                                      : "Confirm dismiss"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    className="underline text-muted-foreground disabled:opacity-50"
+                                    data-testid={`graph-quality-finding-reason-cancel-${f.id}`}
+                                    onClick={closeReasonEditor}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <span className="ml-auto text-muted-foreground">
+                                    {reasonDraft.length} / 2000
+                                  </span>
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         ) : null}
