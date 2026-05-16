@@ -333,3 +333,9 @@ export {
   type MaybeInstallInstitutionalMemoryLensRunnerResult,
   type MaybeInstallInstitutionalMemoryLensRunnerWithAsdbOptions,
 } from "./install-institutional-memory-lens-runner.js";
+
+export {
+  maybeInstallAllLensRunnersWithAsdb,
+  type MaybeInstallAllLensRunnersWithAsdbOptions,
+  type MaybeInstallAllLensRunnersWithAsdbResult,
+} from "./install-all-lens-runners.js";
