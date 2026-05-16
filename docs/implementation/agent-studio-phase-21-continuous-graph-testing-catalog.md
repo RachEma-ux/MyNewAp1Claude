@@ -293,6 +293,7 @@ runtime catches up.
 | `runtime-validation-verdict-metadata.test.ts` | `services/runtime/trace-writer` — `RUNTIME_VALIDATION_VERDICT_METADATA` (2-entry per-verdict label + description + allowsDispatch boolean for ok/rejected; also promotes `RUNTIME_VALIDATION_VERDICTS` closed-tuple) — **100th per-kind metadata table** | T-G.56 / #1169 |
 | `graph-skill-risk-level-metadata.test.ts` | `services/graph-skill/pack-mutations` — `GRAPH_SKILL_RISK_LEVEL_METADATA` (3-entry per-level label + description + rank (0..2) + requiresApproval booleans for low/medium/high; also promotes `GRAPH_SKILL_RISK_LEVELS` closed-tuple) | T-G.57 / #1170 |
 | `runtime-dispatch-result-metadata.test.ts` | `services/runtime/trace-writer` — `RUNTIME_DISPATCH_RESULT_METADATA` (3-entry per-result label + description + attempted + successful booleans for ok/error/blocked; also promotes `RUNTIME_DISPATCH_RESULTS` closed-tuple) | T-G.58 / #1171 |
+| `saved-views-default-lens-kind.test.ts` | `services/vault/view-kind-blueprints` — `ViewKindBlueprint.defaultLensKind` field + `getDefaultLensKindForViewKind` accessor wiring saved-view `viewKind` → Phase 24 `GraphLensKind` preview projection (note_list → null / entity_list → institutional_memory / runtime_asset_list → runtime / graph_quality → governance / projection_status → governance) | T-B.6 / #1178 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
