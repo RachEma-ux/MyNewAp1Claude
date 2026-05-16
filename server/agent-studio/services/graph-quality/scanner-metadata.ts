@@ -195,6 +195,64 @@ export const QUALITY_FINDING_SEVERITIES = [
 
 export type QualityFindingSeverity = (typeof QUALITY_FINDING_SEVERITIES)[number];
 
+// ============================================================================
+// Per-severity operator-facing metadata (T-D.13)
+// ============================================================================
+
+export interface QualityFindingSeverityMetadata {
+  /** Display label rendered in the finding-list filter and detail
+   *  drawer. */
+  readonly label: string;
+  /** Short operator-facing description of what this severity implies
+   *  for triage. */
+  readonly description: string;
+  /** Stable rank 0-3 for severity comparison (0=low / 3=critical).
+   *  Filter chips compare against this for threshold queries. */
+  readonly rank: 0 | 1 | 2 | 3;
+  /** Whether this severity blocks publish-readiness — true for
+   *  high + critical findings. False for low + medium (advisory). */
+  readonly blocksPublish: boolean;
+}
+
+export const QUALITY_FINDING_SEVERITY_METADATA: Readonly<
+  Record<QualityFindingSeverity, QualityFindingSeverityMetadata>
+> = {
+  low: {
+    label: "Low",
+    description:
+      "Advisory finding — informational only; does not block publish or require operator action.",
+    rank: 0,
+    blocksPublish: false,
+  },
+  medium: {
+    label: "Medium",
+    description:
+      "Soft warning — should be triaged before publish but does not gate the readiness check.",
+    rank: 1,
+    blocksPublish: false,
+  },
+  high: {
+    label: "High",
+    description:
+      "Hard warning — blocks publish-readiness until acknowledged or dismissed by an owner.",
+    rank: 2,
+    blocksPublish: true,
+  },
+  critical: {
+    label: "Critical",
+    description:
+      "Blocking finding — must be resolved or formally overridden by an owner before publish.",
+    rank: 3,
+    blocksPublish: true,
+  },
+};
+
+export function getQualityFindingSeverityMetadata(
+  severity: QualityFindingSeverity,
+): QualityFindingSeverityMetadata {
+  return QUALITY_FINDING_SEVERITY_METADATA[severity];
+}
+
 export interface QualityFindingListSummary {
   readonly total: number;
   /** Counts per closed-taxonomy `findingClass` (== scanKind). Sparse
