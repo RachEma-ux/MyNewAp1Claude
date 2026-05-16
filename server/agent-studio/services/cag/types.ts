@@ -78,14 +78,99 @@ export function getCagPackStatusMetadata(
   return CAG_PACK_STATUS_METADATA[status];
 }
 
-export type CagPackEventType =
-  | "pack_created"
-  | "pack_marked_stale"
-  | "pack_archived"
-  | "pack_used"
-  | "pack_validation_failed"
-  | "pack_refresh_skipped"
-  | "pack_refresh_forced";
+/**
+ * Closed-taxonomy CAG pack event type. Promoted to a tuple at T-G.43
+ * so the metadata table + lockstep tests can be authored.
+ */
+export const CAG_PACK_EVENT_TYPES = [
+  "pack_created",
+  "pack_marked_stale",
+  "pack_archived",
+  "pack_used",
+  "pack_validation_failed",
+  "pack_refresh_skipped",
+  "pack_refresh_forced",
+] as const;
+export type CagPackEventType = (typeof CAG_PACK_EVENT_TYPES)[number];
+
+// ============================================================================
+// Per-event-type operator-facing metadata (T-G.43)
+// ============================================================================
+
+export interface CagPackEventTypeMetadata {
+  /** Display label rendered in the pack event log type column. */
+  readonly label: string;
+  /** Short operator-facing description of when this event fires and
+   *  what it indicates about the pack lifecycle. */
+  readonly description: string;
+  /** Default severity bucket — drives event-log default color coding.
+   *  References `CAG_PACK_EVENT_SEVERITIES`. */
+  readonly defaultSeverity: CagPackEventSeverity;
+  /** Whether this event marks a pack lifecycle status transition
+   *  (true for pack_created / pack_marked_stale / pack_archived;
+   *  false for use / validation / refresh-decision events). */
+  readonly isLifecycleTransition: boolean;
+}
+
+export const CAG_PACK_EVENT_TYPE_METADATA: Readonly<
+  Record<CagPackEventType, CagPackEventTypeMetadata>
+> = {
+  pack_created: {
+    label: "Pack Created",
+    description:
+      "A new pack was created — first lifecycle event for a pack ID. Pack starts in `fresh` status.",
+    defaultSeverity: "info",
+    isLifecycleTransition: true,
+  },
+  pack_marked_stale: {
+    label: "Pack Marked Stale",
+    description:
+      "Freshness scanner or operator decision moved the pack from `fresh` → `stale`. Compile path stops accepting the pack.",
+    defaultSeverity: "warn",
+    isLifecycleTransition: true,
+  },
+  pack_archived: {
+    label: "Pack Archived",
+    description:
+      "Operator decision moved the pack to `archived` (terminal). Pack is preserved for audit but is no longer reachable from active routes.",
+    defaultSeverity: "info",
+    isLifecycleTransition: true,
+  },
+  pack_used: {
+    label: "Pack Used",
+    description:
+      "Runtime path compiled the pack into a CAG block for a request. High-volume event; informational only.",
+    defaultSeverity: "info",
+    isLifecycleTransition: false,
+  },
+  pack_validation_failed: {
+    label: "Pack Validation Failed",
+    description:
+      "Schema / governance / consistency check rejected the pack. Operator must remediate or archive.",
+    defaultSeverity: "error",
+    isLifecycleTransition: false,
+  },
+  pack_refresh_skipped: {
+    label: "Pack Refresh Skipped",
+    description:
+      "Refresh scheduler decided the pack was still fresh and skipped the rebuild. Routine; informational.",
+    defaultSeverity: "info",
+    isLifecycleTransition: false,
+  },
+  pack_refresh_forced: {
+    label: "Pack Refresh Forced",
+    description:
+      "Operator or runtime forced a rebuild outside the freshness window. Warn-level because it signals abnormal urgency.",
+    defaultSeverity: "warn",
+    isLifecycleTransition: false,
+  },
+};
+
+export function getCagPackEventTypeMetadata(
+  type: CagPackEventType,
+): CagPackEventTypeMetadata {
+  return CAG_PACK_EVENT_TYPE_METADATA[type];
+}
 
 /**
  * Closed-taxonomy CAG pack event severity. Promoted to a tuple at
