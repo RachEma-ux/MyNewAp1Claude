@@ -627,10 +627,17 @@ function RenderEnvelopeView({
             ) : null}
           </div>
           {viewMode === "graph" ? (
-            <SnapshotGraphViz
-              nodes={filteredNodes}
-              edges={snapshot.edges}
-            />
+            snapshot.layout === "timeline" ? (
+              <TimelineGraphViz
+                nodes={filteredNodes}
+                edges={snapshot.edges}
+              />
+            ) : (
+              <SnapshotGraphViz
+                nodes={filteredNodes}
+                edges={snapshot.edges}
+              />
+            )
           ) : (
             <>
           <div>
@@ -844,6 +851,152 @@ function SnapshotGraphViz({
                 cx={p.x}
                 cy={p.y}
                 r={5}
+                fill={n.visible ? "currentColor" : "transparent"}
+                stroke="currentColor"
+                strokeDasharray={n.visible ? undefined : "2 2"}
+              />
+              <title>
+                {n.visible
+                  ? `${n.typeKey}: ${n.label ?? n.id}`
+                  : `${n.typeKey}: (hidden)`}
+              </title>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * T-F.78 TimelineGraphViz — first layout-specific renderer.
+ *
+ * Selected when `snapshot.layout === "timeline"`. Positions nodes
+ * left-to-right by their index in the filtered list (the runner emits
+ * nodes in a deterministic order — for runtime-runs that's
+ * chronological by `createdAt`, for runner_pack rollups it's typeKey
+ * batched). y is banded by the node's typeKey: each unique typeKey
+ * gets its own horizontal row, sorted alphabetically for stability.
+ *
+ * Edges remain straight lines between their endpoints — same
+ * dangling-suppression discipline as the circular renderer.
+ */
+function TimelineGraphViz({
+  nodes,
+  edges,
+}: {
+  readonly nodes: ReadonlyArray<{
+    typeKey: string;
+    id: string;
+    visible: boolean;
+    label?: string;
+  }>;
+  readonly edges: ReadonlyArray<{
+    typeKey: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    visible: boolean;
+  }>;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground italic"
+        data-testid="graph-lens-timeline-viz-empty"
+      >
+        No nodes to render.
+      </p>
+    );
+  }
+  const width = 480;
+  const height = 240;
+  const marginX = 24;
+  const marginY = 24;
+  // Banding: the alphabetically-sorted set of typeKeys present in the
+  // filtered node list. y derives from the typeKey's index in this
+  // band, so each typeKey gets a stable horizontal row regardless of
+  // node order.
+  const typeKeyBands = Array.from(new Set(nodes.map((n) => n.typeKey))).sort();
+  const bandStep =
+    typeKeyBands.length === 1
+      ? 0
+      : (height - 2 * marginY) / (typeKeyBands.length - 1);
+  const positions = new Map<string, { x: number; y: number }>();
+  for (let i = 0; i < nodes.length; i += 1) {
+    const n = nodes[i];
+    const x =
+      marginX + (i / Math.max(nodes.length - 1, 1)) * (width - 2 * marginX);
+    const bandIndex = typeKeyBands.indexOf(n.typeKey);
+    const y = marginY + bandIndex * bandStep;
+    positions.set(n.id, { x, y });
+  }
+  const renderableEdges = edges.filter(
+    (e) => positions.has(e.sourceNodeId) && positions.has(e.targetNodeId),
+  );
+  return (
+    <div data-testid="graph-lens-timeline-viz">
+      <SectionLabel>
+        Timeline ({nodes.length} nodes, {typeKeyBands.length} bands,{" "}
+        {renderableEdges.length} edges)
+      </SectionLabel>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-2xl border border-border rounded"
+        data-testid="graph-lens-timeline-viz-svg"
+      >
+        {typeKeyBands.map((key, i) => {
+          const y = marginY + i * bandStep;
+          return (
+            <g key={`band-${key}`}>
+              <line
+                x1={marginX}
+                y1={y}
+                x2={width - marginX}
+                y2={y}
+                stroke="currentColor"
+                strokeOpacity={0.1}
+                strokeWidth={1}
+              />
+              <text
+                x={marginX - 6}
+                y={y + 3}
+                fontSize={8}
+                textAnchor="end"
+                fill="currentColor"
+                fillOpacity={0.6}
+              >
+                {key}
+              </text>
+            </g>
+          );
+        })}
+        {renderableEdges.map((e, i) => {
+          const s = positions.get(e.sourceNodeId)!;
+          const t = positions.get(e.targetNodeId)!;
+          return (
+            <line
+              key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
+              x1={s.x}
+              y1={s.y}
+              x2={t.x}
+              y2={t.y}
+              stroke="currentColor"
+              strokeOpacity={e.visible ? 0.4 : 0.15}
+              strokeWidth={1}
+            />
+          );
+        })}
+        {nodes.map((n) => {
+          const p = positions.get(n.id)!;
+          return (
+            <g
+              key={n.id}
+              data-testid={`graph-lens-timeline-viz-node-${n.id}`}
+            >
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={4}
                 fill={n.visible ? "currentColor" : "transparent"}
                 stroke="currentColor"
                 strokeDasharray={n.visible ? undefined : "2 2"}
