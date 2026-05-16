@@ -188,12 +188,22 @@ export function GraphHealthAdminPanel() {
   // (default behavior). When the operator picks a specific kind,
   // we pass `kind: [kindFilter]` so the server pre-filters the
   // errorClass IN list, dedicating the 50-row buffer to that kind.
+  //
+  // T-I.66 — `sourceKindFilter` mirrors the same shape on the
+  // sourceKind axis. Open-ended (no fixed enum) so the UI affords
+  // selection via clicks on the by-source-kind rollup table rather
+  // than a dropdown. Both filters compose — operator can ask "show
+  // me all `text2cypher_rejected` from `rac-retrieval-executor`".
   const [kindFilter, setKindFilter] = useState<string | null>(null);
+  const [sourceKindFilter, setSourceKindFilter] = useState<string | null>(
+    null,
+  );
   const failureStateEventsQ =
     trpc.agentStudio.workspaceObservability.listRecentFailureStateEvents.useQuery(
       {
         limit: 50,
         kind: kindFilter !== null ? [kindFilter as never] : undefined,
+        sourceKind: sourceKindFilter ?? undefined,
       },
       { refetchOnWindowFocus: false },
     );
@@ -832,6 +842,34 @@ export function GraphHealthAdminPanel() {
               </button>
             ) : null}
           </div>
+          {/* T-I.66: source-kind filter indicator. Open-ended axis
+              with no fixed enum, so the affordance is "click a row
+              in the by-source-kind table to filter". This chip shows
+              the active filter + lets the operator clear it without
+              scrolling back to the row (which may be off-screen
+              after the filter narrows the buffer). Renders only when
+              a filter is active — silent at rest. */}
+          {sourceKindFilter !== null ? (
+            <div
+              className="flex items-center gap-2 text-xs"
+              data-testid="graph-health-failure-state-events-source-kind-filter-chip"
+            >
+              <span className="text-muted-foreground">
+                Source kind:
+              </span>
+              <span className="rounded bg-muted px-2 py-0.5 font-mono">
+                {sourceKindFilter}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSourceKindFilter(null)}
+                className="text-xs text-muted-foreground underline"
+                data-testid="graph-health-failure-state-events-source-kind-filter-clear"
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
           {failureStateEventsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Loading recent failure-state events…
@@ -1038,9 +1076,31 @@ export function GraphHealthAdminPanel() {
                         return Array.from(counts.entries())
                           .sort(([, a], [, b]) => b - a)
                           .map(([sourceKind, count]) => (
-                            <tr key={sourceKind} className="border-t">
+                            <tr
+                              key={sourceKind}
+                              className={`border-t ${sourceKindFilter === sourceKind ? "bg-muted/50" : ""}`}
+                              data-testid={`graph-health-failure-state-events-by-source-kind-row-${sourceKind}`}
+                            >
                               <td className="py-1 pr-3 font-mono text-xs">
-                                {sourceKind}
+                                {/* T-I.66: clickable source-kind cell
+                                    — mirrors T-I.65's by-kind shape on
+                                    the second axis. Toggle semantics:
+                                    clicking the active sourceKind
+                                    clears the filter. */}
+                                <button
+                                  type="button"
+                                  className="underline decoration-dotted hover:decoration-solid"
+                                  onClick={() =>
+                                    setSourceKindFilter(
+                                      sourceKindFilter === sourceKind
+                                        ? null
+                                        : sourceKind,
+                                    )
+                                  }
+                                  data-testid={`graph-health-failure-state-events-by-source-kind-filter-${sourceKind}`}
+                                >
+                                  {sourceKind}
+                                </button>
                               </td>
                               <td className="py-1 pr-3 font-mono text-xs">
                                 {count}
