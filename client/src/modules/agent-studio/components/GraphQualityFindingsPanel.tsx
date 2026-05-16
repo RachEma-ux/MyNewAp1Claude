@@ -72,12 +72,17 @@ const FINDINGS_LIST_LIMIT = 50;
 export function GraphQualityFindingsPanel() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+  // T-F.85: per-row dismiss error surface — sticks the most recent
+  // mutation failure (network / not-found / state-conflict) inline
+  // so the operator gets feedback without a global toast.
+  const [dismissError, setDismissError] = useState<string | null>(null);
   const hasAnyFilter = severityFilter !== null || statusFilter !== null;
   function clearAllFilters() {
     setSeverityFilter(null);
     setStatusFilter(null);
   }
 
+  const utils = trpc.useUtils();
   const statsQ = trpc.agentStudio.graphQuality.getStats.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
@@ -88,6 +93,16 @@ export function GraphQualityFindingsPanel() {
       ...(statusFilter ? { status: statusFilter } : {}),
     },
     { refetchOnWindowFocus: false },
+  );
+  const dismissMutation = trpc.agentStudio.graphQuality.dismissFinding.useMutation(
+    {
+      onSuccess: () => {
+        setDismissError(null);
+        void utils.agentStudio.graphQuality.listFindings.invalidate();
+        void utils.agentStudio.graphQuality.getStats.invalidate();
+      },
+      onError: (err) => setDismissError(err.message),
+    },
   );
 
   if (statsQ.isLoading) {
@@ -282,38 +297,70 @@ export function GraphQualityFindingsPanel() {
               )}
             </p>
           ) : (
-            <table
-              className="w-full text-xs"
-              data-testid="graph-quality-findings-list"
-            >
-              <thead>
-                <tr className="text-left text-muted-foreground">
-                  <th className="py-1">id</th>
-                  <th className="py-1">class</th>
-                  <th className="py-1">severity</th>
-                  <th className="py-1">status</th>
-                  <th className="py-1">source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {findingsQ.data.map((f) => (
-                  <tr
-                    key={f.id}
-                    className="border-t border-border"
-                    data-testid={`graph-quality-finding-row-${f.id}`}
-                  >
-                    <td className="py-1 font-mono">{f.id}</td>
-                    <td className="py-1 font-mono">{f.findingClass}</td>
-                    <td className="py-1 font-mono">{f.severity}</td>
-                    <td className="py-1 font-mono">{f.status}</td>
-                    <td className="py-1 font-mono text-muted-foreground">
-                      {f.sourceTypeKey ?? "—"}
-                      {f.sourceId ? `: ${f.sourceId}` : ""}
-                    </td>
+            <>
+              {dismissError ? (
+                <p
+                  className="text-xs text-destructive"
+                  data-testid="graph-quality-dismiss-error"
+                >
+                  Dismiss failed: {dismissError}
+                </p>
+              ) : null}
+              <table
+                className="w-full text-xs"
+                data-testid="graph-quality-findings-list"
+              >
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1">id</th>
+                    <th className="py-1">class</th>
+                    <th className="py-1">severity</th>
+                    <th className="py-1">status</th>
+                    <th className="py-1">source</th>
+                    <th className="py-1"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {findingsQ.data.map((f) => {
+                    const isDismissable = f.status === "open";
+                    const isPending =
+                      dismissMutation.isPending &&
+                      dismissMutation.variables?.findingId === f.id;
+                    return (
+                      <tr
+                        key={f.id}
+                        className="border-t border-border"
+                        data-testid={`graph-quality-finding-row-${f.id}`}
+                      >
+                        <td className="py-1 font-mono">{f.id}</td>
+                        <td className="py-1 font-mono">{f.findingClass}</td>
+                        <td className="py-1 font-mono">{f.severity}</td>
+                        <td className="py-1 font-mono">{f.status}</td>
+                        <td className="py-1 font-mono text-muted-foreground">
+                          {f.sourceTypeKey ?? "—"}
+                          {f.sourceId ? `: ${f.sourceId}` : ""}
+                        </td>
+                        <td className="py-1">
+                          {isDismissable ? (
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              className="underline text-muted-foreground disabled:opacity-50"
+                              data-testid={`graph-quality-finding-dismiss-${f.id}`}
+                              onClick={() =>
+                                dismissMutation.mutate({ findingId: f.id })
+                              }
+                            >
+                              {isPending ? "Dismissing…" : "Dismiss"}
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
           )}
         </CardContent>
       </Card>
