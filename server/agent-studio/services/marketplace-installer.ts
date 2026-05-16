@@ -20,7 +20,67 @@ import {
   type ToolBundleEntry,
 } from "./marketplace";
 
-export type ConflictBehavior = "skip" | "overwrite" | "rename";
+/**
+ * Closed-taxonomy install-time conflict behavior. Promoted to a tuple
+ * at T-G.53 so the metadata table + lockstep tests can be authored.
+ */
+export const CONFLICT_BEHAVIORS = [
+  "skip",
+  "overwrite",
+  "rename",
+] as const;
+export type ConflictBehavior = (typeof CONFLICT_BEHAVIORS)[number];
+
+// ============================================================================
+// Per-conflict-behavior operator-facing metadata (T-G.53)
+// ============================================================================
+
+export interface ConflictBehaviorMetadata {
+  /** Display label rendered in the install conflict-resolution prompt. */
+  readonly label: string;
+  /** Short operator-facing description of what this behavior does
+   *  when an existing item collides with the installing one. */
+  readonly description: string;
+  /** Whether this behavior produces a new record on collision (true
+   *  for `rename`; false for `skip` + `overwrite` which either
+   *  no-op or replace the existing record in place). */
+  readonly producesNewRecord: boolean;
+  /** Whether this behavior preserves the existing record (true for
+   *  `skip` + `rename`; false for `overwrite` which replaces it). */
+  readonly preservesExisting: boolean;
+}
+
+export const CONFLICT_BEHAVIOR_METADATA: Readonly<
+  Record<ConflictBehavior, ConflictBehaviorMetadata>
+> = {
+  skip: {
+    label: "Skip",
+    description:
+      "On collision, leave the existing item in place and abort the install. Safest default for accidental re-installs.",
+    producesNewRecord: false,
+    preservesExisting: true,
+  },
+  overwrite: {
+    label: "Overwrite",
+    description:
+      "On collision, replace the existing item's record with the incoming payload. Destructive; requires explicit operator intent.",
+    producesNewRecord: false,
+    preservesExisting: false,
+  },
+  rename: {
+    label: "Rename",
+    description:
+      "On collision, install the incoming payload under a suffixed name so both rows coexist. Non-destructive; produces a new record.",
+    producesNewRecord: true,
+    preservesExisting: true,
+  },
+};
+
+export function getConflictBehaviorMetadata(
+  behavior: ConflictBehavior,
+): ConflictBehaviorMetadata {
+  return CONFLICT_BEHAVIOR_METADATA[behavior];
+}
 
 export interface InstallInput {
   itemId: number;

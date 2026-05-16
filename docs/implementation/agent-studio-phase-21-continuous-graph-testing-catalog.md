@@ -284,6 +284,7 @@ runtime catches up.
 | `composer-mode-metadata.test.ts` | `services/runtime/system-prompt-composer` — `COMPOSER_MODE_METADATA` (3-entry per-mode label + description + composes + throwsOnMissingPack booleans for disabled/safe_degraded/strict; also promotes `COMPOSER_MODES` closed-tuple) | T-G.51 / #1160 |
 | `rac-readiness-status-metadata.test.ts` | `shared/export-candidate` — `RAC_READINESS_STATUS_METADATA` (3-entry per-status label + description + allowsExport + requiresInvestigation booleans for ready/degraded/blocked; also promotes `RAC_READINESS_STATUSES` closed-tuple) | T-A.13 / #1161 |
 | `marketplace-item-source-metadata.test.ts` | `services/marketplace` — `MARKETPLACE_ITEM_SOURCE_METADATA` (3-entry per-source label + description + isFirstParty + isAdvertised booleans for local/imported/published; also promotes `MARKETPLACE_ITEM_SOURCES` closed-tuple) | T-G.52 / #1162 |
+| `conflict-behavior-metadata.test.ts` | `services/marketplace-installer` — `CONFLICT_BEHAVIOR_METADATA` (3-entry per-behavior label + description + producesNewRecord + preservesExisting booleans for skip/overwrite/rename; also promotes `CONFLICT_BEHAVIORS` closed-tuple) | T-G.53 / #1163 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 
