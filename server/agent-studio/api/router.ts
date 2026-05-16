@@ -76,6 +76,7 @@ import { workspaceObservabilityRouter } from "../services/workspace-observabilit
 import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
+import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
 import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-router";
@@ -2920,6 +2921,11 @@ export const agentStudioRouter = router({
   // alerts read surface. Pair to graphProjection — both expose
   // cron status to the operator dashboard's single panel pattern.
   graphHealth: graphHealthRouter,
+  // T-F.61 (2026-05-16): graph lens browser surface. `list` + `summary` +
+  // `render` over the Phase 24 lens registry. Sits alongside graphHealth/
+  // graphProjection because the lens snapshots include health-relevant
+  // shapes (runtime / governance / runtime-error overlays).
+  graphLens: graphLensRouter,
   // V1+ Phase MR-1 Phase-2 (2026-05-15, PR-V1-156): region admin
   // surface — listActiveRegions, registerRegion, listPins, getPin,
   // setPin, removePin, getCacheStatus, getRewarmCronStatus.
