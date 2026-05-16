@@ -31,6 +31,9 @@
  *   - Pure function over input array; no DB I/O
  */
 
+import { desc } from "drizzle-orm";
+import { getAsDb } from "../../../db/connection.js";
+import { agsGraphProjectionSyncJobs } from "../../../../../drizzle/tables/agent-studio-graph-projection.js";
 import {
   recordFailureStateEvent,
   type RecordFailureStateEventInput,
@@ -222,4 +225,51 @@ export async function runStalenessCheck(
     thresholdMs: options.thresholdMs,
   });
   return summary;
+}
+
+/**
+ * Default DB-reading row fetcher for `runStalenessCheck`. Reads
+ * `agsGraphProjectionSyncJobs` from ASDB and maps to the
+ * `ProjectionSyncJobRow` shape. Returns an empty array when ASDB is
+ * unavailable (fail-soft — the staleness check downgrades to a no-op
+ * rather than throwing into the caller's flow).
+ *
+ * Limit is a hard cap to keep the detector's memory bounded; default
+ * 5000 rows ordered by `id DESC` so the most-recent runs are
+ * preferred when truncation kicks in. Production cron callers pass a
+ * smaller limit (e.g. 500) since older rows can't meaningfully change
+ * the per-projection max(completedAt).
+ */
+export interface LoadStalenessRowsFromAsDbOptions {
+  /** Maximum rows to load. Default 5000. */
+  readonly limit?: number;
+  /** Test seam — override the `getAsDb` accessor. */
+  readonly getDb?: typeof getAsDb;
+}
+
+const DEFAULT_FETCH_LIMIT = 5000;
+
+export async function loadStalenessRowsFromAsDb(
+  options: LoadStalenessRowsFromAsDbOptions = {},
+): Promise<readonly ProjectionSyncJobRow[]> {
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) return [];
+  const limit = options.limit ?? DEFAULT_FETCH_LIMIT;
+  const rows = await db
+    .select({
+      id: agsGraphProjectionSyncJobs.id,
+      projectionKey: agsGraphProjectionSyncJobs.projectionKey,
+      status: agsGraphProjectionSyncJobs.status,
+      completedAt: agsGraphProjectionSyncJobs.completedAt,
+    })
+    .from(agsGraphProjectionSyncJobs)
+    .orderBy(desc(agsGraphProjectionSyncJobs.id))
+    .limit(limit);
+  return rows.map((r) => ({
+    id: Number(r.id),
+    projectionKey: String(r.projectionKey),
+    status: String(r.status),
+    completedAt: (r.completedAt as Date | null) ?? null,
+  }));
 }
