@@ -149,3 +149,82 @@ Lessons 14-22 in `~/.claude/projects/-root/memory/project_v1_plus_session_2026_0
 - Lesson ledger: `~/.claude/projects/-root/memory/project_v1_plus_session_2026_05_15.md`
 - Roadmap: `agent-studio-native-graph-workspace-roadmap.md` §Phase 22
 - Remaining plan: `agent-studio-native-graph-workspace-remaining-execution-plan.md` §T-I
+
+---
+
+## 7. Addendum — Post-burst closures (2026-05-16)
+
+The original burst summary above froze at 12/25 LIVE on 2026-05-15. The
+following slices landed on top, raising live coverage to **17/25
+(68%)** without re-opening the burst proper.
+
+### 7.1 — Slice-by-slice timeline (post-burst)
+
+| Slice / PR | What it closed | Pattern |
+|---|---|---|
+| T-I.38 / #1213 | Kind #22 `golden_question_failed` (corrected `runLiveEvaluation` premise) | Single-PR wiring via injected `emitter` parameter |
+| T-I.40 / #1215 | Kind #23 `graph_correction_rejected` (corrected `reject path missing` premise) | Single-PR wiring; reject-only branch emits |
+| T-I.41 / #1216 | Kind #2 `note_conflict` (corrected `UI-only` premise) | Vault repository optimistic-lock branch |
+| T-I.43 → T-I.47 / #1218-#1222 | Kind #7 `neo4j_projection_stale` | **5-PR new-detection ladder**: detector → orchestrator → DB fetcher → admin tRPC → scheduled cron |
+| T-I.48 / #1223 | Audit doc kind #7 promotion to 🟢 LIVE | Post-closure audit refresh |
+| T-I.49 / #1224 | Boot wiring for projection-staleness cron | Wires the cron into `boot.ts` |
+| T-I.50 / #1226 | GraphHealthAdminPanel projection-staleness card | First React surface for `getStalenessCronStatus` |
+| **T-I.51 / #1227** | **Kind #10 `graph_query_timeout`** | **1-PR sibling-emit** — detection already existed at `runWithTimeout` → `errorReason: "timeout"`; only emission was missing |
+| T-I.52 / #1231 | Extend bridge coverage guard 13 → 17 entries | Lockstep guard catches up to live coverage |
+
+### 7.2 — Updated live coverage (post-#1231)
+
+| Status | Count | Kinds |
+|---|---|---|
+| 🟢 LIVE via closed-taxonomy bridge | **17** | #1, #2, #3, #4, #5, #7, #8, #9, #10, #12, #15, #18, #19, #20, #21, #22, #23 |
+| ⚠️ Has detection code, partial emission | 1 | #25 background_job_failed (count-pin blocker) |
+| 🟡 Detection state exists in DB but no observability surface | **1** | #6 neo4j_query_timeout (down from 2; #10 closed via T-I.51) |
+| ❌ No detection yet — phase-gated | 5 | #11, #13, #14, #16, #17 |
+| 🔒 Phase-gated on T-D.3 | 1 | #24 |
+
+Sum: 17 + 1 + 1 + 5 + 1 = 25 ✓.
+
+### 7.3 — New closure patterns named in this addendum
+
+Two precedents emerged after the original burst closed:
+
+- **(P-LADDER) 5-PR new-detection ladder** — the canonical pattern for
+  closing a 🟡 detection-gap kind when no detection state exists in
+  the runtime yet. Used for kind #7. Shape: pure-function detector
+  (no I/O) → orchestrator composing fetcher + detector + emitter →
+  DB-reading row fetcher → admin tRPC for on-demand triggering →
+  scheduled cron via `makeRetentionCron`. Each step is independently
+  testable. Subsequent slices add audit promotion + boot wiring +
+  admin UI card.
+- **(P-SIBLING) 1-PR sibling-emit** — substitutes for the 5-PR ladder
+  when the upstream catch branch already discriminates the failure
+  mode (i.e. the runtime already knows it's a timeout / a conflict /
+  a rejection). Used for kind #10. Shape: count the discriminated
+  branch's results inside the existing handler, gate on count > 0,
+  emit one aggregated event per call (NOT per source) with a
+  metadata field carrying the per-item breakdown. Saves 4 PRs of
+  infrastructure when the precondition holds.
+
+The choice between P-LADDER and P-SIBLING is determined by whether
+detection already exists in the runtime, not by the kind's category
+or severity.
+
+### 7.4 — Forward work after this addendum
+
+| Track | Description | Remaining |
+|---|---|---|
+| T-I.5.B.6 (deferred) | Wire `background_job_failed` sibling | Count-pin blocker; needs test-update slice (#1034 records the analysis) |
+| **T-I.??** | **Wire `neo4j_query_timeout` (kind #6)** | **Only detection-gap kind remaining.** Needs per-Cypher-query timeout enforcement in `services/graph/repository/**` first (P-LADDER applies because no current branch throws `GraphTimeoutError`). |
+| T-I.5.D (phase-gated) | Wire `semantic_enrichment_rejected` (kind #24) | T-D.3 (semantic enrichment agent runtime) |
+| T-I.5.C (phase-gated) | Wire remaining ❌ kinds (#11, #13, #14, #16, #17) | Underlying detection runtimes don't exist yet |
+
+After kind #6 closes, Phase 22 live coverage reaches 18/25 — the
+ceiling for what's reachable without opening new runtime phases.
+
+### 7.5 — Self-reference + 4-slice cycle reminder
+
+This addendum lands at PR #1232 (T-I.53). Per lesson 24's 4-slice
+closure-artifact cycle, this is the post-closure refresh that
+follows the closure event itself (T-I.51 / #1227 was the closure;
+#1228, #1229, #1230 the CI recovery + ledger refresh; #1231 the
+lockstep extension; this is the doc consolidation).
