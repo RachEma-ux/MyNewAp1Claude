@@ -693,6 +693,101 @@ export const AGS_REQUIRED_PUBLISH_FIELDS = [
   "systemInstructions",
   "outputContract",
 ] as const;
+export type AgsRequiredPublishField =
+  (typeof AGS_REQUIRED_PUBLISH_FIELDS)[number];
+
+// ============================================================================
+// Per-required-publish-field operator-facing metadata (T-S.22)
+// ============================================================================
+
+export type AgsRequiredPublishFieldCategory =
+  | "identifier"
+  | "ownership"
+  | "behavior"
+  | "contract";
+
+export interface AgsRequiredPublishFieldMetadata {
+  /** Display label rendered in the publish-readiness checklist. */
+  readonly label: string;
+  /** Short operator-facing description of what this field captures
+   *  and why it gates publish readiness. */
+  readonly description: string;
+  /** Closed-taxonomy category for grouping the publish-readiness
+   *  checklist in the UI. */
+  readonly category: AgsRequiredPublishFieldCategory;
+  /** Whether this field expects free-form prose from the operator
+   *  (true for behavior fields like mission/scope/systemInstructions;
+   *  false for identifier/ownership/contract fields which are
+   *  short-form or structured). */
+  readonly requiresFreeFormProse: boolean;
+}
+
+export const AGS_REQUIRED_PUBLISH_FIELD_METADATA: Readonly<
+  Record<AgsRequiredPublishField, AgsRequiredPublishFieldMetadata>
+> = {
+  name: {
+    label: "Name",
+    description:
+      "Human-readable agent name shown in the catalog and run UI. Must be unique per workspace.",
+    category: "identifier",
+    requiresFreeFormProse: false,
+  },
+  internalKey: {
+    label: "Internal Key",
+    description:
+      "Slug-style identifier used by code paths and APIs to reference this agent. Immutable post-publish.",
+    category: "identifier",
+    requiresFreeFormProse: false,
+  },
+  ownerId: {
+    label: "Owner",
+    description:
+      "User who owns this agent — receives governance notifications and approves cross-team usage.",
+    category: "ownership",
+    requiresFreeFormProse: false,
+  },
+  agentClass: {
+    label: "Agent Class",
+    description:
+      "Closed-taxonomy classification (planner / builder / reviewer / tester / governance / utility). Drives default permission scaffolding.",
+    category: "ownership",
+    requiresFreeFormProse: false,
+  },
+  mission: {
+    label: "Mission",
+    description:
+      "Free-form prose describing why this agent exists. Surfaces in the catalog card and informs router heuristics.",
+    category: "behavior",
+    requiresFreeFormProse: true,
+  },
+  scope: {
+    label: "Scope",
+    description:
+      "Free-form prose bounding what this agent will and will not do. Read by the policy engine when scoring requests.",
+    category: "behavior",
+    requiresFreeFormProse: true,
+  },
+  systemInstructions: {
+    label: "System Instructions",
+    description:
+      "Free-form prose system prompt assembled into the model context. The agent's primary behavior driver.",
+    category: "behavior",
+    requiresFreeFormProse: true,
+  },
+  outputContract: {
+    label: "Output Contract",
+    description:
+      "Structured contract describing the expected output shape — schema, citation requirements, refusal policy. Validated at receipt time.",
+    category: "contract",
+    requiresFreeFormProse: false,
+  },
+};
+
+export function getAgsRequiredPublishFieldMetadata(
+  field: AgsRequiredPublishField,
+): AgsRequiredPublishFieldMetadata {
+  return AGS_REQUIRED_PUBLISH_FIELD_METADATA[field];
+}
 
 // ── Phase 0a: openllm-agent2 native parity enums ────────────────────────────
 
