@@ -290,6 +290,7 @@ runtime catches up.
 | `rac-trace-feedback-verdict-metadata.test.ts` | `services/rac/trace/store` — `RAC_TRACE_FEEDBACK_VERDICT_METADATA` (2-entry per-verdict label + description + isPositive boolean for thumbs_up/thumbs_down; also promotes `RAC_TRACE_FEEDBACK_VERDICTS` closed-tuple) | T-A.14 / #1166 |
 | `pii-severity-metadata.test.ts` | `services/ingestion/pii-detector` — `PII_SEVERITY_METADATA` (2-entry per-severity label + description + halts boolean for warn/block; also promotes `PII_SEVERITIES` closed-tuple) | T-D.15 / #1167 |
 | `runtime-graph-event-kind-metadata.test.ts` | `services/graph-agent/projection-events` — `RUNTIME_GRAPH_EVENT_KIND_METADATA` (2-entry per-kind label + description + isDecision boolean for runtime_trace/decision_trace; also promotes `RUNTIME_GRAPH_EVENT_KINDS` closed-tuple) | T-G.55 / #1168 |
+| `runtime-validation-verdict-metadata.test.ts` | `services/runtime/trace-writer` — `RUNTIME_VALIDATION_VERDICT_METADATA` (2-entry per-verdict label + description + allowsDispatch boolean for ok/rejected; also promotes `RUNTIME_VALIDATION_VERDICTS` closed-tuple) — **100th per-kind metadata table** | T-G.56 / #1169 |
 
 ### 7.2 — Phase 22 emission bridge + wiring lockstep tests
 

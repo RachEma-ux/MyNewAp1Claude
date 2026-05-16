@@ -36,8 +36,51 @@ import type { ApprovalDecision } from "../approval/approval-gate";
 
 // ── Pure builders ─────────────────────────────────────────────────────
 
-export type ValidationVerdict = "ok" | "rejected";
+/**
+ * Closed-taxonomy runtime validation verdict. Promoted to a tuple at
+ * T-G.56 so the metadata table + lockstep tests can be authored.
+ */
+export const RUNTIME_VALIDATION_VERDICTS = ["ok", "rejected"] as const;
+export type ValidationVerdict = (typeof RUNTIME_VALIDATION_VERDICTS)[number];
 export type DispatchResult = "ok" | "error" | "blocked";
+
+// ============================================================================
+// Per-validation-verdict operator-facing metadata (T-G.56)
+// ============================================================================
+
+export interface RuntimeValidationVerdictMetadata {
+  /** Display label rendered in the trace-writer verdict column. */
+  readonly label: string;
+  /** Short operator-facing description of what this verdict implies
+   *  for the downstream dispatch chain. */
+  readonly description: string;
+  /** Whether dispatch may proceed at this verdict (true for `ok`;
+   *  false for `rejected` which hard-stops the chain before dispatch). */
+  readonly allowsDispatch: boolean;
+}
+
+export const RUNTIME_VALIDATION_VERDICT_METADATA: Readonly<
+  Record<ValidationVerdict, RuntimeValidationVerdictMetadata>
+> = {
+  ok: {
+    label: "Passed",
+    description:
+      "Proposed-tool-call validation passed — shape and risk-class checks succeeded; chain proceeds to the approval gate.",
+    allowsDispatch: true,
+  },
+  rejected: {
+    label: "Rejected",
+    description:
+      "Proposed-tool-call validation failed — shape or risk-class check rejected the call. Dispatch refuses; trace row carries the rejection code.",
+    allowsDispatch: false,
+  },
+};
+
+export function getRuntimeValidationVerdictMetadata(
+  verdict: ValidationVerdict,
+): RuntimeValidationVerdictMetadata {
+  return RUNTIME_VALIDATION_VERDICT_METADATA[verdict];
+}
 
 export function validationVerdictFromResult(
   result: ProposedToolCallValidationResult,
