@@ -433,3 +433,82 @@ items 54 + 59 + 60 per CLAUDE.md and the remaining-execution plan.
 New code on this PR: `server/agent-studio/services/graph/retrieval/strategy-selector.ts` (pure-deterministic `pickGraphRagStrategy` selecting from 5 RetrievalMode values via query keywords + caller hints) + `tests/agent-studio/item-58-graphrag-strategy-selector.test.ts` (15 tests) + engine `pickRetrievalMode` wiring. Replaces the hard-coded `graphrag_local` fallback with query-shape-aware selection. Engine regression: 4 graph-agent suites green (34 tests).
 
 Closure evidence + per-item audit + boundary review + remaining-blocker matrix in `docs/evidence/agent-studio-post-mvp-full-implementation-2026-05-17.md`.
+
+## 16. T-G.1 Institutional Memory Lens 7-typeKey ladder closure (2026-05-17)
+
+Mechanical 6-PR sub-arc on top of the existing α (`inst_workflow`,
+#1366) shipped 7 new closed-taxonomy-aligned projector-backed node
+types in `InstitutionalMemoryLensRunner`. Each slice followed the
+α-shell pattern (precedent **(o)** opportunistic α-shell): a row
+interface + optional `<plural>?:` field on the ReadResult + a
+NODE_PREFIX constant + an emit loop + a public-API re-export + a
+focused test file (~7 behavior tests + 1 source-scan integrity test).
+
+| Slice | PR | typeKey | Source-mapping table |
+|---|---|---|---|
+| α | #1366 | `inst_workflow` | `workflows` |
+| β | #1404 | `inst_person` | `users` |
+| γ | #1405 | `inst_project` | `workspaces` |
+| δ | #1406 | `inst_decision` | `ags_approval_steps` |
+| ε | #1407 | `inst_outcome` | `ags_runtime_runs` |
+| ζ | #1408 | `inst_timeline_event` | `ags_runtime_runs` (primary, union-shape) |
+| η | #1409 | `inst_document` | `ags_vault_notes` |
+
+Closed-taxonomy coverage after η:
+- **8/13 mapped + real-SoT-backed**: workflow, person, project,
+  decision, outcome, timeline_event, document (this ladder) + the
+  legacy `agent` typeKey (not in the closed taxonomy, but the
+  pre-ladder primary).
+- **5/13 unmapped or non-row-shape**:
+  - `team` — synthetic-from-`workspace_members`; `idColumn: null` +
+    `labelColumn: null` flag this as aggregation, not 1:1 row emit;
+    requires a different read-shape than the additive ladder pattern
+  - `system`, `service`, `responsibility` — `sourceTable: null` in the
+    closed-taxonomy source-mapping; no SoT table exists yet
+  - `policy`, `governance_record` — both mapped to
+    `ags_governance_records`, **which does not yet exist on the ASDB
+    schema** (Phase 25.2 future table per source-mapping notes)
+
+Sub-arc lessons (carry-forward):
+1. **Source-mapping aspiration vs SoT existence audit.** When picking
+   the next slice, verify the named source table actually exists on
+   the schema before opening the branch. ε pivoted from `policy` (table
+   doesn't exist) to `outcome` (real); the source-mapping is
+   aspirational ahead of the schema and the lens runner must follow
+   the schema, not the aspiration.
+2. **Additive rebase via "keep both" resolution.** Every slice on this
+   ladder added orthogonal additive lines (row interface + ReadResult
+   field + prefix constant + emit loop + public-api re-export). When a
+   sibling slice merges first and the next branch rebases, **all
+   conflicts resolve mechanically by keeping both regions**. No slice
+   had to redesign its shape to accommodate another sibling — the
+   contract for additive lens slices is strictly extension, never
+   modification.
+3. **sourceKind-discriminated id for union-shape slices.** When one
+   typeKey will eventually be unioned across multiple source tables
+   (ζ's `inst_timeline_event` reads from
+   runtime_run / approval_step / vault_version / governance_record per
+   the source-mapping note), the node id must encode the source
+   discriminator (`timeline_event:<sourceKind>:<rawId>`) — otherwise
+   raw numeric ids collide across tables. This pattern is reusable any
+   time the source-mapping note says "the primary mapping here is the
+   largest" or "unions multiple tables".
+4. **Denormalize at the read seam, not in the runner.** ε's read row
+   carries `agentKey` from `agsAgents.internalKey` even though the
+   primary table is `ags_runtime_runs`; the runner does not join. The
+   asdb-reader (not in this ladder) is responsible for the join. This
+   keeps the runner pure and additive, and keeps reader-shape changes
+   local.
+5. **Label string is operator-readable, not a key.** Labels like
+   `"approved: reviewer (step 1)"` (δ) and
+   `"succeeded: agent_one (production)"` (ε) encode the most
+   operator-relevant facts in priority order: terminal-verdict +
+   actor-role + scope-discriminator. Operators read labels at a glance
+   in the lens viewport; meta carries the full row for drill-in.
+
+Recommendation: T-G.1 ladder is substantially closed at η. The
+remaining 5 unmapped types either need a different shape (`team`
+aggregation), or wait on SoT tables that don't yet exist
+(`system`/`service`/`responsibility`/`policy`/`governance_record`).
+The natural next pivot is T-G.2 (code-graph parser) or a different
+roadmap track — not more T-G.1 slices.
