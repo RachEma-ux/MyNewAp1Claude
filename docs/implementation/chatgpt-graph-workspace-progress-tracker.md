@@ -593,3 +593,82 @@ ingestion). Those are mutation-heavy and should be opened on
 explicit user direction. The natural next read-side pivot is a
 client React panel that consumes these 7 procedures — UI work, which
 requires browser testing the user can validate.
+
+## 18. T-G.3 Security Graph operator-facing tRPC surface (2026-05-17)
+
+Pivot from T-G.2 to T-G.3 per session direction. Prior to this
+sub-arc, the security-graph stack had contracts + persistence +
+projection + NVD CVE feed reader shipped piecewise (T-G.3.1-.4), but
+**no operator-facing tRPC surface**. Same gap T-G.2 had before
+its α-ε ladder, and closed here with the same shape.
+
+This sub-arc ships a stacked 4-PR ladder mirroring T-G.2's α-γ + δ
+shape — **precedent (s)** cross-graph pattern reuse applied to the
+parallel security-graph schema:
+
+| Slice | PR | Procedure | Purpose |
+|---|---|---|---|
+| α | #1417 | `listIngestions` + `getIngestionStats` | Ingestion list + per-ingestion typeKey breakdown |
+| β | #1418 | `listIngestionNodes` + `listIngestionEdges` | Drill from stats panel into actual rows (typeKey-filterable) |
+| γ | #1419 | `listKnownTypes` | Closed-taxonomy enumeration (10 nodes + 8 edges + edge constraints) |
+| δ | #1420 | `listSources` | Per-source-key summary (latest ingestion + freshness + total count) — drives the "feed freshness" panel |
+
+All 7 procedures are `adminProcedure` — per remaining-execution-plan
+T-G.3, **"security findings are not workspace-public"**.
+`adminProcedure` is the floor; downstream workspace-scoping (if added
+later) goes on top, never below.
+
+**No mutations in this stack** — NVD CVE feed ingestion is triggered
+by the orchestrator (or future cron); projection is triggered by
+`security-graph-projection.ts` downstream of persistence. This router
+does not own those entry points.
+
+Schema-shape differences from T-G.2 (the only deltas in an otherwise
+line-for-line mirror):
+- `sourceKey` (NVD/GHSA/scanner-id) substitutes for `repositoryId`
+  throughout — list rows, source-summary rows, and the underlying
+  `agsSecurityGraphIngestions` table column
+- No `parserErrorCount` column on the ingestion schema (security
+  graph rejections live in `metadata.rejectionsByReason` as a count
+  map, not a row-list — so the T-G.2.ε equivalent is intentionally
+  NOT mirrored)
+- 10 node types + 8 edge types (vs T-G.2's 12 + 10)
+
+Sub-arc carry-forward lessons:
+1. **Cross-graph pattern reuse template.** T-G.2's α-γ + δ ladder
+   maps line-for-line to T-G.3 with one schema substitution
+   (`repositoryId` → `sourceKey`). When two graphs share the same
+   ingestion-row + nodes + edges shape, the read-side router can be
+   ported by find-replace + one column-name swap. New precedent
+   **(t)** cross-graph mirror.
+2. **Closed-taxonomy spot-checks anchor against silent enum drift.**
+   The γ test spot-checks `affects_package` (not `affects`),
+   `governed_by_policy` (not `policy_governed`), etc. — verbatim
+   match to the contracts. Caught one author-error during
+   development (`affects` vs `affects_package`) before it shipped.
+3. **Schema-substitution discipline keeps SQL uniform.** The
+   `DISTINCT ON (source_key)` in δ mirrors T-G.2.γ's
+   `DISTINCT ON (repository_id)` line-for-line — Postgres-specific
+   in both, single round-trip per side in both, JS-Map join in
+   both. Uniform across both graphs makes future maintenance
+   single-pass.
+4. **`adminProcedure` floor at the router; downstream scoping goes
+   on top.** Per the "security findings are not workspace-public"
+   rule, admin-only is the minimum. If a future slice needs
+   workspace-scoped read access (e.g., owners can see findings for
+   services they own), that's a layer ON TOP of admin, not a
+   replacement.
+5. **Don't mirror what doesn't apply.** T-G.2.ε's parser-error
+   telemetry has no security-graph equivalent — security-graph
+   rejections are count-by-reason in metadata, not per-file rows.
+   The mirror stopped at 4 slices instead of pushing for a 5th that
+   would have been a misshape.
+
+Recommendation: T-G.3 read surface substantially closed at δ (4
+procedures across 4 PRs). Optional follow-up: rejection-by-reason
+telemetry surface that flattens `metadata.rejectionsByReason` across
+recent ingestions (rough analog to T-G.2.ε but with count-map shape
+not row-list). Otherwise the natural next pivot is T-G.4
+(Recommendation Service) per remaining-execution-plan — or the
+mutation-side work for T-G.2/T-G.3 (cron + operator-trigger) on
+explicit user direction.
