@@ -114,6 +114,26 @@ export function PublishTargetsAdminPanel() {
       },
     );
 
+  // T-F.129 (T-F.7-j₂ intra-panel, mechanical replication of
+  // T-F.128 ExtensionsAdminPanel): click a target name in the
+  // recent-executions log → highlight + scrollIntoView its row
+  // in the targets registry above. Saves the operator a Ctrl+F-
+  // and-scroll round-trip when an unusual status / digest / error
+  // in the log invites a target config re-check.
+  const [highlightedTargetId, setHighlightedTargetId] = useState<
+    number | null
+  >(null);
+  const targetRowRefs = React.useRef<
+    Map<number, HTMLTableRowElement | null>
+  >(new Map());
+  function handleExecutionTargetClick(targetId: number) {
+    setHighlightedTargetId(targetId);
+    const row = targetRowRefs.current.get(targetId);
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
   // PR-V1-188: per-target execution health summary joined into
   // the registry table by targetId. Zero-filled service-side so
   // every registry row has a corresponding summary entry.
@@ -321,7 +341,13 @@ export function PublishTargetsAdminPanel() {
                     const s = summaryByTargetId.get(t.id);
                     return (
                     <React.Fragment key={t.id}>
-                    <tr className="border-t">
+                    <tr
+                      ref={(el) => {
+                        targetRowRefs.current.set(t.id, el);
+                      }}
+                      className={`border-t ${highlightedTargetId === t.id ? "bg-amber-100 dark:bg-amber-900/30" : ""}`}
+                      data-testid={`publish-target-registry-row-${t.id}`}
+                    >
                       <td className="py-1 pr-3 font-mono text-xs">
                         {t.targetKey}
                       </td>
@@ -635,7 +661,17 @@ export function PublishTargetsAdminPanel() {
                             {fmtTs(r.createdAt)}
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
-                            {targetKeyById.get(r.targetId) ?? `#${r.targetId}`}
+                            <button
+                              type="button"
+                              className="underline hover:text-primary"
+                              data-testid={`publish-execution-row-target-${r.id}`}
+                              title="Highlight matching target registry row above"
+                              onClick={() =>
+                                handleExecutionTargetClick(r.targetId)
+                              }
+                            >
+                              {targetKeyById.get(r.targetId) ?? `#${r.targetId}`}
+                            </button>
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
                             {r.sourcePromotionId}
