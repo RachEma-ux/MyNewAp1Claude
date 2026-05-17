@@ -512,3 +512,84 @@ aggregation), or wait on SoT tables that don't yet exist
 (`system`/`service`/`responsibility`/`policy`/`governance_record`).
 The natural next pivot is T-G.2 (code-graph parser) or a different
 roadmap track — not more T-G.1 slices.
+
+## 17. T-G.2 Code Graph operator-facing tRPC surface (2026-05-17)
+
+Pivot from T-G.1 to T-G.2 per §16 recommendation. Prior to this
+session, the code-graph stack had parser + persistence + projection +
+lens shipped piecewise across the T-E spike (#1363-#1367 OUTCOME A)
+and T-G.2.1/.3/.4/.5, but **no operator-facing tRPC surface**. The
+dashboard had no way to list ingestions or inspect typeKey breakdowns
+without going through the lens (useful for graph view, not for raw
+triage).
+
+This sub-arc closes that gap with a stacked 5-PR ladder that
+incrementally builds the `agentStudio.codeGraph.*` read surface:
+
+| Slice | PR | Procedure | Purpose |
+|---|---|---|---|
+| α | #1411 | `listIngestions` + `getIngestionStats` | Ingestion list + per-ingestion typeKey breakdown |
+| β | #1412 | `listIngestionNodes` + `listIngestionEdges` | Drill from stats panel into actual rows (typeKey-filterable) |
+| γ | #1413 | `listRepositories` | Per-repo summary (latest ingestion + freshness anchor + total count) — drives the "stale repos" panel |
+| δ | #1414 | `listKnownTypes` | Closed-taxonomy enumeration (12 nodes + 10 edges + edge constraints) — dashboard dropdown population |
+| ε | #1415 | `listRecentParserErrors` | Audit-trail parser-error telemetry flattened across recent ingestions |
+
+All 7 procedures are `adminProcedure` (operator-only) and read-only.
+**No mutations in this stack** — ingestion is triggered by the
+orchestrator (T-G.2.3 server-side) or a future operator-trigger
+mutation slice. Projection is triggered by `code-graph-projection.ts`
+(T-G.2.4) downstream of persistence. This router does not own those
+entry points — separation keeps the read surface stable while
+ingestion/projection wiring iterates.
+
+Persistence-layer additions (5 new methods + 4 new interfaces on
+`CodeGraphStore`):
+
+| Method | Interface | Source-table shape |
+|---|---|---|
+| `listIngestions(limit)` | `CodeGraphIngestionListRow` | `agsCodeGraphIngestions` rows, `desc(startedAt)` |
+| `getIngestionStats(ingestionId)` | `CodeGraphIngestionStats \| null` | Two independent `GROUP BY` aggregates (typeKey + edgeTypeKey); null discriminator for missing ingestion |
+| `listIngestionNodes(input)` | `ParsedCodeNode[]` | Conditional sql\`\` where-clause for optional typeKey filter; `orderBy(nodeId)` |
+| `listIngestionEdges(input)` | `ParsedCodeEdge[]` | Mirror of nodes; optional edgeTypeKey filter; `orderBy(edgeId)` |
+| `listRepositories(limit)` | `CodeGraphRepositorySummaryRow[]` | `DISTINCT ON (repository_id) ORDER BY repository_id, started_at DESC` + second `GROUP BY` total-count; joined in JS via Map |
+| `listRecentParserErrors(input)` | `CodeGraphRecentParserErrorRow[]` | Prefilter `parserErrorCount > 0`, flatten `metadata.parserErrors` audit-list; ingestion context attached at read-time |
+
+Sub-arc carry-forward lessons:
+1. **Stacked branches via "build on the branch tip, rebase as
+   siblings merge"** kept the 5-PR sequence shippable in parallel.
+   Because every slice is strictly additive (new methods, new
+   procedures, new constants — no modification of α's lines), rebase
+   is always clean ("Successfully rebased and updated…" with no
+   conflicts). This is the inverse of the T-G.1 ladder pattern where
+   sibling slices touched the same regions of the runner; T-G.2's
+   per-method/per-procedure additive shape avoids that entirely.
+2. **Source-scan mount-drift guard.** Per the
+   `reference_tsconfig_excludes_hide_trpc_mount_drift` memory,
+   tsconfig excludes `services/**` from typecheck, so a
+   silently-unmounted router compiles clean. The α test
+   source-scans `api/router.ts` for both the import statement AND
+   `codeGraph: codeGraphRouter,` mount-key. Reusable pattern for any
+   new router.
+3. **Discriminated envelopes for "row not found" vs "zero rows".**
+   `getIngestionStats` returns `null`, then β + ε wrap that into an
+   `ingestion_not_found` envelope discriminator. Operators see "this
+   ingestion exists but has zero rows" as distinct from "no such
+   ingestion" — actionable distinction.
+4. **Pre-flight existence check before drill-in.** β's
+   `listIngestionNodes`/`listIngestionEdges` call `getIngestionStats`
+   first (cheap COUNT query) before paying for the row-sample
+   query. Returns `ingestion_not_found` envelope without scanning
+   nodes/edges tables when the ingestion id is unknown.
+5. **Parameterless query when the input space is enumerable.** δ's
+   `listKnownTypes` has no `input` schema — there's no use case for
+   filtered enumeration (operators always want the full enum). Wire
+   shape stays minimal; client doesn't need to construct an empty
+   input object.
+
+Recommendation: T-G.2 read surface is now complete. The remaining
+T-G.2 work in the remaining-execution-plan is on the mutation/cron
+side (operator-trigger ingestion + re-ingestion cron + multi-repo
+ingestion). Those are mutation-heavy and should be opened on
+explicit user direction. The natural next read-side pivot is a
+client React panel that consumes these 7 procedures — UI work, which
+requires browser testing the user can validate.
