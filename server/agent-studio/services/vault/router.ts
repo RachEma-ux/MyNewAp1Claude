@@ -62,6 +62,7 @@ import {
   getSavedViewVersionById,
   updateSavedView,
   deleteSavedView,
+  deleteSavedViews,
   SavedViewNotFoundError,
 } from "./saved-views.js";
 import {
@@ -693,6 +694,28 @@ export const vaultRouter = router({
     .mutation(async ({ input }) => {
       try {
         return await deleteSavedView(input.viewId);
+      } catch (e) {
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // T-F.118 (T-F.2-ζ.2): bulk-delete saved views. Cap at 200 IDs
+  // per call (Postgres `IN (...)` parameter explosion stays
+  // bounded; consistent with `bulkDismissFindings.max(500)` shape
+  // but lower since saved-view deletions are operator-driven
+  // bulk-cleanup, not a Quality-Lens-scale finding stream).
+  deleteSavedViews: protectedProcedure
+    .input(
+      z.object({
+        viewIds: z.array(z.number().int().positive()).min(0).max(200),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await deleteSavedViews(input.viewIds);
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

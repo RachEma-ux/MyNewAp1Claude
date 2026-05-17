@@ -337,6 +337,29 @@ export function BasesPanel() {
       },
       onError: (err) => setFilterEditError(err.message),
     });
+
+  // ── T-F.118 (T-F.2-ζ.2): bulk-delete mutation + composite state ──
+  // Single bulk gesture at a time (lesson 83 — bulk state collapses
+  // to composite when bulk-actions are mutually exclusive). Confirm
+  // is two-step per lesson 64 (destructive; N rows vanish).
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] =
+    useState<boolean>(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+  const [bulkDeleteResult, setBulkDeleteResult] = useState<string | null>(null);
+  const bulkDeleteMutation =
+    trpc.agentStudio.vault.deleteSavedViews.useMutation({
+      onSuccess: (res) => {
+        setBulkDeleteError(null);
+        setBulkDeleteResult(`Deleted ${res.deletedCount} base(s).`);
+        setBulkDeleteConfirmOpen(false);
+        clearBaseSelection();
+        void utils.agentStudio.vault.listVisibleSavedViews.invalidate();
+      },
+      onError: (err) => {
+        setBulkDeleteError(err.message);
+        setBulkDeleteResult(null);
+      },
+    });
   const sortEditMutation =
     trpc.agentStudio.vault.updateSavedView.useMutation({
       onSuccess: () => {
@@ -742,23 +765,88 @@ export function BasesPanel() {
                   + server bulk-delete endpoint land in T-F.118 ζ.2. */}
               {selectedBaseIds.size > 0 ? (
                 <div
-                  className="mb-2 flex items-center gap-3 rounded border bg-muted/30 px-3 py-1.5 text-xs"
+                  className="mb-2 space-y-2 rounded border bg-muted/30 px-3 py-1.5 text-xs"
                   data-testid="bases-bulk-selection-bar"
                 >
-                  <span data-testid="bases-bulk-selection-count">
-                    {selectedBaseIds.size} selected
-                  </span>
-                  <span className="text-muted-foreground">
-                    Bulk actions land in a follow-up slice.
-                  </span>
-                  <button
-                    type="button"
-                    className="ml-auto underline text-muted-foreground"
-                    onClick={clearBaseSelection}
-                    data-testid="bases-bulk-selection-clear"
-                  >
-                    Clear selection
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <span data-testid="bases-bulk-selection-count">
+                      {selectedBaseIds.size} selected
+                    </span>
+                    {/* T-F.118 (T-F.2-ζ.2): bulk-delete entry button +
+                        two-step confirm. The confirm panel renders
+                        inline below this row (lesson 64 — destructive,
+                        explicit operator gesture). */}
+                    {!bulkDeleteConfirmOpen ? (
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+                        disabled={bulkDeleteMutation.isPending}
+                        onClick={() => {
+                          setBulkDeleteError(null);
+                          setBulkDeleteResult(null);
+                          setBulkDeleteConfirmOpen(true);
+                        }}
+                        data-testid="bases-bulk-delete"
+                      >
+                        Delete {selectedBaseIds.size}…
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="ml-auto underline text-muted-foreground"
+                      onClick={clearBaseSelection}
+                      data-testid="bases-bulk-selection-clear"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                  {bulkDeleteConfirmOpen ? (
+                    <div
+                      className="flex items-center gap-2 rounded border border-destructive/30 bg-destructive/5 px-2 py-1"
+                      data-testid="bases-bulk-delete-confirm"
+                    >
+                      <span>
+                        Delete {selectedBaseIds.size} base(s)? This cannot
+                        be undone.
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded border border-destructive bg-destructive px-2 py-0.5 text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+                        disabled={bulkDeleteMutation.isPending}
+                        onClick={() =>
+                          bulkDeleteMutation.mutate({
+                            viewIds: Array.from(selectedBaseIds),
+                          })
+                        }
+                        data-testid="bases-bulk-delete-confirm-button"
+                      >
+                        {bulkDeleteMutation.isPending
+                          ? "Deleting…"
+                          : "Confirm delete"}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-0.5 hover:bg-muted"
+                        onClick={() => setBulkDeleteConfirmOpen(false)}
+                        data-testid="bases-bulk-delete-cancel"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : null}
+                  {bulkDeleteResult !== null ? (
+                    <div data-testid="bases-bulk-delete-result">
+                      {bulkDeleteResult}
+                    </div>
+                  ) : null}
+                  {bulkDeleteError !== null ? (
+                    <div
+                      className="text-destructive"
+                      data-testid="bases-bulk-delete-error"
+                    >
+                      Bulk delete failed: {bulkDeleteError}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <table className="w-full text-xs" data-testid="bases-list">

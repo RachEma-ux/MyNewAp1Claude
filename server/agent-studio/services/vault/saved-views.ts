@@ -22,7 +22,7 @@
  * ADR: docs/architecture/agent-studio-markdown-profile.md
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import {
   agsVaultSavedViews,
@@ -317,6 +317,35 @@ export async function deleteSavedView(
     .where(eq(agsVaultSavedViews.id, viewId));
 
   return { deleted: true };
+}
+
+/**
+ * Bulk-delete saved views by id (T-F.118 / T-F.2-ζ.2).
+ *
+ * Single DB round-trip via `inArray`. Empty input short-circuits
+ * with `{ deletedCount: 0 }` and no DB call (matches the
+ * `dismissNotifications` / `bulkDismissFindings` empty-array
+ * contract). Returns the actual `deletedCount` from `.returning()`
+ * so the UI can render "N deleted" (operator sees the real
+ * server-side count, distinct from the input length when some IDs
+ * didn't exist).
+ */
+export async function deleteSavedViews(
+  viewIds: readonly number[],
+  options: SavedViewServiceOptions = {},
+): Promise<{ deletedCount: number }> {
+  if (viewIds.length === 0) return { deletedCount: 0 };
+
+  const getDb = options.getDb ?? getAsDb;
+  const db = getDb();
+  if (!db) throw new AsdbUnavailableError();
+
+  const deleted = await db
+    .delete(agsVaultSavedViews)
+    .where(inArray(agsVaultSavedViews.id, viewIds as number[]))
+    .returning({ id: agsVaultSavedViews.id });
+
+  return { deletedCount: deleted.length };
 }
 
 // ============================================================================
