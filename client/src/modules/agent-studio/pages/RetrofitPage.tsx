@@ -105,6 +105,23 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
   const draftQuery = trpc.agentStudio.identity.get.useQuery({ agentId });
   const draftId = draftQuery.data?.draft?.id ?? null;
 
+  // ── T-F.125 (T-F.7-j₂ fusion): clickable-rollup state-lift ──
+  // Lifted from BulkJobOpsPanel + Tabs to enable cross-tab
+  // orchestration: clicking a kind in the jobs-by-kind breakdown
+  // (rendered inside ObservabilityStatsPanel) fills BOTH retry and
+  // cancel form inputs (operator's gesture is "narrow to this
+  // kind" — they pick the action next) AND switches the active tab
+  // to bulk-job-ops so they see the filled form without scrolling.
+  const [tabValue, setTabValue] = useState<string>("ingestion");
+  const [retryJobKind, setRetryJobKind] = useState<string>("");
+  const [cancelJobKind, setCancelJobKind] = useState<string>("");
+
+  function handleKindClick(kind: string): void {
+    setRetryJobKind(kind);
+    setCancelJobKind(kind);
+    setTabValue("bulk-job-ops");
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -112,7 +129,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         subtitle="Universal KB · Tool Knowledge · Approvals queue"
       />
 
-      <Tabs defaultValue="ingestion">
+      <Tabs value={tabValue} onValueChange={setTabValue}>
         <TabsList>
           <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
           <TabsTrigger value="kb">Knowledge Units</TabsTrigger>
@@ -164,7 +181,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <CronStatusPanel />
         </TabsContent>
         <TabsContent value="observability-stats">
-          <ObservabilityStatsPanel />
+          <ObservabilityStatsPanel onClickKind={handleKindClick} />
         </TabsContent>
         <TabsContent value="observability-dashboard">
           <ObservabilityDashboardPanel />
@@ -173,7 +190,12 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <AdminSweepsPanel />
         </TabsContent>
         <TabsContent value="bulk-job-ops">
-          <BulkJobOpsPanel />
+          <BulkJobOpsPanel
+            retryJobKind={retryJobKind}
+            setRetryJobKind={setRetryJobKind}
+            cancelJobKind={cancelJobKind}
+            setCancelJobKind={setCancelJobKind}
+          />
         </TabsContent>
         <TabsContent value="runtime-runs-retention">
           <RuntimeRunsRetentionPanel />
@@ -930,11 +952,17 @@ function JobsByKindBreakdownCard({
   failedJobsByKind,
   pendingJobsByKind,
   runningJobsByKind,
+  onClickKind,
 }: {
   jobsByKind: Record<string, number>;
   failedJobsByKind: Record<string, number>;
   pendingJobsByKind: Record<string, number>;
   runningJobsByKind: Record<string, number>;
+  // T-F.125 (T-F.7-j₂ fusion): optional click handler. When set,
+  // the Kind cell becomes a button that calls onClickKind(k);
+  // when unset, the Kind cell stays a plain `<span>` (read-only
+  // breakdown for non-RetrofitPage consumers).
+  onClickKind?: (kind: string) => void;
 }) {
   // Union of all kinds seen across the four axes — a kind might be
   // 0 in `jobsByKind` overall (e.g. retention-pruned) but still
@@ -991,7 +1019,21 @@ function JobsByKindBreakdownCard({
                     className="border-t border-zinc-800"
                     data-testid={`retrofit-jobs-by-kind-row-${k}`}
                   >
-                    <td className="px-2 py-1 font-mono">{k}</td>
+                    <td className="px-2 py-1 font-mono">
+                      {onClickKind ? (
+                        <button
+                          type="button"
+                          className="underline text-left hover:text-blue-300"
+                          onClick={() => onClickKind(k)}
+                          data-testid={`retrofit-jobs-by-kind-row-${k}-click`}
+                          title="Fill bulk-job-ops retry+cancel forms with this kind"
+                        >
+                          {k}
+                        </button>
+                      ) : (
+                        k
+                      )}
+                    </td>
                     <td className="px-2 py-1 text-right tabular-nums">
                       {jobsByKind[k] ?? 0}
                     </td>
@@ -1107,7 +1149,16 @@ function JobsByLaneBreakdownCard({
   );
 }
 
-function ObservabilityStatsPanel() {
+function ObservabilityStatsPanel({
+  onClickKind,
+}: {
+  // T-F.125 (T-F.7-j₂ fusion): optional click handler for the
+  // jobs-by-kind breakdown rows. Wired from RetrofitPage; clicking
+  // a kind row fills both retry+cancel forms AND switches tabs.
+  // Optional so the component still works without the handler
+  // (e.g. if another consumer wants the read-only breakdown).
+  onClickKind?: (kind: string) => void;
+}) {
   const q = trpc.agentStudio.workspaceObservability.getStats.useQuery(
     undefined,
     { refetchInterval: 30_000 },
@@ -1173,6 +1224,7 @@ function ObservabilityStatsPanel() {
         failedJobsByKind={s.failedJobsByKind}
         pendingJobsByKind={s.pendingJobsByKind}
         runningJobsByKind={s.runningJobsByKind}
+        onClickKind={onClickKind}
       />
 
       {/* ── T-F.113 (T-F.7-β): jobs-by-lane companion ──
@@ -1625,10 +1677,22 @@ function AdminSweepsPanel() {
 // cancelBackgroundJobsByQuery accepts a statuses filter (default
 // ["pending"]) so operators can scope the cancel to safe targets.
 
-function BulkJobOpsPanel() {
-  const [retryJobKind, setRetryJobKind] = useState("");
+function BulkJobOpsPanel({
+  retryJobKind,
+  setRetryJobKind,
+  cancelJobKind,
+  setCancelJobKind,
+}: {
+  // T-F.125 (T-F.7-j₂ fusion): lifted state. retryJobKind +
+  // cancelJobKind move to RetrofitPage so the jobs-by-kind click
+  // handler can fill them. Limit + statuses stay local since the
+  // operator picks those after the kind is filled.
+  retryJobKind: string;
+  setRetryJobKind: (v: string) => void;
+  cancelJobKind: string;
+  setCancelJobKind: (v: string) => void;
+}) {
   const [retryLimit, setRetryLimit] = useState("50");
-  const [cancelJobKind, setCancelJobKind] = useState("");
   const [cancelStatuses, setCancelStatuses] = useState("pending");
   const [cancelLimit, setCancelLimit] = useState("50");
 
