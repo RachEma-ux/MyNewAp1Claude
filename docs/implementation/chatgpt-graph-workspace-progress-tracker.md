@@ -1094,3 +1094,138 @@ that read surface is uniform across T-D.3 + graph-quality +
 graph-correction), T-I cross-cutting governance, or T-D.1
 quality-agent operator-trigger mutations (graph-quality service
 already has `agent-run.ts` runtime).
+
+## 23. Cross-graph mount-drift audit + closure (2026-05-17)
+
+Continues full-autonomous execution. Pivoted from T-D.3 closure
+(§22) to a **cross-graph mount audit** of all tRPC routers under
+`server/agent-studio/services/**/router.ts`. Audit turned up two
+orphan routers — defined but never imported / mounted in
+`agentStudioRouter` — causing silent runtime 404s for any client
+call to those sub-paths.
+
+### Audit one-liner
+
+The audit (now codified as the
+[[mount-drift-audit-pattern]] memory) is a single bash one-liner:
+
+```bash
+find server/agent-studio/services -name "*router.ts" -type f | while read f; do
+  name=$(grep -oE "export const \w+Router" "$f" | head -1 | awk '{print $3}')
+  [ -z "$name" ] && continue
+  mounted=$(grep -c "$name" server/agent-studio/api/router.ts)
+  echo "$mounted $name $f"
+done | awk '$1==0'
+```
+
+Output before fixes:
+
+```
+0 graphChangeProposalsRouter  server/agent-studio/services/graph-change-proposals/router.ts
+0 vaultRouter                  server/agent-studio/services/vault/router.ts
+```
+
+### Ledger
+
+| # | PR | Slice | Fix |
+|---|---|---|---|
+| 1 | #1434 | mount-graphChangeProposals | `agentStudio.graphChangeProposals.{submit, approve, reject, withdraw}` — Phase 11.5 surface; AsdbGraphChangeProposalAdapter was wired in `boot.ts` but the mount was missing |
+| 2 | #1435 | mount-vault | `agentStudio.vault.*` — entire vault subsystem (~860 LoC router, hundreds of procedures) consumed by heavy client surfaces (BasesPanel, AttachmentListPanel, SavedViewVersionHistoryPanel, AttachmentQuotaPanel + more); all `trpc.agentStudio.vault.*` calls 404'd at runtime pre-fix |
+
+(This PR is the closure receipt — docs-only, no procedure
+additions.)
+
+### Why the drift was hidden
+
+Per [[tsconfig-excludes-hide-trpc-mount-drift]]: `client/src/**`
+is excluded from typecheck, so client
+`trpc.<module>.<sub>.<proc>.useQuery() / .useMutation()` calls
+compile against an unmounted sub-router without a type error —
+only manifesting as runtime 404. The existing
+`graph-agent-router-shape.test.ts` source-scan suite verifies
+each router *exists* (asserts the export shape) but does NOT
+verify that each router is *mounted*. The new
+`*-router-mounted.test.ts` pattern (which now has 4+ instances
+including promotion, graphChangeProposals, vault) closes that
+half of the gap.
+
+### Severity analysis
+
+- **graphChangeProposals**: Phase 11.5 (graph mutation proposals
+  from agents). The Drizzle adapter wiring in `boot.ts` was wasted
+  effort because the procedures were unreachable. Severity:
+  HIGH — every agent-initiated graph mutation 404'd, but the
+  proposal flow is also reachable via `graphCorrection` for
+  quality / enrichment / golden-question flows so the user-visible
+  blast radius was narrower than for vault.
+- **vault**: Severity: CRITICAL — heavy client surfaces depend on
+  it. Every saved view creation, every attachment list query,
+  every BasesPanel interaction was returning 404 at runtime.
+  BasesPanel-related UI was operating in a fully broken state.
+
+### Hard-rule compliance (CLAUDE.md)
+
+Both PRs:
+
+- ✓ No new `neo4j-driver` / `dispatchMcpToolCall` / `openrouter`
+  / `credential-resolver` imports in `api/router.ts`.
+- ✓ Mount keys chosen to match the client invocation paths —
+  `graphChangeProposals` (not `agentStudioGraphChangeProposals`)
+  and `vault` (not `agentStudioVault` from the manifest's
+  `routerKey`) — because the client uses
+  `trpc.agentStudio.graphChangeProposals.*` and
+  `trpc.agentStudio.vault.*`.
+- ✓ Source-scan integrity tests added per
+  [[source-scan-integrity-test-pattern]] (cheap structural tests,
+  no DB / no boot).
+
+### Sub-arc carry-forward lessons
+
+1. **Mount drift is a recurring class of bug.** PR #710 fixed
+   promotionRouter mount; #1434 / #1435 found 2 more. The shape is
+   uniform: `services/**/router.ts` exports a router; client uses
+   `trpc.agentStudio.<key>.*`; the api/router.ts mount is missing
+   → 404 at runtime, silent in tests. **Recurring audit pattern is
+   now codified as a memory** ([[mount-drift-audit-pattern]]) so
+   future autonomous-execution sessions can find these in <5
+   minutes.
+2. **"Defined ≠ mounted" is a separate invariant from "exists ≠
+   correct."** The `graph-agent-router-shape.test.ts` suite asserts
+   the router export exists and has expected procedures. That's
+   necessary but NOT sufficient. The new `*-router-mounted.test.ts`
+   pattern asserts the second half: that `api/router.ts` actually
+   imports + mounts the router at the expected key. Both halves
+   need separate tests.
+3. **Manifest registry is a parallel mount path that wasn't taken.**
+   The vault manifest has a `routerKey: "agentStudioVault"` but no
+   `router:` property, so even if it were registered with the
+   module-routers composer it wouldn't auto-mount. Two paths
+   (manual `api/router.ts` mount vs manifest-driven composer)
+   coexist; vault uses neither. Future routers should pick one
+   path explicitly — either add `router:` to the manifest AND
+   register with the composer, OR add the manual mount.
+4. **Adapter-wiring without router-mounting is dead code.** PR
+   #1434 found Phase 11.5's `AsdbGraphChangeProposalAdapter`
+   correctly injected in `boot.ts` Step 2e — but the procedures
+   that would invoke it had no tRPC mount, so the injection was
+   wasted. **Pattern**: when wiring an adapter, source-scan that
+   the consuming router is also mounted. Asymmetric wiring is a
+   strong "smell" worth investigating.
+5. **Pivoting mid-arc to fix critical bugs is correct.** This arc
+   was triggered by a one-line audit during the T-D.3 closure
+   pivot. The user's continuous-execution mandate prefers shipping
+   the fix as soon as the bug surfaces (vs queueing behind planned
+   work). Both PRs are tiny + focused (single-line mount changes +
+   source-scan tests) so they don't disrupt the broader plan
+   cadence.
+
+Recommendation: with the orphan-router audit clean across
+`server/agent-studio/services/**/router.ts`, the next natural
+pivot is the broader `server/**/router.ts` audit (per the
+[[mount-drift-audit-pattern]] memory). Top-level `server/`
+routers go through `server/routers.ts` + `server/platform/modules/`
+composer — a different mount path with its own potential drift
+modes. Defer to a follow-up audit slice when time allows. For
+the current arc, T-F.4 Quality Lens UI, T-I cross-cutting
+governance, and T-D.1 quality-agent operator-trigger mutations
+all remain ready to pick up.
