@@ -1964,8 +1964,17 @@ function FilterConditionsSummary({
         ) : null}
         {addField !== "" ? (
           <>
+            {/* T-F.122 (T-F.2-γ-polish δ): type-aware folderId input.
+                Number input gives mobile number-pad + browser-level
+                non-numeric rejection before buildConditionFromForm
+                runs. min=1 + step=1 match the FolderIdEqSchema
+                contract (`z.number().int().positive()`). Other 4
+                variants keep text input — datetime-local and
+                multi-token chips ship as separate polish slices. */}
             <input
-              type="text"
+              type={addField === "folderId" ? "number" : "text"}
+              min={addField === "folderId" ? 1 : undefined}
+              step={addField === "folderId" ? 1 : undefined}
               className="rounded border border-border bg-background px-1 py-0.5 font-mono"
               value={addValue}
               onChange={(e) => setAddValue(e.target.value)}
