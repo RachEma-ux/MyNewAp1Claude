@@ -11,4 +11,5 @@ export {
   type SecurityGraphIngestionResult,
   type SecurityGraphIngestionListRow,
   type SecurityGraphIngestionStats,
+  type SecurityGraphSourceSummaryRow,
 } from "./security-graph-store.js";
