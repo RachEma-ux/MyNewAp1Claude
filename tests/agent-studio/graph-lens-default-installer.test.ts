@@ -23,7 +23,7 @@ beforeEach(() => {
 
 describe("DEFAULT_GRAPH_LENS_DEFINITIONS — closed-taxonomy coverage", () => {
   it("ships exactly 8 default lens definitions (one per kind)", () => {
-    expect(DEFAULT_GRAPH_LENS_DEFINITIONS).toHaveLength(9);
+    expect(DEFAULT_GRAPH_LENS_DEFINITIONS).toHaveLength(10);
   });
 
   it("each kind appears exactly once across the 8 defaults", () => {
@@ -97,8 +97,8 @@ describe("maybeInstallDefaultGraphLenses — envflag gate", () => {
       env: { AGS_GRAPH_LENS_DEFAULTS_INSTALL: "on" },
     });
     expect(result.installed).toBe(true);
-    expect(result.installedIds).toHaveLength(9);
-    expect(listGraphLenses()).toHaveLength(9);
+    expect(result.installedIds).toHaveLength(10);
+    expect(listGraphLenses()).toHaveLength(10);
   });
 
   it("installedIds matches the registration order in DEFAULT_GRAPH_LENS_DEFINITIONS", () => {
@@ -118,7 +118,7 @@ describe("maybeInstallDefaultGraphLenses — envflag gate", () => {
       },
     });
     expect(result.installed).toBe(true);
-    expect(calls).toHaveLength(9);
+    expect(calls).toHaveLength(10);
     // Real registry was NOT touched (we overrode the registrar).
     expect(listGraphLenses()).toEqual([]);
   });

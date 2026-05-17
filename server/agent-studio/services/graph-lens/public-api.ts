@@ -361,6 +361,32 @@ export {
 } from "./install-code-intelligence-lens-runner.js";
 
 export {
+  buildSecurityDevSecOpsLensSnapshot,
+  clampSecurityDevSecOpsLensLimit,
+  createSecurityDevSecOpsLensRunner,
+  isSecurityDevSecOpsNodeVisibleToViewer,
+  SECURITY_DEVSECOPS_LENS_ABSOLUTE_LIMIT,
+  SECURITY_DEVSECOPS_LENS_DEFAULT_LIMIT,
+  type BuildSecurityDevSecOpsLensSnapshotInput,
+  type CreateSecurityDevSecOpsLensRunnerDeps,
+} from "./runners/security-devsecops-lens-runner.js";
+
+export {
+  readSecurityDevSecOpsLensFromAsdb,
+  type SecurityDevSecOpsLensReadFn,
+  type SecurityDevSecOpsLensReadParams,
+  type SecurityDevSecOpsLensReadResult,
+} from "./runners/security-devsecops-lens-asdb-reader.js";
+
+export {
+  maybeInstallSecurityDevSecOpsLensRunner,
+  maybeInstallSecurityDevSecOpsLensRunnerWithAsdb,
+  type MaybeInstallSecurityDevSecOpsLensRunnerOptions,
+  type MaybeInstallSecurityDevSecOpsLensRunnerResult,
+  type MaybeInstallSecurityDevSecOpsLensRunnerWithAsdbOptions,
+} from "./install-security-devsecops-lens-runner.js";
+
+export {
   maybeInstallAllLensRunnersWithAsdb,
   type MaybeInstallAllLensRunnersWithAsdbOptions,
   type MaybeInstallAllLensRunnersWithAsdbResult,
