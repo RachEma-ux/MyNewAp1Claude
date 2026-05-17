@@ -79,6 +79,7 @@ import { graphHealthRouter } from "../services/graph/health-router";
 import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
 import { impactAnalysisRouter } from "../services/graph-lens/impact-analysis-router";
 import { semanticEnrichmentRouter } from "../services/graph-enrichment/semantic-enrichment-router";
+import { graphChangeProposalsRouter } from "../services/graph-change-proposals/router";
 import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
@@ -3004,6 +3005,17 @@ export const agentStudioRouter = router({
   // proposal-kind picker. Recent-runs + per-run drill-in deferred to
   // T-D.3.β (needs ASDB read methods on the store).
   semanticEnrichment: semanticEnrichmentRouter,
+  // Phase 11.5 — graph change proposals (agent-initiated graph
+  // mutations: node create/update/deprecate, edge create/update/remove,
+  // entity merge/split, observation/provenance/projection correction).
+  // The Drizzle-backed AsdbGraphChangeProposalAdapter is wired in
+  // boot.ts; mount drift here meant the submit/approve/reject/withdraw
+  // procedures were unreachable. This mount closes the gap. Distinct
+  // from graphCorrection (which writes ags_graph_correction_proposals
+  // for quality/enrichment/golden-question failure flows) — this writes
+  // ags_graph_change_proposals for Phase 11.5 agent-initiated mutation
+  // proposals.
+  graphChangeProposals: graphChangeProposalsRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
