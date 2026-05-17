@@ -22,7 +22,7 @@
  *   - No `process.env.*_API_KEY` reads.
  */
 
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import {
   agsSecurityGraphEdges,
@@ -73,6 +73,41 @@ export interface SecurityGraphIngestionResult {
   readonly edgesRejected: number;
 }
 
+/**
+ * One row in the operator dashboard's ingestion list — denormalized
+ * snapshot of `agsSecurityGraphIngestions` for display + drill-in.
+ * Mirrors `CodeGraphIngestionListRow` shape so the dashboard
+ * composition is uniform across both graphs.
+ */
+export interface SecurityGraphIngestionListRow {
+  readonly ingestionId: string;
+  readonly sourceKey: string;
+  readonly status: string;
+  readonly nodesUpserted: number;
+  readonly edgesUpserted: number;
+  readonly edgesRejected: number;
+  readonly startedAt: Date;
+  readonly completedAt: Date | null;
+}
+
+/**
+ * Per-ingestion drill-in stats — counts only, no rows. Mirrors
+ * `CodeGraphIngestionStats` shape.
+ */
+export interface SecurityGraphIngestionStats {
+  readonly ingestionId: string;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly nodeTypeCounts: ReadonlyArray<{
+    readonly typeKey: string;
+    readonly count: number;
+  }>;
+  readonly edgeTypeCounts: ReadonlyArray<{
+    readonly edgeTypeKey: string;
+    readonly count: number;
+  }>;
+}
+
 export interface SecurityGraphStore {
   /**
    * Persist a parsed batch into ASDB. Idempotent on re-ingest of
@@ -92,6 +127,22 @@ export interface SecurityGraphStore {
     readonly nodes: ReadonlyArray<SecurityGraphNode>;
     readonly edges: ReadonlyArray<SecurityGraphEdge>;
   }>;
+
+  /**
+   * Operator dashboard surface — list recent ingestions newest-first.
+   * T-G.3.α (securityGraph tRPC) consumer.
+   */
+  listIngestions(limit: number): Promise<
+    ReadonlyArray<SecurityGraphIngestionListRow>
+  >;
+
+  /**
+   * Per-ingestion typeKey breakdown — counts only. Returns null if
+   * the ingestion row doesn't exist.
+   */
+  getIngestionStats(
+    ingestionId: string,
+  ): Promise<SecurityGraphIngestionStats | null>;
 }
 
 /**
@@ -262,6 +313,69 @@ export function createSecurityGraphStore(): SecurityGraphStore {
         properties: r.properties ?? undefined,
       }));
       return { nodes, edges };
+    },
+
+    async listIngestions(limit: number) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const rows = await conn
+        .select()
+        .from(agsSecurityGraphIngestions)
+        .orderBy(desc(agsSecurityGraphIngestions.startedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        ingestionId: r.ingestionId,
+        sourceKey: r.sourceKey,
+        status: r.status,
+        nodesUpserted: r.nodesUpserted,
+        edgesUpserted: r.edgesUpserted,
+        edgesRejected: r.edgesRejected,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+      }));
+    },
+
+    async getIngestionStats(ingestionId: string) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const ingestionRows = await conn
+        .select({ id: agsSecurityGraphIngestions.id })
+        .from(agsSecurityGraphIngestions)
+        .where(eq(agsSecurityGraphIngestions.ingestionId, ingestionId))
+        .limit(1);
+      if (ingestionRows.length === 0) return null;
+
+      const nodeCounts = await conn
+        .select({
+          typeKey: agsSecurityGraphNodes.typeKey,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsSecurityGraphNodes)
+        .where(eq(agsSecurityGraphNodes.ingestionId, ingestionId))
+        .groupBy(agsSecurityGraphNodes.typeKey);
+      const edgeCounts = await conn
+        .select({
+          edgeTypeKey: agsSecurityGraphEdges.edgeTypeKey,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsSecurityGraphEdges)
+        .where(eq(agsSecurityGraphEdges.ingestionId, ingestionId))
+        .groupBy(agsSecurityGraphEdges.edgeTypeKey);
+
+      const nodeCount = nodeCounts.reduce((a, r) => a + Number(r.count), 0);
+      const edgeCount = edgeCounts.reduce((a, r) => a + Number(r.count), 0);
+
+      return {
+        ingestionId,
+        nodeCount,
+        edgeCount,
+        nodeTypeCounts: nodeCounts
+          .map((r) => ({ typeKey: r.typeKey, count: Number(r.count) }))
+          .sort((a, b) => b.count - a.count),
+        edgeTypeCounts: edgeCounts
+          .map((r) => ({ edgeTypeKey: r.edgeTypeKey, count: Number(r.count) }))
+          .sort((a, b) => b.count - a.count),
+      };
     },
   };
 }
