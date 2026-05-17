@@ -157,10 +157,10 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
     expect(src).toMatch(/Promise<ProjectSecurityGraphResult>/);
   });
 
-  it("projection/security-graph-projection.ts factory throws T-G.3.4 placeholder", () => {
+  it("projection/security-graph-projection.ts exports the createSecurityGraphProjection factory (wired in T-G.3.4)", () => {
     const src = read("projection/security-graph-projection.ts");
     expect(src).toMatch(/export\s+function\s+createSecurityGraphProjection/);
-    expect(src).toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.4/);
+    expect(src).not.toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.4/);
   });
 
   it("projection/ has NO direct neo4j-driver / drizzle import (always — projects via GraphRepository)", () => {
@@ -171,11 +171,22 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
 
   // ── Factory invocation (placeholder errors) ──────────────────────
 
-  it("projection factory still throws T-G.3.1 placeholder (cve-feed + persistence wired)", async () => {
-    const { createSecurityGraphProjection } = await import(
-      "../../server/agent-studio/services/security-graph/projection/security-graph-projection.js"
-    );
-    expect(() => createSecurityGraphProjection()).toThrow(/T-G\.3\.1/);
+  it("all three factories wired (cve-feed T-G.3.2, persistence T-G.3.3, projection T-G.3.4)", () => {
+    // Source-scan negative check — the T-G.3.1 placeholder string
+    // must be gone from all three. Behavioral coverage of each
+    // wired factory lives in the per-sub-slice `*-wired.test.ts`.
+    for (const path of [
+      "cve-feed/cve-feed-reader.ts",
+      "cve-feed/nvd-cve-feed-reader.ts",
+      "persistence/security-graph-store.ts",
+      "projection/security-graph-projection.ts",
+    ]) {
+      const src = read(path);
+      expect(
+        src.match(/\[T-G\.3\.1\]\s+(?:CveFeedReader|SecurityGraph(?:Store|Projection))/),
+        `${path} still carries the T-G.3.1 placeholder string`,
+      ).toBeNull();
+    }
   });
 
   // ── Public-api re-exports the edge surfaces (T-G.3.3 entry point) ──
