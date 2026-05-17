@@ -67,6 +67,28 @@ function NotificationKindBadge({
   );
 }
 
+/**
+ * T-F.137 — read `?kind=X` from the page URL on first render.
+ *
+ * Mechanical replication of the T-F.135 lens-browser deeplink
+ * primitive onto a third selection axis: InboxPanel's kind-filter
+ * dropdown. Same string-axis shape as T-F.135 (not the numeric
+ * T-F.136 variant), so the helper accepts any non-empty raw value
+ * — the dropdown is open-taxonomy (varchar(100) free-form) per
+ * the panel's precedent (o) note, so we don't gate by a closed
+ * enum here. The receiving page may end up with a `?kind=X` that
+ * doesn't appear in the current `kindOptions` list; that's fine
+ * — the dropdown's controlled value still renders the param as
+ * the selected kind and the operator can recover by clicking
+ * Clear filters.
+ */
+function readKindFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("kind");
+  return raw && raw.length > 0 ? raw : null;
+}
+
 export function InboxPanel() {
   const utils = trpc.useUtils();
 
@@ -75,7 +97,9 @@ export function InboxPanel() {
   // breakdown — operators see and pick from the LIVE taxonomy
   // the workspace is actually emitting (precedent (o) made
   // interactive). null = "all kinds".
-  const [selectedKind, setSelectedKind] = useState<string | null>(null);
+  const [selectedKind, setSelectedKind] = useState<string | null>(
+    () => readKindFromUrl(),
+  );
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
   const inboxQuery = trpc.agentStudio.workspaceObservability.getMyInbox.useQuery(
@@ -296,6 +320,25 @@ export function InboxPanel() {
             data-testid="inbox-filter-clear"
           >
             Clear filters
+          </button>
+        ) : null}
+        {/* T-F.137 — copy a shareable link with `?kind=X` pre-filled.
+            Gated on `selectedKind` because the bare-URL no-filter
+            state is the default and offers no shareable narrowing.
+            Replicates T-F.135 / T-F.136 deeplink primitive onto the
+            inbox kind-filter axis. */}
+        {selectedKind != null ? (
+          <button
+            type="button"
+            className="rounded border bg-background px-2 py-0.5 text-xs hover:bg-muted"
+            data-testid="inbox-copy-link-button"
+            title={`Copy a shareable link with ?kind=${selectedKind}`}
+            onClick={() => {
+              const url = `${window.location.origin}${window.location.pathname}?kind=${encodeURIComponent(selectedKind)}`;
+              void navigator.clipboard?.writeText(url);
+            }}
+          >
+            Copy link
           </button>
         ) : null}
       </div>
