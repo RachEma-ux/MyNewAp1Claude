@@ -650,6 +650,11 @@ function RenderEnvelopeView({
                 nodes={filteredNodes}
                 edges={snapshot.edges}
               />
+            ) : snapshot.layout === "dependency_path" ? (
+              <DependencyPathGraphViz
+                nodes={filteredNodes}
+                edges={snapshot.edges}
+              />
             ) : (
               <SnapshotGraphViz
                 nodes={filteredNodes}
@@ -1328,6 +1333,186 @@ function TreeGraphViz({
           const p = positions.get(n.id)!;
           return (
             <g key={n.id} data-testid={`graph-lens-tree-viz-node-${n.id}`}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={5}
+                fill={n.visible ? "currentColor" : "transparent"}
+                stroke="currentColor"
+                strokeDasharray={n.visible ? undefined : "2 2"}
+              />
+              <title>
+                {n.visible
+                  ? `${n.typeKey}: ${n.label ?? n.id}`
+                  : `${n.typeKey}: (hidden)`}
+              </title>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * T-F.130 DependencyPathGraphViz — fourth layout-specific renderer.
+ *
+ * Selected when `snapshot.layout === "dependency_path"`. The Runtime
+ * Trace Lens is the canonical caller — agsRuntimeRuns +
+ * graphAgentDecisionTrace + step ledger model a sequential
+ * input→...→output flow, which the generic SnapshotGraphViz force-
+ * directed fallback scrambles into a mesh.
+ *
+ * Layout strategy (a horizontal rotation of TreeGraphViz with
+ * longest-path depth instead of BFS shortest-path):
+ *   1. Compute in-degree per node from the filtered edge set.
+ *   2. Roots = nodes with in-degree 0.
+ *   3. Kahn-style topological pass; for each visited node, depth =
+ *      max(parents' depth) + 1. Longest-path semantics so a fan-in
+ *      node lands at its LATEST contributor's depth, preserving the
+ *      "wait for all inputs" reading natural to traces.
+ *   4. Orphan fallback: nodes not reached (cycle-only subgraphs)
+ *      land at a synthetic floor band at maxDepth + 1.
+ *   5. x = depth × dx (left-to-right pipeline); y = sibling-within-
+ *      depth slot × evenly-spaced vertical band.
+ *
+ * Edges remain straight lines — depth ordering already encodes
+ * direction, no arrowheads needed; same dangling-suppression
+ * discipline as the other renderers.
+ */
+function DependencyPathGraphViz({
+  nodes,
+  edges,
+}: {
+  readonly nodes: ReadonlyArray<{
+    typeKey: string;
+    id: string;
+    visible: boolean;
+    label?: string;
+  }>;
+  readonly edges: ReadonlyArray<{
+    typeKey: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    visible: boolean;
+  }>;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground italic"
+        data-testid="graph-lens-dependency-path-viz-empty"
+      >
+        No nodes to render.
+      </p>
+    );
+  }
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+  for (const n of nodes) {
+    inDegree.set(n.id, 0);
+    adjacency.set(n.id, []);
+  }
+  for (const e of edges) {
+    if (!nodeIds.has(e.sourceNodeId) || !nodeIds.has(e.targetNodeId)) {
+      continue;
+    }
+    inDegree.set(e.targetNodeId, (inDegree.get(e.targetNodeId) ?? 0) + 1);
+    adjacency.get(e.sourceNodeId)?.push(e.targetNodeId);
+  }
+  // Kahn-style topological order with longest-path depth.
+  const remainingIn = new Map(inDegree);
+  const depth = new Map<string, number>();
+  const queue: string[] = [];
+  for (const n of nodes) {
+    if (remainingIn.get(n.id) === 0) {
+      depth.set(n.id, 0);
+      queue.push(n.id);
+    }
+  }
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDepth = depth.get(current) ?? 0;
+    for (const child of adjacency.get(current) ?? []) {
+      const childDepth = Math.max(depth.get(child) ?? 0, currentDepth + 1);
+      depth.set(child, childDepth);
+      const remaining = (remainingIn.get(child) ?? 0) - 1;
+      remainingIn.set(child, remaining);
+      if (remaining === 0) {
+        queue.push(child);
+      }
+    }
+  }
+  // Orphan fallback: cycle-only subgraphs never enter the queue.
+  let maxDepth = 0;
+  for (const d of depth.values()) {
+    if (d > maxDepth) maxDepth = d;
+  }
+  for (const n of nodes) {
+    if (!depth.has(n.id)) depth.set(n.id, maxDepth + 1);
+  }
+  // Group by depth, preserve filtered-node order within each band.
+  const bands = new Map<number, Array<typeof nodes[number]>>();
+  for (const n of nodes) {
+    const d = depth.get(n.id) ?? 0;
+    if (!bands.has(d)) bands.set(d, []);
+    bands.get(d)!.push(n);
+  }
+  const sortedDepths = Array.from(bands.keys()).sort((a, b) => a - b);
+  const totalBands = sortedDepths.length;
+  const dx = 88;
+  const marginX = 32;
+  const width = marginX * 2 + Math.max(totalBands - 1, 0) * dx + 24;
+  const height = 240;
+  const marginY = 24;
+  const positions = new Map<string, { x: number; y: number }>();
+  sortedDepths.forEach((d, bandIdx) => {
+    const band = bands.get(d)!;
+    const slotH =
+      band.length === 0 ? height : (height - 2 * marginY) / (band.length + 1);
+    const x = marginX + bandIdx * dx;
+    band.forEach((n, slotIdx) => {
+      positions.set(n.id, { x, y: marginY + slotH * (slotIdx + 1) });
+    });
+  });
+  const renderableEdges = edges.filter(
+    (e) => positions.has(e.sourceNodeId) && positions.has(e.targetNodeId),
+  );
+  return (
+    <div data-testid="graph-lens-dependency-path-viz">
+      <SectionLabel>
+        Dependency path ({nodes.length} nodes, {totalBands} depth bands,{" "}
+        {renderableEdges.length} edges)
+      </SectionLabel>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-2xl border border-border rounded"
+        data-testid="graph-lens-dependency-path-viz-svg"
+      >
+        {renderableEdges.map((e, i) => {
+          const s = positions.get(e.sourceNodeId)!;
+          const t = positions.get(e.targetNodeId)!;
+          return (
+            <line
+              key={`${e.sourceNodeId}-${e.targetNodeId}-${i}`}
+              x1={s.x}
+              y1={s.y}
+              x2={t.x}
+              y2={t.y}
+              stroke="currentColor"
+              strokeOpacity={e.visible ? 0.4 : 0.15}
+              strokeWidth={1}
+            />
+          );
+        })}
+        {nodes.map((n) => {
+          const p = positions.get(n.id)!;
+          return (
+            <g
+              key={n.id}
+              data-testid={`graph-lens-dependency-path-viz-node-${n.id}`}
+            >
               <circle
                 cx={p.x}
                 cy={p.y}
