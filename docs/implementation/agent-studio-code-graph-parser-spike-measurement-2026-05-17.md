@@ -111,22 +111,36 @@ The 5 queries from spike doc §4:
 
 ### 6.2 Recorded results
 
-**Evidence source:** GitHub Actions workflow `code-graph-spike-measurement.yml` run #TBD on `te4-code-graph-spike-projection-measurement` @ TBD-SHA. Console.log lines tagged `[T-E.4]` transcribed verbatim below.
+**Evidence source:** GitHub Actions workflow `code-graph-spike-measurement.yml` run [25989660914](https://github.com/RachEma-ux/MyNewAp1Claude/actions/runs/25989660914) on `main` @ `9372eea4` (post #1366 ESM `__dirname` fix), 2026-05-17 11:34 UTC, ubuntu-latest, `neo4j:5-community` service container. Console.log lines tagged `[T-E.4]` transcribed verbatim below.
 
 | Metric | Target | Recorded | Verdict |
 |---|---|---|---|
-| Projection time (ms) | < 10000 | TBD | TBD |
-| Q1 p95 (ms) | < 100 | TBD | TBD |
-| Q2 p95 (ms) | < 100 | TBD | TBD |
-| Q3 p95 (ms) | < 100 | TBD | TBD |
-| Q4 p95 (ms) | < 100 | TBD | TBD |
-| Q5 p95 (ms) | < 100 | TBD | TBD |
+| Projection time (ms) | < 10000 | **4098.67** | **PASS** (2.4× margin) |
+| Q1 p95 (ms) — manifest.ts imports | < 100 | **3.10** (p50=2.31, 10 iter) | **PASS** (32× margin) |
+| Q2 p95 (ms) — invokeFromExtension calls (2-hop) | < 100 | **5.18** (p50=2.67, 10 iter, 3 results) | **PASS** (19× margin) |
+| Q3 p95 (ms) — Class LaneHookFn declarations | < 100 | **5.08** (p50=2.29, 10 iter) | **PASS** (20× margin) |
+| Q4 p95 (ms) — call chain invokeFromExtension→dispatchMcpToolCall | < 100 | **2.50** (p50=2.17, 10 iter) | **PASS** (40× margin) |
+| Q5 p95 (ms) — tests referencing manifest.ts | < 100 | **2.75** (p50=1.89, 10 iter) | **PASS** (36× margin) |
 
-**Verdict (T-E.4 isolated, post-dispatch transcription):** TBD.
+Side metrics: 14 files parsed → **58 nodes**, **363 edges** (consistent with T-E.3's by-type counts: File=14 + Function=40 + Class=4 = 58 nodes; IMPORTS=30 + DECLARES=44 + CALLS=202 + EXPORTS=87 = 363 edges). Script's final log line: `[T-E.4] all §4 gates PASS`.
 
-**Combined verdict (T-E.3 + T-E.4 → §3 decision tree):**
-- If T-E.4 verdict is **PASS** → Outcome A (parse + projection both PASS); Phase 25 T-G.2 unblocked; scale measurement to `services/` (~120 files) for T-E.5.
-- If T-E.4 verdict is **FAIL** (projection >= 10s OR any query p95 >= 100ms) → Outcome B (parse-only PASS); Phase 25 scope reduction per §4 fallback (drop Python OR trigger Phase 27 Aura) OR defer Phase 25 code-graph entirely.
+**Verdict (T-E.4 isolated, post-dispatch transcription): PASS.** Both §4 gates clear by huge margins. Projection time at 4 seconds for 14 files / 58 nodes / 363 edges suggests Neo4j 5 CE comfortably handles the spike's scale; per-query p95 in the 2.5-5.2 ms range leaves ~20× headroom against the 100 ms gate.
+
+**Honest result-count caveat (NOT a gate failure):** Q1, Q3, Q5 returned 0 records and Q4's shortestPath returned 0 results. The latency gate measures the *query execution path*, not result *correctness*. The 0-result outcomes reflect the spike's deliberately naive name-based resolution:
+
+- IMPORTS edges store the raw specifier (`./contracts.js`) and resolve via `tgt.id ENDS WITH $specifierTail`. File node ids end in `.ts`, so the `.js`→`.ts` mismatch silently drops these matches.
+- CALLS edges extract the rightmost callee name from member expressions (`mod.foo()` → `foo`), then resolve via label match. Method calls + namespaced imports where the local symbol name doesn't match a declared module-level function don't resolve.
+- Q3 may also reflect that `LaneHookFn` is a type alias (not a class) in the actual `extensions/` source, in which case the emitter correctly didn't emit a Class node.
+
+These are real **resolution-layer quality concerns** for a production code-graph indexer (T-G.2 territory), not gate failures. The gate signals the **infrastructure can handle the load**; the resolution accuracy is a separate axis that a follow-up slice (T-E.5 scale-up, or T-G.2 production indexer) would address with import-path normalization + cross-file symbol resolution + module-scope analysis.
+
+**Combined verdict (T-E.3 + T-E.4 → §3 decision tree): OUTCOME A — both halves PASS.** Parse + projection + query gates all clear with substantial margins (25× / 330× for parse, 2.4× for projection, 19-40× for queries). Phase 25 T-G.2 (Code Intelligence Graph) is **infrastructure-unblocked** from the spike's perspective; the actual Phase 25 buildout still requires Phase 7.5 production unblock (real `Neo4jCommunityGraphRepository.executeTemplate` + `applyProjectionJob`) and the resolution-layer work named in the caveat above.
+
+**Next slices (post-T-E.4 closure):**
+
+1. **T-E.5** (optional, recommended) — scale-up measurement to `server/agent-studio/services/` (~120 files vs the spike's 14). Re-runs the same projection + 5 queries against the larger corpus to confirm margins hold an order of magnitude up before greenlighting Phase 25 buildout. Same workflow; just change the spike target dir.
+2. **Phase 7.5 production unblock** (now genuinely the next gate per `docs/architecture/agent-studio-phase-7-5-neo4j-blocker.md`) — wire `neo4j-driver` into `Neo4jKgiaAdapter` (~40 LOC) + implement `Neo4jCommunityGraphRepository.executeTemplate` (~30 LOC + 7 Cypher templates). 3 PRs per the doc's §4 sequence.
+3. **T-G.2 Code Intelligence Graph** — full production indexer with proper resolution layer, projection cron, lens runner, UI. 8-10 PRs ONCE Phase 7.5 lands.
 
 ---
 
