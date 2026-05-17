@@ -99,6 +99,24 @@ export interface InstitutionalMemoryLensPersonRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Project row — third projector-backed institutional memory node
+ * type (T-G.1.γ). Emits `inst_project` typeKey nodes mapped from the
+ * existing `workspaces` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.project` ("Workspace == project
+ * in MVP"). The reader is responsible for permission-scoping the
+ * workspaces list to those the viewer can see; the runner relies on
+ * that boundary.
+ */
+export interface InstitutionalMemoryLensProjectRow {
+  readonly id: number;
+  readonly name: string;
+  readonly purposeType: string | null;
+  readonly status: string;
+  readonly ownerId: number;
+  readonly createdAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
@@ -106,6 +124,8 @@ export interface InstitutionalMemoryLensReadResult {
   readonly workflows?: ReadonlyArray<InstitutionalMemoryLensWorkflowRow>;
   /** T-G.1.β — optional projector-backed person reads. */
   readonly persons?: ReadonlyArray<InstitutionalMemoryLensPersonRow>;
+  /** T-G.1.γ — optional projector-backed project (workspace) reads. */
+  readonly projects?: ReadonlyArray<InstitutionalMemoryLensProjectRow>;
   readonly truncated: boolean;
 }
 
@@ -166,6 +186,7 @@ const OWNER_NODE_PREFIX = "user:";
 const DOMAIN_NODE_PREFIX = "domain:";
 const WORKFLOW_NODE_PREFIX = "workflow:";
 const PERSON_NODE_PREFIX = "person:";
+const PROJECT_NODE_PREFIX = "project:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -299,6 +320,29 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_person", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const pr of read.projects ?? []) {
+    const id = `${PROJECT_NODE_PREFIX}${pr.id}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_project",
+        id,
+        visible: true,
+        label: pr.name,
+        meta: {
+          projectId: pr.id,
+          name: pr.name,
+          purposeType: pr.purposeType,
+          status: pr.status,
+          ownerId: pr.ownerId,
+          createdAt: pr.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_project", id, visible: false });
       hiddenNodeCount += 1;
     }
   }
