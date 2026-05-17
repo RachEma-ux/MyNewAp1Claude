@@ -64,7 +64,9 @@ describe("Bases rich-form add-condition (T-F.120 / T-F.2-γ-polish β)", () => {
     expect(src).toMatch(
       /data-testid=\{`bases-row-detail-filters-add-field-\$\{baseId\}`\}/,
     );
-    expect(src).toMatch(/<option value="">\+ Add condition…<\/option>/);
+    // T-F.121: placeholder is dynamic now (Add vs Editing); just
+    // assert the value="" sentinel option exists.
+    expect(src).toMatch(/<option value="">/);
     expect(src).toMatch(/<option value="folderId">folderId<\/option>/);
     expect(src).toMatch(/<option value="slug">slug<\/option>/);
     expect(src).toMatch(/<option value="title">title<\/option>/);
@@ -104,8 +106,10 @@ describe("Bases rich-form add-condition (T-F.120 / T-F.2-γ-polish β)", () => {
     expect(src).toMatch(
       /data-testid=\{`bases-row-detail-filters-add-\$\{baseId\}`\}/,
     );
+    // T-F.121: field-picker disabled gate now ORs in editingIdx
+    // (lock the field type while editing).
     expect(src).toMatch(
-      /<select[\s\S]{0,300}value=\{addField\}[\s\S]{0,300}disabled=\{disabled\}/,
+      /<select[\s\S]{0,300}value=\{addField\}[\s\S]{0,500}disabled=\{disabled(\s*\|\|\s*editingIdx\s*!==\s*null)?\}/,
     );
   });
 
