@@ -27,6 +27,46 @@ import { trpc } from "@/lib/trpc";
 
 const INBOX_LIMIT = 50;
 
+/**
+ * T-F.132 — notification-kind-coded badge (mechanical replication
+ * of T-F.131's StepKindBadge onto the inbox row).
+ *
+ * 2 closed-emitter notification kinds in the server today
+ * (server/agent-studio/services/graph-quality/agent-run-notifications.ts):
+ *   - graph_quality_run_completed     → emerald (run finished cleanly)
+ *   - graph_quality_proposals_created → amber   (new proposals — operator action)
+ *
+ * Any other kind (including future server-side emitters and any
+ * indirect-pipeline emissions surfaced via the same inbox) falls
+ * back to a neutral outline — same lesson-45 future-extensibility
+ * shape T-F.131 used.
+ *
+ * Helper kept inline in InboxPanel.tsx (not shared with T-F.131's
+ * StepKindBadge) because the closed taxonomies are independent and
+ * extracting a shared `<TaxonomyBadge>` would over-couple two
+ * unrelated server-side enums into one client primitive.
+ */
+function NotificationKindBadge({
+  notificationKind,
+}: {
+  notificationKind: string;
+}) {
+  const tone =
+    notificationKind === "graph_quality_run_completed"
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+      : notificationKind === "graph_quality_proposals_created"
+        ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+        : "border-border/60 text-muted-foreground";
+  return (
+    <span
+      className={`inline-block rounded border px-1.5 py-0 text-[10px] font-mono font-medium ${tone}`}
+      data-testid={`inbox-notification-kind-badge-${notificationKind}`}
+    >
+      {notificationKind}
+    </span>
+  );
+}
+
 export function InboxPanel() {
   const utils = trpc.useUtils();
 
@@ -466,10 +506,12 @@ export function InboxPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
                     <span
-                      className="truncate font-mono text-xs"
+                      className="truncate"
                       data-testid={`inbox-row-kind-${n.id}`}
                     >
-                      {n.notificationKind}
+                      <NotificationKindBadge
+                        notificationKind={n.notificationKind}
+                      />
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                       {new Date(n.createdAt).toLocaleString()}
