@@ -25,7 +25,7 @@ import { Network } from "lucide-react";
 import GraphSkillUsagePanel from "../components/GraphSkillUsagePanel";
 import GraphAgentExplainPanel from "../components/GraphAgentExplainPanel";
 import GraphSchemaSummaryPanel from "../components/GraphSchemaSummaryPanel";
-import GraphQualityFindingsPanel from "../components/GraphQualityFindingsPanel";
+import { GraphQualityFindingsPanel } from "../components/GraphQualityFindingsPanel";
 import { PageHeader } from "../components/ui";
 import {
   VaultExplorer,
