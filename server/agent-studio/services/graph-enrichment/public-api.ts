@@ -35,6 +35,7 @@ export {
   type SemanticEnrichmentRunListRow,
   type SemanticEnrichmentProposalListRow,
   type SemanticEnrichmentRunStats,
+  type SemanticEnrichmentRecentRejectionRow,
 } from "./semantic-enrichment-store.js";
 
 export {

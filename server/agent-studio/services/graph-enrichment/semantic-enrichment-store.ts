@@ -91,6 +91,25 @@ export interface SemanticEnrichmentRunStats {
   }>;
 }
 
+/**
+ * One row of cross-run rejection telemetry — used by
+ * `listRecentRejectionsByKind` (T-D.3.γ) to drive the operator
+ * "which kinds are most-often failing the confidence gate" panel.
+ * One row per (runId, proposalKind) pair where below-threshold
+ * rejections were recorded.
+ *
+ * Mirrors the security-graph `listRecentRejectionsByReason` row
+ * shape (T-G.3.ε) — flatten + attach source-of-record context
+ * (here: runId + runStartedAt) so operators can correlate spikes
+ * to specific runs.
+ */
+export interface SemanticEnrichmentRecentRejectionRow {
+  readonly runId: number;
+  readonly proposalKind: string;
+  readonly count: number;
+  readonly runStartedAt: Date | null;
+}
+
 export interface SemanticEnrichmentStore {
   beginRun(
     input: SemanticEnrichmentRunInput,
@@ -130,6 +149,22 @@ export interface SemanticEnrichmentStore {
     readonly status?: string;
     readonly limit: number;
   }): Promise<ReadonlyArray<SemanticEnrichmentProposalListRow>>;
+
+  /**
+   * T-D.3.γ rejection telemetry. Flattens below-threshold rejections
+   * across the most-recent `runLimit` runs, grouped by
+   * `(runId, proposalKind)`. Drives the operator panel that
+   * surfaces "which kinds are most-often failing the confidence
+   * gate".
+   *
+   * Returns at most `rowLimit` rows, newest-run first then by count
+   * desc within a run. Same shape as security-graph
+   * listRecentRejectionsByReason (T-G.3.ε).
+   */
+  listRecentRejectionsByKind(input: {
+    readonly runLimit: number;
+    readonly rowLimit: number;
+  }): Promise<ReadonlyArray<SemanticEnrichmentRecentRejectionRow>>;
 }
 
 export interface CreateSemanticEnrichmentStoreOptions {
@@ -308,6 +343,77 @@ export function createSemanticEnrichmentStore(
             (a: { count: number }, b: { count: number }) => b.count - a.count,
           ),
       };
+    },
+
+    async listRecentRejectionsByKind(input) {
+      const db = requireDb(options.db);
+      // 1) Find the N most-recent runs (any status). We don't pre-
+      //    filter to runs WITH rejections because the join below
+      //    filters down naturally — keeps the windowing query simple
+      //    + matches the security-graph T-G.3.ε pattern.
+      const recentRunRows = await db
+        .select({
+          id: agsSemanticEnrichmentRuns.id,
+          startedAt: agsSemanticEnrichmentRuns.startedAt,
+          createdAt: agsSemanticEnrichmentRuns.createdAt,
+        })
+        .from(agsSemanticEnrichmentRuns)
+        .orderBy(desc(agsSemanticEnrichmentRuns.createdAt))
+        .limit(input.runLimit);
+      if (recentRunRows.length === 0) return [];
+
+      const runIdToStartedAt = new Map<number, Date | null>(
+        recentRunRows.map(
+          (r: { id: number; startedAt: Date | null }) => [r.id, r.startedAt],
+        ),
+      );
+
+      // 2) Per (runId, proposalKind), count below-threshold
+      //    rejections. The IN() filter caps the scan to the windowed
+      //    runs so a never-ending rejected_below_threshold backlog
+      //    doesn't get re-scanned.
+      const counts = await db
+        .select({
+          runId: agsSemanticEnrichmentProposals.runId,
+          proposalKind: agsSemanticEnrichmentProposals.proposalKind,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsSemanticEnrichmentProposals)
+        .where(
+          and(
+            eq(
+              agsSemanticEnrichmentProposals.status,
+              PROPOSAL_STATUS_REJECTED_BELOW_THRESHOLD,
+            ),
+            sql`${agsSemanticEnrichmentProposals.runId} IN (${sql.join(
+              recentRunRows.map((r: { id: number }) => sql`${r.id}`),
+              sql`, `,
+            )})`,
+          ),
+        )
+        .groupBy(
+          agsSemanticEnrichmentProposals.runId,
+          agsSemanticEnrichmentProposals.proposalKind,
+        );
+
+      // 3) Sort newest-run first then count desc within a run; cap.
+      const rows: SemanticEnrichmentRecentRejectionRow[] = counts.map(
+        (r: {
+          runId: number | null;
+          proposalKind: string;
+          count: number;
+        }) => ({
+          runId: r.runId ?? 0,
+          proposalKind: r.proposalKind,
+          count: Number(r.count),
+          runStartedAt: runIdToStartedAt.get(r.runId ?? -1) ?? null,
+        }),
+      );
+      rows.sort((a, b) => {
+        if (a.runId !== b.runId) return b.runId - a.runId;
+        return b.count - a.count;
+      });
+      return rows.slice(0, input.rowLimit);
     },
 
     async listProposals(input) {
