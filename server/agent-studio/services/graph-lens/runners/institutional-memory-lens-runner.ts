@@ -80,11 +80,32 @@ export interface InstitutionalMemoryLensWorkflowRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Person row — second projector-backed institutional memory node
+ * type (T-G.1.β). Emits `inst_person` typeKey nodes mapped from the
+ * existing `users` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.person`. Per-workspace
+ * visibility is enforced at the read seam (the reader filters out
+ * users not visible to the viewer's workspace); the runner relies on
+ * that boundary.
+ */
+export interface InstitutionalMemoryLensPersonRow {
+  readonly id: number;
+  /** Display name; nullable in `users` — runner falls back to email
+   *  then to `user-${id}` so the label is never empty. */
+  readonly name: string | null;
+  readonly email: string | null;
+  readonly role: string;
+  readonly createdAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
    * projector-backed shape. New typeKey-aligned reads land additively. */
   readonly workflows?: ReadonlyArray<InstitutionalMemoryLensWorkflowRow>;
+  /** T-G.1.β — optional projector-backed person reads. */
+  readonly persons?: ReadonlyArray<InstitutionalMemoryLensPersonRow>;
   readonly truncated: boolean;
 }
 
@@ -144,6 +165,7 @@ const AGENT_NODE_PREFIX = "agent:";
 const OWNER_NODE_PREFIX = "user:";
 const DOMAIN_NODE_PREFIX = "domain:";
 const WORKFLOW_NODE_PREFIX = "workflow:";
+const PERSON_NODE_PREFIX = "person:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -253,6 +275,30 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_workflow", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const p of read.persons ?? []) {
+    const id = `${PERSON_NODE_PREFIX}${p.id}`;
+    if (visible) {
+      // Label fallback ladder: name → email → user-${id}
+      const label = p.name ?? p.email ?? `user-${p.id}`;
+      nodes.push({
+        typeKey: "inst_person",
+        id,
+        visible: true,
+        label,
+        meta: {
+          personId: p.id,
+          name: p.name,
+          email: p.email,
+          role: p.role,
+          createdAt: p.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_person", id, visible: false });
       hiddenNodeCount += 1;
     }
   }
