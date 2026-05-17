@@ -25,7 +25,13 @@
  *   - No `process.env.*_API_KEY` reads (driver auth is per-GraphSource).
  */
 
-import neo4j, { type Driver } from "neo4j-driver";
+import neo4j from "neo4j-driver";
+
+// `neo4j-driver` 5.x exports `Driver` as both a class AND a
+// namespace, which trips tsc's "Cannot use namespace as type"
+// error (TS2709). Deriving the type from the factory function's
+// return shape sidesteps the ambiguity without losing type safety.
+type Driver = ReturnType<typeof neo4j.driver>;
 
 import type { GraphSource } from "../domain/types";
 

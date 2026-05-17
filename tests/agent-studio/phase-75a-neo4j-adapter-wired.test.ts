@@ -42,7 +42,11 @@ function readAdapter(): string {
 describe("Phase 7.5a — Neo4jKgiaAdapter wired against neo4j-driver", () => {
   it("imports neo4j-driver (the production wire — pre-7.5a was stub)", () => {
     const src = readAdapter();
-    expect(src).toMatch(/import\s+neo4j\s*,?\s*\{?\s*type\s+Driver\s*\}?\s+from\s+["']neo4j-driver["']/);
+    expect(src).toMatch(/import\s+neo4j\s+from\s+["']neo4j-driver["']/);
+    // Driver type is derived from neo4j.driver's return type because
+    // neo4j-driver 5.x exports `Driver` as both class + namespace,
+    // which trips TS2709 if imported directly.
+    expect(src).toMatch(/type\s+Driver\s*=\s*ReturnType<typeof\s+neo4j\.driver>/);
   });
 
   it("declares a driverCache map keyed by (endpoint, username, database)", () => {
