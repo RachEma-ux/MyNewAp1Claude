@@ -23,6 +23,9 @@ export {
   createSemanticEnrichmentAgent,
   type SemanticEnrichmentAgent,
   type CreateSemanticEnrichmentAgentOptions,
+  type SemanticEnrichmentCandidate,
+  type SemanticEnrichmentRunInputWithCandidates,
+  type SemanticEnrichmentRunOutputWithSkips,
 } from "./semantic-enrichment-agent.js";
 
 export {
