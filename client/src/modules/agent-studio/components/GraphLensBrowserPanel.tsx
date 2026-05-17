@@ -66,9 +66,37 @@ const CROSS_LENS_TYPEKEY_TARGETS: Readonly<Record<string, string>> = {
  */
 const GRAPH_VIZ_NODE_CAP = 50;
 
+/**
+ * T-F.135 — read `?lensId=X` from the page URL on first render.
+ *
+ * Operators bookmark a specific lens (or share its URL with a
+ * teammate) by appending `?lensId=runtime_default` to
+ * `/agent-studio/graph-lens-browser`. The lens then pre-selects
+ * on page mount instead of forcing the operator to re-scan the
+ * runner-coverage card every time.
+ *
+ * Lazy-init pattern: read window.location.search ONCE per useState
+ * initializer call (React only invokes the initializer on first
+ * render). SSR-safe because the lazy initializer only runs in the
+ * browser; `typeof window` guard keeps the initializer harmless if
+ * this panel is ever rendered server-side ahead of hydration.
+ *
+ * Returns null when no lensId param is present — pre-T-F.135
+ * default state, so this is a purely additive enhancement with no
+ * behavior change for the no-param case.
+ */
+function readLensIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("lensId");
+  return raw && raw.length > 0 ? raw : null;
+}
+
 export function GraphLensBrowserPanel() {
   const [workspaceId, setWorkspaceId] = useState<number>(1);
-  const [selectedLensId, setSelectedLensId] = useState<string | null>(null);
+  const [selectedLensId, setSelectedLensId] = useState<string | null>(
+    () => readLensIdFromUrl(),
+  );
   // T-F.72: typeKey drill-in filter. Pure client-side narrowing over
   // the already-fetched snapshot — no server round-trip needed.
   // Resets to null whenever the operator picks a different lens
@@ -272,6 +300,26 @@ export function GraphLensBrowserPanel() {
               className="w-24 rounded border border-border bg-background px-2 py-1 text-sm"
               data-testid="graph-lens-workspace-input"
             />
+            {/* T-F.135 — copy a shareable link with `?lensId=X`
+                pre-filled. Gated on `selectedLensId` because the
+                button has no shareable target until a lens is
+                picked; before that the URL would be a bare path
+                and wouldn't survive the readLensIdFromUrl round-
+                trip on the receiving end. */}
+            {selectedLensId ? (
+              <button
+                type="button"
+                className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-muted"
+                data-testid="graph-lens-copy-link-button"
+                title={`Copy a shareable link with ?lensId=${selectedLensId}`}
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?lensId=${encodeURIComponent(selectedLensId)}`;
+                  void navigator.clipboard?.writeText(url);
+                }}
+              >
+                Copy link
+              </button>
+            ) : null}
           </div>
           {!selectedLensId ? (
             <p className="text-sm text-muted-foreground">
