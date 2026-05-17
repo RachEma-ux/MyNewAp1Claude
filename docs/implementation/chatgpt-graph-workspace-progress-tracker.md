@@ -312,3 +312,26 @@ Code surface: `server/agent-studio/services/graph/retrieval/{retrieval-router.ts
 Test surface: `tests/agent-studio/graphrag-retrieval-closure.test.ts` (42 tests / 6 sections) plus 7 adjacent suites (124 tests total) all green via `pnpm exec vitest run --pool=forks --poolOptions.forks.singleFork`.
 
 What is intentionally NOT in this PR: live Neo4j 5 CE evidence (BLOCKED BY MISSING CREDENTIALS / INFRA — operator-runnable via existing `graph-p0-smoke-neo4j-ce.yml` workflow dispatch), GDS algorithm pass-through (out of MVP-0-4 scope; CE backend correctly rejects via `GraphCapabilityUnsupportedError`), vector/text signal caller-side wiring (separate slice; ranker contract proven).
+
+## 12. Graph Agent Runtime closure (items 33–37, 2026-05-17)
+
+Per the Graph Agent Runtime closure prompt, the five Runtime
+acceptance items have been driven to FULLY IMPLEMENTED at the code
++ test level. Full per-item classification + acceptance-rule mapping
++ test surface live in `docs/evidence/agent-studio-graph-agent-runtime-closure-2026-05-17.md`.
+
+| # | Item | Status |
+|---|---|---|
+| 33 | Graph Agent over real Neo4j traversal paths | FULLY IMPLEMENTED (live-Cypher evidence BLOCKED BY CREDENTIALS) |
+| 34 | Provenance explanation from explainNode/explainPath | FULLY IMPLEMENTED |
+| 35 | Reasoning benchmark evidence | FULLY IMPLEMENTED (6/6 scenarios PASS; live-model variant BLOCKED BY CREDENTIALS) |
+| 36 | Golden-question pass evidence for Graph Agent / GraphRAG | FULLY IMPLEMENTED at workflow level (live pass BLOCKED BY CREDENTIALS) |
+| 37 | Failure → correction proposal loop | FULLY IMPLEMENTED via PR #1395 (T-D.5) |
+
+New code: `server/agent-studio/services/graph-agent/provenance-enricher.ts` (pure module, 5-signal envelope union, redaction-aware) + `scripts/graph-bench/run-graph-agent-reasoning-bench.ts` (deterministic 6-scenario walk through the engine) + `.github/workflows/graph-agent-reasoning-bench.yml` (operator-triggered).
+
+New tests: `tests/agent-studio/item-34-provenance-enrichment.test.ts` (13) + `tests/agent-studio/item-35-reasoning-bench-shape.test.ts` (5). Combined with regression coverage on `graph-agent-{engine,decision-trace,boundaries}` + `td-5-golden-question-failure-correction` = **58 tests across 6 suites all green** via `pnpm exec vitest run --pool=forks --poolOptions.forks.singleFork`.
+
+Operator-runnable benchmark evidence: `docs/evidence/graph-backend/2026-05-17-graph-agent-reasoning-bench/report.md` — 6/6 PASS.
+
+Engine change: `retrieve` step output now records `graphNodeIds: string[]` (additive on JSONB) so `provenance-enricher` can attach `explainNode` provenance per node in a future explain-reader update.
