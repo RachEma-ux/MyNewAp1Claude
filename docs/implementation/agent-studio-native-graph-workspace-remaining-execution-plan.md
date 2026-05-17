@@ -433,6 +433,26 @@ Tracks T-A through T-G can ship autonomously. Tracks T-H sub-arcs require explic
 
 ---
 
+## 9.5. Standing patterns surfaced by completed arcs
+
+Named precedents future arcs can cite as `(precedent X)`. Each is sourced from a closure ledger; the menu grows as arcs complete.
+
+### T-G.2 — Code Intelligence Graph (closed 2026-05-17)
+
+Full closure ledger: `docs/implementation/agent-studio-code-intelligence-graph-closure-2026-05-17.md`.
+
+- **(p) Skeleton-first with factory-throws placeholders** — multi-PR arcs ship a PR-0 skeleton (interfaces + barrels + tagged-placeholder factories). Each subsequent PR flips exactly one placeholder; source-scan locks the placeholder strings so a forgotten flip fails before merge. Use for 3+ PR arcs with a stable contract.
+
+- **(q) Source-of-truth boundary INSIDE a domain** — split a domain across `<x>/`(pure) + `persistence/`(SoT) + `projection/`(derived). Each layer's tests forbid the other's imports. Failure isolation (projection-side outage doesn't block ingest); re-projection is a single-method call. Use when Postgres → Neo4j is the canonical flow.
+
+- **(r) Closed-taxonomy extension as 6-touch-point checklist** — adding a new lens kind / impact kind / closed enum follows a predictable 6-file diff (const + metadata + default-definitions entry + per-kind installer + omnibus composer + public-api barrel) + N hardcoded-count test updates. Reviewer can verify all touches without reading impl.
+
+- **(s) Previously-excluded inclusion strictness gap** — `tsconfig.json` excludes `**/services/**`; when a new non-services entry point imports from a previously-excluded services file, that file enters tsc compilation for the first time and may surface latent strictness gaps. Mitigation: fix at the callsite (minimal), or add a barrel-exhaustion source-scan test (hygiene).
+
+- **(t) Generic-by-shape UI affordance** — when adding an operator UX hook triggered by node/edge meta payload, key it on meta SHAPE (not lens kind) so future lenses with shape-compatible meta get the affordance for free. Reserve lens-kind gating for genuinely kind-specific affordances.
+
+---
+
 ## 10. References
 
 - Roadmap: `docs/implementation/agent-studio-native-graph-workspace-roadmap.md`
