@@ -437,6 +437,12 @@ Tracks T-A through T-G can ship autonomously. Tracks T-H sub-arcs require explic
 
 Named precedents future arcs can cite as `(precedent X)`. Each is sourced from a closure ledger; the menu grows as arcs complete.
 
+### T-G.3 — Security / DevSecOps Graph Lens (closed 2026-05-17)
+
+Full closure ledger: `docs/implementation/agent-studio-security-devsecops-graph-closure-2026-05-17.md`.
+
+**Validation observation:** T-G.3 was the **second arc to ship line-for-line against the T-G.2 precedent menu** without surfacing any new precedents. Different domain (security/CVE), different external boundary (NVD HTTP vs. tree-sitter native lib), different permission model (approver-only vs. workspace-members) — and yet the same 5 patterns `(p)–(t)` covered the load-bearing decisions. The precedent menu is robust enough to template arcs of this shape.
+
 ### T-G.2 — Code Intelligence Graph (closed 2026-05-17)
 
 Full closure ledger: `docs/implementation/agent-studio-code-intelligence-graph-closure-2026-05-17.md`.
