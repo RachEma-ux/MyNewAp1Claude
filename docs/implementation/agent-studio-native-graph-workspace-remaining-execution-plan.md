@@ -437,6 +437,14 @@ Tracks T-A through T-G can ship autonomously. Tracks T-H sub-arcs require explic
 
 Named precedents future arcs can cite as `(precedent X)`. Each is sourced from a closure ledger; the menu grows as arcs complete.
 
+### T-G.4 — Recommendation Service (closed 2026-05-17)
+
+Full closure ledger: `docs/implementation/agent-studio-recommendation-service-closure-2026-05-17.md`.
+
+- **(u) Query-service shape — thin shell over assembler + injected fetcher** — when an arc emits a **query/rank/reason envelope** rather than projecting graph state, the natural shape is: contracts (shipped or first) → assembler (pure decision logic) → thin runtime `create<X>Service({ fetch<Y> })` composing fetcher → assembler → production fetcher `create<Y>Fetcher({ <dependency> })` returning the boundary-typed fetch fn. Tests partition cleanly across `*-runtime.test.ts` (compose-only with stub fetcher) and `*-fetcher.test.ts` (mapper + transform + boundary with stub dependency); the existing `*-assemble-response.test.ts` is untouched. Contrast with **(q)**: precedent (q) assumes a 3-quadrant `ingestion/persistence/projection` directory shape; precedent (u) is the **query-side analog** where boundary discipline still applies (dependency injected, not imported) but the directory shape is **runtime/ alone**. Collapses what looks like a 6–7 PR arc into 2 substantive PRs when contracts + assembler pre-exist.
+
+**Validation observation:** T-G.4 was the **third arc this session and the first query-service-shaped arc**. The 5 prior precedents `(p)–(t)` partially applied: (p) compressed into a single PR because the contract surface was already shipped; (q) generalized from directory shape to boundary discipline; (r) applied verbatim to the closed `RecommendationKind` taxonomy; (s)/(t) did not surface (no new file inclusion, no UI). The single new precedent (u) names the asymmetry — arc shape is directly tied to whether work emits/projects state vs. queries existing state.
+
 ### T-G.3 — Security / DevSecOps Graph Lens (closed 2026-05-17)
 
 Full closure ledger: `docs/implementation/agent-studio-security-devsecops-graph-closure-2026-05-17.md`.
