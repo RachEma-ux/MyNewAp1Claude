@@ -23,6 +23,47 @@ import { toast } from "sonner";
 import { Loader2, Search, ThumbsUp, ThumbsDown } from "lucide-react";
 import { SectionLabel } from "./ui";
 
+/**
+ * T-F.134 — RAC retrieval-mode color-coded tone, sourced from
+ * CLAUDE.md's 8-mode closed taxonomy under "RAC (Phase 6, extends
+ * existing planner/orchestrator)". Maps each mode into one of 4
+ * logical clusters that meaningfully separate the planner's
+ * decision space for at-a-glance scan:
+ *   - no_retrieval                       → muted (passive baseline)
+ *   - cag_only                           → indigo (CAG-only)
+ *   - knowledge_retrieval                → cyan (RAG-only)
+ *   - multimodal_hybrid_retrieval        → cyan (RAG variant)
+ *   - tool_knowledge_retrieval           → violet (tool-knowledge)
+ *   - hybrid_cag_rag                     → emerald (common fusion)
+ *   - hybrid_cag_tool_knowledge          → emerald (CAG+Tool fusion)
+ *   - hybrid_cag_rag_tool_knowledge      → emerald (max fusion)
+ *
+ * Unknown modes (server-side enum extension ahead of this client
+ * mirror) fall back to the default outline tone — lesson 45
+ * future-extensibility shape, same as T-F.131 / T-F.132 / T-F.133.
+ */
+function racModeBadgeClass(mode: string | null | undefined): string {
+  if (!mode) return "";
+  if (mode === "no_retrieval")
+    return "bg-muted/40 text-muted-foreground border-border";
+  if (mode === "cag_only")
+    return "bg-indigo-500/15 text-indigo-300 border-indigo-500/40";
+  if (
+    mode === "knowledge_retrieval" ||
+    mode === "multimodal_hybrid_retrieval"
+  )
+    return "bg-cyan-500/15 text-cyan-300 border-cyan-500/40";
+  if (mode === "tool_knowledge_retrieval")
+    return "bg-violet-500/15 text-violet-300 border-violet-500/40";
+  if (
+    mode === "hybrid_cag_rag" ||
+    mode === "hybrid_cag_tool_knowledge" ||
+    mode === "hybrid_cag_rag_tool_knowledge"
+  )
+    return "bg-emerald-500/15 text-emerald-300 border-emerald-500/40";
+  return "";
+}
+
 interface Props {
   workspaceId: number;
   agentId: number;
@@ -132,7 +173,12 @@ export default function RacTracesPanel({ workspaceId, agentId }: Props) {
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <SectionLabel>Trace #{trace.id}</SectionLabel>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge
+                variant="outline"
+                className={`text-[10px] ${racModeBadgeClass(trace.mode)}`}
+                data-testid={`rac-trace-mode-badge-${trace.id}`}
+                title={`retrieval mode: ${trace.mode ?? "(none)"}`}
+              >
                 {trace.mode ?? "—"}
               </Badge>
             </div>
