@@ -108,11 +108,13 @@ describe("Inbox dismiss γ-slice (T-F.109 / T-F.6-γ)", () => {
     // must include mark-read + dismiss live AND still name the
     // remaining deferred bulk actions until they ship.
     const src = readPanel();
-    expect(src).toMatch(/Inbox\s+(γ|δ):/);
+    expect(src).toMatch(/Inbox\s+(γ|δ|ε):/);
     expect(src).toMatch(/mark-read\s*\+\s*dismiss\s+live/);
-    expect(src).toMatch(
-      /mark-all-by-kind[\s\S]{0,200}dismiss-all-by-kind[\s\S]{0,200}follow-up/,
-    );
+    // Earlier slices named the deferred bulk actions in the banner;
+    // ε ships them and removes "follow-up slices" wording. The
+    // invariant for γ is just that dismiss is live; bulk references
+    // may appear as either deferred (γ/δ) or live (ε+).
+    expect(src).toMatch(/by-kind/);
     expect(src).not.toMatch(/Inbox β:/);
   });
 });
