@@ -53,7 +53,7 @@ describe("TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA (T-G.37)", () => {
     expect(structural).toEqual(["empty_query"]);
   });
 
-  it("forbidden_token + forbidden_procedure are the only security failures", () => {
+  it("security failures are forbidden_token + forbidden_procedure + multi_statement", () => {
     const security = new Set(
       TEXT2CYPHER_VALIDATION_FAILURE_REASONS.filter(
         (r) =>
@@ -61,15 +61,20 @@ describe("TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA (T-G.37)", () => {
           "security",
       ),
     );
-    expect(security).toEqual(new Set(["forbidden_token", "forbidden_procedure"]));
+    expect(security).toEqual(
+      new Set(["forbidden_token", "forbidden_procedure", "multi_statement"]),
+    );
   });
 
-  it("disallowed_procedure is the only policy failure", () => {
-    const policy = TEXT2CYPHER_VALIDATION_FAILURE_REASONS.filter(
-      (r) =>
-        TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA[r].category === "policy",
+  it("policy failures are disallowed_procedure + unbounded_query", () => {
+    const policy = new Set(
+      TEXT2CYPHER_VALIDATION_FAILURE_REASONS.filter(
+        (r) =>
+          TEXT2CYPHER_VALIDATION_FAILURE_REASON_METADATA[r].category ===
+          "policy",
+      ),
     );
-    expect(policy).toEqual(["disallowed_procedure"]);
+    expect(policy).toEqual(new Set(["disallowed_procedure", "unbounded_query"]));
   });
 
   it("isHardSecurityViolation is true iff category === security", () => {
