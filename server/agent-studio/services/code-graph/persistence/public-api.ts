@@ -9,4 +9,5 @@ export {
   type CodeGraphIngestionResult,
   type CodeGraphIngestionListRow,
   type CodeGraphIngestionStats,
+  type CodeGraphRepositorySummaryRow,
 } from "./code-graph-store.js";
