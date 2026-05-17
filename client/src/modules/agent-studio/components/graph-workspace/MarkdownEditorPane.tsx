@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
-import AppStreamdown from "../../../../components/markdown/AppStreamdown";
+import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer from "./WorkspaceStateLayer";
 
@@ -165,7 +165,7 @@ export default function MarkdownEditorPane({
       )}
 
       <div className="flex-1 min-h-0 overflow-auto p-3" data-testid="markdown-editor-body">
-        {mode === "read" && <AppStreamdown content={liveText} />}
+        {mode === "read" && <AppStreamdown>{liveText}</AppStreamdown>}
         {mode === "edit" && (
           <textarea
             data-testid="markdown-editor-textarea-edit"
