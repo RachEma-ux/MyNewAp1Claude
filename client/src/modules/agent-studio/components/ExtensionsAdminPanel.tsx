@@ -72,6 +72,24 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
   const [expandedInvocationId, setExpandedInvocationId] = useState<
     number | null
   >(null);
+  // T-F.128 (T-F.7-j₂ intra-panel): click an extension name in the
+  // recent-invocations log → highlight + scrollIntoView its row in
+  // the registry table above. Saves the operator a 2-step workflow
+  // (find Ctrl+F target → scroll) when an unusual lane/error in the
+  // log invites a config re-check.
+  const [highlightedExtensionId, setHighlightedExtensionId] = useState<
+    number | null
+  >(null);
+  const registryRowRefs = React.useRef<
+    Map<number, HTMLTableRowElement | null>
+  >(new Map());
+  function handleInvocationExtensionClick(extensionId: number) {
+    setHighlightedExtensionId(extensionId);
+    const row = registryRowRefs.current.get(extensionId);
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
 
   function refreshList() {
     void utils.agentStudio.extensions.list.invalidate({ workspaceId });
@@ -386,7 +404,13 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                     const isConfigExpanded = expandedConfigId === ext.id;
                     return (
                     <React.Fragment key={ext.id}>
-                    <tr className="border-t">
+                    <tr
+                      ref={(el) => {
+                        registryRowRefs.current.set(ext.id, el);
+                      }}
+                      className={`border-t ${highlightedExtensionId === ext.id ? "bg-amber-100 dark:bg-amber-900/30" : ""}`}
+                      data-testid={`extension-registry-row-${ext.id}`}
+                    >
                       <td className="py-1 pr-3 font-mono text-xs">
                         {ext.extensionKey}
                       </td>
@@ -715,8 +739,18 @@ export function ExtensionsAdminPanel({ workspaceId }: Props) {
                             {fmtTs(r.invokedAt)}
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
-                            {extensionKeyById.get(r.extensionId) ??
-                              `#${r.extensionId}`}
+                            <button
+                              type="button"
+                              className="underline hover:text-primary"
+                              data-testid={`extension-invocation-row-extension-${r.id}`}
+                              title="Highlight matching registry row above"
+                              onClick={() =>
+                                handleInvocationExtensionClick(r.extensionId)
+                              }
+                            >
+                              {extensionKeyById.get(r.extensionId) ??
+                                `#${r.extensionId}`}
+                            </button>
                           </td>
                           <td className="py-1 pr-3 font-mono text-xs">
                             {r.lane}
