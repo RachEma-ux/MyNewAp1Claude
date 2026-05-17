@@ -846,6 +846,108 @@ function MiniTrend({
   );
 }
 
+// ── T-F.112 (T-F.7-α): jobs-by-kind breakdown card.
+// Reads the 4 jobKind axes from getStats (total, failed, pending,
+// running) and renders them as a per-kind 5-column table sorted
+// by total descending. Lane-rollup variants (jobsByLane etc.) are
+// intentionally NOT surfaced here — those are a separate axis whose
+// own card lands in a later slice if operator demand surfaces.
+//
+// Precedent (j₂) clickable-rollup fusion is deferred to a follow-up
+// because the retry/cancel form state lives in a sibling component
+// (BulkJobOpsPanel); lifting state up is a larger refactor and the
+// operator can read the card AND manually type a kind in the bulk
+// ops form below in the same scroll. The first slice ships the data.
+function JobsByKindBreakdownCard({
+  jobsByKind,
+  failedJobsByKind,
+  pendingJobsByKind,
+  runningJobsByKind,
+}: {
+  jobsByKind: Record<string, number>;
+  failedJobsByKind: Record<string, number>;
+  pendingJobsByKind: Record<string, number>;
+  runningJobsByKind: Record<string, number>;
+}) {
+  // Union of all kinds seen across the four axes — a kind might be
+  // 0 in `jobsByKind` overall (e.g. retention-pruned) but still
+  // appear in pending/running.
+  const allKinds = Array.from(
+    new Set<string>([
+      ...Object.keys(jobsByKind),
+      ...Object.keys(failedJobsByKind),
+      ...Object.keys(pendingJobsByKind),
+      ...Object.keys(runningJobsByKind),
+    ]),
+  ).sort((a, b) => (jobsByKind[b] ?? 0) - (jobsByKind[a] ?? 0));
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <SectionLabel>Jobs by kind</SectionLabel>
+        {allKinds.length === 0 ? (
+          <div
+            className="text-sm text-zinc-500"
+            data-testid="retrofit-jobs-by-kind-empty"
+          >
+            No jobs recorded.
+          </div>
+        ) : (
+          <div
+            className="overflow-auto rounded border border-zinc-800"
+            data-testid="retrofit-jobs-by-kind-card"
+          >
+            <table className="w-full text-xs">
+              <thead className="bg-zinc-900/60 text-zinc-400">
+                <tr>
+                  <th className="px-2 py-1 text-left font-medium uppercase">
+                    Kind
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Total
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Failed
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Pending
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Running
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {allKinds.map((k) => (
+                  <tr
+                    key={k}
+                    className="border-t border-zinc-800"
+                    data-testid={`retrofit-jobs-by-kind-row-${k}`}
+                  >
+                    <td className="px-2 py-1 font-mono">{k}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {jobsByKind[k] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {failedJobsByKind[k] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {pendingJobsByKind[k] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {runningJobsByKind[k] ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ObservabilityStatsPanel() {
   const q = trpc.agentStudio.workspaceObservability.getStats.useQuery(
     undefined,
@@ -897,6 +999,22 @@ function ObservabilityStatsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── T-F.112 (T-F.7-α): jobs-by-kind breakdown ──
+          Surfaces the s.jobsByKind / failedJobsByKind / pendingJobsByKind /
+          runningJobsByKind quartet — all four already in getStats. Pure
+          panel-saturation: the data was live since stats.ts shipped, but
+          the only UI consumption was per-row j.jobKind labels in the
+          recent-jobs lists below. Operator question answered: "which
+          jobKind dominates the queue / failure pool / running pool right
+          now?" — currently they'd have to read the per-row labels and
+          count by hand. */}
+      <JobsByKindBreakdownCard
+        jobsByKind={s.jobsByKind}
+        failedJobsByKind={s.failedJobsByKind}
+        pendingJobsByKind={s.pendingJobsByKind}
+        runningJobsByKind={s.runningJobsByKind}
+      />
 
       {/* Error events: system vs user */}
       <Card>
