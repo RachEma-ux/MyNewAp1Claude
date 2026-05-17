@@ -2,17 +2,14 @@
  * T-D.3.1 — Semantic Enrichment Agent skeleton.
  *
  * Source-scan integrity test locking the boundary contract for the
- * LLM-driven graph enrichment proposer. The runtime is intentionally
- * a factory-throws placeholder per precedent (p) — subsequent
- * T-D.3.x slices flip exactly one factory at a time:
+ * LLM-driven graph enrichment proposer. The four factories were
+ * landed via precedent (p) skeleton-first; this test now reflects
+ * the FULLY-WIRED runtime after T-D.3.2-5:
  *
  *   T-D.3.2 → store (ASDB persistence to ags_semantic_enrichment_*)
  *   T-D.3.3 → evidence collector (KB / RAC source-note read path)
  *   T-D.3.4 → LLM proposer (via OpenRouter Model Access)
  *   T-D.3.5 → agent runtime composing all three
- *
- * The source-scan locks placeholder strings so a forgotten flip
- * fails before merge.
  *
  * Hard-rule boundary scans:
  *   - No neo4j-driver import anywhere in graph-enrichment/.
@@ -88,24 +85,20 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
     expect(src).toMatch(/DEFAULT_SEMANTIC_ENRICHMENT_MIN_CONFIDENCE\s*=\s*0\.8/);
   });
 
-  // ── factory-throws placeholders (precedent (p)) ───────────────
+  // ── flip ledger (ALL four factories wired) ────────────────────
 
-  it("agent / evidence-collector / proposer still throw T-D.3.1 placeholders (store flipped @ T-D.3.2)", () => {
-    const expected: Array<[string, string]> = [
-      ["semantic-enrichment-agent.ts", "T-D.3.1] createSemanticEnrichmentAgent"],
-      [
-        "semantic-enrichment-evidence-collector.ts",
-        "T-D.3.1] createSemanticEnrichmentEvidenceCollector",
-      ],
-      ["semantic-enrichment-proposer.ts", "T-D.3.1] createSemanticEnrichmentProposer"],
-    ];
-    for (const [file, marker] of expected) {
+  it("ALL four factories flipped (agent @ T-D.3.5, store @ T-D.3.2, evidence @ T-D.3.3, proposer @ T-D.3.4)", () => {
+    for (const file of [
+      "semantic-enrichment-agent.ts",
+      "semantic-enrichment-store.ts",
+      "semantic-enrichment-evidence-collector.ts",
+      "semantic-enrichment-proposer.ts",
+    ]) {
       const src = readFile(join(DIR, file));
-      expect(src).toContain(marker);
+      expect(src, `${file} placeholder must be gone`).not.toMatch(
+        /\[T-D\.3\.1\][\s\S]*create/,
+      );
     }
-    // Store has been flipped — must no longer carry the placeholder tag.
-    const storeSrc = readFile(join(DIR, "semantic-enrichment-store.ts"));
-    expect(storeSrc).not.toMatch(/\[T-D\.3\.1\][\s\S]*createSemanticEnrichmentStore/);
   });
 
   // ── boundary discipline (hard rules) ──────────────────────────
@@ -122,9 +115,6 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
   it("no direct openrouter SDK import — LLM access only via Model Access boundary", () => {
     for (const f of readDirAll(DIR)) {
       const src = readFile(f);
-      // openrouter/model-access is what the proposer will inject via
-      // the `modelAccess` factory option; direct openrouter SDK
-      // imports are forbidden.
       expect(src, `${f} should not directly import the openrouter SDK`).not.toMatch(
         /from\s+["'](?:openrouter|openai|@anthropic-ai\/sdk|@google\/generative-ai)["']/,
       );
@@ -152,16 +142,16 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
     }
   });
 
-  it("no drizzle-orm import in agent / proposer / evidence-collector (store-only boundary)", () => {
-    // Store CAN import drizzle (it's the persistence boundary, T-D.3.2);
-    // the other layers must not.
-    const nonStoreFiles = [
+  it("no drizzle-orm import in agent / proposer / contracts (persistence-layer boundary)", () => {
+    // Store CAN import drizzle (T-D.3.2 persistence boundary).
+    // Evidence collector CAN import drizzle (T-D.3.3 read-only KB).
+    // Agent + proposer + contracts must not.
+    const nonPersistenceFiles = [
       "semantic-enrichment-agent.ts",
       "semantic-enrichment-proposer.ts",
-      "semantic-enrichment-evidence-collector.ts",
       "contracts.ts",
     ];
-    for (const file of nonStoreFiles) {
+    for (const file of nonPersistenceFiles) {
       const src = readFile(join(DIR, file));
       expect(src, `${file} should not import drizzle-orm`).not.toMatch(
         /from\s+["']drizzle-orm/,
@@ -169,12 +159,12 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
     }
   });
 
-  // ── contract shape (read-only boundary types) ─────────────────
+  // ── contract shape ────────────────────────────────────────────
 
-  it("agent interface declares only run(input): Promise<RunOutput>", () => {
+  it("agent interface declares run(input): Promise<RunOutput> (T-D.3.5 widened to input+candidates / output+skips)", () => {
     const src = readFile(join(DIR, "semantic-enrichment-agent.ts"));
     expect(src).toMatch(
-      /interface\s+SemanticEnrichmentAgent\s*\{[\s\S]*?run\(input:\s*SemanticEnrichmentRunInput\):\s*Promise<SemanticEnrichmentRunOutput>[\s\S]*?\}/,
+      /interface\s+SemanticEnrichmentAgent\s*\{[\s\S]*?run\([\s\S]*?\):\s*Promise<\s*SemanticEnrichmentRunOutput\w*\s*>[\s\S]*?\}/,
     );
   });
 
@@ -206,7 +196,7 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
   });
 });
 
-describe("T-D.3.1 — normalization helpers (behavioral)", () => {
+describe("T-D.3.1 — runtime is fully wired (behavioral)", () => {
   it("normalizeSemanticEnrichmentMinConfidence clamps below 0 → 0, above 1 → 1, missing → default", async () => {
     const {
       normalizeSemanticEnrichmentMinConfidence,
@@ -254,7 +244,7 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
     expect(isSemanticEnrichmentProposalKind(undefined)).toBe(false);
   });
 
-  it("agent / evidence-collector / proposer factory-throws fire with [T-D.3.1] tagged messages (store flipped @ T-D.3.2)", async () => {
+  it("ALL four factories are constructible without throwing — runtime is fully wired", async () => {
     const {
       createSemanticEnrichmentAgent,
       createSemanticEnrichmentStore,
@@ -263,28 +253,59 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
     } = await import(
       "../../server/agent-studio/services/graph-enrichment/public-api"
     );
-    const store = createSemanticEnrichmentStore();
-    const collector = createSemanticEnrichmentEvidenceCollector({
-      noteVersionReader: {},
-    });
-    const proposer = createSemanticEnrichmentProposer({ modelAccess: {} });
+    expect(() => createSemanticEnrichmentStore()).not.toThrow();
+    expect(() => createSemanticEnrichmentEvidenceCollector()).not.toThrow();
+    expect(() =>
+      createSemanticEnrichmentProposer({
+        modelAccess: {},
+        providerConnectionId: 1,
+        modelRef: "m",
+        actorId: 1,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      createSemanticEnrichmentAgent({
+        store: createSemanticEnrichmentStore(),
+        evidenceCollector: createSemanticEnrichmentEvidenceCollector(),
+        proposer: createSemanticEnrichmentProposer({
+          modelAccess: {},
+          providerConnectionId: 1,
+          modelRef: "m",
+          actorId: 1,
+        }),
+      }),
+    ).not.toThrow();
+  });
+
+  it("agent.run with no candidates completes cleanly (full lifecycle via stubs)", async () => {
+    const { createSemanticEnrichmentAgent } = await import(
+      "../../server/agent-studio/services/graph-enrichment/public-api"
+    );
+    const calls: string[] = [];
+    const store = {
+      async beginRun() {
+        calls.push("beginRun");
+        return { runId: 1, startedAt: new Date() };
+      },
+      async recordProposal() {
+        calls.push("recordProposal");
+        return { proposalId: 1 };
+      },
+      async recordRejectedBelowThreshold() {
+        calls.push("recordRejectedBelowThreshold");
+      },
+      async finishRun() {
+        calls.push("finishRun");
+      },
+    } as any;
     const agent = createSemanticEnrichmentAgent({
       store,
-      evidenceCollector: collector,
-      proposer,
+      evidenceCollector: { async collect() { return []; } } as any,
+      proposer: { async propose() { throw new Error("should not be called"); } } as any,
     });
-    await expect(agent.run({ workspaceId: 1 })).rejects.toThrow(/T-D\.3\.1/);
-    await expect(
-      collector.collect({ workspaceId: 1, targetTypeKey: "note", targetId: 1 }),
-    ).rejects.toThrow(/T-D\.3\.1/);
-    await expect(
-      proposer.propose({
-        workspaceId: 1,
-        targetTypeKey: "note",
-        targetId: 1,
-        proposalKind: "description_enrichment",
-        citations: [],
-      }),
-    ).rejects.toThrow(/T-D\.3\.1/);
+    const out = await agent.run({ workspaceId: 1, candidates: [] } as any);
+    expect(out.proposalsCreated).toBe(0);
+    expect(out.status).toBe("completed");
+    expect(calls).toEqual(["beginRun", "finishRun"]);
   });
 });
