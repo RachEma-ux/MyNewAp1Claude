@@ -86,10 +86,56 @@ Three outcomes — the operator picks one in the T-E.4 follow-up based on the §
 
 ---
 
-## 5. Related artifacts
+## 6. T-E.4 — projection + query-latency measurement (live Neo4j 5 CE)
+
+Closes the other half of the §4 gate set. Spike-only `neo4j-driver`
+exemption documented in `spike/README.md` + enforced in
+`code-graph-spike-boundary.test.ts`; production paths (`services/
+graph/repository/**` + `modules/kgia/**`) remain the only non-spike
+locations where `neo4j-driver` may appear.
+
+### 6.1 §4 gates being measured (the other half)
+
+| Gate | Target | Measured by |
+|---|---|---|
+| Projection time to Neo4j CE | < 10000 ms (~15 files) | `server/agent-studio/services/code-graph/spike/project-and-measure.ts` (driven by `.github/workflows/code-graph-spike-measurement.yml`) |
+| Per-query latency p95 (5 representative queries) | < 100 ms each | same script — runs each query × 10 iterations |
+
+The 5 queries from spike doc §4:
+
+1. Q1 — "What does `manifest.ts` import?" (1-hop IMPORTS)
+2. Q2 — "What does `runtime.ts::invokeFromExtension` call?" (2-hop DECLARES + CALLS)
+3. Q3 — "Which files declare a Class named `LaneHookFn`?" (label scan)
+4. Q4 — "Call chain from `invokeFromExtension` to `dispatchMcpToolCall`" (shortestPath, variable-depth CALLS)
+5. Q5 — "Which tests reference `manifest.ts`?" (reverse IMPORTS from `*.test.ts`)
+
+### 6.2 Recorded results
+
+**Evidence source:** GitHub Actions workflow `code-graph-spike-measurement.yml` run #TBD on `te4-code-graph-spike-projection-measurement` @ TBD-SHA. Console.log lines tagged `[T-E.4]` transcribed verbatim below.
+
+| Metric | Target | Recorded | Verdict |
+|---|---|---|---|
+| Projection time (ms) | < 10000 | TBD | TBD |
+| Q1 p95 (ms) | < 100 | TBD | TBD |
+| Q2 p95 (ms) | < 100 | TBD | TBD |
+| Q3 p95 (ms) | < 100 | TBD | TBD |
+| Q4 p95 (ms) | < 100 | TBD | TBD |
+| Q5 p95 (ms) | < 100 | TBD | TBD |
+
+**Verdict (T-E.4 isolated, post-dispatch transcription):** TBD.
+
+**Combined verdict (T-E.3 + T-E.4 → §3 decision tree):**
+- If T-E.4 verdict is **PASS** → Outcome A (parse + projection both PASS); Phase 25 T-G.2 unblocked; scale measurement to `services/` (~120 files) for T-E.5.
+- If T-E.4 verdict is **FAIL** (projection >= 10s OR any query p95 >= 100ms) → Outcome B (parse-only PASS); Phase 25 scope reduction per §4 fallback (drop Python OR trigger Phase 27 Aura) OR defer Phase 25 code-graph entirely.
+
+---
+
+## 7. Related artifacts
 
 - Spike ADR: `docs/implementation/agent-studio-code-graph-parser-spike-2026.md`
 - Spike emitter: `server/agent-studio/services/code-graph/spike/parse-ts-file.ts`
 - Spike sample-ingest: `server/agent-studio/services/code-graph/spike/run-sample-ingest.ts`
-- Measurement test: `tests/agent-studio/code-graph-spike-perf-measurement.test.ts`
+- Spike projection + measurement: `server/agent-studio/services/code-graph/spike/project-and-measure.ts`
+- Parse-time measurement test: `tests/agent-studio/code-graph-spike-perf-measurement.test.ts`
 - Spike boundary test: `tests/agent-studio/code-graph-spike-boundary.test.ts`
+- Projection-time measurement workflow: `.github/workflows/code-graph-spike-measurement.yml`

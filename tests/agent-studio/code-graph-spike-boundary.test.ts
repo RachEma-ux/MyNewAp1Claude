@@ -70,7 +70,13 @@ describe("T-E.1 — Code Graph Parser Spike boundary", () => {
   it("Spike directory README names the hard-rule boundaries", () => {
     const src = readFileSync(join(spikeDir, "README.md"), "utf8");
     expect(src).toContain("No tree-sitter imports outside this directory");
-    expect(src).toContain("No `neo4j-driver` imports anywhere in this tree");
+    // T-E.4: spike-only exemption documented in README — neo4j-driver
+    // IS permitted inside the spike tree (and only here). The README
+    // must explain the exemption + the "doesn't leak" guarantee.
+    expect(src).toContain(
+      "neo4j-driver` imports ARE permitted inside this directory tree",
+    );
+    expect(src).toContain("Phase 7.5 production unblock");
   });
 
   it("T-E.2: spike tree contains the emitter + sample-ingest scripts", () => {
@@ -100,6 +106,26 @@ describe("T-E.1 — Code Graph Parser Spike boundary", () => {
         const src = readFileSync(f, "utf8");
         if (/from\s+["']tree-sitter/.test(src)) offenders.push(f);
       }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("T-E.4: neo4j-driver imports stay inside the spike tree under server/agent-studio/", () => {
+    // CLAUDE.md hard rule: no `neo4j-driver` imports outside
+    // `services/graph/repository/**` and `server/modules/kgia/**`.
+    // T-E.4 adds a spike-only exemption: `code-graph/spike/**` may
+    // also import neo4j-driver. This test enforces both halves:
+    // (a) the spike's neo4j-driver imports DO live inside spike/
+    // and (b) no other agent-studio/services/** path imports it.
+    const agentStudioSurface = resolve(repoRoot, "server/agent-studio/services");
+    if (!existsSync(agentStudioSurface)) return;
+    const offenders: string[] = [];
+    for (const f of walk(agentStudioSurface)) {
+      if (!/\.(ts|tsx|js)$/.test(f)) continue;
+      if (f.includes("/code-graph/spike/")) continue;
+      if (f.includes("/graph/repository/")) continue;
+      const src = readFileSync(f, "utf8");
+      if (/from\s+["']neo4j-driver["']/.test(src)) offenders.push(f);
     }
     expect(offenders).toEqual([]);
   });
