@@ -264,6 +264,32 @@ Live-evidence items still **BLOCKED BY MISSING CREDENTIALS / INFRA** (not classi
 - P0 closure live smoke — dispatch `.github/workflows/graph-p0-smoke-neo4j-ce.yml`
 - Live golden-question evidence — dispatch `.github/workflows/graph-golden-questions-live.yml`
 
+## 10. Graph Workspace Product Work closure (2026-05-17)
+
+Items 14–25 of the original roadmap (Markdown editor, vault explorer,
+wikilinks/backlinks, local/global graph, inspector, impact analysis,
+quality panel as workspace UX, runtime/decision trace, 11 workspace
+states) shipped 2026-05-17. The page transitioned from observability-
+only to a full Obsidian-like workspace shell with 13 surfaces.
+
+| Item | Description | Classification |
+|---|---|---|
+| 14 | Full Markdown editor surface | **FULLY IMPLEMENTED** |
+| 15 | Vault explorer / folder tree | **PARTIALLY IMPLEMENTED** (folder nesting deferred — needs `vault.listFoldersInVault`) |
+| 16 | Note reading/editing/source modes | **FULLY IMPLEMENTED** |
+| 17 | Wikilinks / backlinks UI | **PARTIALLY IMPLEMENTED** (outgoing FULL; backlinks heuristic — projection writer deferred) |
+| 18 | Local graph view | **FULLY IMPLEMENTED** |
+| 19 | Global graph view | **FULLY IMPLEMENTED** |
+| 20 | Graph inspector | **FULLY IMPLEMENTED** |
+| 21 | Impact analysis UI backed by traversal | **FULLY IMPLEMENTED** (7 impact_* templates, allow-list enforced) |
+| 22 | Graph quality panel as workspace UX | **FULLY IMPLEMENTED** (reused) |
+| 23 | Runtime trace graph view | **PARTIALLY IMPLEMENTED** (list-view; graph-visual rendering deferred pending graph library approval) |
+| 24 | Decision trace graph view | **PARTIALLY IMPLEMENTED** (same visualization caveat) |
+| 25 | Permission-denied / stale / projection-drift workspace states | **FULLY IMPLEMENTED** (11 closed-taxonomy states) |
+
+Evidence: `docs/evidence/agent-studio-graph-workspace-product-closure-2026-05-17.md`.
+Tests: `tests/agent-studio/graph-workspace-router.test.ts` (10) + `graph-workspace-product-shell.test.ts` (14) = 24 passing.
+
 ## 11. GraphRAG / Retrieval closure (items 26–32, 2026-05-17)
 
 Per the GraphRAG closure prompt, the seven Retrieval acceptance items
