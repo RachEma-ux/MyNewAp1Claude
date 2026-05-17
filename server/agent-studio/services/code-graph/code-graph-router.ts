@@ -53,6 +53,14 @@ import {
   type CodeGraphIngestionStats,
   type CodeGraphRepositorySummaryRow,
 } from "./persistence/public-api.js";
+import {
+  CODE_GRAPH_NODE_TYPES,
+  CODE_GRAPH_EDGE_TYPES,
+  CODE_GRAPH_EDGE_CONSTRAINTS,
+  type CodeGraphEdgeType,
+  type CodeGraphNodeType,
+  type CodeGraphEdgeConstraint,
+} from "./contracts/public-api.js";
 import type {
   ParsedCodeEdge,
   ParsedCodeNode,
@@ -111,6 +119,19 @@ export interface CodeGraphListIngestionsEnvelope {
 
 export interface CodeGraphListRepositoriesEnvelope {
   readonly repositories: ReadonlyArray<CodeGraphRepositorySummaryRow>;
+}
+
+/**
+ * Closed-taxonomy enumeration shipped to the client so the
+ * dashboard filter dropdowns don't have to hard-code the 12+10
+ * enums. Edge constraints are surfaced so the dashboard can
+ * preview the allowed source/target typeKey pairs for each edge —
+ * a UX assist when operators filter edges.
+ */
+export interface CodeGraphKnownTypesEnvelope {
+  readonly nodeTypes: ReadonlyArray<CodeGraphNodeType>;
+  readonly edgeTypes: ReadonlyArray<CodeGraphEdgeType>;
+  readonly edgeConstraints: Readonly<Record<CodeGraphEdgeType, CodeGraphEdgeConstraint>>;
 }
 
 export type CodeGraphGetIngestionStatsEnvelope =
@@ -212,6 +233,25 @@ export const codeGraphRouter = router({
         }
       },
     ),
+
+  /**
+   * Closed-taxonomy enumeration. No DB I/O — just exposes the
+   * compile-time constants from
+   * `code-intelligence-contracts.ts`. The client uses this to
+   * populate the dashboard's typeKey + edgeTypeKey filter dropdowns
+   * (instead of hard-coding the 12+10 enums in client code) and to
+   * preview the allowed source/target typeKey pairs for each edge.
+   *
+   * No `input` schema — it's an enumeration request, parameterless
+   * by design.
+   */
+  listKnownTypes: adminProcedure.query(
+    (): CodeGraphKnownTypesEnvelope => ({
+      nodeTypes: CODE_GRAPH_NODE_TYPES,
+      edgeTypes: CODE_GRAPH_EDGE_TYPES,
+      edgeConstraints: CODE_GRAPH_EDGE_CONSTRAINTS,
+    }),
+  ),
 
   /**
    * Per-ingestion node drill-in. Returns sample rows ordered by
