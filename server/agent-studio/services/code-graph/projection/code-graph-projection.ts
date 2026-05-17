@@ -1,21 +1,27 @@
 /**
- * Code Graph Neo4j Projection — production interface (T-G.2.1).
+ * Code Graph Neo4j Projection — production interface + wiring.
  *
- * Pins the surface T-G.2.4 must implement. Reads from the
- * authoritative ASDB store (`persistence/`) and writes derived
- * facts into Neo4j via the GraphRepository.
+ * Surface contract pinned at T-G.2.1. T-G.2.4 (this PR) wires the
+ * factory to a real implementation that:
  *
- * Why a separate `projection/` rather than letting `persistence/`
- * also write to Neo4j:
- *   - Source-of-truth boundary: persistence owns Postgres writes;
- *     projection owns Neo4j writes. The split is enforced by the
- *     CLAUDE.md "Postgres = source of truth" rule.
- *   - Re-projection: operators can re-project an existing ASDB
- *     ingestion into Neo4j without re-running the parser. The
- *     separation makes that a single-method call rather than a
- *     conditional inside persistence.
- *   - Failure isolation: Neo4j outages don't block ingest.
- *     Persistence completes; projection retries.
+ *   1. Reads the ingestion's nodes + edges from the ASDB store
+ *      (`CodeGraphStore.readIngestion()` — T-G.2.3)
+ *   2. Converts each ParsedCodeNode / ParsedCodeEdge into a
+ *      `ProjectionWrite` (the shape consumed by
+ *      `GraphProjectionRepository.applyProjectionJob`)
+ *   3. Calls `applyProjectionJob` — which Phase 7.5b backs with
+ *      batched UNWIND writes (`PROJECTION_BATCH_SIZE = 1000`) via
+ *      the wired Neo4j adapter (Phase 7.5a).
+ *
+ * Dependency injection: the factory takes `{ store, repository }`
+ * so callers can plug in real ASDB + Neo4j repositories in
+ * production OR test doubles in tests. Mirrors the existing
+ * pattern in `services/graph/projection/sync-worker.ts`.
+ *
+ * Source-of-truth invariant preserved: projection ONLY reads from
+ * ASDB; it never writes to ASDB. Re-projection of an existing
+ * ingestion is a single-method call (operators can flush Neo4j
+ * and rebuild without re-running the parser).
  *
  * Hard-rule compliance (CLAUDE.md):
  *   - No direct `neo4j-driver` import. Projection calls through
@@ -25,6 +31,17 @@
  *   - No `dispatchMcpToolCall`.
  *   - No `process.env.*_API_KEY` reads.
  */
+
+import type { CodeGraphStore } from "../persistence/code-graph-store.js";
+import type {
+  GraphProjectionRepository,
+  ProjectionWrite,
+  ProvenanceFields,
+} from "../../graph/repository/types.js";
+import type {
+  ParsedCodeEdge,
+  ParsedCodeNode,
+} from "../parser/code-graph-parser.js";
 
 export interface ProjectCodeGraphInput {
   /**
@@ -58,13 +75,110 @@ export interface CodeGraphProjection {
   ): Promise<ProjectCodeGraphResult>;
 }
 
+export interface CodeGraphProjectionOptions {
+  readonly store: CodeGraphStore;
+  readonly repository: GraphProjectionRepository;
+}
+
 /**
- * Factory entry point. T-G.2.4 returns the real GraphRepository-
- * backed implementation; today it throws so callers can wire-
- * without-using during T-G.2.1.
+ * Factory entry point. Returns a projection that reads from the
+ * given ASDB store and writes derived facts to Neo4j via the
+ * given GraphRepository. Caller wires up both — see
+ * `services/graph/projection/sync-worker.ts` for the established
+ * DI pattern.
  */
-export function createCodeGraphProjection(): CodeGraphProjection {
-  throw new Error(
-    "[T-G.2.1] CodeGraphProjection is the T-G.2.1 interface contract only; the production implementation lands in T-G.2.4.",
-  );
+export function createCodeGraphProjection(
+  options: CodeGraphProjectionOptions,
+): CodeGraphProjection {
+  return {
+    async projectIngestion(
+      input: ProjectCodeGraphInput,
+    ): Promise<ProjectCodeGraphResult> {
+      const start = Date.now();
+      const { nodes, edges } = await options.store.readIngestion(
+        input.ingestionId,
+      );
+      const writes: ProjectionWrite[] = [
+        ...nodes.map((n) => toNodeWrite(input.ingestionId, n)),
+        ...edges.map((e) => toEdgeWrite(input.ingestionId, e, nodes)),
+      ];
+      const result = await options.repository.applyProjectionJob(writes);
+      const durationMs = Date.now() - start;
+      return {
+        ingestionId: input.ingestionId,
+        nodesProjected:
+          result.nodesCreated + result.nodesUpdated,
+        edgesProjected:
+          result.edgesCreated + result.edgesUpdated,
+        durationMs,
+      };
+    },
+  };
+}
+
+function toNodeWrite(
+  ingestionId: string,
+  node: ParsedCodeNode,
+): ProjectionWrite {
+  const provenance: ProvenanceFields = {
+    sourceType: "code_graph_ingestion",
+    sourceId: ingestionId,
+    sourceLocator: node.filePath,
+    lineageStatus: "derived",
+    extractionMethod: "tree-sitter",
+    governanceStatus: "active",
+  };
+  return {
+    kind: "upsert_node",
+    node: {
+      typeKey: node.typeKey,
+      id: node.id,
+      properties: {
+        name: node.name,
+        filePath: node.filePath,
+        startLine: node.startLine,
+        endLine: node.endLine,
+        ...(node.properties ?? {}),
+      },
+      provenance,
+    },
+  };
+}
+
+function toEdgeWrite(
+  ingestionId: string,
+  edge: ParsedCodeEdge,
+  nodes: ReadonlyArray<ParsedCodeNode>,
+): ProjectionWrite {
+  // GraphProjectionRepository requires both endpoints carry a
+  // typeKey. The persistence layer (T-G.2.3) already validated
+  // every edge via the closed-taxonomy registry, so the source
+  // typeKey is always resolvable from the batch; the target
+  // may still be a raw cross-file reference (callee name /
+  // import specifier) which we tag with the placeholder typeKey
+  // `unresolved` — the projection writes still land in Neo4j
+  // (MERGE on id) and the cross-file join happens in the lens
+  // runner's read query.
+  const sourceTypeKey =
+    nodes.find((n) => n.id === edge.sourceId)?.typeKey ?? "unresolved";
+  const targetTypeKey =
+    nodes.find((n) => n.id === edge.targetId)?.typeKey ?? "unresolved";
+  const provenance: ProvenanceFields = {
+    sourceType: "code_graph_ingestion",
+    sourceId: ingestionId,
+    lineageStatus: "derived",
+    extractionMethod: "tree-sitter",
+    governanceStatus: "active",
+  };
+  return {
+    kind: "upsert_edge",
+    edge: {
+      typeKey: edge.edgeTypeKey,
+      id: edge.id,
+      sourceNode: { typeKey: sourceTypeKey, id: edge.sourceId },
+      targetNode: { typeKey: targetTypeKey, id: edge.targetId },
+      properties: edge.properties ?? {},
+      provenance,
+    },
+  };
 }

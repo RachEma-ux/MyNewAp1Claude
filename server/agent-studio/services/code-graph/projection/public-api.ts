@@ -5,6 +5,7 @@
 export {
   createCodeGraphProjection,
   type CodeGraphProjection,
+  type CodeGraphProjectionOptions,
   type ProjectCodeGraphInput,
   type ProjectCodeGraphResult,
 } from "./code-graph-projection.js";
