@@ -77,6 +77,7 @@ import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
 import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
+import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
 import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-router";
@@ -2926,6 +2927,13 @@ export const agentStudioRouter = router({
   // graphProjection because the lens snapshots include health-relevant
   // shapes (runtime / governance / runtime-error overlays).
   graphLens: graphLensRouter,
+  // PW Product Work items 18/19/20/21 (2026-05-17): graph-workspace
+  // tRPC surface. Wraps GraphRepository's localGraph/globalGraphSample/
+  // neighborhood/shortestPath/explainNode/explainPath + allow-listed
+  // impact_* template execution + backend health. Sole consumer is
+  // the new GraphWorkspacePage composition (vault explorer + editor +
+  // graph views + inspector + impact + state layer).
+  graphWorkspace: graphWorkspaceRouter,
   // V1+ Phase MR-1 Phase-2 (2026-05-15, PR-V1-156): region admin
   // surface — listActiveRegions, registerRegion, listPins, getPin,
   // setPin, removePin, getCacheStatus, getRewarmCronStatus.
