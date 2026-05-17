@@ -938,3 +938,159 @@ or T-I cross-cutting governance hardening. The plan's §6 PR
 sequencing recommendation favors T-D detection runtime as it
 unblocks T-F.4 quality-lens and closes the largest remaining
 strict-audit gap.
+
+## 22. T-D.3 Semantic Enrichment Agent operator surface (2026-05-17)
+
+Continues full-autonomous execution. Three additive PRs close the
+operator-facing tRPC surface for the Semantic Enrichment Agent
+(T-D.3). Mirrors the **completion-gap pattern** established by
+T-G.4 + T-G.5: the engine + store + proposer + evidence-collector
++ run lifecycle were already shipped (T-D.3.1–.3.5), but no
+operator dashboard could reach them — the tRPC mount was missing.
+
+### Ledger
+
+| # | PR | Slice | Surface added |
+|---|---|---|---|
+| 1 | #1430 | T-D.3.α | `agentStudio.semanticEnrichment.listKnownProposalKinds` |
+| 2 | #1431 | T-D.3.β | `agentStudio.semanticEnrichment.{listRecentRuns, getRunStats, listProposals}` |
+| 3 | #1432 | T-D.3.γ | `agentStudio.semanticEnrichment.listRecentRejectionsByKind` |
+
+(This PR is the closure receipt — docs-only, no procedure
+additions.)
+
+### Pre-flight discovery
+
+Same "completion gap" pattern as T-G.4 / T-G.5:
+
+| Layer | State before this arc |
+|---|---|
+| Contracts (5 closed-taxonomy proposal kinds + metadata) | ✓ shipped (T-D.3) |
+| Store (writes: beginRun + recordProposal + recordRejectedBelowThreshold + finishRun) | ✓ shipped (T-D.3.2) |
+| Evidence collector | ✓ shipped (T-D.3.3) |
+| Proposer (LLM-driven; OpenRouter Model Access boundary) | ✓ shipped (T-D.3.4) |
+| Agent runtime (composes the above into `run(input)`) | ✓ shipped (T-D.3.5) |
+| **Store (reads)** | **❌ missing — write-only API** |
+| **tRPC router mount** | **❌ missing — no operator-facing surface** |
+
+α + β + γ close the two missing layers. The store reads were
+co-shipped with their consuming procedures rather than in a
+separate slice, because the read API surface is small enough
+(3 methods) that fragmenting it added bookkeeping without value.
+
+### What ships
+
+**α — enumeration (closed taxonomy).** Single procedure
+`listKnownProposalKinds` returns the 5 closed-taxonomy values
+(`description_enrichment` / `missing_property_fill` /
+`stale_fact_refresh` / `entity_disambiguation` /
+`relationship_label_repair`) plus per-kind metadata (label +
+description + `requiresSourceCitation` flag). Mirrors the
+parameterless-enumeration pattern from T-G.2.γ / T-G.3.γ /
+T-G.4.α / T-G.5.α.
+
+**β — recent-runs + per-run drill-in.** Three procedures
+(`listRecentRuns` / `getRunStats` / `listProposals`) backed by
+three new `SemanticEnrichmentStore` read methods. List rows strip
+heavy JSON (`payload` / `sourceEvidence`) to avoid over-fetching
+in list views; future detail surfaces re-read with full JSON.
+`getRunStats` uses a discriminated envelope (`{ status: "ok" |
+"not_found", stats? }`) so stale dashboard links don't throw.
+
+**γ — rejection telemetry.** Single procedure
+`listRecentRejectionsByKind` cross-runs the most-recent N
+enrichment runs and flattens below-threshold rejections grouped
+by `(runId, proposalKind)`. Drives the "which kinds are
+most-often failing the confidence gate" operator panel — signal
+for confidence-threshold tuning + per-kind proposer improvement.
+Mirrors `securityGraph.listRecentRejectionsByReason` (T-G.3.ε)
+windowing + source-of-record-context pattern.
+
+### Hard-rule compliance (CLAUDE.md)
+
+All three PRs:
+
+- ✓ No `neo4j-driver` import. Semantic-enrichment is Postgres-
+  only (proposals + runs + decisions in ASDB); graph mutations
+  route through the existing T-D.4 approve-and-apply chain.
+- ✓ No `dispatchMcpToolCall` / `openrouter` / `credential-resolver`
+  imports in the router. Proposer's LLM calls remain isolated to
+  the proposer service (which routes through OpenRouter Model
+  Access per T-D.3 boundary).
+- ✓ No `process.env.*_API_KEY` reads.
+- ✓ `adminProcedure` floor preserved on every procedure (no
+  permission downgrade).
+- ✓ DB I/O routes through `createSemanticEnrichmentStore` — no
+  Drizzle imports in the router file.
+- ✓ Source-scan integrity test guards the mount key
+  (`semanticEnrichment: semanticEnrichmentRouter`) against silent
+  drift per `reference_tsconfig_excludes_hide_trpc_mount_drift`.
+
+### T-D acceptance status after this arc
+
+| Item | Status |
+|---|---|
+| Quality Agent runtime (10 scanners + scan-orchestrator + agent-run) | ✓ pre-shipped |
+| Correction-proposal pipeline (finding-to-proposal + payload builder) | ✓ pre-shipped |
+| Semantic Enrichment Agent runtime (T-D.3.1-.3.5) | ✓ pre-shipped |
+| **Semantic Enrichment operator-facing tRPC surface** | ✓ **(T-D.3.α/β/γ this arc — #1430-#1432)** |
+| Approve → SoT mutation → reproject chain (T-D.4) | ✓ pre-shipped |
+| Golden-question failure → correction-proposal hook (T-D.5) | ✓ pre-shipped |
+| Semantic Enrichment run-trigger mutation | **DEFERRED** (T-D.3.δ candidate — needs candidate-selection layer plumbed) |
+| Semantic Enrichment proposal detail surface (full payload + sourceEvidence) | **DEFERRED** (T-D.3.ε candidate — detail-view pattern) |
+
+### Sub-arc carry-forward lessons
+
+1. **The "completion gap" pattern recurs.** Three sub-systems
+   (T-G.4 recommendation, T-G.5 impact-analysis, T-D.3 semantic-
+   enrichment) all shipped their engine + persistence + run-lifecycle
+   layers without an operator-facing tRPC mount. The mount is
+   typically <50 LoC + a source-scan integrity test, and unblocks
+   dashboard work that would otherwise need to re-implement the
+   closed taxonomy client-side. **Pre-flight discovery saves
+   ~80% of the work** vs assuming the engine is missing.
+2. **Co-ship store reads with their consuming procedures.** When
+   a store is write-only and the read API is small (3 methods or
+   fewer), don't fragment into a separate "add reads" slice
+   followed by an "add procedures" slice — co-ship the read
+   methods + their procedures. The bookkeeping cost of two PRs
+   outweighs the slice-boundary benefit when neither slice
+   independently delivers operator value.
+3. **Cross-graph mirror precedent (t) keeps holding.** T-D.3.γ
+   rejection-telemetry shipped in <100 LoC because it mirrors
+   T-G.3.ε's windowing + source-context-attach pattern line-for-
+   line, substituting `runId/runStartedAt` for
+   `ingestionId/sourceKey`. Three sub-systems now ship the
+   rejection-telemetry shape; the cross-system uniformity makes
+   client-side composition uniform.
+4. **List rows MUST strip heavy JSON.** Operator dashboards
+   over-fetch when list views include `payload` / `sourceEvidence`
+   columns. The contract pattern: list rows are projection-only
+   (id + scalar fields + timestamps); detail surfaces re-read
+   with full JSON. T-D.3.β's `SemanticEnrichmentProposalListRow`
+   intentionally omits `payload` + `sourceEvidence` even though
+   they're present in the underlying table.
+5. **Discriminated envelopes for stale-link safety.** `getRunStats`
+   returns `{ status: "ok" | "not_found", stats? }` rather than
+   throwing on missing runId. Operators may click a stale
+   dashboard link to a pruned run; the discriminated envelope
+   gives the client a no-throw render path. Same pattern as
+   `codeGraph.getIngestionStats` / `securityGraph.getIngestionStats`.
+
+Recommendation: T-D.3 substantially closed at α + β + γ. Two
+remaining items are mutation-shaped and defer cleanly:
+  - **T-D.3.δ** — run-trigger mutation. Needs the candidate-
+    selection layer plumbed (typically nodes flagged "weak
+    description" by a graph-quality scanner). Mutation surface
+    needs governance review (operator-initiated runs vs
+    cron-initiated runs may share the agent but should differ in
+    governance audit attribution).
+  - **T-D.3.ε** — proposal detail surface. Pure read; should ship
+    when an operator dashboard component actually consumes it
+    (avoid pre-building YAGNI surfaces).
+
+Natural next pivots from this arc: T-F.4 Quality Lens UI (now
+that read surface is uniform across T-D.3 + graph-quality +
+graph-correction), T-I cross-cutting governance, or T-D.1
+quality-agent operator-trigger mutations (graph-quality service
+already has `agent-run.ts` runtime).
