@@ -103,18 +103,40 @@ export function BasesPanel() {
   const [renameBaseId, setRenameBaseId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>("");
   const [renameError, setRenameError] = useState<string | null>(null);
-  function openRenameEditor(baseId: number, currentName: string) {
-    setRenameBaseId(baseId);
-    setRenameDraft(currentName);
+  // T-F.116 (T-F.2-a.4-narrow): closeAllRowEdits refactor (lesson 65
+  // trigger at N=5 row-mutation slices). Centralises the cross-
+  // clear that every open* helper performs so adding the 6th
+  // mutation slice doesn't grow each helper by another 2 setStates.
+  // Resets the 5 mutation-input slices only — does NOT touch
+  // expandedBaseId (detail-expand is inspection state — lesson 69
+  // independence) and does NOT touch previewBaseId /
+  // openPreviewNoteId / shareError* (preview is also inspection,
+  // share error is per-row mutation-side-effect, both orthogonal
+  // to the row-edit one-of-N invariant). Whether to ALSO clear
+  // expandedBaseId stays in the caller (rename + delete clear it;
+  // filter/sort/columns editors don't because they live INSIDE
+  // the detail expansion).
+  function closeAllRowEdits() {
+    setRenameBaseId(null);
+    setRenameDraft("");
     setRenameError(null);
-    setExpandedBaseId(null);
     setConfirmDeleteBaseId(null);
+    setDeleteError(null);
     setFilterEditBaseId(null);
     setFilterEditDraft("");
+    setFilterEditError(null);
     setSortEditBaseId(null);
     setSortEditDraft("");
+    setSortEditError(null);
     setColumnsEditBaseId(null);
     setColumnsEditDraft("");
+    setColumnsEditError(null);
+  }
+  function openRenameEditor(baseId: number, currentName: string) {
+    closeAllRowEdits();
+    setExpandedBaseId(null);
+    setRenameBaseId(baseId);
+    setRenameDraft(currentName);
   }
   function closeRenameEditor() {
     setRenameBaseId(null);
@@ -131,17 +153,9 @@ export function BasesPanel() {
   >(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   function openDeleteConfirm(baseId: number) {
-    setConfirmDeleteBaseId(baseId);
-    setDeleteError(null);
-    setRenameBaseId(null);
-    setRenameDraft("");
+    closeAllRowEdits();
     setExpandedBaseId(null);
-    setFilterEditBaseId(null);
-    setFilterEditDraft("");
-    setSortEditBaseId(null);
-    setSortEditDraft("");
-    setColumnsEditBaseId(null);
-    setColumnsEditDraft("");
+    setConfirmDeleteBaseId(baseId);
   }
   function closeDeleteConfirm() {
     setConfirmDeleteBaseId(null);
@@ -233,16 +247,9 @@ export function BasesPanel() {
   const [filterEditDraft, setFilterEditDraft] = useState<string>("");
   const [filterEditError, setFilterEditError] = useState<string | null>(null);
   function openFilterEditor(baseId: number, currentJson: string) {
+    closeAllRowEdits();
     setFilterEditBaseId(baseId);
     setFilterEditDraft(currentJson);
-    setFilterEditError(null);
-    setRenameBaseId(null);
-    setRenameDraft("");
-    setConfirmDeleteBaseId(null);
-    setSortEditBaseId(null);
-    setSortEditDraft("");
-    setColumnsEditBaseId(null);
-    setColumnsEditDraft("");
   }
   function closeFilterEditor() {
     setFilterEditBaseId(null);
@@ -269,16 +276,9 @@ export function BasesPanel() {
     null,
   );
   function openSortEditor(baseId: number, currentJson: string) {
+    closeAllRowEdits();
     setSortEditBaseId(baseId);
     setSortEditDraft(currentJson);
-    setSortEditError(null);
-    setRenameBaseId(null);
-    setRenameDraft("");
-    setConfirmDeleteBaseId(null);
-    setFilterEditBaseId(null);
-    setFilterEditDraft("");
-    setColumnsEditBaseId(null);
-    setColumnsEditDraft("");
   }
   function closeSortEditor() {
     setSortEditBaseId(null);
@@ -286,16 +286,9 @@ export function BasesPanel() {
     setSortEditError(null);
   }
   function openColumnsEditor(baseId: number, currentJson: string) {
+    closeAllRowEdits();
     setColumnsEditBaseId(baseId);
     setColumnsEditDraft(currentJson);
-    setColumnsEditError(null);
-    setRenameBaseId(null);
-    setRenameDraft("");
-    setConfirmDeleteBaseId(null);
-    setFilterEditBaseId(null);
-    setFilterEditDraft("");
-    setSortEditBaseId(null);
-    setSortEditDraft("");
   }
   function closeColumnsEditor() {
     setColumnsEditBaseId(null);

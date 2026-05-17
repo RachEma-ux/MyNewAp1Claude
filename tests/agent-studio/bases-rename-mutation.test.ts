@@ -47,9 +47,15 @@ describe("Bases per-row rename ε-slice (T-F.95 / T-F.2-ε)", () => {
   });
 
   it("openRenameEditor pre-populates the draft with the current name + clears expandedBaseId for mutual exclusion", () => {
+    // T-F.116 refactor: cross-clears moved into closeAllRowEdits()
+    // helper. The open*() helpers now: call closeAllRowEdits(),
+    // clear expandedBaseId (rename + delete clear it; nested
+    // editors don't), then set the slice's own state. The
+    // pre-populate + expand-clear invariants live on regardless
+    // of the cross-clear factoring.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openRenameEditor[\s\S]{0,500}setRenameBaseId\(baseId\)[\s\S]{0,200}setRenameDraft\(currentName\)[\s\S]{0,200}setRenameError\(null\)[\s\S]{0,200}setExpandedBaseId\(null\)/,
+      /function\s+openRenameEditor[\s\S]{0,400}closeAllRowEdits\(\)[\s\S]{0,300}setExpandedBaseId\(null\)[\s\S]{0,300}setRenameBaseId\(baseId\)[\s\S]{0,150}setRenameDraft\(currentName\)/,
     );
     expect(src).toMatch(
       /function\s+closeRenameEditor[\s\S]{0,200}setRenameBaseId\(null\)[\s\S]{0,80}setRenameDraft\(""\)/,
