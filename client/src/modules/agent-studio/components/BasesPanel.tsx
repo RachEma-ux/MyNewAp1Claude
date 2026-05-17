@@ -1875,6 +1875,30 @@ function FilterConditionsSummary({
     setEditingIdx(null);
   }
 
+  // T-F.123 (T-F.2-γ-polish ε): datetime-local <-> ISO conversion
+  // helpers for the updatedAt input. addValue stays canonical
+  // ISO-8601 internally (what buildConditionFromForm consumes and
+  // openEditCondition pre-fills with); the input value is the
+  // local-time "YYYY-MM-DDTHH:mm" string the browser's
+  // datetime-local control wants.
+  //
+  // Returns empty string on invalid input so the operator can clear
+  // the field. The Zod schema's `.datetime()` rejection at submit-
+  // time handles other malformed cases.
+  function isoToLocalInputValue(iso: string): string {
+    if (iso === "") return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number): string => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function localInputValueToIso(local: string): string {
+    if (local === "") return "";
+    const d = new Date(local);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString();
+  }
+
   return (
     <div
       className="space-y-1 rounded border border-border bg-muted/20 px-2 py-1"
@@ -1968,16 +1992,36 @@ function FilterConditionsSummary({
                 Number input gives mobile number-pad + browser-level
                 non-numeric rejection before buildConditionFromForm
                 runs. min=1 + step=1 match the FolderIdEqSchema
-                contract (`z.number().int().positive()`). Other 4
-                variants keep text input — datetime-local and
-                multi-token chips ship as separate polish slices. */}
+                contract (`z.number().int().positive()`).
+                T-F.123 (T-F.2-γ-polish ε): type-aware updatedAt
+                datetime-local input. addValue stays canonical ISO
+                internally; the input value is the local-time
+                "YYYY-MM-DDTHH:mm" string the browser wants —
+                converted via the helpers above. Other 3 variants
+                (slug / title / governanceStatus) stay text. */}
             <input
-              type={addField === "folderId" ? "number" : "text"}
+              type={
+                addField === "folderId"
+                  ? "number"
+                  : addField === "updatedAt"
+                    ? "datetime-local"
+                    : "text"
+              }
               min={addField === "folderId" ? 1 : undefined}
               step={addField === "folderId" ? 1 : undefined}
               className="rounded border border-border bg-background px-1 py-0.5 font-mono"
-              value={addValue}
-              onChange={(e) => setAddValue(e.target.value)}
+              value={
+                addField === "updatedAt"
+                  ? isoToLocalInputValue(addValue)
+                  : addValue
+              }
+              onChange={(e) =>
+                setAddValue(
+                  addField === "updatedAt"
+                    ? localInputValueToIso(e.target.value)
+                    : e.target.value,
+                )
+              }
               placeholder={
                 addField === "folderId"
                   ? "positive integer"

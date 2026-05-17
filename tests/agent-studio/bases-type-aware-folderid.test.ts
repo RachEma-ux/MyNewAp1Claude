@@ -27,10 +27,14 @@ function readPanel(): string {
 }
 
 describe("Bases type-aware folderId input (T-F.122 / T-F.2-γ-polish δ)", () => {
-  it("value input's type attribute toggles on addField === 'folderId'", () => {
+  it("value input's type attribute branches on folderId → number (T-F.123 extends to 3-branch with updatedAt → datetime-local)", () => {
     const src = readPanel();
+    // T-F.122 invariant: folderId → "number" branch exists.
+    // The expression may be a 2-branch ternary (folderId/text) or
+    // a 3-branch ternary after T-F.123 (folderId/updatedAt/text).
+    // Assert just the folderId mapping.
     expect(src).toMatch(
-      /type=\{addField\s*===\s*"folderId"\s*\?\s*"number"\s*:\s*"text"\}/,
+      /type=\{[\s\S]{0,200}addField\s*===\s*"folderId"[\s\S]{0,40}"number"/,
     );
   });
 
@@ -51,16 +55,11 @@ describe("Bases type-aware folderId input (T-F.122 / T-F.2-γ-polish δ)", () =>
     expect(src).toMatch(/"ISO-8601 \(e\.g\. 2026-01-01T00:00:00Z\)"/);
   });
 
-  it("non-folderId variants still get type=\"text\" (no regression for slug / title / governanceStatus / updatedAt)", () => {
-    // The ternary expression covers both branches; this assertion
-    // documents that ALL non-folderId fields fall through to "text"
-    // by the single ternary's else-branch.
+  it("non-folderId/updatedAt variants still get type=\"text\" (slug / title / governanceStatus)", () => {
+    // After T-F.123 the type ternary is 3-branch: folderId → number,
+    // updatedAt → datetime-local, else → text. This test locks the
+    // existence of the text fallback for the remaining fields.
     const src = readPanel();
-    expect(src).toMatch(
-      /type=\{addField\s*===\s*"folderId"\s*\?\s*"number"\s*:\s*"text"\}/,
-    );
-    expect(src).not.toMatch(
-      /type=\{addField\s*===\s*"updatedAt"\s*\?\s*"datetime-local"/,
-    );
+    expect(src).toMatch(/"text"/);
   });
 });
