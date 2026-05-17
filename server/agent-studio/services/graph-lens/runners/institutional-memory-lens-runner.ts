@@ -193,6 +193,27 @@ export interface InstitutionalMemoryLensTimelineEventRow {
   readonly meta: Record<string, unknown> | null;
 }
 
+/**
+ * Document row — seventh projector-backed institutional memory node
+ * type (T-G.1.η). Emits `inst_document` typeKey nodes mapped from the
+ * existing `ags_vault_notes` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.document` ("Vault notes are
+ * institutional documents."). The reader is responsible for
+ * permission-scoping notes to the viewer's accessible vaults; the
+ * runner relies on that boundary.
+ */
+export interface InstitutionalMemoryLensDocumentRow {
+  readonly id: number;
+  readonly vaultId: number;
+  readonly title: string;
+  readonly slug: string;
+  readonly governanceStatus: string;
+  readonly currentVersionId: number | null;
+  readonly createdByUserId: number | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
@@ -208,6 +229,8 @@ export interface InstitutionalMemoryLensReadResult {
   readonly outcomes?: ReadonlyArray<InstitutionalMemoryLensOutcomeRow>;
   /** T-G.1.ζ — optional projector-backed timeline event reads. */
   readonly timelineEvents?: ReadonlyArray<InstitutionalMemoryLensTimelineEventRow>;
+  /** T-G.1.η — optional projector-backed document (vault note) reads. */
+  readonly documents?: ReadonlyArray<InstitutionalMemoryLensDocumentRow>;
   readonly truncated: boolean;
 }
 
@@ -272,6 +295,7 @@ const PROJECT_NODE_PREFIX = "project:";
 const DECISION_NODE_PREFIX = "decision:";
 const OUTCOME_NODE_PREFIX = "outcome:";
 const TIMELINE_EVENT_NODE_PREFIX = "timeline_event:";
+const DOCUMENT_NODE_PREFIX = "document:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -511,6 +535,32 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_timeline_event", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const doc of read.documents ?? []) {
+    const id = `${DOCUMENT_NODE_PREFIX}${doc.id}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_document",
+        id,
+        visible: true,
+        label: doc.title,
+        meta: {
+          documentId: doc.id,
+          vaultId: doc.vaultId,
+          title: doc.title,
+          slug: doc.slug,
+          governanceStatus: doc.governanceStatus,
+          currentVersionId: doc.currentVersionId,
+          createdByUserId: doc.createdByUserId,
+          createdAt: doc.createdAt.toISOString(),
+          updatedAt: doc.updatedAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_document", id, visible: false });
       hiddenNodeCount += 1;
     }
   }
