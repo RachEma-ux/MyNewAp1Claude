@@ -90,9 +90,12 @@ describe("T-E.1 — Code Graph Parser Spike boundary", () => {
     expect(src).toMatch(/from\s+["']tree-sitter-typescript["']/);
   });
 
-  it("Source-scan: no tree-sitter import outside the spike tree (anywhere in server/ or client/src/)", () => {
+  it("Source-scan: tree-sitter imports stay inside the allowlist (spike + production parser)", () => {
     // Walk only the agent-studio + client surfaces so the test stays
-    // bounded; tree-sitter is the spike-only dep.
+    // bounded. Allowlist (post-T-G.2.2):
+    //   - `services/code-graph/spike/**` (frozen T-E measurement reference)
+    //   - `services/code-graph/parser/**` (production graduation per T-G.2.2,
+    //     scoped to the single sibling file `tree-sitter-emitter.ts`)
     const surfaces = [
       resolve(repoRoot, "server/agent-studio"),
       resolve(repoRoot, "client/src"),
@@ -103,6 +106,7 @@ describe("T-E.1 — Code Graph Parser Spike boundary", () => {
       for (const f of walk(surface)) {
         if (!/\.(ts|tsx|js)$/.test(f)) continue;
         if (f.includes("/code-graph/spike/")) continue;
+        if (f.includes("/code-graph/parser/")) continue;
         const src = readFileSync(f, "utf8");
         if (/from\s+["']tree-sitter/.test(src)) offenders.push(f);
       }
