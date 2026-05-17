@@ -49,8 +49,10 @@ import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
   createSecurityGraphStore,
+  type SecurityGraphEdge,
   type SecurityGraphIngestionListRow,
   type SecurityGraphIngestionStats,
+  type SecurityGraphNode,
 } from "./persistence/public-api.js";
 
 // ============================================================================
@@ -67,12 +69,26 @@ const GetIngestionStatsInput = z.object({
   ingestionId: z.string().min(1).max(255),
 });
 
+const ListIngestionNodesInput = z.object({
+  ingestionId: z.string().min(1).max(255),
+  typeKey: z.string().min(1).max(50).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+});
+
+const ListIngestionEdgesInput = z.object({
+  ingestionId: z.string().min(1).max(255),
+  edgeTypeKey: z.string().min(1).max(50).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+});
+
 // ============================================================================
 // Defaults
 // ============================================================================
 
 export const SECURITY_GRAPH_LIST_INGESTIONS_DEFAULT_LIMIT = 50;
 export const SECURITY_GRAPH_LIST_INGESTIONS_ABSOLUTE_LIMIT = 200;
+export const SECURITY_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
+export const SECURITY_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
 
 // ============================================================================
 // Output envelopes
@@ -85,6 +101,14 @@ export interface SecurityGraphListIngestionsEnvelope {
 export type SecurityGraphGetIngestionStatsEnvelope =
   | { readonly status: "ok"; readonly stats: SecurityGraphIngestionStats }
   | { readonly status: "not_found"; readonly ingestionId: string };
+
+export type SecurityGraphListIngestionNodesEnvelope =
+  | { readonly status: "ok"; readonly nodes: ReadonlyArray<SecurityGraphNode> }
+  | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
+
+export type SecurityGraphListIngestionEdgesEnvelope =
+  | { readonly status: "ok"; readonly edges: ReadonlyArray<SecurityGraphEdge> }
+  | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
 
 // ============================================================================
 // Router
@@ -134,6 +158,66 @@ export const securityGraphRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message:
               err instanceof Error ? err.message : "getIngestionStats failed",
+          });
+        }
+      },
+    ),
+
+  listIngestionNodes: adminProcedure
+    .input(ListIngestionNodesInput)
+    .query(
+      async ({ input }): Promise<SecurityGraphListIngestionNodesEnvelope> => {
+        const limit = input.limit ?? SECURITY_GRAPH_DRILL_IN_DEFAULT_LIMIT;
+        try {
+          const store = createSecurityGraphStore();
+          const stats = await store.getIngestionStats(input.ingestionId);
+          if (stats === null) {
+            return {
+              status: "ingestion_not_found",
+              ingestionId: input.ingestionId,
+            };
+          }
+          const nodes = await store.listIngestionNodes({
+            ingestionId: input.ingestionId,
+            typeKey: input.typeKey,
+            limit,
+          });
+          return { status: "ok", nodes };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listIngestionNodes failed",
+          });
+        }
+      },
+    ),
+
+  listIngestionEdges: adminProcedure
+    .input(ListIngestionEdgesInput)
+    .query(
+      async ({ input }): Promise<SecurityGraphListIngestionEdgesEnvelope> => {
+        const limit = input.limit ?? SECURITY_GRAPH_DRILL_IN_DEFAULT_LIMIT;
+        try {
+          const store = createSecurityGraphStore();
+          const stats = await store.getIngestionStats(input.ingestionId);
+          if (stats === null) {
+            return {
+              status: "ingestion_not_found",
+              ingestionId: input.ingestionId,
+            };
+          }
+          const edges = await store.listIngestionEdges({
+            ingestionId: input.ingestionId,
+            edgeTypeKey: input.edgeTypeKey,
+            limit,
+          });
+          return { status: "ok", edges };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listIngestionEdges failed",
           });
         }
       },
