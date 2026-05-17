@@ -95,9 +95,9 @@ If the spike target meets these, scale to `server/agent-studio/services/` (~120 
 | PR | Scope |
 |---|---|
 | T-E.1 (#990) | This document + decision tree + boundary placeholder + 1-test source-scan |
-| T-E.2 (this PR) | Tree-sitter dep add + 1 emitter (`parse-ts-file.ts`, strict-subset node/edge model per §3) + sample-ingest orchestrator (`run-sample-ingest.ts`) targeting `services/extensions/` per §2; 16-assertion source-scan test (`code-graph-spike-parse-ts-file.test.ts`) locking emitter + sample-ingest + dep wiring; spike-boundary test extended to assert tree-sitter imports live inside the spike tree |
-| T-E.3 | Performance measurement + reporting + decision recorded — runs `aggregate()` exported by T-E.2's sample-ingest, captures p50/p95 against §4 targets, commits the result as a measurement-run doc |
-| T-E.4 | (Conditional on T-E.3 outcome) Either: full repo ingest → handoff to T-G.2 ; OR: spike-failed addendum + Phase 25 scope reduction recommendation |
+| T-E.2 (#1363) | Tree-sitter dep add + 1 emitter (`parse-ts-file.ts`, strict-subset node/edge model per §3) + sample-ingest orchestrator (`run-sample-ingest.ts`) targeting `services/extensions/` per §2; 16-assertion source-scan test (`code-graph-spike-parse-ts-file.test.ts`) locking emitter + sample-ingest + dep wiring; spike-boundary test extended to assert tree-sitter imports live inside the spike tree |
+| T-E.3 (this PR) | Parse-time performance measurement (§4 parse-time gates only — projection-time + Neo4j-CE-query-latency gates deferred to T-E.4 because they need Neo4j CE in CI service containers). Measurement test `code-graph-spike-perf-measurement.test.ts` calls T-E.2's `aggregate()` against `services/extensions/`, asserts per-file p95 < 50 ms + total < 5000 ms, logs `[T-E.3]`-tagged metrics to stdout. Decision-recorded doc `agent-studio-code-graph-parser-spike-measurement-2026-05-17.md` names the test as evidence locator + lays out the 3-outcome decision tree (A: both halves PASS / B: parse-only PASS / C: parse FAIL) that T-E.4 picks from. |
+| T-E.4 | (Conditional on T-E.3 outcome) Either: projection + query-latency measurement against Neo4j CE → handoff to T-G.2 ; OR: spike-failed addendum + Phase 25 scope reduction recommendation per the §4 fallback options |
 
 ---
 
