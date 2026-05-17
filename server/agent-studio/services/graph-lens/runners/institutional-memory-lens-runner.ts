@@ -161,6 +161,38 @@ export interface InstitutionalMemoryLensOutcomeRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Timeline event row — sixth projector-backed institutional memory
+ * node type (T-G.1.ζ). Emits `inst_timeline_event` typeKey nodes
+ * mapped from `ags_runtime_runs` per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.timeline_event`.
+ *
+ * The source-mapping note observes that "the lens-runner unions
+ * multiple tables (approval_steps, vault_versions, governance_records)
+ * into the timeline; the primary mapping here is the largest." The
+ * read row therefore carries a `sourceKind` discriminator so future
+ * additive reads can union into the same `timelineEvents?:` slot
+ * without breaking the typeKey contract — operators read all timeline
+ * events through one shape, but each event remembers where it came
+ * from.
+ */
+export interface InstitutionalMemoryLensTimelineEventRow {
+  readonly id: number;
+  /** Discriminator — which source table the event was derived from. */
+  readonly sourceKind:
+    | "runtime_run"
+    | "approval_step"
+    | "vault_version"
+    | "governance_record";
+  /** Temporal anchor — usually `createdAt` from the source row. */
+  readonly occurredAt: Date;
+  /** Pre-rendered display label; reader composes from source columns. */
+  readonly label: string;
+  /** Optional opaque meta — reader includes any source-specific fields
+   * useful for drill-in. */
+  readonly meta: Record<string, unknown> | null;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
@@ -174,6 +206,8 @@ export interface InstitutionalMemoryLensReadResult {
   readonly decisions?: ReadonlyArray<InstitutionalMemoryLensDecisionRow>;
   /** T-G.1.ε — optional projector-backed outcome (runtime run) reads. */
   readonly outcomes?: ReadonlyArray<InstitutionalMemoryLensOutcomeRow>;
+  /** T-G.1.ζ — optional projector-backed timeline event reads. */
+  readonly timelineEvents?: ReadonlyArray<InstitutionalMemoryLensTimelineEventRow>;
   readonly truncated: boolean;
 }
 
@@ -237,6 +271,7 @@ const PERSON_NODE_PREFIX = "person:";
 const PROJECT_NODE_PREFIX = "project:";
 const DECISION_NODE_PREFIX = "decision:";
 const OUTCOME_NODE_PREFIX = "outcome:";
+const TIMELINE_EVENT_NODE_PREFIX = "timeline_event:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -452,6 +487,30 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_outcome", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const ev of read.timelineEvents ?? []) {
+    // Node id includes sourceKind so unioned reads (runtime_run +
+    // approval_step + vault_version + governance_record) never
+    // collide on raw numeric id across tables.
+    const id = `${TIMELINE_EVENT_NODE_PREFIX}${ev.sourceKind}:${ev.id}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_timeline_event",
+        id,
+        visible: true,
+        label: ev.label,
+        meta: {
+          eventId: ev.id,
+          sourceKind: ev.sourceKind,
+          occurredAt: ev.occurredAt.toISOString(),
+          ...(ev.meta ?? {}),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_timeline_event", id, visible: false });
       hiddenNodeCount += 1;
     }
   }

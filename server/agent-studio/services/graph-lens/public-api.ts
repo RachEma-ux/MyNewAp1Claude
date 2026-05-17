@@ -324,6 +324,7 @@ export {
   type InstitutionalMemoryLensProjectRow,
   type InstitutionalMemoryLensDecisionRow,
   type InstitutionalMemoryLensOutcomeRow,
+  type InstitutionalMemoryLensTimelineEventRow,
 } from "./runners/institutional-memory-lens-runner.js";
 
 export {
