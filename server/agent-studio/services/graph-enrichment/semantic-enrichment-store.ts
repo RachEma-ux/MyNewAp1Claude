@@ -25,7 +25,7 @@
  *     Reads aren't part of this store's contract.
  */
 
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import {
   agsSemanticEnrichmentRuns,
@@ -41,6 +41,55 @@ const SEMANTIC_ENRICHMENT_AGENT_KEY = "semantic_enrichment_agent";
 
 const PROPOSAL_STATUS_PENDING = "pending";
 const PROPOSAL_STATUS_REJECTED_BELOW_THRESHOLD = "rejected_below_threshold";
+
+/**
+ * Operator-facing list row for `agsSemanticEnrichmentRuns`. Same
+ * shape as the row but typed to TS primitives + nullable timestamps.
+ * Used by `listRecentRuns` (T-D.3.β).
+ */
+export interface SemanticEnrichmentRunListRow {
+  readonly id: number;
+  readonly agentKey: string;
+  readonly status: string;
+  readonly proposalsCreated: number;
+  readonly startedAt: Date | null;
+  readonly completedAt: Date | null;
+  readonly createdAt: Date;
+}
+
+/**
+ * Operator-facing list row for `agsSemanticEnrichmentProposals`.
+ * Strips the heavy `payload` / `sourceEvidence` JSON for list views;
+ * detail surfaces (not yet built) re-read with the full JSON. Used
+ * by `listProposals` (T-D.3.β).
+ */
+export interface SemanticEnrichmentProposalListRow {
+  readonly id: number;
+  readonly runId: number | null;
+  readonly proposalKind: string;
+  readonly targetTypeKey: string | null;
+  readonly targetId: number | null;
+  readonly confidence: string | null;
+  readonly status: string;
+  readonly createdAt: Date;
+}
+
+/**
+ * Aggregate stats for one enrichment run. Used by `getRunStats`
+ * (T-D.3.β) to drive the per-run drill-in.
+ */
+export interface SemanticEnrichmentRunStats {
+  readonly runId: number;
+  readonly proposalCount: number;
+  readonly proposalsByKind: ReadonlyArray<{
+    readonly proposalKind: string;
+    readonly count: number;
+  }>;
+  readonly proposalsByStatus: ReadonlyArray<{
+    readonly status: string;
+    readonly count: number;
+  }>;
+}
 
 export interface SemanticEnrichmentStore {
   beginRun(
@@ -66,6 +115,21 @@ export interface SemanticEnrichmentStore {
       readonly completedAt: Date;
     },
   ): Promise<void>;
+
+  /**
+   * T-D.3.β read methods. Operator dashboard surfaces.
+   */
+  listRecentRuns(
+    limit: number,
+  ): Promise<ReadonlyArray<SemanticEnrichmentRunListRow>>;
+
+  getRunStats(runId: number): Promise<SemanticEnrichmentRunStats | null>;
+
+  listProposals(input: {
+    readonly runId: number;
+    readonly status?: string;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<SemanticEnrichmentProposalListRow>>;
 }
 
 export interface CreateSemanticEnrichmentStoreOptions {
@@ -170,6 +234,127 @@ export function createSemanticEnrichmentStore(
           status: summary.status,
         })
         .where(eq(agsSemanticEnrichmentRuns.id, runId));
+    },
+
+    async listRecentRuns(limit) {
+      const db = requireDb(options.db);
+      const rows = await db
+        .select()
+        .from(agsSemanticEnrichmentRuns)
+        .orderBy(desc(agsSemanticEnrichmentRuns.createdAt))
+        .limit(limit);
+      return rows.map(
+        (r: typeof agsSemanticEnrichmentRuns.$inferSelect) => ({
+          id: r.id,
+          agentKey: r.agentKey,
+          status: r.status,
+          proposalsCreated: r.proposalsCreated ?? 0,
+          startedAt: r.startedAt,
+          completedAt: r.completedAt,
+          createdAt: r.createdAt,
+        }),
+      );
+    },
+
+    async getRunStats(runId) {
+      const db = requireDb(options.db);
+      const runRows = await db
+        .select({ id: agsSemanticEnrichmentRuns.id })
+        .from(agsSemanticEnrichmentRuns)
+        .where(eq(agsSemanticEnrichmentRuns.id, runId))
+        .limit(1);
+      if (runRows.length === 0) return null;
+
+      const byKind = await db
+        .select({
+          proposalKind: agsSemanticEnrichmentProposals.proposalKind,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsSemanticEnrichmentProposals)
+        .where(eq(agsSemanticEnrichmentProposals.runId, runId))
+        .groupBy(agsSemanticEnrichmentProposals.proposalKind);
+
+      const byStatus = await db
+        .select({
+          status: agsSemanticEnrichmentProposals.status,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsSemanticEnrichmentProposals)
+        .where(eq(agsSemanticEnrichmentProposals.runId, runId))
+        .groupBy(agsSemanticEnrichmentProposals.status);
+
+      const proposalCount = byKind.reduce(
+        (a: number, r: { count: number }) => a + Number(r.count),
+        0,
+      );
+
+      return {
+        runId,
+        proposalCount,
+        proposalsByKind: byKind
+          .map((r: { proposalKind: string; count: number }) => ({
+            proposalKind: r.proposalKind,
+            count: Number(r.count),
+          }))
+          .sort(
+            (a: { count: number }, b: { count: number }) => b.count - a.count,
+          ),
+        proposalsByStatus: byStatus
+          .map((r: { status: string; count: number }) => ({
+            status: r.status,
+            count: Number(r.count),
+          }))
+          .sort(
+            (a: { count: number }, b: { count: number }) => b.count - a.count,
+          ),
+      };
+    },
+
+    async listProposals(input) {
+      const db = requireDb(options.db);
+      const whereClause =
+        input.status !== undefined
+          ? and(
+              eq(agsSemanticEnrichmentProposals.runId, input.runId),
+              eq(agsSemanticEnrichmentProposals.status, input.status),
+            )
+          : eq(agsSemanticEnrichmentProposals.runId, input.runId);
+      const rows = await db
+        .select({
+          id: agsSemanticEnrichmentProposals.id,
+          runId: agsSemanticEnrichmentProposals.runId,
+          proposalKind: agsSemanticEnrichmentProposals.proposalKind,
+          targetTypeKey: agsSemanticEnrichmentProposals.targetTypeKey,
+          targetId: agsSemanticEnrichmentProposals.targetId,
+          confidence: agsSemanticEnrichmentProposals.confidence,
+          status: agsSemanticEnrichmentProposals.status,
+          createdAt: agsSemanticEnrichmentProposals.createdAt,
+        })
+        .from(agsSemanticEnrichmentProposals)
+        .where(whereClause)
+        .orderBy(desc(agsSemanticEnrichmentProposals.createdAt))
+        .limit(input.limit);
+      return rows.map(
+        (r: {
+          id: number;
+          runId: number | null;
+          proposalKind: string;
+          targetTypeKey: string | null;
+          targetId: number | null;
+          confidence: string | null;
+          status: string;
+          createdAt: Date;
+        }) => ({
+          id: r.id,
+          runId: r.runId,
+          proposalKind: r.proposalKind,
+          targetTypeKey: r.targetTypeKey,
+          targetId: r.targetId,
+          confidence: r.confidence,
+          status: r.status,
+          createdAt: r.createdAt,
+        }),
+      );
     },
   };
 }

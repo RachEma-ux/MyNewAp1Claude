@@ -32,6 +32,9 @@ export {
   createSemanticEnrichmentStore,
   type SemanticEnrichmentStore,
   type CreateSemanticEnrichmentStoreOptions,
+  type SemanticEnrichmentRunListRow,
+  type SemanticEnrichmentProposalListRow,
+  type SemanticEnrichmentRunStats,
 } from "./semantic-enrichment-store.js";
 
 export {
