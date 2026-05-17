@@ -77,6 +77,7 @@ import { graphCorrectionRouter } from "../services/graph-correction/router";
 import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
 import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
+import { impactAnalysisRouter } from "../services/graph-lens/impact-analysis-router";
 import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
@@ -2988,6 +2989,12 @@ export const agentStudioRouter = router({
   // T-G.4 / T-G.4.1 / T-G.4.2. This is the missing tRPC mount so the
   // operator dashboard can call recommend().
   recommendation: recommendationRouter,
+  // Native Graph Workspace Phase 25 T-G.5.α: Impact Analysis Lens
+  // operator-facing read-only surface — listKnownKinds + summarizeResult
+  // (pure aggregator wrapper around T-F.10 summarizeImpactAnalysisResult).
+  // Contracts shipped at T-F.3. The actual traversal executor is
+  // deferred to a future T-G.5.β slice (needs Cypher-template review).
+  impactAnalysis: impactAnalysisRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
