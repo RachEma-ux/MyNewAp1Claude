@@ -92,12 +92,53 @@ const RecommendInput = z.object({
   minConfidence: z.number().min(0).max(1).optional(),
 });
 
+const RecommendBatchInput = z.object({
+  /** One or more closed-taxonomy kinds. Each kind runs as an
+   *  independent recommend() against the same anchor + workspace,
+   *  in parallel. Deduped before dispatch. */
+  kinds: z
+    .array(z.enum(RECOMMENDATION_KINDS))
+    .min(1)
+    .max(RECOMMENDATION_KINDS.length),
+  anchor: z.object({
+    typeKey: z.string().min(1).max(120),
+    id: z.string().min(1).max(512),
+  }),
+  workspaceId: z.number().int().positive(),
+  limit: z.number().int().positive().max(100).optional(),
+  minConfidence: z.number().min(0).max(1).optional(),
+});
+
 // ============================================================================
 // Output envelopes
 // ============================================================================
 
 export type RecommendEnvelope =
   | { readonly status: "ok"; readonly response: RecommendationResponse }
+  | { readonly status: "graphrag_unavailable" };
+
+/**
+ * Per-kind result inside the batch envelope. The `status`
+ * discriminator is per-kind because GraphRAG availability can vary
+ * by call — even with the lazy router shared across the batch, a
+ * future per-kind kindMapper change might fail in a specific way.
+ * Today only `ok` is returned by the engine when the lazy router
+ * resolves; the schema is future-proofed.
+ */
+export interface BatchKindResult {
+  readonly kind: RecommendationKind;
+  readonly status: "ok" | "error";
+  /** Present when status === "ok". */
+  readonly response?: RecommendationResponse;
+  /** Present when status === "error" — error message string. */
+  readonly errorMessage?: string;
+}
+
+export type RecommendBatchEnvelope =
+  | {
+      readonly status: "ok";
+      readonly results: ReadonlyArray<BatchKindResult>;
+    }
   | { readonly status: "graphrag_unavailable" };
 
 export interface ListKnownKindsEnvelope {
@@ -157,6 +198,73 @@ export const recommendationRouter = router({
           message: err instanceof Error ? err.message : "recommend failed",
         });
       }
+    }),
+
+  /**
+   * Multi-kind recommend in one round-trip — for dashboard surfaces
+   * that render N kinds in parallel panels. Constructs the
+   * GraphRetrievalRouter + service once, then fan-outs the per-kind
+   * `service.recommend(...)` calls via `Promise.all`. Deduplicates
+   * input kinds; preserves request order in the response.
+   *
+   * Per-kind failures don't abort the batch — each kind has its own
+   * `status: "ok" | "error"` discriminator so the dashboard can
+   * render partial success. This matches the
+   * "permission-classify-everything" stance of the Recommendation
+   * Service: visibility of which kinds succeeded vs failed is more
+   * actionable than an opaque whole-batch reject.
+   */
+  recommendBatch: adminProcedure
+    .input(RecommendBatchInput)
+    .query(async ({ input }): Promise<RecommendBatchEnvelope> => {
+      let graphRouter: GraphRetrievalRouter;
+      try {
+        graphRouter = new GraphRetrievalRouter(getGraphRepository());
+      } catch {
+        return { status: "graphrag_unavailable" };
+      }
+      const fetchCandidates = createGraphRagCandidateFetcher({
+        router: graphRouter,
+      });
+      const service = createRecommendationService({ fetchCandidates });
+      // Preserve request order; dedupe via Set so the dashboard's
+      // panel order survives even if the caller passes duplicates.
+      const seen = new Set<RecommendationKind>();
+      const orderedKinds: RecommendationKind[] = [];
+      for (const k of input.kinds) {
+        if (!seen.has(k)) {
+          seen.add(k);
+          orderedKinds.push(k);
+        }
+      }
+      const limit = normalizeRecommendationLimit(input.limit);
+      const minConfidence = normalizeRecommendationMinConfidence(
+        input.minConfidence,
+      );
+      const results = await Promise.all(
+        orderedKinds.map(async (kind): Promise<BatchKindResult> => {
+          try {
+            const response = await service.recommend({
+              kind,
+              anchor: input.anchor,
+              workspaceId: input.workspaceId,
+              limit,
+              minConfidence,
+            });
+            return { kind, status: "ok", response };
+          } catch (err) {
+            return {
+              kind,
+              status: "error",
+              errorMessage:
+                err instanceof Error
+                  ? err.message
+                  : "recommend failed for kind",
+            };
+          }
+        }),
+      );
+      return { status: "ok", results };
     }),
 
   /**
