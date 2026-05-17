@@ -48,10 +48,13 @@ describe("Bases type-aware folderId input (T-F.122 / T-F.2-γ-polish δ)", () =>
     );
   });
 
-  it("placeholder copy preserved per-field (existing operator hint behaviour)", () => {
+  it("placeholder copy preserved per-field (existing operator hint behaviour; T-F.124 moved governanceStatus to chip-draft input)", () => {
     const src = readPanel();
     expect(src).toMatch(/"positive integer"/);
-    expect(src).toMatch(/"draft,published \(comma-separated\)"/);
+    // T-F.124: governanceStatus placeholder moved to the chip-draft
+    // input ("add a status…"); the comma-separated text-input
+    // placeholder is no longer in source.
+    expect(src).toMatch(/"add a status…"|"draft,published \(comma-separated\)"/);
     expect(src).toMatch(/"ISO-8601 \(e\.g\. 2026-01-01T00:00:00Z\)"/);
   });
 
