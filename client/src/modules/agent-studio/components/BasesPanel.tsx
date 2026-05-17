@@ -103,6 +103,27 @@ export function BasesPanel() {
   const [renameBaseId, setRenameBaseId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>("");
   const [renameError, setRenameError] = useState<string | null>(null);
+  // T-F.117 (T-F.2-ζ.1): bulk-selection model. Mirrors Quality Lens
+  // T-F.89 / Inbox T-F.111. `Set<number>` selection state with O(1)
+  // toggle, status-independent (works on all bases regardless of
+  // expand/rename/edit state per lesson 69 inspection-mutation
+  // orthogonality). Bulk-action UX + server bulk-delete endpoint
+  // land in ζ.2 (T-F.118).
+  const [selectedBaseIds, setSelectedBaseIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  function toggleBaseSelection(id: number): void {
+    setSelectedBaseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function clearBaseSelection(): void {
+    setSelectedBaseIds(new Set());
+  }
+
   // T-F.116 (T-F.2-a.4-narrow): closeAllRowEdits refactor (lesson 65
   // trigger at N=5 row-mutation slices). Centralises the cross-
   // clear that every open* helper performs so adding the 6th
@@ -388,6 +409,28 @@ export function BasesPanel() {
 
   const bases = basesQuery.data ?? [];
   const reachedLimit = bases.length === BASES_LIST_LIMIT;
+  // T-F.117 (T-F.2-ζ.1): derive header-checkbox state from the
+  // currently-displayed slice. `pageAllSelected` is true iff every
+  // visible base is in the selection set. Toggle behavior on
+  // header click: select-all if any unselected; clear if all
+  // selected (matches Quality Lens precedent).
+  const pageAllSelected =
+    bases.length > 0 && bases.every((b) => selectedBaseIds.has(b.id));
+  function togglePageSelection(): void {
+    if (pageAllSelected) {
+      setSelectedBaseIds((prev) => {
+        const next = new Set(prev);
+        for (const b of bases) next.delete(b.id);
+        return next;
+      });
+    } else {
+      setSelectedBaseIds((prev) => {
+        const next = new Set(prev);
+        for (const b of bases) next.add(b.id);
+        return next;
+      });
+    }
+  }
   // T-F.98 (T-F.2-ζ): resolve the previewing base's row from the
   // already-fetched list so we can extract `filters.folderId`. Uses
   // `find` on the in-memory list — no extra round-trip.
@@ -693,17 +736,51 @@ export function BasesPanel() {
               )}
             </p>
           ) : (
-            <table className="w-full text-xs" data-testid="bases-list">
-              <thead>
-                <tr className="text-left text-muted-foreground">
-                  <th className="py-1">id</th>
-                  <th className="py-1">name</th>
-                  <th className="py-1">visibility</th>
-                  <th className="py-1">version</th>
-                  <th className="py-1">updated</th>
-                  <th className="py-1"></th>
-                </tr>
-              </thead>
+            <>
+              {/* T-F.117 (T-F.2-ζ.1): selection bar gated on size > 0.
+                  Names the count, offers Clear. Bulk-action button(s)
+                  + server bulk-delete endpoint land in T-F.118 ζ.2. */}
+              {selectedBaseIds.size > 0 ? (
+                <div
+                  className="mb-2 flex items-center gap-3 rounded border bg-muted/30 px-3 py-1.5 text-xs"
+                  data-testid="bases-bulk-selection-bar"
+                >
+                  <span data-testid="bases-bulk-selection-count">
+                    {selectedBaseIds.size} selected
+                  </span>
+                  <span className="text-muted-foreground">
+                    Bulk actions land in a follow-up slice.
+                  </span>
+                  <button
+                    type="button"
+                    className="ml-auto underline text-muted-foreground"
+                    onClick={clearBaseSelection}
+                    data-testid="bases-bulk-selection-clear"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              ) : null}
+              <table className="w-full text-xs" data-testid="bases-list">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 w-6">
+                      <input
+                        type="checkbox"
+                        checked={pageAllSelected}
+                        onChange={togglePageSelection}
+                        data-testid="bases-row-select-all"
+                        aria-label="Select all bases on this page"
+                      />
+                    </th>
+                    <th className="py-1">id</th>
+                    <th className="py-1">name</th>
+                    <th className="py-1">visibility</th>
+                    <th className="py-1">version</th>
+                    <th className="py-1">updated</th>
+                    <th className="py-1"></th>
+                  </tr>
+                </thead>
               <tbody>
                 {bases.map((b) => {
                   const isExpanded = expandedBaseId === b.id;
@@ -728,6 +805,15 @@ export function BasesPanel() {
                         className="border-t border-border"
                         data-testid={`bases-row-${b.id}`}
                       >
+                        <td className="py-1 w-6">
+                          <input
+                            type="checkbox"
+                            checked={selectedBaseIds.has(b.id)}
+                            onChange={() => toggleBaseSelection(b.id)}
+                            data-testid={`bases-row-select-${b.id}`}
+                            aria-label={`Select base ${b.name}`}
+                          />
+                        </td>
                         <td className="py-1 font-mono">{b.id}</td>
                         <td className="py-1">{b.name}</td>
                         <td className="py-1 font-mono text-muted-foreground">
@@ -803,7 +889,7 @@ export function BasesPanel() {
                       {shareError !== null && shareErrorBaseId === b.id ? (
                         <tr data-testid={`bases-row-share-error-row-${b.id}`}>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="bg-destructive/10 px-3 py-2 text-xs"
                           >
                             <p
@@ -817,7 +903,7 @@ export function BasesPanel() {
                       ) : null}
                       {isExpanded ? (
                         <tr data-testid={`bases-row-detail-${b.id}`}>
-                          <td colSpan={6} className="bg-muted/20 px-3 py-2 text-xs">
+                          <td colSpan={7} className="bg-muted/20 px-3 py-2 text-xs">
                             <BaseRowDetail
                               base={b}
                               filterEdit={{
@@ -967,7 +1053,7 @@ export function BasesPanel() {
                       {isRenaming ? (
                         <tr data-testid={`bases-row-rename-row-${b.id}`}>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="bg-muted/20 px-3 py-2 text-xs"
                           >
                             <div className="space-y-2">
@@ -1044,7 +1130,7 @@ export function BasesPanel() {
                           data-testid={`bases-row-delete-row-${b.id}`}
                         >
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="bg-destructive/10 px-3 py-2 text-xs"
                           >
                             <div className="space-y-2">
@@ -1094,7 +1180,7 @@ export function BasesPanel() {
                       {isPreviewing ? (
                         <tr data-testid={`bases-row-preview-row-${b.id}`}>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="bg-muted/20 px-3 py-2 text-xs"
                           >
                             <BasePreview
@@ -1119,7 +1205,8 @@ export function BasesPanel() {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </>
           )}
         </CardContent>
       </Card>
