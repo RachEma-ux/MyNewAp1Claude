@@ -103,10 +103,10 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
     expect(src).toMatch(/affectedPackages:\s+ReadonlyArray<\{/);
   });
 
-  it("cve-feed/cve-feed-reader.ts factory throws T-G.3.2 placeholder", () => {
+  it("cve-feed/cve-feed-reader.ts exports the createCveFeedReader factory (wired in T-G.3.2)", () => {
     const src = read("cve-feed/cve-feed-reader.ts");
     expect(src).toMatch(/export\s+function\s+createCveFeedReader/);
-    expect(src).toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.2/);
+    expect(src).not.toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.2/);
   });
 
   it("cve-feed/ has NO drizzle / neo4j-driver imports (external feed only)", () => {
@@ -169,17 +169,13 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
 
   // ── Factory invocation (placeholder errors) ──────────────────────
 
-  it("all three factories throw T-G.3.1-tagged placeholder errors today", async () => {
-    const { createCveFeedReader } = await import(
-      "../../server/agent-studio/services/security-graph/cve-feed/cve-feed-reader.js"
-    );
+  it("persistence + projection factories still throw T-G.3.1-tagged placeholders (cve-feed wired in T-G.3.2)", async () => {
     const { createSecurityGraphStore } = await import(
       "../../server/agent-studio/services/security-graph/persistence/security-graph-store.js"
     );
     const { createSecurityGraphProjection } = await import(
       "../../server/agent-studio/services/security-graph/projection/security-graph-projection.js"
     );
-    expect(() => createCveFeedReader()).toThrow(/T-G\.3\.1/);
     expect(() => createSecurityGraphStore()).toThrow(/T-G\.3\.1/);
     expect(() => createSecurityGraphProjection()).toThrow(/T-G\.3\.1/);
   });
