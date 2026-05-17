@@ -58,6 +58,55 @@ const CROSS_LENS_TYPEKEY_TARGETS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * T-G.2.6 — code_intelligence lens node source-locator extraction.
+ *
+ * The code_intelligence lens (T-G.2.5) emits nodes whose meta
+ * carries `filePath` + optional `startLine` / `endLine` so
+ * operators can see "function: foo" alongside "src/foo.ts:1-5"
+ * right on the row, without drilling into the node card.
+ *
+ * Generic by design: any future lens that emits the same meta
+ * shape (filePath / startLine / endLine) gets the same affordance
+ * for free — the helper is keyed on shape, not on lens kind.
+ */
+export interface CodeGraphSourceLocator {
+  readonly filePath: string;
+  readonly startLine?: number;
+  readonly endLine?: number;
+}
+
+export function getCodeGraphSourceLocator(
+  meta: Readonly<Record<string, unknown>> | undefined,
+): CodeGraphSourceLocator | null {
+  if (!meta) return null;
+  const filePath = meta.filePath;
+  if (typeof filePath !== "string" || filePath.length === 0) return null;
+  const startLineRaw = meta.startLine;
+  const endLineRaw = meta.endLine;
+  const startLine =
+    typeof startLineRaw === "number" && Number.isFinite(startLineRaw)
+      ? startLineRaw
+      : undefined;
+  const endLine =
+    typeof endLineRaw === "number" && Number.isFinite(endLineRaw)
+      ? endLineRaw
+      : undefined;
+  return { filePath, startLine, endLine };
+}
+
+export function formatCodeGraphSourceLocator(
+  loc: CodeGraphSourceLocator,
+): string {
+  if (loc.startLine != null && loc.endLine != null && loc.startLine !== loc.endLine) {
+    return `${loc.filePath}:${loc.startLine}-${loc.endLine}`;
+  }
+  if (loc.startLine != null) {
+    return `${loc.filePath}:${loc.startLine}`;
+  }
+  return loc.filePath;
+}
+
+/**
  * T-F.77 cap — the SVG graph viz uses circular positioning, so it
  * gets visually unusable as N grows. 50 is the practical ceiling
  * for hover/select interactions; beyond that the table preview
@@ -769,7 +818,29 @@ function RenderEnvelopeView({
                         <td className="py-1 font-mono">
                           {n.visible ? "true" : "false"}
                         </td>
-                        <td className="py-1">{n.label ?? "—"}</td>
+                        <td className="py-1">
+                          <div>{n.label ?? "—"}</div>
+                          {(() => {
+                            // T-G.2.6: source-locator badge under the
+                            // label cell. Shows up for any lens whose
+                            // node meta carries `filePath` (+ optional
+                            // line range) — code_intelligence is the
+                            // first consumer; future lenses get the
+                            // same affordance for free.
+                            const loc = getCodeGraphSourceLocator(
+                              n.meta as Readonly<Record<string, unknown>> | undefined,
+                            );
+                            if (!loc) return null;
+                            return (
+                              <div
+                                className="mt-0.5 font-mono text-[10px] text-muted-foreground"
+                                data-testid={`graph-lens-node-source-locator-${n.id}`}
+                              >
+                                📄 {formatCodeGraphSourceLocator(loc)}
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td className="py-1">
                           {targetLens ? (
                             <button
