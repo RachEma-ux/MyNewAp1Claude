@@ -1,0 +1,12 @@
+/**
+ * Security Graph Persistence public-api barrel — T-G.3.1.
+ */
+
+export {
+  createSecurityGraphStore,
+  type SecurityGraphStore,
+  type SecurityGraphNode,
+  type SecurityGraphEdge,
+  type SecurityGraphIngestionInput,
+  type SecurityGraphIngestionResult,
+} from "./security-graph-store.js";

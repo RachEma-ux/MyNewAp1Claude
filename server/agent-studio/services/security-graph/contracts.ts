@@ -829,3 +829,238 @@ export function validateImpactPathSequence(
   }
   return { ok: true };
 }
+
+// ============================================================================
+// Closed taxonomy — 8 security-graph edge types (T-G.3.1)
+// ============================================================================
+
+/**
+ * Edges that compose the canonical impact path
+ *   CVE → Package → Component → Service → Environment → Owner → CustomerExposure
+ * plus two governance-graph cross-links (policy/control).
+ *
+ * Added at T-G.3.1 ahead of the persistence layer (T-G.3.3) so
+ * `validateSecurityGraphEdgeBatch` has a closed registry to gate
+ * writes against (same shape as `validateCodeGraphEdgeBatch` from
+ * the T-G.2 arc — precedent (r) carry-forward).
+ */
+export const SECURITY_GRAPH_EDGE_TYPES = [
+  "affects_package",       // CVE → Package
+  "bundled_in",            // Package → Component
+  "deployed_in",           // Component → Service
+  "runs_in_environment",   // Service → Environment
+  "owned_by",              // Service/Environment/Component → Owner
+  "exposes_customer",      // Environment → CustomerExposure
+  "governed_by_policy",    // Service/Environment → Policy
+  "enforced_by_control",   // Policy → Control
+] as const;
+
+export type SecurityGraphEdgeType =
+  (typeof SECURITY_GRAPH_EDGE_TYPES)[number];
+
+export function isSecurityGraphEdgeType(s: unknown): s is SecurityGraphEdgeType {
+  return (
+    typeof s === "string" &&
+    (SECURITY_GRAPH_EDGE_TYPES as readonly string[]).includes(s)
+  );
+}
+
+export interface SecurityGraphEdgeConstraint {
+  readonly sourceTypeKeys: ReadonlyArray<SecurityGraphNodeType>;
+  readonly targetTypeKeys: ReadonlyArray<SecurityGraphNodeType>;
+  readonly cardinality: "one_to_one" | "one_to_many" | "many_to_many";
+}
+
+export const SECURITY_GRAPH_EDGE_CONSTRAINTS: Readonly<
+  Record<SecurityGraphEdgeType, SecurityGraphEdgeConstraint>
+> = {
+  affects_package: {
+    sourceTypeKeys: ["cve"],
+    targetTypeKeys: ["package"],
+    cardinality: "many_to_many",
+  },
+  bundled_in: {
+    sourceTypeKeys: ["package"],
+    targetTypeKeys: ["component"],
+    cardinality: "many_to_many",
+  },
+  deployed_in: {
+    sourceTypeKeys: ["component"],
+    targetTypeKeys: ["service"],
+    cardinality: "many_to_many",
+  },
+  runs_in_environment: {
+    sourceTypeKeys: ["service"],
+    targetTypeKeys: ["environment"],
+    cardinality: "many_to_many",
+  },
+  owned_by: {
+    sourceTypeKeys: ["service", "environment", "component"],
+    targetTypeKeys: ["owner"],
+    cardinality: "many_to_many",
+  },
+  exposes_customer: {
+    sourceTypeKeys: ["environment"],
+    targetTypeKeys: ["customer_exposure"],
+    cardinality: "many_to_many",
+  },
+  governed_by_policy: {
+    sourceTypeKeys: ["service", "environment"],
+    targetTypeKeys: ["policy"],
+    cardinality: "many_to_many",
+  },
+  enforced_by_control: {
+    sourceTypeKeys: ["policy"],
+    targetTypeKeys: ["control"],
+    cardinality: "one_to_many",
+  },
+};
+
+// ============================================================================
+// Per-edge-type operator-facing metadata
+// ============================================================================
+
+export interface SecurityGraphEdgeTypeMetadata {
+  readonly label: string;
+  readonly description: string;
+}
+
+export const SECURITY_GRAPH_EDGE_TYPE_METADATA: Readonly<
+  Record<SecurityGraphEdgeType, SecurityGraphEdgeTypeMetadata>
+> = {
+  affects_package: {
+    label: "Affects Package",
+    description: "CVE applies to a specific package version (sourced from NVD).",
+  },
+  bundled_in: {
+    label: "Bundled In",
+    description: "Package is a dependency of a component.",
+  },
+  deployed_in: {
+    label: "Deployed In",
+    description: "Component is shipped as part of a service.",
+  },
+  runs_in_environment: {
+    label: "Runs In Environment",
+    description: "Service is deployed to a specific environment.",
+  },
+  owned_by: {
+    label: "Owned By",
+    description: "Service / environment / component has an accountable owner.",
+  },
+  exposes_customer: {
+    label: "Exposes Customer",
+    description: "Environment exposes a customer-facing surface.",
+  },
+  governed_by_policy: {
+    label: "Governed By Policy",
+    description: "Service / environment is constrained by a governance policy.",
+  },
+  enforced_by_control: {
+    label: "Enforced By Control",
+    description: "Policy is enforced by a specific mitigating control.",
+  },
+};
+
+export function getSecurityGraphEdgeTypeMetadata(
+  type: SecurityGraphEdgeType,
+): SecurityGraphEdgeTypeMetadata {
+  return SECURITY_GRAPH_EDGE_TYPE_METADATA[type];
+}
+
+// ============================================================================
+// Edge-batch validator — mirrors validateCodeGraphEdgeBatch (T-G.2 precedent)
+// ============================================================================
+
+export type SecurityGraphEdgeValidationReason =
+  | "unknown_source_type"
+  | "unknown_edge_type"
+  | "unknown_target_type"
+  | "source_type_not_allowed_for_edge"
+  | "target_type_not_allowed_for_edge";
+
+export type SecurityGraphEdgeValidationOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: SecurityGraphEdgeValidationReason };
+
+export function validateSecurityGraphEdgeWithReason(
+  sourceTypeKey: string,
+  edgeTypeKey: string,
+  targetTypeKey: string,
+): SecurityGraphEdgeValidationOutcome {
+  if (!isSecurityGraphNodeType(sourceTypeKey)) {
+    return { ok: false, reason: "unknown_source_type" };
+  }
+  if (!isSecurityGraphEdgeType(edgeTypeKey)) {
+    return { ok: false, reason: "unknown_edge_type" };
+  }
+  if (!isSecurityGraphNodeType(targetTypeKey)) {
+    return { ok: false, reason: "unknown_target_type" };
+  }
+  const c = SECURITY_GRAPH_EDGE_CONSTRAINTS[edgeTypeKey];
+  const sourceOk =
+    c.sourceTypeKeys.length === 0 || c.sourceTypeKeys.includes(sourceTypeKey);
+  if (!sourceOk) {
+    return { ok: false, reason: "source_type_not_allowed_for_edge" };
+  }
+  const targetOk =
+    c.targetTypeKeys.length === 0 || c.targetTypeKeys.includes(targetTypeKey);
+  if (!targetOk) {
+    return { ok: false, reason: "target_type_not_allowed_for_edge" };
+  }
+  return { ok: true };
+}
+
+export interface SecurityGraphEdgeBatchInput {
+  readonly sourceTypeKey: string;
+  readonly edgeTypeKey: string;
+  readonly targetTypeKey: string;
+  readonly edgeId: string;
+}
+
+export interface SecurityGraphEdgeBatchResult {
+  readonly acceptedEdgeIds: ReadonlyArray<string>;
+  readonly rejected: ReadonlyArray<{
+    readonly edgeId: string;
+    readonly reason: SecurityGraphEdgeValidationReason;
+  }>;
+  readonly rejectionsByReason: Readonly<
+    Record<SecurityGraphEdgeValidationReason, number>
+  >;
+}
+
+export function validateSecurityGraphEdgeBatch(
+  edges: ReadonlyArray<SecurityGraphEdgeBatchInput>,
+): SecurityGraphEdgeBatchResult {
+  const accepted: string[] = [];
+  const rejected: Array<{
+    edgeId: string;
+    reason: SecurityGraphEdgeValidationReason;
+  }> = [];
+  const rejectionsByReason: Record<SecurityGraphEdgeValidationReason, number> = {
+    unknown_source_type: 0,
+    unknown_edge_type: 0,
+    unknown_target_type: 0,
+    source_type_not_allowed_for_edge: 0,
+    target_type_not_allowed_for_edge: 0,
+  };
+  for (const e of edges) {
+    const outcome = validateSecurityGraphEdgeWithReason(
+      e.sourceTypeKey,
+      e.edgeTypeKey,
+      e.targetTypeKey,
+    );
+    if (outcome.ok) {
+      accepted.push(e.edgeId);
+    } else {
+      // Precedent (s) — explicit narrow under `strict: false`.
+      const failed = outcome as Extract<
+        SecurityGraphEdgeValidationOutcome,
+        { readonly ok: false }
+      >;
+      rejected.push({ edgeId: e.edgeId, reason: failed.reason });
+      rejectionsByReason[failed.reason] += 1;
+    }
+  }
+  return { acceptedEdgeIds: accepted, rejected, rejectionsByReason };
+}
