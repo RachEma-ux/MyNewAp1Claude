@@ -131,8 +131,9 @@ describe("Phase 7.5b — Neo4jCommunityGraphRepository wired", () => {
   it("health() calls testNeo4jConnection (NOT a stub 'degraded — driver not yet wired')", () => {
     const src = readRepo();
     expect(src).toMatch(/await\s+testNeo4jConnection\(source\)/);
-    expect(src).toMatch(/status:\s*"ok"/);
-    expect(src).toMatch(/status:\s*"down"/);
+    // BackendHealth.status enum is "healthy" | "degraded" | "unavailable"
+    expect(src).toMatch(/status:\s*"healthy"/);
+    expect(src).toMatch(/status:\s*"unavailable"/);
     // Negative: the pre-7.5b stub string must be GONE.
     expect(src).not.toMatch(/neo4j-ce driver not yet wired/);
   });

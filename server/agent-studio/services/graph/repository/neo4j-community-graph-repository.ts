@@ -464,13 +464,13 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     const probe = await testNeo4jConnection(source);
     if (probe.connected) {
       return {
-        status: "ok",
+        status: "healthy",
         errors: [],
         capabilities: this.capabilities,
       };
     }
     return {
-      status: "down",
+      status: "unavailable",
       errors: [probe.error ?? "neo4j connectivity probe failed"],
       capabilities: this.capabilities,
     };
