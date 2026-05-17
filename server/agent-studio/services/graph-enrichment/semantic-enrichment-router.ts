@@ -51,6 +51,7 @@ import {
 import {
   createSemanticEnrichmentStore,
   type SemanticEnrichmentProposalListRow,
+  type SemanticEnrichmentRecentRejectionRow,
   type SemanticEnrichmentRunListRow,
   type SemanticEnrichmentRunStats,
 } from "./public-api.js";
@@ -63,6 +64,11 @@ export const SEMANTIC_ENRICHMENT_LIST_RUNS_DEFAULT_LIMIT = 50;
 export const SEMANTIC_ENRICHMENT_LIST_RUNS_ABSOLUTE_LIMIT = 200;
 export const SEMANTIC_ENRICHMENT_LIST_PROPOSALS_DEFAULT_LIMIT = 100;
 export const SEMANTIC_ENRICHMENT_LIST_PROPOSALS_ABSOLUTE_LIMIT = 500;
+
+export const SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_DEFAULT_RUN_LIMIT = 20;
+export const SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_ABSOLUTE_RUN_LIMIT = 200;
+export const SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_DEFAULT_ROW_LIMIT = 100;
+export const SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_ABSOLUTE_ROW_LIMIT = 500;
 
 // ============================================================================
 // Output envelopes
@@ -89,6 +95,10 @@ export interface GetSemanticEnrichmentRunStatsEnvelope {
 
 export interface ListSemanticEnrichmentProposalsEnvelope {
   readonly proposals: ReadonlyArray<SemanticEnrichmentProposalListRow>;
+}
+
+export interface ListSemanticEnrichmentRecentRejectionsEnvelope {
+  readonly rejections: ReadonlyArray<SemanticEnrichmentRecentRejectionRow>;
 }
 
 // ============================================================================
@@ -188,6 +198,49 @@ export const semanticEnrichmentRouter = router({
           limit: input.limit,
         });
         return { proposals };
+      },
+    ),
+
+  /**
+   * Cross-run rejection telemetry (T-D.3.γ). Flattens below-
+   * threshold rejections across the most-recent `runLimit` runs,
+   * grouped by `(runId, proposalKind)`. Drives the operator panel
+   * "which kinds are most-often failing the confidence gate" —
+   * actionable signal for confidence-threshold tuning or
+   * per-kind proposer improvement.
+   *
+   * Mirrors `securityGraph.listRecentRejectionsByReason`
+   * (T-G.3.ε) — same windowing shape, source-of-record context
+   * attached at read-time (here: `runId` + `runStartedAt`; there:
+   * `ingestionId` + `sourceKey`).
+   */
+  listRecentRejectionsByKind: adminProcedure
+    .input(
+      z.object({
+        runLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_ABSOLUTE_RUN_LIMIT)
+          .default(SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_DEFAULT_RUN_LIMIT),
+        rowLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_ABSOLUTE_ROW_LIMIT)
+          .default(SEMANTIC_ENRICHMENT_RECENT_REJECTIONS_DEFAULT_ROW_LIMIT),
+      }),
+    )
+    .query(
+      async ({
+        input,
+      }): Promise<ListSemanticEnrichmentRecentRejectionsEnvelope> => {
+        const store = createSemanticEnrichmentStore();
+        const rejections = await store.listRecentRejectionsByKind({
+          runLimit: input.runLimit,
+          rowLimit: input.rowLimit,
+        });
+        return { rejections };
       },
     ),
 });
