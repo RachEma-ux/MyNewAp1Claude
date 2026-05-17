@@ -22,8 +22,8 @@ import {
 const FORBIDDEN_TOKENS = ["CREATE", "MERGE", "SET", "DELETE", "DETACH", "REMOVE", "DROP", "LOAD CSV"];
 
 describe("DEFAULT_CYPHER_TEMPLATES", () => {
-  it("includes all 16 default categories", () => {
-    expect(DEFAULT_CYPHER_TEMPLATES.length).toBe(16);
+  it("includes all 23 default categories (16 baseline + 7 Phase 7.5c impact-analysis)", () => {
+    expect(DEFAULT_CYPHER_TEMPLATES.length).toBe(23);
   });
 
   it("template keys are unique", () => {
@@ -68,16 +68,16 @@ describe("DEFAULT_CYPHER_TEMPLATES", () => {
     }
   });
 
-  it("seedCypherTemplates produces an inserted=16 result on first run", async () => {
+  it("seedCypherTemplates produces an inserted=23 result on first run", async () => {
     let calls = 0;
     const result = await seedCypherTemplates(async (_t: CypherTemplateSeed) => {
       calls++;
       return "inserted";
     });
-    expect(result.inserted).toBe(16);
+    expect(result.inserted).toBe(23);
     expect(result.updated).toBe(0);
     expect(result.errors).toEqual([]);
-    expect(calls).toBe(16);
+    expect(calls).toBe(23);
   });
 });
 

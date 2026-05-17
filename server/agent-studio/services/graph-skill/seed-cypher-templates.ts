@@ -400,6 +400,207 @@ export const DEFAULT_CYPHER_TEMPLATES: CypherTemplateSeed[] = [
     riskLevel: "low",
     allowedRoles: null,
   },
+
+  // ────────────────────────────────────────────────────────────
+  // Phase 7.5c — Impact Analysis templates (7 impact kinds per
+  // the remaining-execution-plan §T-F.3 + Phase 7.5 blocker doc §2)
+  //
+  // Each template follows the same shape: start at a node by id,
+  // traverse impact-type-specific relationships up to a depth cap
+  // (interpolated literal in the Cypher body — Cypher 5 doesn't
+  // accept parameter binding for variable-length depth bounds),
+  // return distinct impacted nodes + the relationship path. The
+  // permission post-filter (`filterByPermissions` on the
+  // GraphRepository) is applied by the lens runner after the
+  // query returns; templates are marked
+  // `permissionFilterRequired: true` so the runner enforces it.
+  //
+  // Depth cap rationale: keeping the literal `*1..3` baked into
+  // the Cypher body lets Neo4j optimize the path expansion; the
+  // matching `maxDepth: 3` on the template metadata is the
+  // operator-visible contract. If we later need dynamic depth,
+  // switch to `apoc.path.expandConfig({ maxLevel: $maxDepth })`
+  // — APOC is already in the production plugin list.
+  //
+  // These templates exercise the GraphRepository.executeTemplate
+  // path implemented by Phase 7.5b. The T-F.3 Impact Analysis
+  // Lens (next sub-arc) registers the runner that calls them.
+  // ────────────────────────────────────────────────────────────
+  {
+    templateKey: "impact_knowledge",
+    name: "Knowledge Impact",
+    description:
+      "Downstream knowledge consumers of a starting note — follows REFERENCES / CITES / EXPLAINS edges up to depth 3.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:REFERENCES|CITES|EXPLAINS*1..3]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 3,
+    maxResults: 500,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "low",
+    allowedRoles: null,
+  },
+  {
+    templateKey: "impact_runtime",
+    name: "Runtime Impact",
+    description:
+      "Runtime traces / executions affected by a starting entity — follows USED_BY / EXECUTED_IN / TRACED_IN edges up to depth 2.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:USED_BY|EXECUTED_IN|TRACED_IN*1..2]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 2,
+    maxResults: 500,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "low",
+    allowedRoles: null,
+  },
+  {
+    templateKey: "impact_code",
+    name: "Code Impact",
+    description:
+      "Code symbols downstream of a starting file/function — follows IMPORTS / CALLS / DECLARES edges up to depth 4. Pairs with the T-G.2 Code Intelligence Graph projection.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:IMPORTS|CALLS|DECLARES*1..4]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 4,
+    maxResults: 1000,
+    timeoutMs: 8000,
+    readOnly: true,
+    riskLevel: "low",
+    allowedRoles: null,
+  },
+  {
+    templateKey: "impact_security",
+    name: "Security Impact",
+    description:
+      "Security-sensitive nodes reachable from a starting node — follows AUTHORIZES / EXPOSES / GRANTS_ACCESS edges up to depth 3. Restricted to admin/security roles.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:AUTHORIZES|EXPOSES|GRANTS_ACCESS*1..3]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 3,
+    maxResults: 200,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "high",
+    allowedRoles: ["admin", "security"],
+  },
+  {
+    templateKey: "impact_governance",
+    name: "Governance Impact",
+    description:
+      "Governance policies / approvals / CAG blocks affected by a starting node — follows GOVERNED_BY / APPROVED_BY / DEPENDS_ON_POLICY edges up to depth 2.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:GOVERNED_BY|APPROVED_BY|DEPENDS_ON_POLICY*1..2]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 2,
+    maxResults: 300,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "medium",
+    allowedRoles: ["admin", "governance"],
+  },
+  {
+    templateKey: "impact_tool",
+    name: "Tool Impact",
+    description:
+      "Runtime tool definitions / capability packs affected by a starting node — follows DISPATCHES_TO / CAPABILITY_OF / WIRED_INTO edges up to depth 2.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:DISPATCHES_TO|CAPABILITY_OF|WIRED_INTO*1..2]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 2,
+    maxResults: 300,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "low",
+    allowedRoles: null,
+  },
+  {
+    templateKey: "impact_workflow",
+    name: "Workflow Impact",
+    description:
+      "Workflow steps / automation triggers affected by a starting node — follows TRIGGERS / STEPS_INTO / DEPENDS_ON_STEP edges up to depth 4.",
+    graphBackend: "neo4j_ce",
+    queryLanguage: "cypher",
+    cypherBody: `
+      MATCH (start { id: $startId })-[r:TRIGGERS|STEPS_INTO|DEPENDS_ON_STEP*1..4]->(impacted)
+      WHERE coalesce(impacted.governance_status, 'active') = 'active'
+      RETURN DISTINCT impacted, last(r) AS edge
+      LIMIT $maxResults
+    `.trim(),
+    parameterSchema: {
+      startId: { type: "string", required: true },
+      maxResults: { type: "number" },
+    },
+    permissionFilterRequired: true,
+    maxDepth: 4,
+    maxResults: 500,
+    timeoutMs: 5000,
+    readOnly: true,
+    riskLevel: "low",
+    allowedRoles: null,
+  },
 ];
 
 /**
