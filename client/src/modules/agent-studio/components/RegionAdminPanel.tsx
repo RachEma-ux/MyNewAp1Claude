@@ -558,7 +558,11 @@ export function RegionAdminPanel() {
                 </thead>
                 <tbody>
                   {pinsQ.data.map((p) => (
-                    <tr key={p.id} className="border-t">
+                    <tr
+                      key={p.id}
+                      className="border-t"
+                      data-testid={`region-pin-row-${p.workspaceId}`}
+                    >
                       <td className="py-1 pr-3 font-mono">{p.workspaceId}</td>
                       <td className="py-1 pr-3 font-mono">{p.regionKey}</td>
                       <td className="py-1 pr-3">
@@ -566,7 +570,31 @@ export function RegionAdminPanel() {
                       </td>
                       <td className="py-1 pr-3">{fmtTs(p.updatedAt)}</td>
                       <td className="py-1 pr-3">{p.notes ?? "—"}</td>
-                      <td className="py-1 pr-3">
+                      <td className="py-1 pr-3 space-x-2">
+                        {/* T-F.127 (T-F.7-j₂ intra-panel): Edit button
+                            prefills setPin form below with this row's
+                            workspaceId / regionKey / isReplicated /
+                            notes. Operator workflow: click Edit →
+                            scroll to form → tweak one field → Save.
+                            Per-button (not whole-row click) so remove
+                            stays unambiguous (lesson 64 destructive-
+                            action proximity guard). */}
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          onClick={() =>
+                            setPinForm({
+                              workspaceId: String(p.workspaceId),
+                              regionKey: p.regionKey,
+                              isReplicated: p.isReplicated,
+                              notes: p.notes ?? "",
+                            })
+                          }
+                          data-testid={`region-pin-row-edit-${p.workspaceId}`}
+                          title="Prefill setPin form with this row's values"
+                        >
+                          edit
+                        </button>
                         <button
                           type="button"
                           className="text-xs underline text-destructive"
@@ -576,6 +604,7 @@ export function RegionAdminPanel() {
                               workspaceId: p.workspaceId,
                             })
                           }
+                          data-testid={`region-pin-row-remove-${p.workspaceId}`}
                         >
                           remove
                         </button>
