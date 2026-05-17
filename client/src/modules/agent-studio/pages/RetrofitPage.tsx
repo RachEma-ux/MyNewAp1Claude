@@ -948,6 +948,98 @@ function JobsByKindBreakdownCard({
   );
 }
 
+// ── T-F.113 (T-F.7-β): jobs-by-lane companion to T-F.112.
+// Lane = first dot-segment of jobKind. Same 5-column shape as
+// JobsByKindBreakdownCard, different aggregation axis. Sister card
+// since the data is already exposed in getStats (jobsByLane /
+// failedJobsByLane / pendingJobsByLane / runningJobsByLane).
+function JobsByLaneBreakdownCard({
+  jobsByLane,
+  failedJobsByLane,
+  pendingJobsByLane,
+  runningJobsByLane,
+}: {
+  jobsByLane: Record<string, number>;
+  failedJobsByLane: Record<string, number>;
+  pendingJobsByLane: Record<string, number>;
+  runningJobsByLane: Record<string, number>;
+}) {
+  const allLanes = Array.from(
+    new Set<string>([
+      ...Object.keys(jobsByLane),
+      ...Object.keys(failedJobsByLane),
+      ...Object.keys(pendingJobsByLane),
+      ...Object.keys(runningJobsByLane),
+    ]),
+  ).sort((a, b) => (jobsByLane[b] ?? 0) - (jobsByLane[a] ?? 0));
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <SectionLabel>Jobs by lane</SectionLabel>
+        {allLanes.length === 0 ? (
+          <div
+            className="text-sm text-zinc-500"
+            data-testid="retrofit-jobs-by-lane-empty"
+          >
+            No jobs recorded.
+          </div>
+        ) : (
+          <div
+            className="overflow-auto rounded border border-zinc-800"
+            data-testid="retrofit-jobs-by-lane-card"
+          >
+            <table className="w-full text-xs">
+              <thead className="bg-zinc-900/60 text-zinc-400">
+                <tr>
+                  <th className="px-2 py-1 text-left font-medium uppercase">
+                    Lane
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Total
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Failed
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Pending
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Running
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {allLanes.map((lane) => (
+                  <tr
+                    key={lane}
+                    className="border-t border-zinc-800"
+                    data-testid={`retrofit-jobs-by-lane-row-${lane}`}
+                  >
+                    <td className="px-2 py-1 font-mono">{lane}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {jobsByLane[lane] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {failedJobsByLane[lane] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {pendingJobsByLane[lane] ?? 0}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {runningJobsByLane[lane] ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ObservabilityStatsPanel() {
   const q = trpc.agentStudio.workspaceObservability.getStats.useQuery(
     undefined,
@@ -1014,6 +1106,20 @@ function ObservabilityStatsPanel() {
         failedJobsByKind={s.failedJobsByKind}
         pendingJobsByKind={s.pendingJobsByKind}
         runningJobsByKind={s.runningJobsByKind}
+      />
+
+      {/* ── T-F.113 (T-F.7-β): jobs-by-lane companion ──
+          Lane = first dot-segment of jobKind (e.g.
+          "ingestion.parse_pdf" → "ingestion"). Operator's higher-
+          level rollup question: "which SUBSYSTEM is dominating the
+          queue?" vs T-F.112's narrower "which specific kind?".
+          Same shape, same 4 axes, different aggregation — pre-
+          existing in `getStats` since stats.ts shipped. */}
+      <JobsByLaneBreakdownCard
+        jobsByLane={s.jobsByLane}
+        failedJobsByLane={s.failedJobsByLane}
+        pendingJobsByLane={s.pendingJobsByLane}
+        runningJobsByLane={s.runningJobsByLane}
       />
 
       {/* Error events: system vs user */}
