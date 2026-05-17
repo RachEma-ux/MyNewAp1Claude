@@ -1694,6 +1694,16 @@ function FilterConditionsSummary({
   const [addValue, setAddValue] = useState<string>("");
   const [addError, setAddError] = useState<string | null>(null);
 
+  // ── T-F.121 (T-F.2-γ-polish γ): edit-existing-condition ──
+  // Per-chip Edit button opens an inline editor pre-populated with
+  // the current condition values. Save calls buildConditionFromForm
+  // (shared with Add) but REPLACES the condition at editingIdx
+  // instead of appending. Cancel exits without changes. Mutually
+  // exclusive with the Add form via shared form-state slices —
+  // opening Edit pre-fills + sets editingIdx; opening Add (or
+  // submitting either) clears editingIdx.
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+
   // Parse defensively — operator may be mid-edit with invalid JSON.
   let parsed: FilterDocument | null = null;
   try {
@@ -1807,10 +1817,62 @@ function FilterConditionsSummary({
       conditions: [...parsed.conditions, c],
     };
     onChange(JSON.stringify(next, null, 2));
+    resetForm();
+  }
+
+  // T-F.121 (T-F.2-γ-polish γ): edit-existing-condition helpers.
+  function openEditCondition(idx: number, c: FilterCondition): void {
+    setEditingIdx(idx);
+    setAddField(c.field);
+    setAddError(null);
+    // Project the typed condition value back to the form's string
+    // shape (mirror of buildConditionFromForm's typed-output).
+    switch (c.field) {
+      case "folderId":
+        setAddValue(String(c.value));
+        setAddOp("gte");
+        break;
+      case "slug":
+      case "title":
+        setAddValue(c.value);
+        setAddOp("gte");
+        break;
+      case "governanceStatus":
+        setAddValue(c.value.join(", "));
+        setAddOp("gte");
+        break;
+      case "updatedAt":
+        setAddValue(c.value);
+        setAddOp(c.op);
+        break;
+    }
+  }
+  function cancelEditCondition(): void {
+    resetForm();
+  }
+  function saveEditCondition(): void {
+    if (parsed === null) {
+      setAddError("Current draft does not parse — fix the JSON first.");
+      return;
+    }
+    if (editingIdx === null) return;
+    const c = buildConditionFromForm();
+    if (c === null) return;
+    const next: FilterDocument = {
+      version: 1,
+      conditions: parsed.conditions.map((existing, i) =>
+        i === editingIdx ? c : existing,
+      ),
+    };
+    onChange(JSON.stringify(next, null, 2));
+    resetForm();
+  }
+  function resetForm(): void {
     setAddField("");
     setAddValue("");
     setAddOp("gte");
     setAddError(null);
+    setEditingIdx(null);
   }
 
   return (
@@ -1841,7 +1903,16 @@ function FilterConditionsSummary({
                 <button
                   type="button"
                   className="ml-auto underline text-muted-foreground disabled:opacity-50"
-                  disabled={disabled}
+                  disabled={disabled || editingIdx !== null}
+                  onClick={() => openEditCondition(idx, c)}
+                  data-testid={`bases-row-detail-filters-summary-edit-${baseId}-${idx}`}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="underline text-muted-foreground disabled:opacity-50"
+                  disabled={disabled || editingIdx !== null}
                   onClick={() => removeConditionAt(idx)}
                   data-testid={`bases-row-detail-filters-summary-remove-${baseId}-${idx}`}
                 >
@@ -1863,10 +1934,16 @@ function FilterConditionsSummary({
           onChange={(e) =>
             setAddField(e.target.value as typeof addField)
           }
-          disabled={disabled}
+          // T-F.121: lock the field picker while editing — changing
+          // the field type mid-edit would corrupt the slot.
+          disabled={disabled || editingIdx !== null}
           data-testid={`bases-row-detail-filters-add-field-${baseId}`}
         >
-          <option value="">+ Add condition…</option>
+          <option value="">
+            {editingIdx !== null
+              ? `Editing condition #${editingIdx + 1}`
+              : "+ Add condition…"}
+          </option>
           <option value="folderId">folderId</option>
           <option value="slug">slug</option>
           <option value="title">title</option>
@@ -1906,15 +1983,38 @@ function FilterConditionsSummary({
               disabled={disabled}
               data-testid={`bases-row-detail-filters-add-value-${baseId}`}
             />
-            <button
-              type="button"
-              className="rounded border border-border bg-background px-2 py-0.5 hover:bg-muted disabled:opacity-50"
-              onClick={addCondition}
-              disabled={disabled}
-              data-testid={`bases-row-detail-filters-add-submit-${baseId}`}
-            >
-              Add
-            </button>
+            {editingIdx === null ? (
+              <button
+                type="button"
+                className="rounded border border-border bg-background px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+                onClick={addCondition}
+                disabled={disabled}
+                data-testid={`bases-row-detail-filters-add-submit-${baseId}`}
+              >
+                Add
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="rounded border border-border bg-background px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+                  onClick={saveEditCondition}
+                  disabled={disabled}
+                  data-testid={`bases-row-detail-filters-edit-save-${baseId}`}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="underline text-muted-foreground disabled:opacity-50"
+                  onClick={cancelEditCondition}
+                  disabled={disabled}
+                  data-testid={`bases-row-detail-filters-edit-cancel-${baseId}`}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </>
         ) : null}
         {addError !== null ? (

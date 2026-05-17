@@ -101,10 +101,10 @@ describe("Bases rich-form filter summary (T-F.119 / T-F.2-γ-polish α)", () => 
     expect(summaryIdx).toBeLessThan(textareaIdx);
   });
 
-  it("Remove button disabled when filter-edit mutation is pending", () => {
+  it("Remove button disabled when filter-edit mutation is pending (or another Edit is open per T-F.121)", () => {
     const src = readPanel();
     expect(src).toMatch(
-      /disabled=\{disabled\}[\s\S]{0,150}onClick=\{\(\)\s*=>\s*removeConditionAt\(idx\)\}/,
+      /disabled=\{disabled(\s*\|\|\s*editingIdx\s*!==\s*null)?\}[\s\S]{0,300}onClick=\{\(\)\s*=>\s*removeConditionAt\(idx\)\}/,
     );
   });
 });
