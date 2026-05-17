@@ -148,6 +148,30 @@ export interface CodeGraphStore {
    * `listIngestions`. Returns `null` if the ingestion doesn't exist.
    */
   getIngestionStats(ingestionId: string): Promise<CodeGraphIngestionStats | null>;
+
+  /**
+   * Operator drill-in — sample rows from `ags_code_graph_nodes`
+   * scoped to one ingestion. Filterable by `typeKey` so the
+   * dashboard can drill from the stats panel directly into the
+   * rows backing one bar. Capped by `limit` (caller clamps).
+   */
+  listIngestionNodes(input: {
+    readonly ingestionId: string;
+    readonly typeKey?: string;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<ParsedCodeNode>>;
+
+  /**
+   * Operator drill-in — sample rows from `ags_code_graph_edges`
+   * scoped to one ingestion. Filterable by `edgeTypeKey` so the
+   * dashboard can drill from the edge-stats panel directly into
+   * the rows backing one bar. Capped by `limit` (caller clamps).
+   */
+  listIngestionEdges(input: {
+    readonly ingestionId: string;
+    readonly edgeTypeKey?: string;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<ParsedCodeEdge>>;
 }
 
 /**
@@ -358,6 +382,52 @@ export function createCodeGraphStore(): CodeGraphStore {
         parserErrorCount: r.parserErrorCount,
         startedAt: r.startedAt,
         completedAt: r.completedAt,
+      }));
+    },
+
+    async listIngestionNodes(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const whereClause =
+        input.typeKey !== undefined
+          ? sql`${agsCodeGraphNodes.ingestionId} = ${input.ingestionId} AND ${agsCodeGraphNodes.typeKey} = ${input.typeKey}`
+          : eq(agsCodeGraphNodes.ingestionId, input.ingestionId);
+      const rows = await conn
+        .select()
+        .from(agsCodeGraphNodes)
+        .where(whereClause)
+        .orderBy(agsCodeGraphNodes.nodeId)
+        .limit(input.limit);
+      return rows.map((r) => ({
+        id: r.nodeId,
+        typeKey: r.typeKey as CodeGraphNodeType,
+        name: r.name,
+        filePath: r.filePath,
+        startLine: r.startLine ?? undefined,
+        endLine: r.endLine ?? undefined,
+        properties: r.properties ?? undefined,
+      }));
+    },
+
+    async listIngestionEdges(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const whereClause =
+        input.edgeTypeKey !== undefined
+          ? sql`${agsCodeGraphEdges.ingestionId} = ${input.ingestionId} AND ${agsCodeGraphEdges.edgeTypeKey} = ${input.edgeTypeKey}`
+          : eq(agsCodeGraphEdges.ingestionId, input.ingestionId);
+      const rows = await conn
+        .select()
+        .from(agsCodeGraphEdges)
+        .where(whereClause)
+        .orderBy(agsCodeGraphEdges.edgeId)
+        .limit(input.limit);
+      return rows.map((r) => ({
+        id: r.edgeId,
+        sourceId: r.sourceNodeId,
+        edgeTypeKey: r.edgeTypeKey as CodeGraphEdgeType,
+        targetId: r.targetNodeId,
+        properties: r.properties ?? undefined,
       }));
     },
 
