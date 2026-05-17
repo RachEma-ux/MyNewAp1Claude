@@ -86,6 +86,7 @@ import { canvasRouter } from "../services/canvas/canvas-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { codeGraphRouter } from "../services/code-graph/code-graph-router";
+import { securityGraphRouter } from "../services/security-graph/security-graph-router";
 import { promotionRouter } from "../services/promotion/router";
 import {
   agentIdSchema,
@@ -2973,6 +2974,13 @@ export const agentStudioRouter = router({
   // entry point for the code-graph stack (parser + persistence +
   // projection + lens already shipped).
   codeGraph: codeGraphRouter,
+  // Native Graph Workspace Phase 25 T-G.3.α: security-graph ingestion
+  // read surface — listIngestions + getIngestionStats. Operator
+  // dashboard entry point for the security-graph stack (contracts +
+  // NVD feed reader + persistence + projection + lens already shipped).
+  // Per remaining-execution-plan T-G.3: "security findings are not
+  // workspace-public" — adminProcedure is the floor.
+  securityGraph: securityGraphRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention

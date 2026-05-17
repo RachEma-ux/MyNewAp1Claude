@@ -9,4 +9,6 @@ export {
   type SecurityGraphEdge,
   type SecurityGraphIngestionInput,
   type SecurityGraphIngestionResult,
+  type SecurityGraphIngestionListRow,
+  type SecurityGraphIngestionStats,
 } from "./security-graph-store.js";
