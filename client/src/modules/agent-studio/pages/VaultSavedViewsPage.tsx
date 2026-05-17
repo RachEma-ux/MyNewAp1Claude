@@ -21,6 +21,32 @@ import { PageHeader } from "../components/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { SavedViewVersionHistoryPanel } from "../components/SavedViewVersionHistoryPanel";
 
+/**
+ * T-B.6 — saved-views Lens registry preview deeplink mapping.
+ *
+ * Client-side mirror of the server's `VIEW_KIND_BLUEPRINTS`
+ * `defaultLensKind` column (server/agent-studio/services/vault/
+ * view-kind-blueprints.ts). Only the 4 non-null mappings are
+ * mirrored here — viewKinds not in the map (note_list, base,
+ * plus any future user-defined kinds) get no deeplink button.
+ *
+ * Why mirrored not fetched: the server table is a 6-entry pure
+ * constant with zero runtime branching; a tRPC roundtrip per
+ * saved-view selection would be pointless overhead. The lockstep
+ * source-scan test (vault-saved-views-lens-preview.test.ts)
+ * locks the mirror against the server file so any future
+ * blueprint edit surfaces drift before merge.
+ *
+ * Composes with the T-F.135 URL-deeplink primitive on the
+ * receiving end (`readLensIdFromUrl` in GraphLensBrowserPanel).
+ */
+const DEFAULT_LENS_KIND_BY_VIEW_KIND: Readonly<Record<string, string>> = {
+  entity_list: "institutional_memory",
+  runtime_asset_list: "runtime",
+  graph_quality: "governance",
+  projection_status: "governance",
+};
+
 export default function VaultSavedViewsPage() {
   const vaultsQuery = trpc.agentStudio.vault.listMyVaults.useQuery(
     undefined,
@@ -54,6 +80,17 @@ export default function VaultSavedViewsPage() {
       : savedViews.length > 0
         ? savedViews[0].id
         : null;
+
+  // T-B.6 — resolve the selected saved view to its viewKind, then
+  // look up the canonical lens kind for that viewKind. Returns null
+  // when the view-kind has no canonical lens (e.g., `note_list`,
+  // `base`) — the Preview button only renders when a lens exists.
+  const previewLensKind = useMemo<string | null>(() => {
+    if (effectiveSavedViewId === null) return null;
+    const sv = savedViews.find((s) => s.id === effectiveSavedViewId);
+    if (!sv) return null;
+    return DEFAULT_LENS_KIND_BY_VIEW_KIND[sv.viewKind] ?? null;
+  }, [effectiveSavedViewId, savedViews]);
 
   return (
     <div className="p-4 space-y-4">
@@ -143,6 +180,26 @@ export default function VaultSavedViewsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* T-B.6 — Preview-in-Lens button. Renders only when the
+          selected saved view's viewKind has a canonical Phase 24
+          lens (per server VIEW_KIND_BLUEPRINTS.defaultLensKind).
+          Deeplinks through the T-F.135 URL-state primitive
+          (`?lensId=X` on the receiving panel). */}
+      {previewLensKind !== null && (
+        <Card>
+          <CardContent className="p-4">
+            <a
+              href={`/agent-studio/graph-lens-browser?lensId=${encodeURIComponent(previewLensKind)}`}
+              data-testid="vault-saved-views-preview-in-lens-link"
+              className="inline-block rounded border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+              title={`Open the ${previewLensKind} lens in the Graph Lens Browser`}
+            >
+              Preview in {previewLensKind} Lens →
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       {effectiveSavedViewId !== null && (
         <SavedViewVersionHistoryPanel savedViewId={effectiveSavedViewId} />
