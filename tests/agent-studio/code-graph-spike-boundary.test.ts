@@ -73,12 +73,15 @@ describe("T-E.1 — Code Graph Parser Spike boundary", () => {
     expect(src).toContain("No `neo4j-driver` imports anywhere in this tree");
   });
 
-  it("Source-scan: NO file in the spike tree (other than README) imports tree-sitter yet — T-E.2 adds the emitter", () => {
-    // T-E.1 ships docs + boundary only. T-E.2 adds the emitter.
-    // This test will be relaxed at T-E.2 to assert the import IS
-    // present (and ONLY inside the spike tree).
-    const files = walk(spikeDir).filter((f) => !f.endsWith("README.md"));
-    expect(files).toEqual([]);
+  it("T-E.2: spike tree contains the emitter + sample-ingest scripts", () => {
+    expect(existsSync(join(spikeDir, "parse-ts-file.ts"))).toBe(true);
+    expect(existsSync(join(spikeDir, "run-sample-ingest.ts"))).toBe(true);
+  });
+
+  it("T-E.2: parse-ts-file.ts imports tree-sitter + tree-sitter-typescript inside the spike tree", () => {
+    const src = readFileSync(join(spikeDir, "parse-ts-file.ts"), "utf8");
+    expect(src).toMatch(/from\s+["']tree-sitter["']/);
+    expect(src).toMatch(/from\s+["']tree-sitter-typescript["']/);
   });
 
   it("Source-scan: no tree-sitter import outside the spike tree (anywhere in server/ or client/src/)", () => {
