@@ -717,7 +717,15 @@ export function summarizeImpactPathValidationOutcomes(
     if (o.ok) ok += 1;
     else {
       failed += 1;
-      failedByReason[o.reason] += 1;
+      // Precedent (s) — explicit narrow under the project's
+      // `strict: false` tsconfig; surfaced when T-G.3.5 lens
+      // runner pulled this file into compilation via the boot.ts
+      // → graph-lens public-api chain.
+      const failedOutcome = o as Extract<
+        CanonicalImpactPathValidationOutcome,
+        { readonly ok: false }
+      >;
+      failedByReason[failedOutcome.reason] += 1;
     }
   }
   return {
