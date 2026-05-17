@@ -33,6 +33,10 @@ import {
   recordFailureStateEvent,
   type RecordFailureStateEventInput,
 } from "../../failure-states/observability-bridge.js";
+import {
+  emitGoldenQuestionFailureProposal,
+  type GoldenQuestionFailureProposalWriter,
+} from "./failure-correction-bridge.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -82,6 +86,25 @@ export interface LiveEvaluationOptions {
   readonly recordFailureStateEvent?:
     | ((input: RecordFailureStateEventInput) => Promise<unknown>)
     | null;
+  /**
+   * T-D.5 — Optional correction-proposal writer. When supplied, every
+   * failed golden question additionally emits a
+   * `review_golden_question_failure` proposal into
+   * `ags_graph_correction_proposals` so operators can triage the
+   * implicated retrieval / agent surface via the existing
+   * approve-and-apply UI. Default: undefined (no proposal emission —
+   * preserves backwards compatibility with callers that haven't
+   * wired the bridge yet). Set to `null` to suppress emission even
+   * when a wrapper would default it.
+   */
+  readonly emitGoldenQuestionFailureProposal?:
+    | GoldenQuestionFailureProposalWriter
+    | null;
+  /**
+   * T-D.5 — Optional agent id attributed to the system-internal
+   * evaluator when emitting correction proposals.
+   */
+  readonly proposedByAgentId?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -321,6 +344,20 @@ export async function runLiveEvaluation(
             engineErrored: scored.error !== undefined,
             failureCount: scored.failures.length,
           },
+        });
+      }
+      // T-D.5 — Also emit a correction proposal so the failure flows
+      // into the operator triage UI via the existing approve-and-apply
+      // chain. Fire-and-forget; null disables; undefined skips.
+      if (
+        !scored.passed &&
+        options.emitGoldenQuestionFailureProposal !== undefined &&
+        options.emitGoldenQuestionFailureProposal !== null
+      ) {
+        void emitGoldenQuestionFailureProposal(scored, {
+          workspaceId: options.workspaceId,
+          proposedByAgentId: options.proposedByAgentId,
+          proposalWriter: options.emitGoldenQuestionFailureProposal,
         });
       }
     }
