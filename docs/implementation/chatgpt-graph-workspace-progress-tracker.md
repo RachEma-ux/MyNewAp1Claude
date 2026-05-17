@@ -746,3 +746,91 @@ T-G acceptance criteria, the three open items are:
 The natural next pivot is the cross-graph impact-analysis surface
 (read-side, can mount at `agentStudio.crossGraphImpact.*` if a new
 router is needed) or the T-G.3.ε rejection-telemetry follow-up.
+
+## 20. T-G.5.α + T-G.3.ε + permission-rules audit closure (2026-05-17)
+
+Continues full-autonomous execution. Three additive PRs close the
+remaining T-G acceptance items short of the deferred work
+(Cypher-template-backed traversal executor + Neo4j CE perf
+benchmark).
+
+### Ledger
+
+| # | PR | Slice | Surface |
+|---|---|---|---|
+| 1 | #1425 | T-G.5.α | `agentStudio.impactAnalysis.{listKnownKinds, summarizeResult}` |
+| 2 | #1426 | T-G.3.ε | `agentStudio.securityGraph.listRecentRejectionsByReason` |
+
+(This PR is the closure receipt + permission-rules audit memo —
+docs-only, no procedure additions.)
+
+### Permission-rules audit across T-G.1-.5
+
+Confirms the standing CLAUDE.md hard-rule "Permission rules enforced"
+holds across all 5 T-G sub-systems' operator-facing tRPC surfaces.
+
+| Sub-system | Router floor | Per-row gate | Per-edge gate | Notes |
+|---|---|---|---|---|
+| T-G.1 institutionalMemory | (lens runners) | `viewer.userId != null` post-filter | n/a (lens not a router) | Hidden rows preserved with `visible:false` + label/meta stripped — never silent drop. `hiddenNodeCount` surfaces "you're missing N" |
+| T-G.2 codeGraph (5 procs) | `adminProcedure` | n/a (admin scope) | n/a | Lens-side gating in code-intelligence-lens-runner; router is admin-only triage surface |
+| T-G.3 securityGraph (7 procs) | `adminProcedure` | n/a (admin scope) | n/a | Per remaining-execution-plan: "security findings are not workspace-public" → admin is the floor; downstream workspace-scoping (if added later) goes ON TOP, never below |
+| T-G.4 recommendation (3 procs) | `adminProcedure` | GraphRAG safety-event channel: `hidden` / `redacted` / `visible` | n/a | The engine permission-classifies per-candidate; admin DOES NOT bypass. Redacted items preserved with placeholder so rank slot survives without leaking content |
+| T-G.5 impactAnalysis (2 procs) | `adminProcedure` | Pure aggregator — no permission decisions; caller-supplied input | n/a | Caller's input already carries `visible:false` flags from upstream traversal; the summary aggregator counts hidden vs visible WITHOUT examining content |
+
+Findings:
+1. **All 5 sub-systems use `adminProcedure` at the router floor.**
+   Operator-dashboard triage surfaces are admin-scoped today;
+   workspace-member surfaces (if added) layer on top, never under.
+2. **No "silent drop" of permission-denied items.** Every sub-system
+   preserves the item slot with a redaction/hidden marker. Operators
+   always see "there's more here you can't see" via either
+   `hiddenNodeCount` (T-G.1 lens), partial-success per-kind
+   `error` discriminator (T-G.4.β), or the explicit
+   `permissionStatus` enum on every recommendation (T-G.4).
+3. **GraphRAG safety-event channel is the sole permission-decision
+   seam in the recommendation engine.** The candidate fetcher reads
+   safety events from the GraphRAG router output; the assemble-
+   response decision logic classifies into `hidden / redacted /
+   visible`. The tRPC router does not re-decide.
+4. **No bypass paths.** All tRPC procedures route through the
+   appropriate service factory (`createCodeGraphStore` /
+   `createSecurityGraphStore` / `createRecommendationService` /
+   `new GraphRetrievalRouter(getGraphRepository())`); none of them
+   construct a raw `neo4j-driver` session, dispatch via MCP
+   directly, or call OpenRouter directly.
+5. **Source-scan tests guard each mount.** Every T-G router
+   (`code-graph`, `security-graph`, `recommendation`,
+   `impact-analysis`) has a source-scan integrity test that fails
+   loudly if the mount is removed from `api/router.ts` — guards
+   against silent drift per
+   `reference_tsconfig_excludes_hide_trpc_mount_drift`.
+
+### T-G acceptance status after this closure
+
+| Item | Status |
+|---|---|
+| Institutional Memory Lens works | ✓ (T-G.1 7-typeKey ladder) |
+| Code Intelligence Graph ingestion read surface | ✓ (T-G.2 5-PR stack) |
+| Security Graph Lens works | ✓ (T-G.3 4-PR stack + ε rejection telemetry) |
+| Recommendation service pattern works | ✓ (T-G.4 2-PR stack) |
+| Impact analysis read surface (kinds + summary) | ✓ (T-G.5.α) |
+| Impact analysis cross-graph traversal executor | **DEFERRED** — needs Cypher-template review (T-G.5.β candidate) |
+| Neo4j CE performance benchmark | **BLOCKED** — needs a running Neo4j (infra-dependent) |
+| Permission rules enforced | ✓ (this audit memo) |
+
+### Sub-arc carry-forward lesson (single, since this is a closure)
+
+**"Mirror sub-systems before innovating new shapes."** T-G.5.α and
+T-G.3.ε both shipped in <30 LoC of router code each because they
+mirror the patterns established by T-G.2.α/T-G.3.α (read-only
+operator-facing tRPC surface) and T-G.2.ε (rejection/error
+telemetry flatten). When the cross-graph pattern reuse template
+fits, ship it line-for-line; defer the actual graph-traversal
+innovation to its own arc (T-G.5.β).
+
+Recommendation: T-G is substantially closed at this milestone.
+Remaining work is two items: (1) the impact-analysis traversal
+executor (Cypher templates) — a multi-PR arc that deserves its own
+ADR and design pass; (2) the Neo4j CE performance benchmark — needs
+a running Neo4j deployment, infra-dependent. Both are appropriate
+to gate on explicit user direction.
