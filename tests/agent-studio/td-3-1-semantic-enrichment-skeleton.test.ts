@@ -90,10 +90,9 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
 
   // ── factory-throws placeholders (precedent (p)) ───────────────
 
-  it("agent / store / evidence-collector / proposer all throw T-D.3.1 placeholders", () => {
+  it("agent / evidence-collector / proposer still throw T-D.3.1 placeholders (store flipped @ T-D.3.2)", () => {
     const expected: Array<[string, string]> = [
       ["semantic-enrichment-agent.ts", "T-D.3.1] createSemanticEnrichmentAgent"],
-      ["semantic-enrichment-store.ts", "T-D.3.1] createSemanticEnrichmentStore"],
       [
         "semantic-enrichment-evidence-collector.ts",
         "T-D.3.1] createSemanticEnrichmentEvidenceCollector",
@@ -104,6 +103,9 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
       const src = readFile(join(DIR, file));
       expect(src).toContain(marker);
     }
+    // Store has been flipped — must no longer carry the placeholder tag.
+    const storeSrc = readFile(join(DIR, "semantic-enrichment-store.ts"));
+    expect(storeSrc).not.toMatch(/\[T-D\.3\.1\][\s\S]*createSemanticEnrichmentStore/);
   });
 
   // ── boundary discipline (hard rules) ──────────────────────────
@@ -252,7 +254,7 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
     expect(isSemanticEnrichmentProposalKind(undefined)).toBe(false);
   });
 
-  it("factory-throws fire with [T-D.3.1] tagged messages", async () => {
+  it("agent / evidence-collector / proposer factory-throws fire with [T-D.3.1] tagged messages (store flipped @ T-D.3.2)", async () => {
     const {
       createSemanticEnrichmentAgent,
       createSemanticEnrichmentStore,
@@ -261,7 +263,7 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
     } = await import(
       "../../server/agent-studio/services/graph-enrichment/public-api"
     );
-    const store = createSemanticEnrichmentStore({ db: {} });
+    const store = createSemanticEnrichmentStore();
     const collector = createSemanticEnrichmentEvidenceCollector({
       noteVersionReader: {},
     });
@@ -272,7 +274,6 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
       proposer,
     });
     await expect(agent.run({ workspaceId: 1 })).rejects.toThrow(/T-D\.3\.1/);
-    await expect(store.beginRun({ workspaceId: 1 })).rejects.toThrow(/T-D\.3\.1/);
     await expect(
       collector.collect({ workspaceId: 1, targetTypeKey: "note", targetId: 1 }),
     ).rejects.toThrow(/T-D\.3\.1/);
