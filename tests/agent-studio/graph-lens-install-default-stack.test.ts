@@ -31,7 +31,7 @@ describe("maybeInstallDefaultLensStack — both env flags on", () => {
     expect(result.fullyInstalled).toBe(true);
     expect(result.lenses.installed).toBe(true);
     expect(result.runners.installed).toBe(true);
-    expect(listGraphLenses()).toHaveLength(8);
+    expect(listGraphLenses()).toHaveLength(9);
     expect(listLensRunnerKinds()).toHaveLength(GRAPH_LENS_KINDS.length);
   });
 });
@@ -44,7 +44,7 @@ describe("maybeInstallDefaultLensStack — only one flag on", () => {
     expect(result.fullyInstalled).toBe(false);
     expect(result.lenses.installed).toBe(true);
     expect(result.runners.installed).toBe(false);
-    expect(listGraphLenses()).toHaveLength(8);
+    expect(listGraphLenses()).toHaveLength(9);
     expect(listLensRunnerKinds()).toEqual([]);
   });
 
@@ -91,7 +91,7 @@ describe("Result shape integrity", () => {
         AGS_GRAPH_LENS_STUB_RUNNERS_INSTALL: "on",
       },
     });
-    expect(result.lenses.installedIds).toHaveLength(8);
+    expect(result.lenses.installedIds).toHaveLength(9);
     expect(result.runners.installedKinds).toHaveLength(
       GRAPH_LENS_KINDS.length,
     );

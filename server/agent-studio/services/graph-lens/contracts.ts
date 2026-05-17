@@ -30,8 +30,10 @@
 // ============================================================================
 
 /**
- * 8 lens kinds. Closed taxonomy — extending requires editing this
- * constant + an ADR. Mirrors roadmap §"Phase 24" Lens enumeration.
+ * 9 lens kinds. Closed taxonomy — extending requires editing this
+ * constant + an ADR. Mirrors roadmap §"Phase 24" Lens enumeration
+ * + T-G.2 (code_intelligence added at T-G.2.5 per the Phase 25
+ * Code Intelligence Graph track of the remaining execution plan).
  */
 export const GRAPH_LENS_KINDS = [
   "rag",
@@ -42,6 +44,7 @@ export const GRAPH_LENS_KINDS = [
   "governance",
   "runtime",
   "institutional_memory",
+  "code_intelligence",
 ] as const;
 
 export type GraphLensKind = (typeof GRAPH_LENS_KINDS)[number];
@@ -106,6 +109,11 @@ export const GRAPH_LENS_KIND_METADATA: Readonly<
     label: "Institutional Memory",
     description:
       "People / teams / decisions / policies — the organizational graph.",
+  },
+  code_intelligence: {
+    label: "Code Intelligence",
+    description:
+      "Code graph — files, classes, functions, API endpoints + import/call/declares relationships parsed from this repo via tree-sitter (T-G.2).",
   },
 };
 

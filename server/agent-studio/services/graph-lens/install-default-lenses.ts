@@ -33,7 +33,7 @@ import { registerGraphLens } from "./registry.js";
 const ENV_KEY = "AGS_GRAPH_LENS_DEFAULTS_INSTALL";
 
 /**
- * 8 default lens definitions, one per closed `GRAPH_LENS_KINDS`
+ * 9 default lens definitions, one per closed `GRAPH_LENS_KINDS`
  * value. Each carries a sensible default layout + scope; operators
  * can register additional lenses of the same kind for tenant-specific
  * variants.
@@ -121,6 +121,17 @@ export const DEFAULT_GRAPH_LENS_DEFINITIONS: ReadonlyArray<GraphLensDefinition> 
       "roadmap §Phase 25. Skeleton-only until T-G.1 concrete projection " +
       "lands.",
   },
+  {
+    id: "code_intelligence_default",
+    kind: "code_intelligence",
+    label: "Code Intelligence Lens",
+    layout: "force_directed",
+    governanceScope: "workspace_members",
+    description:
+      "Surfaces files / classes / functions / API endpoints + " +
+      "imports / calls / declares relationships parsed from this repo. " +
+      "Backed by ags_code_graph_* tables (T-G.2.3).",
+  },
 ];
 
 export interface MaybeInstallDefaultGraphLensesOptions {
@@ -138,7 +149,7 @@ export interface MaybeInstallDefaultGraphLensesResult {
 /**
  * Boot-time opt-in installer. Mirrors the AS-4 envflag installer
  * pattern. Reads `AGS_GRAPH_LENS_DEFAULTS_INSTALL`; when "on",
- * registers the 8 default lens definitions.
+ * registers the 9 default lens definitions.
  */
 export function maybeInstallDefaultGraphLenses(
   options: MaybeInstallDefaultGraphLensesOptions = {},

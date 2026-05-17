@@ -335,6 +335,32 @@ export {
 } from "./install-institutional-memory-lens-runner.js";
 
 export {
+  buildCodeIntelligenceLensSnapshot,
+  clampCodeIntelligenceLensLimit,
+  createCodeIntelligenceLensRunner,
+  isCodeIntelligenceNodeVisibleToViewer,
+  CODE_INTELLIGENCE_LENS_ABSOLUTE_LIMIT,
+  CODE_INTELLIGENCE_LENS_DEFAULT_LIMIT,
+  type BuildCodeIntelligenceLensSnapshotInput,
+  type CreateCodeIntelligenceLensRunnerDeps,
+} from "./runners/code-intelligence-lens-runner.js";
+
+export {
+  readCodeIntelligenceLensFromAsdb,
+  type CodeIntelligenceLensReadFn,
+  type CodeIntelligenceLensReadParams,
+  type CodeIntelligenceLensReadResult,
+} from "./runners/code-intelligence-lens-asdb-reader.js";
+
+export {
+  maybeInstallCodeIntelligenceLensRunner,
+  maybeInstallCodeIntelligenceLensRunnerWithAsdb,
+  type MaybeInstallCodeIntelligenceLensRunnerOptions,
+  type MaybeInstallCodeIntelligenceLensRunnerResult,
+  type MaybeInstallCodeIntelligenceLensRunnerWithAsdbOptions,
+} from "./install-code-intelligence-lens-runner.js";
+
+export {
   maybeInstallAllLensRunnersWithAsdb,
   type MaybeInstallAllLensRunnersWithAsdbOptions,
   type MaybeInstallAllLensRunnersWithAsdbResult,

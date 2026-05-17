@@ -6,13 +6,14 @@
  * still honors its own envflag, so an operator can enable any
  * subset by toggling individual `AGS_GRAPH_LENS_<KIND>_RUNNER_INSTALL`
  * flags. This file just lets the production boot step write ONE
- * line instead of 8.
+ * line instead of N.
  *
- * After T-F.69 reached 8/8 coverage, this composer is the natural
- * "production wires up the full lens stack" closure step. Tests
- * verify (a) every kind is reachable, (b) coverage summary returns
- * 100% when every flag is on, and (c) any subset of flags installs
- * exactly that subset.
+ * After T-F.69 reached 8/8 coverage + T-G.2.5 added the
+ * `code_intelligence` kind (taking us to 9 lens kinds total),
+ * this composer is the natural "production wires up the full lens
+ * stack" closure step. Tests verify (a) every kind is reachable,
+ * (b) coverage summary returns 100% when every flag is on, and
+ * (c) any subset of flags installs exactly that subset.
  *
  * Hard-rule compliance (CLAUDE.md):
  *   - No `neo4j-driver` / `dispatchMcpToolCall` / `openrouter` /
@@ -54,6 +55,10 @@ import {
   maybeInstallInstitutionalMemoryLensRunnerWithAsdb,
   type MaybeInstallInstitutionalMemoryLensRunnerWithAsdbOptions,
 } from "./install-institutional-memory-lens-runner.js";
+import {
+  maybeInstallCodeIntelligenceLensRunnerWithAsdb,
+  type MaybeInstallCodeIntelligenceLensRunnerWithAsdbOptions,
+} from "./install-code-intelligence-lens-runner.js";
 
 export interface MaybeInstallAllLensRunnersWithAsdbOptions {
   /** Test seam — override env source. Each per-kind composer reads
@@ -98,6 +103,7 @@ export function maybeInstallAllLensRunnersWithAsdb(
   const racOpts: MaybeInstallRacLensRunnerWithAsdbOptions = { env, now };
   const graphSkillOpts: MaybeInstallGraphSkillLensRunnerWithAsdbOptions = { env, now };
   const instMemoryOpts: MaybeInstallInstitutionalMemoryLensRunnerWithAsdbOptions = { env, now };
+  const codeIntelligenceOpts: MaybeInstallCodeIntelligenceLensRunnerWithAsdbOptions = { env, now };
 
   const perKind: Record<GraphLensKind, boolean> = {
     rag: maybeInstallRagLensRunnerWithAsdb(ragOpts).installed,
@@ -109,6 +115,9 @@ export function maybeInstallAllLensRunnersWithAsdb(
     runtime: maybeInstallRuntimeLensRunnerWithAsdb(runtimeOpts).installed,
     institutional_memory: maybeInstallInstitutionalMemoryLensRunnerWithAsdb(
       instMemoryOpts,
+    ).installed,
+    code_intelligence: maybeInstallCodeIntelligenceLensRunnerWithAsdb(
+      codeIntelligenceOpts,
     ).installed,
   };
 
