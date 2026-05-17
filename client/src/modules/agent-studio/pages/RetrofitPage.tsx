@@ -184,7 +184,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <ObservabilityStatsPanel onClickKind={handleKindClick} />
         </TabsContent>
         <TabsContent value="observability-dashboard">
-          <ObservabilityDashboardPanel />
+          <ObservabilityDashboardPanel onClickKind={handleKindClick} />
         </TabsContent>
         <TabsContent value="admin-sweeps">
           <AdminSweepsPanel />
@@ -1435,7 +1435,44 @@ function ListSlice<T extends { id: number }>({
   );
 }
 
-function ObservabilityDashboardPanel() {
+// T-F.126 (T-F.7-j₂ extension): jobKind cell helper. Renders as a
+// clickable button when onClickKind is set (with per-kind `-click`
+// testid + title hint), plain text otherwise. Used by 4 recent-
+// jobs lists in ObservabilityDashboardPanel.
+function JobKindCell({
+  jobKind,
+  onClickKind,
+}: {
+  jobKind: string;
+  onClickKind?: (kind: string) => void;
+}) {
+  if (!onClickKind) {
+    return <span className="text-zinc-400">{jobKind}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="text-zinc-400 underline hover:text-blue-300"
+      onClick={() => onClickKind(jobKind)}
+      data-testid={`retrofit-dashboard-jobkind-${jobKind}-click`}
+      title="Fill bulk-job-ops retry+cancel forms with this kind"
+    >
+      {jobKind}
+    </button>
+  );
+}
+
+function ObservabilityDashboardPanel({
+  onClickKind,
+}: {
+  // T-F.126 (T-F.7-j₂ extension): optional click handler. When
+  // set, jobKind cells in the 4 jobKind-bearing recent-jobs lists
+  // (failed / completed / stale running / oldest pending) become
+  // buttons that fire onClickKind(jobKind). Recent error events
+  // list is unchanged because its discriminator (sourceKind) is
+  // not a valid jobKind for the retry/cancel forms.
+  onClickKind?: (kind: string) => void;
+}) {
   const q = trpc.agentStudio.workspaceObservability.getDashboard.useQuery(
     {},
     { refetchInterval: 30_000 },
@@ -1465,7 +1502,7 @@ function ObservabilityDashboardPanel() {
           <>
             <div className="flex justify-between gap-2">
               <span className="font-mono">#{j.id}</span>
-              <span className="text-zinc-400">{j.jobKind}</span>
+              <JobKindCell jobKind={j.jobKind} onClickKind={onClickKind} />
               <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
             </div>
             {j.lastError ? (
@@ -1481,7 +1518,7 @@ function ObservabilityDashboardPanel() {
         renderRow={(j: any) => (
           <div className="flex justify-between gap-2">
             <span className="font-mono">#{j.id}</span>
-            <span className="text-zinc-400">{j.jobKind}</span>
+            <JobKindCell jobKind={j.jobKind} onClickKind={onClickKind} />
             <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
           </div>
         )}
@@ -1511,7 +1548,7 @@ function ObservabilityDashboardPanel() {
         renderRow={(j: any) => (
           <div className="flex justify-between gap-2">
             <span className="font-mono">#{j.id}</span>
-            <span className="text-zinc-400">{j.jobKind}</span>
+            <JobKindCell jobKind={j.jobKind} onClickKind={onClickKind} />
             <span className="text-zinc-500">{shortTime(j.updatedAt)}</span>
           </div>
         )}
@@ -1524,7 +1561,7 @@ function ObservabilityDashboardPanel() {
           renderRow={(j: any) => (
             <div className="flex justify-between gap-2">
               <span className="font-mono">#{j.id}</span>
-              <span className="text-zinc-400">{j.jobKind}</span>
+              <JobKindCell jobKind={j.jobKind} onClickKind={onClickKind} />
               <span className="text-zinc-500">
                 queued {shortTime(j.createdAt)}
               </span>
