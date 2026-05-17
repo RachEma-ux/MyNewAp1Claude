@@ -322,6 +322,7 @@ export {
   type InstitutionalMemoryLensWorkflowRow,
   type InstitutionalMemoryLensPersonRow,
   type InstitutionalMemoryLensProjectRow,
+  type InstitutionalMemoryLensDecisionRow,
 } from "./runners/institutional-memory-lens-runner.js";
 
 export {

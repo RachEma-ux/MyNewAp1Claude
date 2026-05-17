@@ -117,6 +117,27 @@ export interface InstitutionalMemoryLensProjectRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Decision row — fourth projector-backed institutional memory node
+ * type (T-G.1.δ). Emits `inst_decision` typeKey nodes mapped from the
+ * existing `ags_approval_steps` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.decision`: approval steps ARE
+ * decisions, with the outcome (approved/rejected/pending) on
+ * `state` and the rationale on `decisionNote`.
+ */
+export interface InstitutionalMemoryLensDecisionRow {
+  readonly id: number;
+  readonly publishRequestId: number;
+  readonly stepOrder: number;
+  readonly approverRole: string;
+  /** Lifecycle state — typically pending/approved/rejected/skipped. */
+  readonly state: string;
+  readonly decidedBy: number | null;
+  readonly decisionNote: string | null;
+  readonly decidedAt: Date | null;
+  readonly createdAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
@@ -126,6 +147,8 @@ export interface InstitutionalMemoryLensReadResult {
   readonly persons?: ReadonlyArray<InstitutionalMemoryLensPersonRow>;
   /** T-G.1.γ — optional projector-backed project (workspace) reads. */
   readonly projects?: ReadonlyArray<InstitutionalMemoryLensProjectRow>;
+  /** T-G.1.δ — optional projector-backed decision reads. */
+  readonly decisions?: ReadonlyArray<InstitutionalMemoryLensDecisionRow>;
   readonly truncated: boolean;
 }
 
@@ -187,6 +210,7 @@ const DOMAIN_NODE_PREFIX = "domain:";
 const WORKFLOW_NODE_PREFIX = "workflow:";
 const PERSON_NODE_PREFIX = "person:";
 const PROJECT_NODE_PREFIX = "project:";
+const DECISION_NODE_PREFIX = "decision:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -343,6 +367,36 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_project", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const d of read.decisions ?? []) {
+    const id = `${DECISION_NODE_PREFIX}${d.id}`;
+    if (visible) {
+      // Label encodes outcome + approver-role so operators can see at
+      // a glance what was decided and by whom (role, not user — user
+      // identity is on `decidedBy` in meta).
+      const label = `${d.state}: ${d.approverRole} (step ${d.stepOrder})`;
+      nodes.push({
+        typeKey: "inst_decision",
+        id,
+        visible: true,
+        label,
+        meta: {
+          decisionId: d.id,
+          publishRequestId: d.publishRequestId,
+          stepOrder: d.stepOrder,
+          approverRole: d.approverRole,
+          state: d.state,
+          decidedBy: d.decidedBy,
+          decisionNote: d.decisionNote,
+          decidedAt: d.decidedAt ? d.decidedAt.toISOString() : null,
+          createdAt: d.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_decision", id, visible: false });
       hiddenNodeCount += 1;
     }
   }
