@@ -1203,6 +1203,58 @@ function ObservabilityStatsPanel() {
         emptyCopy="No error events recorded."
       />
 
+      {/* ── T-F.115 (T-F.7-δ): error-events-by-lane companion ──
+          Lane = first dot-segment of source kind. Higher-level
+          rollup for the same operator triage axis as
+          T-F.114 — "which subsystem is the error source dominator?" */}
+      <SingleAxisBreakdownCard
+        title="Error events by lane"
+        rowLabel="Lane"
+        data={s.errorEventsByLane}
+        testidPrefix="retrofit-error-events-by-lane"
+        emptyCopy="No error events recorded."
+      />
+
+      {/* ── T-F.115 (T-F.7-δ): error-events-by-error-class breakdown ──
+          Different axis from source-kind/lane: NOT who emitted but
+          WHAT class of exception. Operator question: "which
+          exception is happening most?" (e.g. TimeoutError vs
+          ValidationError vs DBConnectionError). Pairs with the
+          source-kind card: source-kind says where; error-class says
+          what. */}
+      <SingleAxisBreakdownCard
+        title="Error events by error class"
+        rowLabel="Error class"
+        data={s.errorEventsByErrorClass}
+        testidPrefix="retrofit-error-events-by-error-class"
+        emptyCopy="No error events recorded."
+      />
+
+      {/* ── T-F.115 (T-F.7-δ): notifications-by-kind workspace-wide ──
+          Distinct from the personal Inbox's by-kind breakdown
+          (T-F.107): that's user-scoped, this is workspace-wide
+          (every recipient summed). Operator question: "which
+          notification kinds dominate at the workspace level?" */}
+      <SingleAxisBreakdownCard
+        title="Notifications by kind (workspace-wide)"
+        rowLabel="Notification kind"
+        data={s.notificationsByKind}
+        testidPrefix="retrofit-notifications-by-kind"
+        emptyCopy="No notifications recorded."
+      />
+
+      {/* ── T-F.115 (T-F.7-δ): notifications-by-lane workspace-wide ──
+          Higher-level rollup of notifications-by-kind by first
+          dot-segment. Operator question: "which subsystem is the
+          loudest notifier?" */}
+      <SingleAxisBreakdownCard
+        title="Notifications by lane (workspace-wide)"
+        rowLabel="Lane"
+        data={s.notificationsByLane}
+        testidPrefix="retrofit-notifications-by-lane"
+        emptyCopy="No notifications recorded."
+      />
+
       {/* Error events: system vs user */}
       <Card>
         <CardContent className="p-4 space-y-3">
