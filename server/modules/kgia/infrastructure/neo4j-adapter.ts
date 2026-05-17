@@ -138,11 +138,39 @@ export async function executeNeo4jQuery(
   queryText: string,
   params?: Record<string, unknown>,
 ): Promise<Neo4jQueryResult> {
+  return runWithMode(source, queryText, params, neo4j.session.READ);
+}
+
+/**
+ * Phase 7.5b write-mode sibling of `executeNeo4jQuery`. Required
+ * by `Neo4jCommunityGraphRepository.applyProjectionJob` (graph
+ * projection writes from Postgres source-of-truth into Neo4j).
+ *
+ * Identical session + result handling to `executeNeo4jQuery`,
+ * only difference is `defaultAccessMode: neo4j.session.WRITE`.
+ * Splitting on access mode (rather than threading a parameter
+ * into `executeNeo4jQuery`) keeps the read-only invariant of the
+ * KGIA query path explicit at the call site.
+ */
+export async function executeNeo4jWrite(
+  source: GraphSource,
+  queryText: string,
+  params?: Record<string, unknown>,
+): Promise<Neo4jQueryResult> {
+  return runWithMode(source, queryText, params, neo4j.session.WRITE);
+}
+
+async function runWithMode(
+  source: GraphSource,
+  queryText: string,
+  params: Record<string, unknown> | undefined,
+  mode: typeof neo4j.session.READ | typeof neo4j.session.WRITE,
+): Promise<Neo4jQueryResult> {
   const config = parseNeo4jConfig(source);
   const driver = getDriver(config);
   const session = driver.session({
     database: config.database ?? "neo4j",
-    defaultAccessMode: neo4j.session.READ,
+    defaultAccessMode: mode,
   });
   const startTime = Date.now();
   try {
