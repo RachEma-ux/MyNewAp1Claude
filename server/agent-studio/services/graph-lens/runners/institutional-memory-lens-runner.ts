@@ -67,8 +67,24 @@ export interface InstitutionalMemoryLensAgentRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Workflow row — first projector-backed institutional memory node
+ * type beyond the legacy agent/owner/domain trio. Emits `inst_workflow`
+ * typeKey nodes mapped from the existing `workflows` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.workflow`.
+ */
+export interface InstitutionalMemoryLensWorkflowRow {
+  readonly id: number;
+  readonly name: string;
+  readonly description: string | null;
+  readonly createdAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
+  /** Optional — defaults to `[]` for callers that haven't migrated to the
+   * projector-backed shape. New typeKey-aligned reads land additively. */
+  readonly workflows?: ReadonlyArray<InstitutionalMemoryLensWorkflowRow>;
   readonly truncated: boolean;
 }
 
@@ -127,6 +143,7 @@ export interface BuildInstitutionalMemoryLensSnapshotInput {
 const AGENT_NODE_PREFIX = "agent:";
 const OWNER_NODE_PREFIX = "user:";
 const DOMAIN_NODE_PREFIX = "domain:";
+const WORKFLOW_NODE_PREFIX = "workflow:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -216,6 +233,27 @@ export function buildInstitutionalMemoryLensSnapshot(
         targetNodeId: `${DOMAIN_NODE_PREFIX}${a.domain}`,
         visible: true,
       });
+    }
+  }
+
+  for (const wf of read.workflows ?? []) {
+    const id = `${WORKFLOW_NODE_PREFIX}${wf.id}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_workflow",
+        id,
+        visible: true,
+        label: wf.name,
+        meta: {
+          workflowId: wf.id,
+          name: wf.name,
+          description: wf.description,
+          createdAt: wf.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_workflow", id, visible: false });
+      hiddenNodeCount += 1;
     }
   }
 
