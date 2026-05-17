@@ -103,11 +103,15 @@ describe("Inbox dismiss γ-slice (T-F.109 / T-F.6-γ)", () => {
     expect(src).toMatch(/Dismiss failed:/);
   });
 
-  it("banner refreshed β → γ naming dismiss live AND remaining deferred bulk actions", () => {
+  it("banner removed β copy and names dismiss live", () => {
+    // γ named "Inbox γ"; later slices (e.g. δ) extend further. Both
+    // must include mark-read + dismiss live AND still name the
+    // remaining deferred bulk actions until they ship.
     const src = readPanel();
-    expect(src).toMatch(/Inbox γ:/);
+    expect(src).toMatch(/Inbox\s+(γ|δ):/);
+    expect(src).toMatch(/mark-read\s*\+\s*dismiss\s+live/);
     expect(src).toMatch(
-      /mark-read\s*\+\s*dismiss\s+live[\s\S]{0,400}mark-all-by-kind[\s\S]{0,200}dismiss-all-by-kind[\s\S]{0,200}follow-up/,
+      /mark-all-by-kind[\s\S]{0,200}dismiss-all-by-kind[\s\S]{0,200}follow-up/,
     );
     expect(src).not.toMatch(/Inbox β:/);
   });

@@ -29,8 +29,25 @@ const INBOX_LIMIT = 50;
 
 export function InboxPanel() {
   const utils = trpc.useUtils();
+
+  // ── T-F.110 (T-F.6-δ): kind filter + unread-only toggle ──
+  // The dropdown options are derived from the unread `byKind`
+  // breakdown — operators see and pick from the LIVE taxonomy
+  // the workspace is actually emitting (precedent (o) made
+  // interactive). null = "all kinds".
+  const [selectedKind, setSelectedKind] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
+
   const inboxQuery = trpc.agentStudio.workspaceObservability.getMyInbox.useQuery(
-    { limit: INBOX_LIMIT },
+    {
+      limit: INBOX_LIMIT,
+      // tRPC zod input accepts `notificationKind: string | string[]`
+      // and `unreadOnly?: boolean`. Pass `undefined` (not `null`)
+      // when the operator hasn't narrowed, so the optional input
+      // stays optional.
+      notificationKind: selectedKind ?? undefined,
+      unreadOnly: unreadOnly || undefined,
+    },
     { staleTime: 15_000 },
   );
 
@@ -106,6 +123,24 @@ export function InboxPanel() {
     return Object.entries(unreadCount.byKind).sort((a, b) => b[1] - a[1]);
   }, [unreadCount.byKind]);
 
+  // ── T-F.110 (T-F.6-δ): dropdown options derived from the FULL
+  // unread breakdown (server's countUnreadNotifications ignores
+  // the listing filter, so byKind here is workspace-wide unread —
+  // exactly what we want for the operator's narrowing picker).
+  // Currently-selected kind is force-included so the dropdown
+  // doesn't lose its current value if it transitions to 0 unread.
+  const kindOptions = useMemo(() => {
+    const set = new Set<string>(Object.keys(unreadCount.byKind));
+    if (selectedKind != null) set.add(selectedKind);
+    return Array.from(set).sort();
+  }, [unreadCount.byKind, selectedKind]);
+
+  const filtersActive = selectedKind != null || unreadOnly;
+  const clearFilters = (): void => {
+    setSelectedKind(null);
+    setUnreadOnly(false);
+  };
+
   if (inboxQuery.isLoading) {
     return (
       <div className="text-sm text-muted-foreground" data-testid="inbox-loading">
@@ -129,11 +164,54 @@ export function InboxPanel() {
         data-testid="inbox-banner"
       >
         <div>
-          <span className="font-medium text-foreground">Inbox γ:</span>{" "}
-          mark-read + dismiss live (per-row). The server also supports
-          mark-all-by-kind and dismiss-all-by-kind bulk actions — those land
-          in follow-up slices.
+          <span className="font-medium text-foreground">Inbox δ:</span>{" "}
+          mark-read + dismiss live (per-row); kind filter + unread-only toggle
+          live. The server also supports mark-all-by-kind and dismiss-all-by-kind
+          bulk actions — those land in follow-up slices.
         </div>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center gap-2"
+        data-testid="inbox-filter-bar"
+      >
+        <label className="flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground">Kind</span>
+          <select
+            className="rounded border bg-background px-2 py-0.5 text-xs"
+            value={selectedKind ?? ""}
+            onChange={(e) =>
+              setSelectedKind(e.target.value === "" ? null : e.target.value)
+            }
+            data-testid="inbox-filter-kind"
+          >
+            <option value="">All kinds</option>
+            {kindOptions.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1 text-xs">
+          <input
+            type="checkbox"
+            checked={unreadOnly}
+            onChange={(e) => setUnreadOnly(e.target.checked)}
+            data-testid="inbox-filter-unread-only"
+          />
+          <span>Unread only</span>
+        </label>
+        {filtersActive ? (
+          <button
+            type="button"
+            className="rounded border px-2 py-0.5 text-xs hover:bg-muted"
+            onClick={clearFilters}
+            data-testid="inbox-filter-clear"
+          >
+            Clear filters
+          </button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -169,13 +247,20 @@ export function InboxPanel() {
           ) : (
             <ul className="mt-1 space-y-0.5">
               {byKindEntries.map(([kind, n]) => (
-                <li
-                  key={kind}
-                  className="flex items-baseline justify-between gap-2 text-sm"
-                  data-testid={`inbox-by-kind-row-${kind}`}
-                >
-                  <span className="truncate font-mono text-xs">{kind}</span>
-                  <span className="tabular-nums">{n}</span>
+                <li key={kind}>
+                  <button
+                    type="button"
+                    className={
+                      selectedKind === kind
+                        ? "flex w-full items-baseline justify-between gap-2 rounded bg-accent px-1 py-0.5 text-left text-sm"
+                        : "flex w-full items-baseline justify-between gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-muted"
+                    }
+                    onClick={() => setSelectedKind(kind)}
+                    data-testid={`inbox-by-kind-row-${kind}`}
+                  >
+                    <span className="truncate font-mono text-xs">{kind}</span>
+                    <span className="tabular-nums">{n}</span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -188,12 +273,28 @@ export function InboxPanel() {
           Recent notifications (up to {INBOX_LIMIT})
         </div>
         {notifications.length === 0 ? (
-          <div
-            className="px-3 py-4 text-sm text-muted-foreground"
-            data-testid="inbox-list-empty"
-          >
-            No notifications.
-          </div>
+          filtersActive ? (
+            <div
+              className="px-3 py-4 text-sm text-muted-foreground"
+              data-testid="inbox-list-empty-filtered"
+            >
+              No notifications match the current filters.{" "}
+              <button
+                type="button"
+                className="underline hover:no-underline"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div
+              className="px-3 py-4 text-sm text-muted-foreground"
+              data-testid="inbox-list-empty"
+            >
+              No notifications.
+            </div>
+          )
         ) : (
           <ul className="divide-y">
             {notifications.map((n) => (
