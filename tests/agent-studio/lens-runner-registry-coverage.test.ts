@@ -59,16 +59,16 @@ describe("summarizeLensRunnerRegistry (T-F.12)", () => {
     expect(s.coveragePercent).toBe(100);
   });
 
-  it("coveragePercent has 1-decimal precision (9 kinds, 3 registered = 33.3%)", () => {
-    if (GRAPH_LENS_KINDS.length !== 9) {
-      // Test assumes 9 kinds — skip cleanly if taxonomy changes.
+  it("coveragePercent has 1-decimal precision (10 kinds, 3 registered = 30.0%)", () => {
+    if (GRAPH_LENS_KINDS.length !== 10) {
+      // Test assumes 10 kinds — skip cleanly if taxonomy changes.
       return;
     }
     registerLensRunner(GRAPH_LENS_KINDS[0], stub);
     registerLensRunner(GRAPH_LENS_KINDS[1], stub);
     registerLensRunner(GRAPH_LENS_KINDS[2], stub);
     const s = summarizeLensRunnerRegistry();
-    expect(s.coveragePercent).toBe(33.3);
+    expect(s.coveragePercent).toBe(30);
   });
 
   it("registeredKinds + missingKinds.length == totalKinds", () => {

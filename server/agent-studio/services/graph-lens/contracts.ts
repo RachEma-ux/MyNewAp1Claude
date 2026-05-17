@@ -30,10 +30,14 @@
 // ============================================================================
 
 /**
- * 9 lens kinds. Closed taxonomy — extending requires editing this
- * constant + an ADR. Mirrors roadmap §"Phase 24" Lens enumeration
- * + T-G.2 (code_intelligence added at T-G.2.5 per the Phase 25
- * Code Intelligence Graph track of the remaining execution plan).
+ * 10 lens kinds. Closed taxonomy — extending requires editing this
+ * constant + an ADR. Mirrors roadmap §"Phase 24" Lens enumeration:
+ *   - 8 original kinds (rag/rac/cag/graph_skill/mcp/governance/
+ *     runtime/institutional_memory)
+ *   - +code_intelligence (T-G.2.5 — Code Intelligence Graph)
+ *   - +security_devsecops (T-G.3.5 — Security/DevSecOps Graph
+ *     Lens; approver_only scope because security findings are
+ *     not workspace-public)
  */
 export const GRAPH_LENS_KINDS = [
   "rag",
@@ -45,6 +49,7 @@ export const GRAPH_LENS_KINDS = [
   "runtime",
   "institutional_memory",
   "code_intelligence",
+  "security_devsecops",
 ] as const;
 
 export type GraphLensKind = (typeof GRAPH_LENS_KINDS)[number];
@@ -114,6 +119,11 @@ export const GRAPH_LENS_KIND_METADATA: Readonly<
     label: "Code Intelligence",
     description:
       "Code graph — files, classes, functions, API endpoints + import/call/declares relationships parsed from this repo via tree-sitter (T-G.2).",
+  },
+  security_devsecops: {
+    label: "Security / DevSecOps",
+    description:
+      "CVE → Package → Component → Service → Environment → Owner → CustomerExposure impact graph (T-G.3). Approver-only because security findings are not workspace-public.",
   },
 };
 

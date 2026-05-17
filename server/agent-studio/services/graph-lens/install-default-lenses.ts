@@ -33,7 +33,7 @@ import { registerGraphLens } from "./registry.js";
 const ENV_KEY = "AGS_GRAPH_LENS_DEFAULTS_INSTALL";
 
 /**
- * 9 default lens definitions, one per closed `GRAPH_LENS_KINDS`
+ * 10 default lens definitions, one per closed `GRAPH_LENS_KINDS`
  * value. Each carries a sensible default layout + scope; operators
  * can register additional lenses of the same kind for tenant-specific
  * variants.
@@ -132,6 +132,17 @@ export const DEFAULT_GRAPH_LENS_DEFINITIONS: ReadonlyArray<GraphLensDefinition> 
       "imports / calls / declares relationships parsed from this repo. " +
       "Backed by ags_code_graph_* tables (T-G.2.3).",
   },
+  {
+    id: "security_devsecops_default",
+    kind: "security_devsecops",
+    label: "Security / DevSecOps Lens",
+    layout: "dependency_path",
+    governanceScope: "approver_only",
+    description:
+      "Surfaces CVE → Package → Component → Service → Environment → Owner → " +
+      "CustomerExposure impact path. Backed by ags_security_graph_* tables " +
+      "(T-G.3.3). Approver-only because security findings are not workspace-public.",
+  },
 ];
 
 export interface MaybeInstallDefaultGraphLensesOptions {
@@ -149,7 +160,7 @@ export interface MaybeInstallDefaultGraphLensesResult {
 /**
  * Boot-time opt-in installer. Mirrors the AS-4 envflag installer
  * pattern. Reads `AGS_GRAPH_LENS_DEFAULTS_INSTALL`; when "on",
- * registers the 9 default lens definitions.
+ * registers the 10 default lens definitions.
  */
 export function maybeInstallDefaultGraphLenses(
   options: MaybeInstallDefaultGraphLensesOptions = {},

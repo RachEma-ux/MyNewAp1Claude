@@ -59,6 +59,10 @@ import {
   maybeInstallCodeIntelligenceLensRunnerWithAsdb,
   type MaybeInstallCodeIntelligenceLensRunnerWithAsdbOptions,
 } from "./install-code-intelligence-lens-runner.js";
+import {
+  maybeInstallSecurityDevSecOpsLensRunnerWithAsdb,
+  type MaybeInstallSecurityDevSecOpsLensRunnerWithAsdbOptions,
+} from "./install-security-devsecops-lens-runner.js";
 
 export interface MaybeInstallAllLensRunnersWithAsdbOptions {
   /** Test seam — override env source. Each per-kind composer reads
@@ -104,6 +108,7 @@ export function maybeInstallAllLensRunnersWithAsdb(
   const graphSkillOpts: MaybeInstallGraphSkillLensRunnerWithAsdbOptions = { env, now };
   const instMemoryOpts: MaybeInstallInstitutionalMemoryLensRunnerWithAsdbOptions = { env, now };
   const codeIntelligenceOpts: MaybeInstallCodeIntelligenceLensRunnerWithAsdbOptions = { env, now };
+  const securityDevSecOpsOpts: MaybeInstallSecurityDevSecOpsLensRunnerWithAsdbOptions = { env, now };
 
   const perKind: Record<GraphLensKind, boolean> = {
     rag: maybeInstallRagLensRunnerWithAsdb(ragOpts).installed,
@@ -118,6 +123,9 @@ export function maybeInstallAllLensRunnersWithAsdb(
     ).installed,
     code_intelligence: maybeInstallCodeIntelligenceLensRunnerWithAsdb(
       codeIntelligenceOpts,
+    ).installed,
+    security_devsecops: maybeInstallSecurityDevSecOpsLensRunnerWithAsdb(
+      securityDevSecOpsOpts,
     ).installed,
   };
 
