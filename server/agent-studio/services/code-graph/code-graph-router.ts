@@ -52,6 +52,7 @@ import {
   type CodeGraphIngestionListRow,
   type CodeGraphIngestionStats,
   type CodeGraphRepositorySummaryRow,
+  type CodeGraphRecentParserErrorRow,
 } from "./persistence/public-api.js";
 import {
   CODE_GRAPH_NODE_TYPES,
@@ -98,6 +99,15 @@ const ListRepositoriesInput = z
   })
   .optional();
 
+const ListRecentParserErrorsInput = z
+  .object({
+    /** Cap on ingestions scanned. */
+    ingestionLimit: z.number().int().positive().max(200).optional(),
+    /** Cap on total parser-error rows returned. */
+    errorLimit: z.number().int().positive().max(500).optional(),
+  })
+  .optional();
+
 // ============================================================================
 // Defaults
 // ============================================================================
@@ -108,6 +118,10 @@ export const CODE_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
 export const CODE_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
 export const CODE_GRAPH_LIST_REPOSITORIES_DEFAULT_LIMIT = 50;
 export const CODE_GRAPH_LIST_REPOSITORIES_ABSOLUTE_LIMIT = 200;
+export const CODE_GRAPH_RECENT_PARSER_ERRORS_DEFAULT_INGESTION_LIMIT = 20;
+export const CODE_GRAPH_RECENT_PARSER_ERRORS_DEFAULT_ERROR_LIMIT = 100;
+export const CODE_GRAPH_RECENT_PARSER_ERRORS_ABSOLUTE_INGESTION_LIMIT = 200;
+export const CODE_GRAPH_RECENT_PARSER_ERRORS_ABSOLUTE_ERROR_LIMIT = 500;
 
 // ============================================================================
 // Output envelopes
@@ -119,6 +133,10 @@ export interface CodeGraphListIngestionsEnvelope {
 
 export interface CodeGraphListRepositoriesEnvelope {
   readonly repositories: ReadonlyArray<CodeGraphRepositorySummaryRow>;
+}
+
+export interface CodeGraphRecentParserErrorsEnvelope {
+  readonly errors: ReadonlyArray<CodeGraphRecentParserErrorRow>;
 }
 
 /**
@@ -180,6 +198,45 @@ export const codeGraphRouter = router({
         });
       }
     }),
+
+  /**
+   * Recent parser errors unioned across the most-recent ingestions.
+   * Each ingestion persists at most 50 parser-error rows on its
+   * `metadata.parserErrors` audit list; this procedure flattens
+   * those out across the N most-recent ingestions that have
+   * `parserErrorCount > 0` and applies a total-row cap.
+   *
+   * Newest-first by `ingestionStartedAt`, then by `filePath`
+   * within an ingestion for deterministic order.
+   */
+  listRecentParserErrors: adminProcedure
+    .input(ListRecentParserErrorsInput)
+    .query(
+      async ({ input }): Promise<CodeGraphRecentParserErrorsEnvelope> => {
+        const ingestionLimit =
+          input?.ingestionLimit ??
+          CODE_GRAPH_RECENT_PARSER_ERRORS_DEFAULT_INGESTION_LIMIT;
+        const errorLimit =
+          input?.errorLimit ??
+          CODE_GRAPH_RECENT_PARSER_ERRORS_DEFAULT_ERROR_LIMIT;
+        try {
+          const store = createCodeGraphStore();
+          const errors = await store.listRecentParserErrors({
+            ingestionLimit,
+            errorLimit,
+          });
+          return { errors };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error
+                ? err.message
+                : "listRecentParserErrors failed",
+          });
+        }
+      },
+    ),
 
   /**
    * Per-repository summary: most-recent ingestion + freshness anchor
