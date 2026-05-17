@@ -846,6 +846,73 @@ function MiniTrend({
   );
 }
 
+// ── T-F.114 (T-F.7-γ): single-axis breakdown card helper.
+// Renders a Record<string, number> as a two-column table (label
+// + count) sorted by count descending. Reusable across error
+// events / notifications / future emission-taxonomy surfaces.
+// Jobs cards stay separate because they're 4-axis (total + 3
+// operational statuses), not 1-axis.
+function SingleAxisBreakdownCard({
+  title,
+  rowLabel,
+  data,
+  testidPrefix,
+  emptyCopy,
+}: {
+  title: string;
+  rowLabel: string;
+  data: Record<string, number>;
+  testidPrefix: string;
+  emptyCopy: string;
+}) {
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <SectionLabel>{title}</SectionLabel>
+        {entries.length === 0 ? (
+          <div
+            className="text-sm text-zinc-500"
+            data-testid={`${testidPrefix}-empty`}
+          >
+            {emptyCopy}
+          </div>
+        ) : (
+          <div
+            className="overflow-auto rounded border border-zinc-800"
+            data-testid={`${testidPrefix}-card`}
+          >
+            <table className="w-full text-xs">
+              <thead className="bg-zinc-900/60 text-zinc-400">
+                <tr>
+                  <th className="px-2 py-1 text-left font-medium uppercase">
+                    {rowLabel}
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium uppercase">
+                    Count
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map(([k, n]) => (
+                  <tr
+                    key={k}
+                    className="border-t border-zinc-800"
+                    data-testid={`${testidPrefix}-row-${k}`}
+                  >
+                    <td className="px-2 py-1 font-mono">{k}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{n}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── T-F.112 (T-F.7-α): jobs-by-kind breakdown card.
 // Reads the 4 jobKind axes from getStats (total, failed, pending,
 // running) and renders them as a per-kind 5-column table sorted
@@ -1120,6 +1187,20 @@ function ObservabilityStatsPanel() {
         failedJobsByLane={s.failedJobsByLane}
         pendingJobsByLane={s.pendingJobsByLane}
         runningJobsByLane={s.runningJobsByLane}
+      />
+
+      {/* ── T-F.114 (T-F.7-γ): error-events-by-source-kind breakdown ──
+          Single-axis (count only — error events don't have the
+          failed/pending/running operational status that jobs do).
+          Pre-existing in `s.errorEventsBySourceKind` since stats.ts
+          shipped. Operator question: "which emission source is
+          spewing the most errors?" */}
+      <SingleAxisBreakdownCard
+        title="Error events by source kind"
+        rowLabel="Source kind"
+        data={s.errorEventsBySourceKind}
+        testidPrefix="retrofit-error-events-by-source-kind"
+        emptyCopy="No error events recorded."
       />
 
       {/* Error events: system vs user */}
