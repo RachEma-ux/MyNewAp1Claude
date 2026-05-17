@@ -138,6 +138,29 @@ export interface InstitutionalMemoryLensDecisionRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Outcome row — fifth projector-backed institutional memory node
+ * type (T-G.1.ε). Emits `inst_outcome` typeKey nodes mapped from the
+ * existing `ags_runtime_runs` table per
+ * `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.outcome`: runtime runs PRODUCE
+ * outcomes, with `status` carrying the terminal verdict and `summary`
+ * carrying the rationale. `agentKey` is denormalized into the read
+ * row so the lens can label outcomes without joining back to agents.
+ */
+export interface InstitutionalMemoryLensOutcomeRow {
+  readonly id: number;
+  readonly agentId: number;
+  /** Denormalized from `agsAgents.internalKey` for label-without-join. */
+  readonly agentKey: string;
+  readonly environment: string;
+  /** Lifecycle status — pending/running/succeeded/failed/aborted/etc. */
+  readonly status: string;
+  readonly summary: string | null;
+  readonly durationMs: number | null;
+  readonly finishedAt: Date | null;
+  readonly createdAt: Date;
+}
+
 export interface InstitutionalMemoryLensReadResult {
   readonly agents: ReadonlyArray<InstitutionalMemoryLensAgentRow>;
   /** Optional — defaults to `[]` for callers that haven't migrated to the
@@ -149,6 +172,8 @@ export interface InstitutionalMemoryLensReadResult {
   readonly projects?: ReadonlyArray<InstitutionalMemoryLensProjectRow>;
   /** T-G.1.δ — optional projector-backed decision reads. */
   readonly decisions?: ReadonlyArray<InstitutionalMemoryLensDecisionRow>;
+  /** T-G.1.ε — optional projector-backed outcome (runtime run) reads. */
+  readonly outcomes?: ReadonlyArray<InstitutionalMemoryLensOutcomeRow>;
   readonly truncated: boolean;
 }
 
@@ -211,6 +236,7 @@ const WORKFLOW_NODE_PREFIX = "workflow:";
 const PERSON_NODE_PREFIX = "person:";
 const PROJECT_NODE_PREFIX = "project:";
 const DECISION_NODE_PREFIX = "decision:";
+const OUTCOME_NODE_PREFIX = "outcome:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -397,6 +423,35 @@ export function buildInstitutionalMemoryLensSnapshot(
       });
     } else {
       nodes.push({ typeKey: "inst_decision", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const o of read.outcomes ?? []) {
+    const id = `${OUTCOME_NODE_PREFIX}${o.id}`;
+    if (visible) {
+      // Label encodes status + agentKey + env so operators see at a
+      // glance what happened, to which agent, in which environment.
+      const label = `${o.status}: ${o.agentKey} (${o.environment})`;
+      nodes.push({
+        typeKey: "inst_outcome",
+        id,
+        visible: true,
+        label,
+        meta: {
+          outcomeId: o.id,
+          agentId: o.agentId,
+          agentKey: o.agentKey,
+          environment: o.environment,
+          status: o.status,
+          summary: o.summary,
+          durationMs: o.durationMs,
+          finishedAt: o.finishedAt ? o.finishedAt.toISOString() : null,
+          createdAt: o.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_outcome", id, visible: false });
       hiddenNodeCount += 1;
     }
   }
