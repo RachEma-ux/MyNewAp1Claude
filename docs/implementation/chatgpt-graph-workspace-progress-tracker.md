@@ -1356,3 +1356,109 @@ can return to feature work. Top of the queue:
     for the top-level mount path (`server/routers.ts` +
     `server/platform/modules/module-routers.ts`); zero orphans
     today but no automated guard exists.
+
+## 25. Top-level router mount-drift guard (2026-05-17)
+
+Continues full-autonomous execution. Closes the "broader
+`server/**/router.ts` audit" follow-up item from §24's
+recommendation block.
+
+### Ledger
+
+| # | PR | Slice | Surface |
+|---|---|---|---|
+| 1 | #1439 | top-level mount-drift guard | `tests/platform/top-level-router-mount-drift-guard.test.ts` walks `server/**/router*.ts` (excl. agent-studio/services + tests) and asserts each export is referenced by one of the three canonical mount paths |
+
+### Canonical mount paths covered
+
+The guard checks each `export const \w+Router = router(...)`
+declaration is referenced by at least one of:
+
+  - `server/routers.ts` (direct app-router composition for
+    platform-core routers like `chat`, `inference`, `embeddings`,
+    `providers`, etc.)
+  - `server/platform/modules/module-routers.ts` (manifest
+    composer for module-registered routers like `agentStudio`,
+    `prm`, `psm`, `codeStudio`, `aiTypes`, etc.)
+  - `server/agent-studio/api/router.ts` (nested sub-mount under
+    agentStudio for cross-cutting helpers — e.g.,
+    `permissionRulesRouter` is a separate file but mounted nested)
+
+### Coverage matrix after §24-§25
+
+| Scope | Test | Guard kind |
+|---|---|---|
+| `server/agent-studio/services/**/router.ts` | `agent-studio-router-mount-drift-guard.test.ts` (#1437) | Asserts BOTH import AND mount-key in api/router.ts (finer-grained) |
+| `server/**/router*.ts` outside agent-studio/services | `top-level-router-mount-drift-guard.test.ts` (#1439, this PR) | Asserts the export name appears in at least one canonical mount file (coarser, allows non-direct mount paths) |
+| `trpc.<module>.<sub>.*` client refs → server mounts | `all-modules-client-mount-parity.test.ts` (#714) | Bidirectional client → server parity per module (catches orphans only when a client uses them) |
+| Specific high-stakes routers (vault, graphChangeProposals, promotion, graphAgent) | `*-router-mounted.test.ts` (per-router) | Per-router source-scan with mount-key + procedure spot-checks |
+
+The four layers compose into defense-in-depth:
+
+  - **Per-router tests** catch shape regressions on routers
+    important enough to spot-check (the highest-stakes routers
+    have these).
+  - **Agent-studio guard** catches all new orphan declarations
+    in the agent-studio services subtree (highest-velocity area).
+  - **Top-level guard** catches orphans in the broader
+    `server/**` tree.
+  - **Client-mount-parity** catches client → server divergence
+    even when neither server-side guard would flag (e.g., a
+    client typo on an existing mount key).
+
+### What §25 does NOT cover (deferred)
+
+- **`server/platform/modules/registry`-based dynamic registration.**
+  Some routers register via the manifest composer at boot time
+  (not via a static `<key>: <name>Router,` line). The top-level
+  guard accepts ANY reference to the router name in the mount
+  files, so dynamic registrations pass. This is correct (those
+  ARE mounted via the composer) but means the guard can't catch
+  cases where a `routerKey` mismatch maps the router under the
+  wrong path. Trade-off accepted — the
+  [[mount-drift-audit-pattern]] memory documents that
+  cross-key-mismatch detection is best done by per-router
+  `*-router-mounted.test.ts` files that assert the SPECIFIC
+  expected mount key.
+- **Multi-router-per-file.** The guard uses a global regex to
+  extract `export const \w+Router = router(...)` declarations
+  (catches all matches, not just the first), so multi-router
+  files ARE covered today — improvement vs the #1437 guard which
+  only checks `head -1`. (Mentioned in #1437's "what it does not
+  cover"; this PR raises the bar by scanning all matches.)
+
+### Hard-rule compliance (CLAUDE.md)
+
+- ✓ Pure source-scan test (no DB / no boot / no tRPC caller).
+- ✓ No `neo4j-driver` / `dispatchMcpToolCall` / `openrouter` /
+  `credential-resolver` imports.
+- ✓ Same shape as #1437 + the per-router
+  `*-router-mounted.test.ts` files.
+
+### Sub-arc carry-forward lesson
+
+**"Defense in depth via complementary scopes."** Four guard
+layers (per-router, agent-studio comprehensive, top-level
+comprehensive, client-mount-parity) each catch a different
+failure mode at different cost/coverage trade-offs. No single
+guard covers everything; the combination does. **Pattern**:
+when the failure-mode space has multiple axes (where it lives,
+how it manifests, what triggers it), pick a small number of
+complementary guards rather than one monolithic guard that
+tries to cover everything.
+
+Recommendation: with the mount-drift class fully guarded by 4
+complementary layers, the autonomous-execution arc can confidently
+return to feature work. Mount drift is no longer a class of bug
+that can ship undetected.
+
+Top of the queue for the next feature slice:
+
+  - **T-D.3.δ** semantic-enrichment trigger mutation
+  - **T-F.4** Quality Lens UI (now that read surfaces are
+    uniform across T-D.3 + graph-quality + graph-correction)
+  - **Golden-questions persistence + caller** mini-arc
+
+Or if the next session prefers a different axis: orphan-FILE
+audits beyond routers (services / adapters / factories with no
+consumers — a different class of dead-code accumulator).
