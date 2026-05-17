@@ -105,6 +105,63 @@ const FAILURE_STATE_KIND_OPTIONS = [
   "background_job_failed",
 ] as const;
 
+/**
+ * T-F.133 — per-kind severity mirror, sourced from
+ * `server/agent-studio/services/failure-states/contracts.ts`
+ * `FAILURE_STATE_METADATA[kind].defaultSeverity`. Inlined here for
+ * the same boundary-crossing reason as `FAILURE_STATE_KIND_OPTIONS`
+ * (T-I.64) — the events list needs at-a-glance severity coloring
+ * without booting a server-side metadata fetch.
+ *
+ * Drift is loudly detectable: if the server adds a new
+ * FAILURE_STATE that's missing from this map, the lookup returns
+ * `undefined` and the row falls through to the neutral tone — the
+ * panel still renders, but the operator sees an uncolored row that
+ * signals "new kind, mirror needs updating." Same lesson-45
+ * future-extensibility shape T-F.131 / T-F.132 used.
+ *
+ * The 25 entries match the 25 kinds in FAILURE_STATES verbatim.
+ * Source-scan test locks the row count + spot-checks 3 mappings
+ * across the 3 severity tiers.
+ */
+const FAILURE_STATE_SEVERITY: Readonly<
+  Record<string, "info" | "warning" | "critical">
+> = {
+  promotion_failed: "critical",
+  note_conflict: "warning",
+  entity_resolution_conflict: "warning",
+  neo4j_unavailable: "critical",
+  neo4j_degraded: "warning",
+  neo4j_query_timeout: "warning",
+  neo4j_projection_stale: "info",
+  neo4j_projection_drift_detected: "warning",
+  projection_sync_failed: "critical",
+  graph_query_timeout: "warning",
+  backlink_refresh_failed: "info",
+  runtime_reference_hidden_by_permission: "info",
+  cag_reference_invalidated: "warning",
+  graph_skill_reference_invalidated: "warning",
+  tool_schema_changed: "warning",
+  search_index_stale: "info",
+  query_cache_stale: "info",
+  text2cypher_rejected: "info",
+  cypher_query_template_failed: "warning",
+  retrieval_safety_filter_blocked_content: "info",
+  graph_agent_answer_incomplete: "warning",
+  golden_question_failed: "warning",
+  graph_correction_rejected: "info",
+  semantic_enrichment_rejected: "info",
+  background_job_failed: "warning",
+};
+
+function failureStateKindClass(kind: string): string {
+  const sev = FAILURE_STATE_SEVERITY[kind];
+  if (sev === "critical") return "text-destructive";
+  if (sev === "warning") return "text-amber-600 dark:text-amber-400";
+  if (sev === "info") return "text-muted-foreground";
+  return "";
+}
+
 function fmtTs(ts: Date | string | null | undefined): string {
   if (!ts) return "—";
   const d = typeof ts === "string" ? new Date(ts) : ts;
@@ -1120,7 +1177,25 @@ export function GraphHealthAdminPanel() {
                             <td className="py-1 pr-3 font-mono text-xs whitespace-nowrap">
                               {fmtTs(r.createdAt)}
                             </td>
-                            <td className="py-1 pr-3 font-mono text-xs">
+                            <td
+                              className={`py-1 pr-3 font-mono text-xs ${failureStateKindClass(
+                                r.errorClass.startsWith("failure_state:")
+                                  ? r.errorClass.slice(
+                                      "failure_state:".length,
+                                    )
+                                  : r.errorClass,
+                              )}`}
+                              data-testid={`graph-health-failure-state-event-kind-${r.id}`}
+                              title={`severity: ${
+                                FAILURE_STATE_SEVERITY[
+                                  r.errorClass.startsWith("failure_state:")
+                                    ? r.errorClass.slice(
+                                        "failure_state:".length,
+                                      )
+                                    : r.errorClass
+                                ] ?? "unknown"
+                              }`}
+                            >
                               {r.errorClass.startsWith("failure_state:")
                                 ? r.errorClass.slice(
                                     "failure_state:".length,
