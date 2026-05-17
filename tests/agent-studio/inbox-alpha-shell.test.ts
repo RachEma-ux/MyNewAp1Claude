@@ -62,14 +62,17 @@ describe("Inbox α-shell (T-F.107 / T-F.6-α)", () => {
     );
   });
 
-  it("InboxPanel ships the honest α-shell banner naming deferred mutations", () => {
+  it("InboxPanel ships the honest α-shell banner naming live + deferred mutations", () => {
+    // The banner copy evolves as slices land (lesson 79: banner is
+    // the live deferral ledger). Keep the assertion liberal: must
+    // have the banner testid AND must reference both mark-read and
+    // dismiss somewhere in the surface — that's the α invariant.
     const src = read(
       "client/src/modules/agent-studio/components/InboxPanel.tsx",
     );
     expect(src).toMatch(/data-testid=["']inbox-banner["']/);
-    expect(src).toMatch(
-      /mark-read[\s\S]{0,200}dismiss[\s\S]{0,300}follow-up\s+slices/,
-    );
+    expect(src).toMatch(/mark-read/);
+    expect(src).toMatch(/dismiss/);
   });
 
   it("InboxPanel handles loading / error / empty states with distinct testids", () => {

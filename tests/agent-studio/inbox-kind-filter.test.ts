@@ -95,9 +95,12 @@ describe("Inbox kind filter δ-slice (T-F.110 / T-F.6-δ)", () => {
     );
   });
 
-  it("banner refreshed γ → δ naming kind filter + unread-only live", () => {
+  it("banner past γ + names kind filter + unread-only live", () => {
+    // δ named "Inbox δ"; ε extends further. Both must include kind
+    // filter + unread-only live (assertions kept liberal so later
+    // slices don't break this invariant).
     const src = readPanel();
-    expect(src).toMatch(/Inbox δ:/);
+    expect(src).toMatch(/Inbox\s+(δ|ε):/);
     expect(src).toMatch(
       /kind filter[\s\S]{0,80}unread-only[\s\S]{0,80}live/,
     );

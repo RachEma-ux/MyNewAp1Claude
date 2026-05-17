@@ -113,6 +113,50 @@ export function InboxPanel() {
     setDismissConfirmRowId(null);
   }
 
+  // ── T-F.111 (T-F.6-ε): bulk-by-kind mutations ──
+  // Both consume the δ-shipped `selectedKind` state directly. The
+  // mark-read variant is one-click (lesson 66 — reversible by
+  // re-emitting the notification); the dismiss variant is two-step
+  // (lesson 64 — destructive, removes N rows).
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState<boolean>(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
+
+  const bulkMarkReadByKindMutation =
+    trpc.agentStudio.workspaceObservability.markAllNotificationsReadByKind.useMutation(
+      {
+        onSuccess: (res) => {
+          utils.agentStudio.workspaceObservability.getMyInbox.invalidate();
+          setBulkError(null);
+          setBulkResult(`Marked ${res.markedCount} notification(s) as read.`);
+        },
+        onError: (err) => {
+          setBulkError(err.message);
+          setBulkResult(null);
+        },
+      },
+    );
+
+  const bulkDismissByKindMutation =
+    trpc.agentStudio.workspaceObservability.dismissAllNotificationsByKind.useMutation(
+      {
+        onSuccess: (res) => {
+          utils.agentStudio.workspaceObservability.getMyInbox.invalidate();
+          setBulkError(null);
+          setBulkResult(`Dismissed ${res.deletedCount} notification(s).`);
+          setBulkConfirmOpen(false);
+        },
+        onError: (err) => {
+          setBulkError(err.message);
+          setBulkResult(null);
+        },
+      },
+    );
+
+  const bulkPending =
+    bulkMarkReadByKindMutation.isPending ||
+    bulkDismissByKindMutation.isPending;
+
   const notifications = inboxQuery.data?.notifications ?? [];
   const unreadCount = inboxQuery.data?.unreadCount ?? {
     total: 0,
@@ -164,10 +208,12 @@ export function InboxPanel() {
         data-testid="inbox-banner"
       >
         <div>
-          <span className="font-medium text-foreground">Inbox δ:</span>{" "}
+          <span className="font-medium text-foreground">Inbox ε:</span>{" "}
           mark-read + dismiss live (per-row); kind filter + unread-only toggle
-          live. The server also supports mark-all-by-kind and dismiss-all-by-kind
-          bulk actions — those land in follow-up slices.
+          live; bulk-mark-read-by-kind + bulk-dismiss-by-kind live (gated on a
+          selected kind). Server-side {"workspace-wide"} dismiss-all is the
+          remaining mutation candidate — kept deferred since the by-kind path
+          already covers the common operator need.
         </div>
       </div>
 
@@ -213,6 +259,111 @@ export function InboxPanel() {
           </button>
         ) : null}
       </div>
+
+      {/* ── T-F.111 (T-F.6-ε): bulk-by-kind action bar ── */}
+      {selectedKind != null ? (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded border bg-muted/20 p-2 text-xs"
+          data-testid="inbox-bulk-bar"
+        >
+          <span className="text-muted-foreground">
+            Bulk actions on kind{" "}
+            <span
+              className="font-mono"
+              data-testid="inbox-bulk-bar-kind"
+            >
+              {selectedKind}
+            </span>
+            :
+          </span>
+          <button
+            type="button"
+            className="rounded border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+            disabled={bulkPending || bulkConfirmOpen}
+            onClick={() => {
+              setBulkError(null);
+              setBulkResult(null);
+              bulkMarkReadByKindMutation.mutate({
+                notificationKind: selectedKind,
+              });
+            }}
+            data-testid="inbox-bulk-mark-read-by-kind"
+          >
+            {bulkMarkReadByKindMutation.isPending
+              ? "Marking…"
+              : "Mark all read"}
+          </button>
+          {!bulkConfirmOpen ? (
+            <button
+              type="button"
+              className="rounded border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+              disabled={bulkPending}
+              onClick={() => {
+                setBulkError(null);
+                setBulkResult(null);
+                setBulkConfirmOpen(true);
+              }}
+              data-testid="inbox-bulk-dismiss-by-kind"
+            >
+              Dismiss all…
+            </button>
+          ) : (
+            <div
+              className="flex items-center gap-2 rounded border border-destructive/30 bg-destructive/5 px-2 py-1"
+              data-testid="inbox-bulk-dismiss-confirm"
+            >
+              <span>
+                Dismiss all notifications of kind{" "}
+                <span className="font-mono">{selectedKind}</span>?
+              </span>
+              <button
+                type="button"
+                className="rounded border border-destructive bg-destructive px-2 py-0.5 text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+                disabled={bulkDismissByKindMutation.isPending}
+                onClick={() =>
+                  bulkDismissByKindMutation.mutate({
+                    notificationKind: selectedKind,
+                    // Explicit operator gesture — nuke read AND unread
+                    // of this kind. The two-step confirm above is the
+                    // safety gate; the server's readOnly-default is
+                    // for the unguarded `dismissAllNotifications` path.
+                    readOnly: false,
+                  })
+                }
+                data-testid="inbox-bulk-dismiss-confirm-button"
+              >
+                {bulkDismissByKindMutation.isPending
+                  ? "Dismissing…"
+                  : "Confirm"}
+              </button>
+              <button
+                type="button"
+                className="rounded border px-2 py-0.5 hover:bg-muted"
+                onClick={() => setBulkConfirmOpen(false)}
+                data-testid="inbox-bulk-dismiss-cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {bulkResult != null ? (
+            <span
+              className="text-foreground"
+              data-testid="inbox-bulk-result"
+            >
+              {bulkResult}
+            </span>
+          ) : null}
+          {bulkError != null ? (
+            <span
+              className="text-destructive"
+              data-testid="inbox-bulk-error"
+            >
+              {bulkError}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div
