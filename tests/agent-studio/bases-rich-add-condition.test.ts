@@ -85,12 +85,19 @@ describe("Bases rich-form add-condition (T-F.120 / T-F.2-γ-polish β)", () => {
 
   it("value input rendered when field selected + type-aware placeholders + Add button", () => {
     const src = readPanel();
+    // T-F.124: governanceStatus has its own chips branch above the
+    // text-input fallback; the bases-row-detail-filters-add-value
+    // testid lives in the fallback branch only. Loosen the regex
+    // to accept either the direct child or the nested-branch shape.
     expect(src).toMatch(
-      /\{addField\s*!==\s*""\s*\?\s*\([\s\S]{0,2500}data-testid=\{`bases-row-detail-filters-add-value-\$\{baseId\}`\}/,
+      /\{addField\s*!==\s*""\s*\?\s*\([\s\S]{0,5500}data-testid=\{`bases-row-detail-filters-add-value-\$\{baseId\}`\}/,
     );
     expect(src).toMatch(/data-testid=\{`bases-row-detail-filters-add-submit-\$\{baseId\}`\}/);
     expect(src).toMatch(/positive integer/);
-    expect(src).toMatch(/comma-separated/);
+    // T-F.124: governanceStatus moved from text-input+comma-separated
+    // placeholder to a multi-token chip UI. The "add a status…"
+    // placeholder lives on the chip-draft input.
+    expect(src).toMatch(/add a status…|comma-separated/);
     expect(src).toMatch(/ISO-8601/);
   });
 

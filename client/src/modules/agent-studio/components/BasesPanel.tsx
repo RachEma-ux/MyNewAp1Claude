@@ -1873,6 +1873,40 @@ function FilterConditionsSummary({
     setAddOp("gte");
     setAddError(null);
     setEditingIdx(null);
+    setAddValueChipDraft("");
+  }
+
+  // T-F.124 (T-F.2-γ-polish ζ): governanceStatus chip helpers.
+  // addValue stays canonical comma-separated string (what
+  // buildConditionFromForm consumes) — the chip UI is a
+  // presentational layer that splits on read and joins on write.
+  // A separate `addValueChipDraft` slice holds the partially-typed
+  // chip the operator hasn't committed yet (Enter or comma).
+  const [addValueChipDraft, setAddValueChipDraft] = useState<string>("");
+  function parseChipList(csv: string): string[] {
+    return csv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  function chipListToCsv(chips: readonly string[]): string {
+    return chips.join(", ");
+  }
+  function commitChipDraft(): void {
+    if (addField !== "governanceStatus") return;
+    const newChips = parseChipList(addValueChipDraft);
+    if (newChips.length === 0) return;
+    const existing = parseChipList(addValue);
+    const next = [...existing];
+    for (const c of newChips) {
+      if (!next.includes(c)) next.push(c);
+    }
+    setAddValue(chipListToCsv(next));
+    setAddValueChipDraft("");
+  }
+  function removeChipAt(idx: number): void {
+    const chips = parseChipList(addValue);
+    setAddValue(chipListToCsv(chips.filter((_, i) => i !== idx)));
   }
 
   // T-F.123 (T-F.2-γ-polish ε): datetime-local <-> ISO conversion
@@ -1997,45 +2031,91 @@ function FilterConditionsSummary({
                 datetime-local input. addValue stays canonical ISO
                 internally; the input value is the local-time
                 "YYYY-MM-DDTHH:mm" string the browser wants —
-                converted via the helpers above. Other 3 variants
-                (slug / title / governanceStatus) stay text. */}
-            <input
-              type={
-                addField === "folderId"
-                  ? "number"
-                  : addField === "updatedAt"
-                    ? "datetime-local"
-                    : "text"
-              }
-              min={addField === "folderId" ? 1 : undefined}
-              step={addField === "folderId" ? 1 : undefined}
-              className="rounded border border-border bg-background px-1 py-0.5 font-mono"
-              value={
-                addField === "updatedAt"
-                  ? isoToLocalInputValue(addValue)
-                  : addValue
-              }
-              onChange={(e) =>
-                setAddValue(
+                converted via the helpers above.
+                T-F.124 (T-F.2-γ-polish ζ): governanceStatus multi-
+                token chips. addValue stays canonical comma-
+                separated string; chip UI is a presentational layer
+                that splits on read and joins on write. Separate
+                `addValueChipDraft` slice for the currently-typed
+                chip. Enter / comma commits; × removes. */}
+            {addField === "governanceStatus" ? (
+              <div
+                className="flex flex-wrap items-center gap-1"
+                data-testid={`bases-row-detail-filters-add-chips-${baseId}`}
+              >
+                {parseChipList(addValue).map((chip, idx) => (
+                  <span
+                    key={`${chip}-${idx}`}
+                    className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1 py-0.5 font-mono"
+                    data-testid={`bases-row-detail-filters-add-chip-${baseId}-${idx}`}
+                  >
+                    {chip}
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      disabled={disabled}
+                      onClick={() => removeChipAt(idx)}
+                      data-testid={`bases-row-detail-filters-add-chip-remove-${baseId}-${idx}`}
+                      aria-label={`Remove ${chip}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  className="rounded border border-border bg-background px-1 py-0.5 font-mono"
+                  value={addValueChipDraft}
+                  onChange={(e) => setAddValueChipDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      commitChipDraft();
+                    }
+                  }}
+                  onBlur={commitChipDraft}
+                  placeholder="add a status…"
+                  disabled={disabled}
+                  data-testid={`bases-row-detail-filters-add-chip-input-${baseId}`}
+                />
+              </div>
+            ) : (
+              <input
+                type={
+                  addField === "folderId"
+                    ? "number"
+                    : addField === "updatedAt"
+                      ? "datetime-local"
+                      : "text"
+                }
+                min={addField === "folderId" ? 1 : undefined}
+                step={addField === "folderId" ? 1 : undefined}
+                className="rounded border border-border bg-background px-1 py-0.5 font-mono"
+                value={
                   addField === "updatedAt"
-                    ? localInputValueToIso(e.target.value)
-                    : e.target.value,
-                )
-              }
-              placeholder={
-                addField === "folderId"
-                  ? "positive integer"
-                  : addField === "governanceStatus"
-                    ? "draft,published (comma-separated)"
+                    ? isoToLocalInputValue(addValue)
+                    : addValue
+                }
+                onChange={(e) =>
+                  setAddValue(
+                    addField === "updatedAt"
+                      ? localInputValueToIso(e.target.value)
+                      : e.target.value,
+                  )
+                }
+                placeholder={
+                  addField === "folderId"
+                    ? "positive integer"
                     : addField === "updatedAt"
                       ? "ISO-8601 (e.g. 2026-01-01T00:00:00Z)"
                       : addField === "title"
                         ? "substring"
                         : "exact match"
-              }
-              disabled={disabled}
-              data-testid={`bases-row-detail-filters-add-value-${baseId}`}
-            />
+                }
+                disabled={disabled}
+                data-testid={`bases-row-detail-filters-add-value-${baseId}`}
+              />
+            )}
             {editingIdx === null ? (
               <button
                 type="button"
