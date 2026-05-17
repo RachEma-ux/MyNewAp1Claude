@@ -52,6 +52,49 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+/**
+ * T-F.131 — stepKind-coded badge for the decision-trace ledger.
+ *
+ * Closed taxonomy from server/agent-studio/services/graph-agent/engine.ts
+ * (5 kinds emitted today):
+ *   - plan_retrieval_mode  → indigo  (planning phase)
+ *   - retrieve             → cyan    (KB / RAC retrieval)
+ *   - model_call           → fuchsia (LLM inference)
+ *   - agentic_model_call   → violet  (LLM in bounded-iteration loop)
+ *   - health_snapshot      → slate   (passive observation; lowest tone)
+ *
+ * Unknown kinds fall back to a neutral outline so the panel still
+ * renders cleanly if engine.ts adds a new kind ahead of this ladder
+ * (precedent (n) "close at operator-visible boundary not enum
+ * exhaustion" — fallback IS the right shape).
+ *
+ * Per-stepKind data-testid lets source-scan tests lock the closed
+ * taxonomy without booting the panel.
+ */
+function StepKindBadge({ stepKind }: { stepKind: string }) {
+  const tone =
+    stepKind === "plan_retrieval_mode"
+      ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/40"
+      : stepKind === "retrieve"
+        ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40"
+        : stepKind === "model_call"
+          ? "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40"
+          : stepKind === "agentic_model_call"
+            ? "bg-violet-500/15 text-violet-300 border-violet-500/40"
+            : stepKind === "health_snapshot"
+              ? "bg-slate-500/15 text-slate-300 border-slate-500/40"
+              : "border-border/60";
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] px-1.5 py-0 h-4 font-medium ${tone}`}
+      data-testid={`graph-agent-explain-stepkind-badge-${stepKind}`}
+    >
+      {stepKind}
+    </Badge>
+  );
+}
+
 interface Props {
   /** Optional pre-filled run id. When omitted, the panel renders an
    *  input field so operators can paste one in. */
@@ -282,9 +325,7 @@ export default function GraphAgentExplainPanel({ initialRunId }: Props = {}) {
                         <span className="text-[10px] font-mono text-muted-foreground/70 tabular-nums">
                           #{step.stepIndex}
                         </span>
-                        <span className="text-xs font-medium truncate">
-                          {step.stepKind}
-                        </span>
+                        <StepKindBadge stepKind={step.stepKind} />
                       </div>
                       <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                         {formatDuration(step.durationMs)}
