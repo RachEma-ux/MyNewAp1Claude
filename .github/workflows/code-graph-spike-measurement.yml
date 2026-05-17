@@ -1,0 +1,99 @@
+# Code Graph Parser Spike — T-E.4 projection + query measurement.
+#
+# Companion to T-E.3's parse-time measurement. Spins up a Neo4j 5 CE
+# service container, runs the spike emitter against
+# `server/agent-studio/services/extensions/`, projects the
+# emit to Neo4j via parameterized Cypher MERGE writes, and executes
+# the 5 §4 measurement queries. Asserts the §4 gates:
+#
+#   - Projection time < 10000 ms (~15 files)
+#   - Per-query latency p95 < 100 ms (5 representative queries)
+#
+# Operator-triggered (workflow_dispatch). The spike measurement is
+# resource-intensive (boots a real Neo4j container) and only needs
+# to be re-run when the spike code changes or the spike target
+# directory grows; running on every PR would burn CI minutes
+# without operator value.
+#
+# Outputs:
+#   - GitHub Actions workflow run with [T-E.4]-tagged stdout lines
+#     captured in the test step log. The operator transcribes the
+#     numbers into `docs/implementation/agent-studio-code-graph-parser-spike-measurement-2026-05-17.md`
+#     §3 (T-E.4 row).
+#
+# Closure path:
+#   - On pass: operator commits the transcribed numbers + flips the
+#     measurement doc verdict from B (parse-only PASS) to A (both
+#     halves PASS) + decides Phase 25 T-G.2 sequencing.
+#   - On fail: operator commits the transcribed numbers + flips the
+#     measurement doc verdict to a spike-failed addendum + names
+#     the §4 fallback option (drop Python OR trigger Phase 27 Aura).
+
+name: Code Graph Spike — T-E.4 Projection + Query Measurement
+
+on:
+  workflow_dispatch:
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/devpassword
+          NEO4J_ACCEPT_LICENSE_AGREEMENT: 'yes'
+        ports:
+          - 7474:7474
+          - 7687:7687
+        options: >-
+          --health-cmd "wget --quiet --tries=1 --spider http://localhost:7474 || exit 1"
+          --health-interval 15s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: devpassword
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Wait for Neo4j health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:7474 > /dev/null; then
+              echo "[wait] Neo4j ready after ${i} polls"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "[wait] Neo4j did not become healthy" >&2
+          exit 1
+
+      - name: Run T-E.4 projection + measurement
+        run: |
+          npx tsx server/agent-studio/services/code-graph/spike/project-and-measure.ts
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Code Graph Spike — T-E.4 Projection + Query Measurement" >> "$GITHUB_STEP_SUMMARY"
+          echo "Neo4j: \`neo4j:5-community\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Spike target: \`server/agent-studio/services/extensions/\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Transcribe \`[T-E.4]\`-tagged log lines into:" >> "$GITHUB_STEP_SUMMARY"
+          echo "  \`docs/implementation/agent-studio-code-graph-parser-spike-measurement-2026-05-17.md\`" >> "$GITHUB_STEP_SUMMARY"
