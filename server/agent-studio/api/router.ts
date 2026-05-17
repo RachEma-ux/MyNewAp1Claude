@@ -87,6 +87,7 @@ import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { codeGraphRouter } from "../services/code-graph/code-graph-router";
 import { securityGraphRouter } from "../services/security-graph/security-graph-router";
+import { recommendationRouter } from "../services/recommendation/recommendation-router";
 import { promotionRouter } from "../services/promotion/router";
 import {
   agentIdSchema,
@@ -2981,6 +2982,12 @@ export const agentStudioRouter = router({
   // Per remaining-execution-plan T-G.3: "security findings are not
   // workspace-public" — adminProcedure is the floor.
   securityGraph: securityGraphRouter,
+  // Native Graph Workspace Phase 25 T-G.4.α: Recommendation Service
+  // operator-facing surface — recommend + listKnownKinds. Contracts +
+  // engine + runtime (graphrag-candidate-fetcher) already shipped via
+  // T-G.4 / T-G.4.1 / T-G.4.2. This is the missing tRPC mount so the
+  // operator dashboard can call recommend().
+  recommendation: recommendationRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
