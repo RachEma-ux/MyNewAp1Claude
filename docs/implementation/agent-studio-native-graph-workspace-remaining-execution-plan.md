@@ -437,6 +437,14 @@ Tracks T-A through T-G can ship autonomously. Tracks T-H sub-arcs require explic
 
 Named precedents future arcs can cite as `(precedent X)`. Each is sourced from a closure ledger; the menu grows as arcs complete.
 
+### T-D.3 — Semantic Enrichment Agent (closed 2026-05-17)
+
+Full closure ledger: `docs/implementation/agent-studio-td-aggregate-closure-2026-05-17.md`.
+
+- **(v) Bundle-on-runtime-completion** — when a multi-PR arc (per precedent (p)) reaches the runtime-completion slices (the last 2–3 that compose into a working end-to-end flow), AND the user has explicitly asked for runtime completion rather than incremental review, **bundle** the remaining flips into a single PR with comprehensive cross-slice tests. The bundled PR's commit message + body still document each slice separately so reviewers can target one. Apply when: skeleton + first flips already merged cleanly; remaining slices are interdependent (test suite naturally covers them together); user signaled "finish this"; stacked-branch rebase cost outweighs reviewer benefit at the closing edge. Do NOT apply for the FIRST slice (precedent (p) skeleton-first is non-negotiable) or when a slice introduces a fundamentally new boundary deserving isolated scrutiny. Contrast with **(p)**: (p) governs arc OPENING, (v) governs arc CLOSING.
+
+**Validation observation:** T-D.3 saw 3 stacked-branch rework moments before bundling (PR #1393 had to be closed because its base squash-merged ahead and left a stale conflict). Bundling avoided further rebase rework while preserving slice-level review fidelity in the PR body.
+
 ### T-G.4 — Recommendation Service (closed 2026-05-17)
 
 Full closure ledger: `docs/implementation/agent-studio-recommendation-service-closure-2026-05-17.md`.
