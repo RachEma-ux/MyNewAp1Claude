@@ -228,3 +228,26 @@ strict-audit prompt of 2026-05-13 forbade that compression and required
 honest binary classification. The strict-audit doc (§7 above) is the
 authoritative source; this tracker is the user-facing summary that
 matches it.
+
+## 11. GraphRAG / Retrieval closure (items 26–32, 2026-05-17)
+
+Per the GraphRAG closure prompt, the seven Retrieval acceptance items
+have been driven to FULLY IMPLEMENTED at the code + test level. Full
+per-item classification + acceptance-rule mapping + test surface live in
+`docs/evidence/agent-studio-graphrag-retrieval-closure-2026-05-17.md`.
+
+| # | Item | Status |
+|---|---|---|
+| 26 | Neo4j traversal-backed retrieval (local / neighborhood / shortest-path) | FULLY IMPLEMENTED |
+| 27 | Permission-aware context assembly proof | FULLY IMPLEMENTED |
+| 28 | Algorithm-backed retrieval + capability-gated rejection | FULLY IMPLEMENTED |
+| 29 | Guarded Text2Cypher (now 6 closed-taxonomy reasons; new: `multi_statement` + `unbounded_query`) | FULLY IMPLEMENTED |
+| 30 | Hybrid ranking (graph + vector + text + freshness + confidence) | FULLY IMPLEMENTED |
+| 31 | Citation / provenance verification across modes | FULLY IMPLEMENTED |
+| 32 | GraphRAG permission regression tests | FULLY IMPLEMENTED |
+
+Code surface: `server/agent-studio/services/graph/retrieval/{retrieval-router.ts, text2cypher-validator.ts, hybrid-ranker.ts}` (last is NEW; pure deterministic, no clock/random/model calls).
+
+Test surface: `tests/agent-studio/graphrag-retrieval-closure.test.ts` (42 tests / 6 sections) plus 7 adjacent suites (124 tests total) all green via `pnpm exec vitest run --pool=forks --poolOptions.forks.singleFork`.
+
+What is intentionally NOT in this PR: live Neo4j 5 CE evidence (BLOCKED BY MISSING CREDENTIALS / INFRA — operator-runnable via existing `graph-p0-smoke-neo4j-ce.yml` workflow dispatch), GDS algorithm pass-through (out of MVP-0-4 scope; CE backend correctly rejects via `GraphCapabilityUnsupportedError`), vector/text signal caller-side wiring (separate slice; ranker contract proven).

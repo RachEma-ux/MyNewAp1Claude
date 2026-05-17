@@ -88,6 +88,10 @@ export type RetrievalMode =
   | "graphrag_traversal"
   | "graphrag_text2cypher"
   | "graphrag_algorithm"
+  // GR-2 (2026-05-17): direct adjacency + bounded shortestPath modes.
+  // Both flow through GraphRepository (no neo4j-driver outside fence).
+  | "graphrag_neighborhood"
+  | "graphrag_shortest_path"
   | "hybrid_cag_graphrag"
   | "hybrid_rac_graphrag";
 
@@ -515,7 +519,95 @@ export class GraphRetrievalRouter {
         break;
       }
       case "graphrag_algorithm": {
-        // Phase 13.5 wires real algorithm invocation through GraphAlgorithmRepository.
+        // GR-4 (2026-05-17): wire real algorithm invocation through
+        // GraphAlgorithmRepository. The repo's runAlgorithm throws
+        // GraphCapabilityUnsupportedError for unsupported keys — we
+        // surface that as a structured rejection instead of fake
+        // empty success.
+        const algorithmKey = (input.templateParameters?.algorithmKey ??
+          "shortest_path") as
+          | "shortest_path"
+          | "centrality"
+          | "similarity"
+          | "community_detection"
+          | "blast_radius";
+        const algoParams = (input.templateParameters?.parameters ?? {}) as Record<
+          string,
+          unknown
+        >;
+        try {
+          const algoOut = await this.repository.runAlgorithm({
+            algorithmKey,
+            parameters: algoParams,
+            runtime: input.runtime,
+          });
+          rawBlocks = algoOut.rows.map((row, i) =>
+            this.algorithmRowToBlock(`${algorithmKey}:${i}`, algorithmKey, row),
+          );
+        } catch (err) {
+          // GraphCapabilityUnsupportedError surfaces as a structured
+          // rejection — never as empty rows. Other errors (timeout /
+          // connection) also short-circuit with their message.
+          const reason =
+            err && (err as Error).name === "GraphCapabilityUnsupportedError"
+              ? `algorithm_capability_unsupported_${algorithmKey}`
+              : `algorithm_failed_${(err as Error).message ?? "unknown"}`;
+          return this.emptyResult(input.mode, startedAt, reason);
+        }
+        break;
+      }
+      case "graphrag_neighborhood": {
+        // GR-2 (2026-05-17): direct neighborhood traversal — distinct
+        // from graphrag_local in that it returns ONLY the neighbor set
+        // (not the seed+neighbors+path-edges that localGraph emits).
+        // Use when the caller wants raw adjacency.
+        if (!input.seedNodeId) {
+          return this.emptyResult(input.mode, startedAt, "no_seed_node");
+        }
+        const r = await this.repository.neighborhood(
+          input.seedNodeId,
+          input.maxDepth ?? 1,
+          input.runtime,
+        );
+        rawBlocks = r.nodes.map((n) => this.nodeToBlock(n));
+        break;
+      }
+      case "graphrag_shortest_path": {
+        // GR-2 (2026-05-17): bounded shortestPath retrieval. The path
+        // itself becomes a single context block whose payload carries
+        // the ordered node + edge sequence so the consumer can render
+        // the chain.
+        const toNodeId = (input.templateParameters?.toNodeId ?? "") as string;
+        if (!input.seedNodeId || !toNodeId) {
+          return this.emptyResult(
+            input.mode,
+            startedAt,
+            "no_seed_or_target_node",
+          );
+        }
+        const r = await this.repository.shortestPath(
+          input.seedNodeId,
+          toNodeId,
+          input.runtime,
+        );
+        if (r) {
+          rawBlocks = [
+            {
+              id: `shortest:${input.seedNodeId}->${toNodeId}`,
+              kind: "path",
+              sourceKind: "graph_path",
+              sourceId: `${input.seedNodeId}->${toNodeId}`,
+              governanceStatus: "active",
+              payload: {
+                from: input.seedNodeId,
+                to: toNodeId,
+                length: r.length,
+                nodes: r.nodes.map((n) => n.id),
+                edgeTypes: r.edges.map((e) => e.typeKey),
+              },
+            },
+          ];
+        }
         break;
       }
       case "hybrid_cag_graphrag":
@@ -683,6 +775,21 @@ export class GraphRetrievalRouter {
       sourceId: id,
       governanceStatus: "active",
       payload: row,
+    };
+  }
+
+  private algorithmRowToBlock(
+    id: string,
+    algorithmKey: string,
+    row: Record<string, unknown>,
+  ): ContextBlockInput {
+    return {
+      id,
+      kind: "graph_subgraph",
+      sourceKind: `graph_algorithm:${algorithmKey}`,
+      sourceId: id,
+      governanceStatus: "active",
+      payload: { ...row, algorithmKey },
     };
   }
 
