@@ -20,6 +20,11 @@ const REPO_ROOT = process.cwd();
 const ALLOWED_NEO4J_DRIVER_PATHS = [
   "server/agent-studio/services/graph/repository",
   "server/modules/kgia",
+  // Code Graph Parser Spike (T-E, closed 2026-05-17) — one-off
+  // measurement script that needs neo4j-driver for the projection
+  // perf measurement. Spike scope is fenced; production callers
+  // continue to use the repository / KGIA chokepoints.
+  "server/agent-studio/services/code-graph/spike",
 ];
 
 function walk(dir: string, results: string[] = []): string[] {

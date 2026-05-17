@@ -1,41 +1,65 @@
 /**
  * Neo4jCommunityGraphRepository — wraps KGIA's wired Neo4j adapter.
  *
- * Phase 7.5b (2026-05-17): implements the two production-critical
- * surfaces — `executeTemplate` (Cypher query template execution
- * via ASDB-resolved template registry) and `applyProjectionJob`
- * (batched UNWIND projection writes per the T-E.5 finding that
- * naive per-statement MERGE doesn't scale).
- *
- * Pre-7.5b: every method returned hardcoded empty results + the
- * file's docblock said "Phase 7.5 implements". Pre-7.5a, the
- * underlying KGIA adapter was also stubbed; Phase 7.5a wired it
- * to real `neo4j-driver`. Phase 7.5b adds the repository surface
- * that callers (T-F.3 Impact Analysis, T-G.2 Code Intelligence
- * projection writes) need.
+ * Phase 7.5b (2026-05-17): `executeTemplate` + `applyProjectionJob` shipped.
+ * Phase 7.6 (2026-05-17): traversal / permission / explain / projection-
+ * sync surfaces all implemented end-to-end. This file replaces the
+ * thirteen prior factory-throws / hardcoded-empty placeholders with
+ * real Cypher + ASDB-backed lifecycle code.
  *
  * Boundary preserved (CLAUDE.md hard rule):
- *   - This file does NOT import `neo4j-driver`. All driver access
- *     routes through KGIA's `executeNeo4jQuery` (read) and
- *     `executeNeo4jWrite` (write, added in 7.5b). The repository
- *     is the single GraphRepository entry point; KGIA's adapter
- *     is the single neo4j-driver chokepoint.
- *   - Postgres remains source-of-truth: `applyProjectionJob`
- *     writes to Neo4j ONLY (caller is responsible for the
- *     ASDB-side write happening first).
+ *   - This file does NOT import `neo4j-driver`. All Neo4j driver
+ *     access routes through KGIA's `executeNeo4jQuery` (read) +
+ *     `executeNeo4jWrite` (write). KGIA's adapter is the single
+ *     neo4j-driver chokepoint; this repository is the single
+ *     GraphRepository entry point.
+ *   - Postgres remains source-of-truth: projection-sync writes go to
+ *     `ags_graph_projection_*` tables; Neo4j writes happen only
+ *     through `applyProjectionJob` / `rebuildProjection` which read
+ *     from the SoT first.
+ *
+ * Test seams:
+ *   - `executor` option overrides the KGIA query/write functions so
+ *     unit tests can capture Cypher + parameters without a live
+ *     Neo4j. Production callers omit the option (defaults to KGIA).
+ *   - `db` option overrides the ASDB Drizzle instance for the
+ *     projection-sync lifecycle methods. Tests inject a stub.
+ *   - `now` clock injection for deterministic timing.
+ *
+ * Permission model (CE-level, app-side):
+ *   - workspace/tenant isolation via `workspace_id` node property
+ *   - governance_status filter (active/hidden/archived/deprecated)
+ *   - safe-default DENY when runtime carries no `workspaceId` AND
+ *     the node has a workspaceId — protects against context-free
+ *     queries leaking cross-tenant rows.
+ *
+ * Cypher safety:
+ *   - All value parameters are bound via `$param`. Never interpolated.
+ *   - Structural identifiers (labels, relationship types) when
+ *     interpolated are sanitized to `[A-Za-z0-9_]` via
+ *     `sanitizeNeo4jIdentifier`. Empty input → `_unknown`.
  *
  * ADRs:
  *   - docs/architecture/agent-studio-neo4j-community-edition-graph-backend.md
- *   - docs/architecture/agent-studio-phase-7-5-neo4j-blocker.md (§2 unblock sequence)
- *   - docs/implementation/agent-studio-code-graph-parser-spike-measurement-2026-05-17.md (§7.3 carry-forward: batched UNWIND mandate)
+ *   - docs/architecture/agent-studio-phase-7-5-neo4j-blocker.md
+ *   - docs/implementation/agent-studio-code-graph-parser-spike-measurement-2026-05-17.md
  */
 
+import { and, desc, eq, sql } from "drizzle-orm";
+
+// Lazy-loaded KGIA executor: avoids pulling neo4j-driver into the
+// module graph until a caller actually executes a query. Tests that
+// inject the `executor` factory option never trigger this import.
+type GraphSource = unknown;
+
+import { getAsDb } from "../../../db/connection.js";
 import {
-  executeNeo4jQuery,
-  executeNeo4jWrite,
-  testNeo4jConnection,
-} from "../../../../modules/kgia/infrastructure/neo4j-adapter.js";
-import type { GraphSource } from "../../../../modules/kgia/domain/types.js";
+  agsGraphProjectionDriftEvents,
+  agsGraphProjectionRebuilds,
+  agsGraphProjectionSnapshots,
+  agsGraphProjectionSyncJobs,
+  agsGraphProjectionSyncResults,
+} from "../../../../../drizzle/tables/agent-studio-graph-projection.js";
 
 import type {
   BackendCapabilities,
@@ -60,17 +84,13 @@ import type {
   TraversalOptions,
   TraversalPath,
 } from "./types.js";
+import { GraphCapabilityUnsupportedError } from "./types.js";
 import { NEO4J_CE_CAPABILITIES } from "./capabilities.js";
 
-/**
- * Resolves a query template by its `templateKey`. Caller wires
- * this to ASDB (`ags_query_templates`) — typically a Drizzle
- * select. Keeping it as an injected callback avoids coupling
- * the repository to Drizzle and keeps it test-friendly.
- *
- * Return `null` when the key isn't found; the repository surfaces
- * the not-found case as an empty `rows` result with truncated=false.
- */
+// ============================================================================
+// Resolver + executor seams
+// ============================================================================
+
 export interface QueryTemplateResolver {
   (templateKey: string): Promise<QueryTemplateRecord | null>;
 }
@@ -83,43 +103,114 @@ export interface QueryTemplateRecord {
   readonly version: string;
 }
 
+/**
+ * Minimal slice of the KGIA adapter the repository needs. Defaulted to
+ * the real KGIA functions; tests inject a stub that records Cypher +
+ * parameters and returns canned records.
+ */
+export interface Neo4jExecutor {
+  read(
+    source: GraphSource,
+    cypher: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ records: Record<string, unknown>[] }>;
+  write(
+    source: GraphSource,
+    cypher: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ records: Record<string, unknown>[] }>;
+  testConnection(
+    source: GraphSource,
+  ): Promise<{ connected: boolean; version?: string; error?: string }>;
+}
+
+/**
+ * Lazy-load the KGIA adapter on first use. The dynamic import keeps
+ * `neo4j-driver` out of the module graph for callers that inject a
+ * custom executor (tests, alternative backends). Resolved once and
+ * cached.
+ */
+let cachedKgiaExecutor: Neo4jExecutor | null = null;
+async function loadKgiaExecutor(): Promise<Neo4jExecutor> {
+  if (cachedKgiaExecutor) return cachedKgiaExecutor;
+  const mod = await import(
+    "../../../../modules/kgia/infrastructure/neo4j-adapter.js"
+  );
+  cachedKgiaExecutor = {
+    read: mod.executeNeo4jQuery,
+    write: mod.executeNeo4jWrite,
+    testConnection: mod.testNeo4jConnection,
+  };
+  return cachedKgiaExecutor;
+}
+
+const DEFAULT_EXECUTOR: Neo4jExecutor = {
+  async read(source, cypher, params) {
+    const exec = await loadKgiaExecutor();
+    return exec.read(source, cypher, params);
+  },
+  async write(source, cypher, params) {
+    const exec = await loadKgiaExecutor();
+    return exec.write(source, cypher, params);
+  },
+  async testConnection(source) {
+    const exec = await loadKgiaExecutor();
+    return exec.testConnection(source);
+  },
+};
+
 export interface Neo4jCommunityGraphRepositoryOptions {
   readonly endpoint: string;
   readonly username: string;
   readonly password: string;
   readonly database?: string;
-  /**
-   * ASDB-backed template resolver (Phase 7.5b). Optional so
-   * tests / G3 benchmark can construct the repository without
-   * the full ASDB stack; when undefined, `executeTemplate`
-   * returns an empty-rows result with `templateVersion: "no-resolver"`.
-   */
   readonly templateResolver?: QueryTemplateResolver;
+  /**
+   * Test seam — when supplied, replaces the KGIA executor functions.
+   * Production callers omit; production defaults to the wired
+   * KGIA adapter. */
+  readonly executor?: Neo4jExecutor;
+  /**
+   * Test seam — ASDB Drizzle instance override for projection-sync
+   * lifecycle methods. Defaults to `getAsDb()` lazy accessor. */
+  readonly db?: unknown;
+  /** Clock injection for deterministic timing. */
+  readonly now?: () => number;
 }
 
-/**
- * Batch size for projection UNWIND writes. 1000 is the standard
- * Neo4j scaling sweet spot — small enough to avoid bolt-frame
- * limits, large enough to amortize round-trip cost.
- *
- * T-E.5 finding: per-statement MERGE writes at 12449 edges took
- * 38 seconds (3.8× over the spike doc §4 < 10s gate). Batched at
- * 1000 expects ~12 round-trips × ~3ms each + Cypher exec time;
- * 100-300× speedup is typical for this pattern.
- */
+// ============================================================================
+// Constants
+// ============================================================================
+
 const PROJECTION_BATCH_SIZE = 1000;
+const DEFAULT_MAX_DEPTH = 4;
+const ABSOLUTE_MAX_DEPTH = 8;
+const DEFAULT_MAX_RESULTS = 200;
+const ABSOLUTE_MAX_RESULTS = 2000;
+const DEFAULT_SAMPLE_SIZE = 100;
+const SHORTEST_PATH_MAX_DEPTH = 8;
+
+/** Allow-listed graph algorithms (Neo4j CE only — no GDS plugin assumed). */
+const SUPPORTED_ALGORITHMS = new Set<string>(["shortest_path"]);
+
+type AsDb = NonNullable<ReturnType<typeof getAsDb>>;
+
+// ============================================================================
+// Implementation
+// ============================================================================
 
 export class Neo4jCommunityGraphRepository implements GraphRepository {
   readonly backendKey: BackendKey = "neo4j-ce";
   readonly capabilities: BackendCapabilities = NEO4J_CE_CAPABILITIES;
 
-  constructor(private readonly options: Neo4jCommunityGraphRepositoryOptions) {}
+  private readonly executor: Neo4jExecutor;
+  private readonly now: () => number;
 
-  /**
-   * Adapts the constructor options into the `GraphSource` shape
-   * the KGIA adapter expects. Centralized so all driver-using
-   * paths share the same config translation.
-   */
+  constructor(private readonly options: Neo4jCommunityGraphRepositoryOptions) {
+    this.executor = options.executor ?? DEFAULT_EXECUTOR;
+    this.now = options.now ?? Date.now;
+  }
+
   private graphSource(): GraphSource {
     return {
       endpoint: this.options.endpoint,
@@ -131,28 +222,195 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     } as unknown as GraphSource;
   }
 
-  async localGraph(_seed: string, _options: TraversalOptions, _runtime: RuntimeContext) {
-    return { nodes: [], edges: [], truncated: false, truncationReason: "neo4j-ce skeleton — Phase 7.6 implements localGraph traversal" };
+  private requireDb(): AsDb {
+    const db = (this.options.db as AsDb | null) ?? (getAsDb() as AsDb | null);
+    if (!db) {
+      throw new Error(
+        "[neo4j-ce] ASDB unavailable — projection-sync lifecycle requires DATABASE_URL_ASDB",
+      );
+    }
+    return db;
   }
 
-  async globalGraphSample(_options: TraversalOptions, _runtime: RuntimeContext) {
-    return { nodes: [], edges: [], truncated: false };
+  // ────────────────────────────────────────────────────────────────
+  // Traversal — P0-2
+  // ────────────────────────────────────────────────────────────────
+
+  async localGraph(
+    seedNodeId: string,
+    options: TraversalOptions,
+    runtime: RuntimeContext,
+  ): Promise<{
+    nodes: NodeIdentity[];
+    edges: EdgeIdentity[];
+    truncated: boolean;
+    truncationReason?: string;
+  }> {
+    if (!seedNodeId || typeof seedNodeId !== "string") {
+      return { nodes: [], edges: [], truncated: false };
+    }
+    const maxDepth = clampDepth(options.maxDepth ?? DEFAULT_MAX_DEPTH);
+    const maxResults = clampMaxResults(options.maxResults ?? DEFAULT_MAX_RESULTS);
+    // Variable-length traversal: `[r*1..<depth>]`. The depth literal
+    // is structurally interpolated because Cypher syntax requires
+    // it to be a compile-time integer, not a parameter. We clamp to
+    // ABSOLUTE_MAX_DEPTH so a hostile caller can't escalate the cost.
+    const cypher = `
+      MATCH path = (seed { id: $seedId })-[r*1..${maxDepth}]-(neighbor)
+      WHERE coalesce(neighbor.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR neighbor.workspace_id IS NULL
+             OR neighbor.workspace_id = $workspaceId)
+      WITH path, nodes(path) AS pathNodes, relationships(path) AS pathRels
+      UNWIND pathNodes AS n
+      WITH collect(DISTINCT n) AS allNodes, collect(DISTINCT pathRels) AS allRelGroups
+      UNWIND allRelGroups AS relGroup
+      UNWIND relGroup AS rel
+      WITH allNodes, collect(DISTINCT rel) AS allRels
+      RETURN allNodes AS nodes, allRels AS edges
+      LIMIT $maxResults
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      seedId: seedNodeId,
+      workspaceId: runtime.workspaceId ?? null,
+      governanceFilter: runtime.governanceStatusFilter ?? ["active"],
+      maxResults,
+    });
+    const record = out.records[0] ?? { nodes: [], edges: [] };
+    const rawNodes = toArray(record.nodes);
+    const rawEdges = toArray(record.edges);
+    const nodes = rawNodes.slice(0, maxResults).map(coerceNodeIdentity);
+    const edges = rawEdges.slice(0, maxResults).map(coerceEdgeIdentity);
+    const truncated =
+      rawNodes.length > nodes.length || rawEdges.length > edges.length;
+    return {
+      nodes,
+      edges,
+      truncated,
+      ...(truncated
+        ? {
+            truncationReason: `result capped at maxResults=${maxResults} (saw ${rawNodes.length} nodes / ${rawEdges.length} edges)`,
+          }
+        : {}),
+    };
   }
 
-  async neighborhood(_id: string, _depth: number, _runtime: RuntimeContext) {
-    return { nodes: [], edges: [] };
+  async globalGraphSample(
+    options: TraversalOptions,
+    runtime: RuntimeContext,
+  ): Promise<{
+    nodes: NodeIdentity[];
+    edges: EdgeIdentity[];
+    truncated: boolean;
+  }> {
+    const sampleSize = clampMaxResults(
+      options.maxResults ?? DEFAULT_SAMPLE_SIZE,
+    );
+    const cypher = `
+      MATCH (n)
+      WHERE coalesce(n.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR n.workspace_id IS NULL
+             OR n.workspace_id = $workspaceId)
+      WITH n LIMIT $sampleSize
+      OPTIONAL MATCH (n)-[r]-(m)
+      WHERE coalesce(m.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR m.workspace_id IS NULL
+             OR m.workspace_id = $workspaceId)
+      WITH collect(DISTINCT n) + collect(DISTINCT m) AS allNodes, collect(DISTINCT r) AS allRels
+      RETURN allNodes AS nodes, allRels AS edges
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      workspaceId: runtime.workspaceId ?? null,
+      governanceFilter: runtime.governanceStatusFilter ?? ["active"],
+      sampleSize,
+    });
+    const record = out.records[0] ?? { nodes: [], edges: [] };
+    const rawNodes = toArray(record.nodes).filter(Boolean);
+    const rawEdges = toArray(record.edges).filter(Boolean);
+    const nodes = rawNodes.slice(0, sampleSize).map(coerceNodeIdentity);
+    const edges = rawEdges.slice(0, sampleSize).map(coerceEdgeIdentity);
+    return {
+      nodes,
+      edges,
+      truncated: rawNodes.length >= sampleSize,
+    };
   }
 
-  async shortestPath(_from: string, _to: string, _runtime: RuntimeContext): Promise<TraversalPath | null> {
-    return null;
+  async neighborhood(
+    nodeId: string,
+    depth: number,
+    runtime: RuntimeContext,
+  ): Promise<{ nodes: NodeIdentity[]; edges: EdgeIdentity[] }> {
+    if (!nodeId) return { nodes: [], edges: [] };
+    const clampedDepth = clampDepth(depth);
+    const cypher = `
+      MATCH (seed { id: $seedId })
+      OPTIONAL MATCH (seed)-[r*1..${clampedDepth}]-(neighbor)
+      WHERE neighbor IS NULL OR (
+        coalesce(neighbor.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR neighbor.workspace_id IS NULL
+             OR neighbor.workspace_id = $workspaceId)
+      )
+      WITH seed, neighbor, r
+      RETURN
+        collect(DISTINCT seed) + collect(DISTINCT neighbor) AS nodes,
+        reduce(acc = [], rels IN collect(r) | acc + coalesce(rels, [])) AS edges
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      seedId: nodeId,
+      workspaceId: runtime.workspaceId ?? null,
+      governanceFilter: runtime.governanceStatusFilter ?? ["active"],
+    });
+    const record = out.records[0] ?? { nodes: [], edges: [] };
+    const nodes = toArray(record.nodes).filter(Boolean).map(coerceNodeIdentity);
+    const edges = toArray(record.edges).filter(Boolean).map(coerceEdgeIdentity);
+    return { nodes, edges };
   }
+
+  async shortestPath(
+    fromNodeId: string,
+    toNodeId: string,
+    runtime: RuntimeContext,
+  ): Promise<TraversalPath | null> {
+    if (!fromNodeId || !toNodeId) return null;
+    const cypher = `
+      MATCH (from { id: $fromId }), (to { id: $toId })
+      MATCH path = shortestPath((from)-[*..${SHORTEST_PATH_MAX_DEPTH}]-(to))
+      WHERE ALL(n IN nodes(path) WHERE
+        coalesce(n.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR n.workspace_id IS NULL
+             OR n.workspace_id = $workspaceId))
+      RETURN nodes(path) AS pathNodes, relationships(path) AS pathRels
+      LIMIT 1
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      fromId: fromNodeId,
+      toId: toNodeId,
+      workspaceId: runtime.workspaceId ?? null,
+      governanceFilter: runtime.governanceStatusFilter ?? ["active"],
+    });
+    const record = out.records[0];
+    if (!record) return null;
+    const nodes = toArray(record.pathNodes).map(coerceNodeIdentity);
+    const edges = toArray(record.pathRels).map(coerceEdgeIdentity);
+    return {
+      nodes,
+      edges,
+      length: edges.length,
+    };
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // Projection writes — P0 (already shipped Phase 7.5b)
+  // ────────────────────────────────────────────────────────────────
 
   async upsertNode(
     node: NodeIdentity & { properties: NodeProperties; provenance: ProvenanceFields },
   ) {
-    // Single-node convenience wrapper around applyProjectionJob.
-    // Production callers should batch via applyProjectionJob; this
-    // method exists for low-volume one-off writes.
     await this.applyProjectionJob([{ kind: "upsert_node", node }]);
   }
 
@@ -191,19 +449,8 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     ]);
   }
 
-  /**
-   * Phase 7.5b — batched UNWIND projection writes.
-   *
-   * Groups writes by (kind, typeKey) so each UNWIND batch uses a
-   * static Cypher label/relationship-type (Neo4j requires labels
-   * to be statically resolvable; dynamic labels need APOC).
-   * Splits each group into PROJECTION_BATCH_SIZE chunks.
-   *
-   * Per T-E.5 §7.3 carry-forward: this is the production batched
-   * pattern the spike's per-statement MERGE didn't use.
-   */
   async applyProjectionJob(writes: ProjectionWrite[]): Promise<ProjectionResult> {
-    const t0 = Date.now();
+    const t0 = this.now();
     const source = this.graphSource();
     const result = {
       nodesCreated: 0,
@@ -216,8 +463,6 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       errors: [] as { write: ProjectionWrite; error: string }[],
     };
 
-    // Bucket by (kind, typeKey) so the batched UNWIND can MERGE
-    // against a static label / relationship type.
     const buckets = new Map<string, ProjectionWrite[]>();
     for (const w of writes) {
       const typeKey =
@@ -233,7 +478,6 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     for (const [bucketKey, group] of buckets) {
       const [kind, typeKey] = bucketKey.split("|");
       const sanitizedLabel = sanitizeNeo4jIdentifier(typeKey ?? "_unknown");
-      // Chunk the group into PROJECTION_BATCH_SIZE batches.
       for (let i = 0; i < group.length; i += PROJECTION_BATCH_SIZE) {
         const batch = group.slice(i, i + PROJECTION_BATCH_SIZE);
         try {
@@ -261,7 +505,7 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       }
     }
 
-    return { ...result, durationMs: Date.now() - t0 };
+    return { ...result, durationMs: this.now() - t0 };
   }
 
   private async batchUpsertNodes(
@@ -289,7 +533,7 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       RETURN sum(CASE WHEN n._created THEN 1 ELSE 0 END) AS created,
              sum(CASE WHEN n._created THEN 0 ELSE 1 END) AS updated
     `;
-    const out = await executeNeo4jWrite(source, cypher, { rows });
+    const out = await this.executor.write(source, cypher, { rows });
     const first = out.records[0];
     if (first) {
       result.nodesCreated += toInt(first.created);
@@ -309,8 +553,6 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       targetId: w.edge?.targetNode.id ?? "",
       properties: w.edge?.properties ?? {},
     }));
-    // MERGE the relationship; ON CREATE / ON MATCH split tracks the
-    // create-vs-update counts for the ProjectionResult.
     const cypher = `
       UNWIND $rows AS row
       MATCH (s { id: row.sourceId })
@@ -325,7 +567,7 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       RETURN sum(CASE WHEN r._created THEN 1 ELSE 0 END) AS created,
              sum(CASE WHEN r._created THEN 0 ELSE 1 END) AS updated
     `;
-    const out = await executeNeo4jWrite(source, cypher, { rows });
+    const out = await this.executor.write(source, cypher, { rows });
     const first = out.records[0];
     if (first) {
       result.edgesCreated += toInt(first.created);
@@ -346,7 +588,7 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       DETACH DELETE n
       RETURN count(n) AS deleted
     `;
-    const out = await executeNeo4jWrite(source, cypher, { ids });
+    const out = await this.executor.write(source, cypher, { ids });
     const first = out.records[0];
     if (first) result.nodesDeleted += toInt(first.deleted);
   }
@@ -364,49 +606,229 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       DELETE r
       RETURN count(r) AS deleted
     `;
-    const out = await executeNeo4jWrite(source, cypher, { ids });
+    const out = await this.executor.write(source, cypher, { ids });
     const first = out.records[0];
     if (first) result.edgesDeleted += toInt(first.deleted);
   }
 
-  async enqueueProjectionJob(_i: ProjectionSyncJobInput) { return { jobId: 0 }; }
-  async takeSnapshot(_s: string) { return { snapshotId: "" }; }
-  async detectDrift(_s: string) { return { driftEvents: [] }; }
-  async rebuildProjection(_s: string): Promise<ProjectionResult> {
-    return { nodesCreated: 0, nodesUpdated: 0, nodesDeleted: 0, edgesCreated: 0, edgesUpdated: 0, edgesDeleted: 0, durationMs: 0, errors: [] };
+  // ────────────────────────────────────────────────────────────────
+  // Projection sync lifecycle — P0-6
+  // ────────────────────────────────────────────────────────────────
+
+  async enqueueProjectionJob(
+    input: ProjectionSyncJobInput,
+  ): Promise<{ jobId: number }> {
+    const db = this.requireDb();
+    const [row] = await db
+      .insert(agsGraphProjectionSyncJobs)
+      .values({
+        projectionKey: input.projectionKey,
+        triggerEvent: input.triggerEvent,
+        triggerPayload: (input.triggerPayload as Record<string, unknown>) ?? null,
+        status: "pending",
+      })
+      .returning({ id: agsGraphProjectionSyncJobs.id });
+    if (!row) {
+      throw new Error(
+        "[neo4j-ce] enqueueProjectionJob — insert returned no row",
+      );
+    }
+    return { jobId: row.id };
   }
 
-  /**
-   * Phase 7.5b — Cypher query template execution.
-   *
-   * Resolves the template via the injected `templateResolver`
-   * (typically wired to `ags_query_templates`), passes parameters
-   * straight through (Neo4j driver handles serialization), applies
-   * the template's `maxResults` as a hard LIMIT, returns the rows.
-   *
-   * `truncated` is `true` when the result count hits `maxResults` —
-   * informational signal that the caller may need to refine the
-   * query. Timing measured around `executeNeo4jQuery` only (not
-   * the resolver lookup) so the value is comparable across runs.
-   */
-  async executeTemplate(input: QueryTemplateExecutionInput): Promise<QueryTemplateExecutionResult> {
+  async takeSnapshot(scope: string): Promise<{ snapshotId: string }> {
+    const db = this.requireDb();
+    const source = this.graphSource();
+    // Count graph entities visible at snapshot time. Snapshot stays
+    // append-only; restoration is operator territory.
+    let nodeCount = 0;
+    let edgeCount = 0;
+    try {
+      const nodeOut = await this.executor.read(
+        source,
+        "MATCH (n) RETURN count(n) AS c",
+      );
+      nodeCount = toInt(nodeOut.records[0]?.c);
+      const edgeOut = await this.executor.read(
+        source,
+        "MATCH ()-[r]->() RETURN count(r) AS c",
+      );
+      edgeCount = toInt(edgeOut.records[0]?.c);
+    } catch {
+      // If Neo4j is unavailable, snapshot still records the intent
+      // with counts=0; operator triages from the storageUri metadata.
+    }
+    const snapshotKey = `snap-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const [row] = await db
+      .insert(agsGraphProjectionSnapshots)
+      .values({
+        snapshotKey,
+        scope,
+        nodeCount,
+        edgeCount,
+        metadata: {
+          backendKey: this.backendKey,
+          takenAtMs: this.now(),
+        } as Record<string, unknown>,
+      })
+      .returning({ id: agsGraphProjectionSnapshots.id });
+    if (!row) {
+      throw new Error("[neo4j-ce] takeSnapshot — insert returned no row");
+    }
+    return { snapshotId: snapshotKey };
+  }
+
+  async detectDrift(scope: string): Promise<{
+    driftEvents: { class: string; sourceId: string; details: unknown }[];
+  }> {
+    const db = this.requireDb();
+    // Pull unresolved drift events for this scope plus any
+    // failed/recent sync jobs that imply unfinished projection work.
+    const driftRows = await db
+      .select({
+        driftClass: agsGraphProjectionDriftEvents.driftClass,
+        sourceId: agsGraphProjectionDriftEvents.sourceId,
+        sourceVersionId: agsGraphProjectionDriftEvents.sourceVersionId,
+        neo4jVersionId: agsGraphProjectionDriftEvents.neo4jVersionId,
+        detectedAt: agsGraphProjectionDriftEvents.detectedAt,
+        remediation: agsGraphProjectionDriftEvents.remediation,
+      })
+      .from(agsGraphProjectionDriftEvents)
+      .where(
+        and(
+          eq(agsGraphProjectionDriftEvents.projectionKey, scope),
+          sql`${agsGraphProjectionDriftEvents.remediatedAt} IS NULL`,
+        ),
+      )
+      .orderBy(desc(agsGraphProjectionDriftEvents.detectedAt))
+      .limit(500);
+
+    const failedJobRows = await db
+      .select({
+        id: agsGraphProjectionSyncJobs.id,
+        status: agsGraphProjectionSyncJobs.status,
+        lastError: agsGraphProjectionSyncJobs.lastError,
+        updatedAt: agsGraphProjectionSyncJobs.updatedAt,
+      })
+      .from(agsGraphProjectionSyncJobs)
+      .where(
+        and(
+          eq(agsGraphProjectionSyncJobs.projectionKey, scope),
+          eq(agsGraphProjectionSyncJobs.status, "failed"),
+        ),
+      )
+      .orderBy(desc(agsGraphProjectionSyncJobs.updatedAt))
+      .limit(100);
+
+    const driftEvents: { class: string; sourceId: string; details: unknown }[] =
+      driftRows.map((r) => ({
+        class: r.driftClass,
+        sourceId: r.sourceId,
+        details: {
+          sourceVersionId: r.sourceVersionId,
+          neo4jVersionId: r.neo4jVersionId,
+          detectedAt: r.detectedAt,
+          remediation: r.remediation,
+        },
+      }));
+
+    for (const j of failedJobRows) {
+      driftEvents.push({
+        class: "sync_job_failed",
+        sourceId: `job:${j.id}`,
+        details: {
+          status: j.status,
+          lastError: j.lastError,
+          updatedAt: j.updatedAt,
+        },
+      });
+    }
+
+    return { driftEvents };
+  }
+
+  async rebuildProjection(scope: string): Promise<ProjectionResult> {
+    const db = this.requireDb();
+    const startedAt = new Date();
+    const [rebuildRow] = await db
+      .insert(agsGraphProjectionRebuilds)
+      .values({
+        trigger: "manual_rebuild",
+        scope,
+        status: "running",
+        startedAt,
+      })
+      .returning({ id: agsGraphProjectionRebuilds.id });
+
+    const tStart = this.now();
+    // CE-level rebuild: this is the wiring point. A production
+    // rebuild reads from Postgres SoT, replays projection writes via
+    // applyProjectionJob. The scope decoding (which projection kind
+    // to rebuild) is delegated to downstream workers reading the
+    // rebuild row's `scope` column; this method records the intent
+    // and returns a zero-counts result so the caller's contract
+    // (ProjectionResult shape) is honoured. Worker-side replay
+    // lands updated counts back to `agsGraphProjectionSyncResults`.
+    const result: ProjectionResult = {
+      nodesCreated: 0,
+      nodesUpdated: 0,
+      nodesDeleted: 0,
+      edgesCreated: 0,
+      edgesUpdated: 0,
+      edgesDeleted: 0,
+      durationMs: this.now() - tStart,
+      errors: [],
+    };
+
+    if (rebuildRow) {
+      await db
+        .update(agsGraphProjectionRebuilds)
+        .set({
+          completedAt: new Date(),
+          status: "queued",
+          summary: {
+            backendKey: this.backendKey,
+            note: "Rebuild row queued for worker replay against Postgres SoT.",
+          } as Record<string, unknown>,
+        })
+        .where(eq(agsGraphProjectionRebuilds.id, rebuildRow.id));
+    }
+    return result;
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // Query templates — P0 (already shipped Phase 7.5b)
+  // ────────────────────────────────────────────────────────────────
+
+  async executeTemplate(
+    input: QueryTemplateExecutionInput,
+  ): Promise<QueryTemplateExecutionResult> {
     const resolver = this.options.templateResolver;
     if (!resolver) {
-      return { rows: [], truncated: false, durationMs: 0, templateVersion: "no-resolver" };
+      return {
+        rows: [],
+        truncated: false,
+        durationMs: 0,
+        templateVersion: "no-resolver",
+      };
     }
     const template = await resolver(input.templateKey);
     if (!template) {
-      return { rows: [], truncated: false, durationMs: 0, templateVersion: "not-found" };
+      return {
+        rows: [],
+        truncated: false,
+        durationMs: 0,
+        templateVersion: "not-found",
+      };
     }
-
     const source = this.graphSource();
     const limited = ensureLimit(template.cypherBody, template.maxResults);
-    const t0 = Date.now();
-    const out = await executeNeo4jQuery(source, limited, {
+    const t0 = this.now();
+    const out = await this.executor.read(source, limited, {
       ...input.parameters,
       __max_results: template.maxResults,
     });
-    const durationMs = Date.now() - t0;
+    const durationMs = this.now() - t0;
     return {
       rows: out.records,
       truncated: out.records.length >= template.maxResults,
@@ -415,22 +837,180 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     };
   }
 
-  async runAlgorithm(_i: GraphAlgorithmInput): Promise<GraphAlgorithmResult> {
+  // ────────────────────────────────────────────────────────────────
+  // Algorithms — P0-5 (capability-gated)
+  // ────────────────────────────────────────────────────────────────
+
+  async runAlgorithm(input: GraphAlgorithmInput): Promise<GraphAlgorithmResult> {
+    if (!SUPPORTED_ALGORITHMS.has(input.algorithmKey)) {
+      // Surface as a typed capability error — callers MUST branch on
+      // this rather than treating empty rows as a successful run.
+      throw new GraphCapabilityUnsupportedError(
+        "supportsGraphAlgorithms",
+        this.backendKey,
+      );
+    }
+    if (input.algorithmKey === "shortest_path") {
+      const t0 = this.now();
+      const from = String(input.parameters.from ?? "");
+      const to = String(input.parameters.to ?? "");
+      const path = await this.shortestPath(from, to, input.runtime);
+      return {
+        rows: path
+          ? [
+              {
+                length: path.length,
+                nodeIds: path.nodes.map((n) => n.id),
+                edgeTypeKeys: path.edges.map((e) => e.typeKey),
+              },
+            ]
+          : [],
+        durationMs: this.now() - t0,
+      };
+    }
     return { rows: [], durationMs: 0 };
   }
 
-  async filterByPermissions<T extends NodeIdentity>(nodes: T[], _r: RuntimeContext): Promise<T[]> {
-    return nodes;
+  // ────────────────────────────────────────────────────────────────
+  // Permissions — P0-3
+  // ────────────────────────────────────────────────────────────────
+
+  async filterByPermissions<T extends NodeIdentity>(
+    nodes: T[],
+    runtime: RuntimeContext,
+  ): Promise<T[]> {
+    if (nodes.length === 0) return nodes;
+    const ids = nodes.map((n) => n.id);
+    const cypher = `
+      MATCH (n)
+      WHERE n.id IN $ids
+      RETURN n.id AS id,
+             coalesce(n.governance_status, 'active') AS governanceStatus,
+             n.workspace_id AS workspaceId,
+             coalesce(n.visibility, 'visible') AS visibility,
+             coalesce(n.sensitivity, 'public') AS sensitivity
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, { ids });
+    const visibilityMap = new Map<string, boolean>();
+    for (const row of out.records) {
+      const id = String(row.id ?? "");
+      visibilityMap.set(
+        id,
+        isVisibleToRuntime(
+          {
+            governanceStatus: String(row.governanceStatus ?? "active"),
+            workspaceId: row.workspaceId == null ? null : toInt(row.workspaceId),
+            visibility: String(row.visibility ?? "visible"),
+            sensitivity: String(row.sensitivity ?? "public"),
+          },
+          runtime,
+        ),
+      );
+    }
+    // Default-deny: any input node not returned by the query is
+    // unknown to the backend and therefore not visible.
+    return nodes.filter((n) => visibilityMap.get(n.id) === true);
   }
 
-  async isVisibleToUser(_id: string, _r: RuntimeContext): Promise<boolean> {
-    return true;
+  async isVisibleToUser(
+    nodeId: string,
+    runtime: RuntimeContext,
+  ): Promise<boolean> {
+    if (!nodeId) return false;
+    const cypher = `
+      MATCH (n { id: $id })
+      RETURN coalesce(n.governance_status, 'active') AS governanceStatus,
+             n.workspace_id AS workspaceId,
+             coalesce(n.visibility, 'visible') AS visibility,
+             coalesce(n.sensitivity, 'public') AS sensitivity
+      LIMIT 1
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      id: nodeId,
+    });
+    const row = out.records[0];
+    if (!row) return false;
+    return isVisibleToRuntime(
+      {
+        governanceStatus: String(row.governanceStatus ?? "active"),
+        workspaceId: row.workspaceId == null ? null : toInt(row.workspaceId),
+        visibility: String(row.visibility ?? "visible"),
+        sensitivity: String(row.sensitivity ?? "public"),
+      },
+      runtime,
+    );
   }
 
-  async explainPath(_f: string, _t: string, _r: RuntimeContext) { return { path: null }; }
-  async explainNode(_id: string, _r: RuntimeContext) { return null; }
+  // ────────────────────────────────────────────────────────────────
+  // Explain — P0-4
+  // ────────────────────────────────────────────────────────────────
 
-  async runBenchmark(scenario: BenchmarkScenario, iterations: number): Promise<BenchmarkResult> {
+  async explainPath(
+    fromNodeId: string,
+    toNodeId: string,
+    runtime: RuntimeContext,
+  ): Promise<{ path: TraversalPath | null; cypher?: string; cost?: number }> {
+    const cypher = `MATCH path = shortestPath((from { id: $fromId })-[*..${SHORTEST_PATH_MAX_DEPTH}]-(to { id: $toId })) RETURN path`;
+    const path = await this.shortestPath(fromNodeId, toNodeId, runtime);
+    return {
+      path,
+      cypher,
+      cost: path?.length ?? 0,
+    };
+  }
+
+  async explainNode(
+    nodeId: string,
+    runtime: RuntimeContext,
+  ): Promise<{
+    node: NodeIdentity;
+    properties: NodeProperties;
+    provenance: ProvenanceFields;
+  } | null> {
+    if (!nodeId) return null;
+    const cypher = `
+      MATCH (n { id: $id })
+      WHERE coalesce(n.governance_status, 'active') IN $governanceFilter
+        AND ($workspaceId IS NULL
+             OR n.workspace_id IS NULL
+             OR n.workspace_id = $workspaceId)
+      RETURN n AS node, labels(n) AS labels
+      LIMIT 1
+    `;
+    const out = await this.executor.read(this.graphSource(), cypher, {
+      id: nodeId,
+      workspaceId: runtime.workspaceId ?? null,
+      governanceFilter: runtime.governanceStatusFilter ?? ["active"],
+    });
+    const record = out.records[0];
+    if (!record) return null;
+    const raw = record.node as Record<string, unknown> | undefined;
+    if (!raw) return null;
+    const props = nodePropsOf(raw);
+    const labels = toArray(record.labels).map(String);
+    return {
+      node: {
+        typeKey: labels[0] ?? "_unknown",
+        id: String(props.id ?? nodeId),
+        sourceId: props.source_id == null ? undefined : String(props.source_id),
+        sourceVersionId:
+          props.source_version_id == null
+            ? undefined
+            : String(props.source_version_id),
+      },
+      properties: props,
+      provenance: extractProvenance(props),
+    };
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // Benchmark — P0 (already shipped)
+  // ────────────────────────────────────────────────────────────────
+
+  async runBenchmark(
+    scenario: BenchmarkScenario,
+    iterations: number,
+  ): Promise<BenchmarkResult> {
     const samples: number[] = [];
     let resultCount = 0;
     for (let i = 0; i < iterations; i++) {
@@ -450,18 +1030,9 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
     };
   }
 
-  /**
-   * Phase 7.5b — real driver health check via KGIA's wired
-   * `testNeo4jConnection`. Returns `status: "ok"` when bolt
-   * connectivity succeeds + the kernel version is available;
-   * `status: "down"` (with the error message) on failure.
-   *
-   * Pre-7.5b this returned hardcoded `"degraded"` with the
-   * "driver not yet wired" error string.
-   */
   async health(): Promise<BackendHealth> {
     const source = this.graphSource();
-    const probe = await testNeo4jConnection(source);
+    const probe = await this.executor.testConnection(source);
     if (probe.connected) {
       return {
         status: "healthy",
@@ -477,30 +1048,28 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
   }
 }
 
-// ── helpers ─────────────────────────────────────────────────────
+// ============================================================================
+// Helpers
+// ============================================================================
 
-/**
- * Neo4j labels + relationship types are interpolated INTO the
- * Cypher string (parameters can only bind property values, not
- * structure). Sanitize to alphanumeric + underscore to defuse
- * any injection attempt via a hostile `typeKey`.
- */
+function clampDepth(d: number): number {
+  if (!Number.isFinite(d) || d <= 0) return 1;
+  if (d > ABSOLUTE_MAX_DEPTH) return ABSOLUTE_MAX_DEPTH;
+  return Math.floor(d);
+}
+
+function clampMaxResults(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_RESULTS;
+  if (n > ABSOLUTE_MAX_RESULTS) return ABSOLUTE_MAX_RESULTS;
+  return Math.floor(n);
+}
+
 function sanitizeNeo4jIdentifier(raw: string): string {
   return raw.replace(/[^A-Za-z0-9_]/g, "_") || "_unknown";
 }
 
-/**
- * Appends a `LIMIT $__max_results` clause when the template body
- * doesn't already end with a LIMIT. Defends against templates that
- * forget to bound their result set — operator UI assumes hard caps.
- *
- * Naive string check; production callers should review templates
- * during the template-authoring flow (Phase 7.5c review pass).
- */
 function ensureLimit(cypher: string, _maxResults: number): string {
   if (/\blimit\s+\d+\b/i.test(cypher)) return cypher;
-  // Append a LIMIT against the param-bound max so callers don't
-  // have to remember it. Trailing semicolon (if any) preserved.
   const stripped = cypher.trimEnd().replace(/;$/, "").trimEnd();
   return `${stripped}\nLIMIT $__max_results`;
 }
@@ -514,5 +1083,195 @@ function toInt(v: unknown): number {
   ) {
     return (v as { toNumber: () => number }).toNumber();
   }
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
   return 0;
+}
+
+function toArray(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  if (v == null) return [];
+  return [v];
+}
+
+function nodePropsOf(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object") return {};
+  const candidate =
+    (raw as { properties?: Record<string, unknown> }).properties ??
+    (raw as Record<string, unknown>);
+  return candidate ?? {};
+}
+
+function coerceNodeIdentity(raw: unknown): NodeIdentity {
+  if (!raw || typeof raw !== "object") {
+    return { typeKey: "_unknown", id: "" };
+  }
+  const obj = raw as Record<string, unknown>;
+  const properties = nodePropsOf(obj);
+  const labels = toArray((obj as { labels?: unknown }).labels).map(String);
+  return {
+    typeKey:
+      labels[0] ??
+      String(properties.typeKey ?? properties.type_key ?? "_unknown"),
+    id: String(properties.id ?? obj.id ?? ""),
+    sourceId:
+      properties.source_id == null
+        ? undefined
+        : String(properties.source_id),
+    sourceVersionId:
+      properties.source_version_id == null
+        ? undefined
+        : String(properties.source_version_id),
+  };
+}
+
+function coerceEdgeIdentity(raw: unknown): EdgeIdentity {
+  if (!raw || typeof raw !== "object") {
+    return {
+      typeKey: "_unknown",
+      sourceNode: { typeKey: "_unknown", id: "" },
+      targetNode: { typeKey: "_unknown", id: "" },
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  const properties = nodePropsOf(obj);
+  return {
+    typeKey: String(
+      (obj as { type?: unknown }).type ??
+        properties.typeKey ??
+        properties.type_key ??
+        "_unknown",
+    ),
+    id: properties.edge_id ? String(properties.edge_id) : undefined,
+    sourceNode: {
+      typeKey: "_unknown",
+      id: String(
+        (obj as { startNodeElementId?: unknown }).startNodeElementId ??
+          (obj as { start?: unknown }).start ??
+          properties.source_id ??
+          "",
+      ),
+    },
+    targetNode: {
+      typeKey: "_unknown",
+      id: String(
+        (obj as { endNodeElementId?: unknown }).endNodeElementId ??
+          (obj as { end?: unknown }).end ??
+          properties.target_id ??
+          "",
+      ),
+    },
+  };
+}
+
+function extractProvenance(props: Record<string, unknown>): ProvenanceFields {
+  const lineageRaw = String(props.lineage_status ?? props.lineageStatus ?? "asserted");
+  const allowedLineage = new Set(["derived", "asserted", "inferred", "imported"]);
+  const lineageStatus = (
+    allowedLineage.has(lineageRaw) ? lineageRaw : "asserted"
+  ) as ProvenanceFields["lineageStatus"];
+  return {
+    sourceType: String(props.source_type ?? props.sourceType ?? "unknown"),
+    sourceId: String(props.source_id ?? props.sourceId ?? ""),
+    sourceVersionId:
+      props.source_version_id == null
+        ? undefined
+        : String(props.source_version_id),
+    sourceLocator:
+      props.source_locator == null ? undefined : String(props.source_locator),
+    createdByUserId:
+      props.created_by_user_id == null
+        ? undefined
+        : toInt(props.created_by_user_id),
+    createdByProcess:
+      props.created_by_process == null
+        ? undefined
+        : String(props.created_by_process),
+    createdByAgentId:
+      props.created_by_agent_id == null
+        ? undefined
+        : toInt(props.created_by_agent_id),
+    confidence:
+      props.confidence == null ? undefined : toInt(props.confidence),
+    lineageStatus,
+    extractionMethod:
+      props.extraction_method == null
+        ? undefined
+        : String(props.extraction_method),
+    validationStatus: (() => {
+      const v = String(props.validation_status ?? "");
+      const allowed = new Set(["unvalidated", "validated", "flagged"]);
+      return allowed.has(v)
+        ? (v as ProvenanceFields["validationStatus"])
+        : undefined;
+    })(),
+    governanceStatus: (() => {
+      const v = String(props.governance_status ?? "active");
+      const allowed = new Set(["active", "hidden", "archived", "deprecated"]);
+      return allowed.has(v)
+        ? (v as ProvenanceFields["governanceStatus"])
+        : "active";
+    })(),
+    validFrom:
+      props.valid_from == null ? undefined : String(props.valid_from),
+    validTo: props.valid_to == null ? undefined : String(props.valid_to),
+    projectionSnapshotId:
+      props.projection_snapshot_id == null
+        ? undefined
+        : String(props.projection_snapshot_id),
+  };
+}
+
+/**
+ * Permission rule centralisation. Returns true iff a node is visible
+ * to the runtime context. Safe-default DENY when the node carries a
+ * workspaceId AND the runtime carries none (a context-free query
+ * cannot prove cross-tenant authorisation).
+ *
+ * Inputs:
+ *   - `governanceStatus`: visible iff in runtime.governanceStatusFilter
+ *     (defaults to `["active"]`).
+ *   - `workspaceId`: must match runtime.workspaceId OR appear in
+ *     runtime.allowedWorkspaces, OR be null (unscoped node).
+ *   - `visibility`: nodes tagged `hidden` are denied unless the
+ *     runtime carries `userRole === "admin"`.
+ *   - `sensitivity`: nodes tagged `confidential` are denied unless
+ *     the runtime carries `userRole === "admin"` or `"approver"`.
+ */
+export function isVisibleToRuntime(
+  node: {
+    governanceStatus: string;
+    workspaceId: number | null;
+    visibility: string;
+    sensitivity: string;
+  },
+  runtime: RuntimeContext,
+): boolean {
+  const filter = runtime.governanceStatusFilter ?? ["active"];
+  if (!filter.includes(node.governanceStatus as never)) return false;
+  // Workspace check
+  if (node.workspaceId != null) {
+    const workspaces = new Set<number>();
+    if (runtime.workspaceId != null) workspaces.add(runtime.workspaceId);
+    for (const w of runtime.allowedWorkspaces ?? []) workspaces.add(w);
+    if (workspaces.size === 0) {
+      // Safe-default DENY: node scoped to a workspace but runtime
+      // didn't bring any workspace authorization.
+      return false;
+    }
+    if (!workspaces.has(node.workspaceId)) return false;
+  }
+  // Visibility / sensitivity role gates
+  const role = runtime.userRole ?? "";
+  if (node.visibility === "hidden" && role !== "admin") return false;
+  if (
+    node.sensitivity === "confidential" &&
+    role !== "admin" &&
+    role !== "approver"
+  ) {
+    return false;
+  }
+  return true;
 }

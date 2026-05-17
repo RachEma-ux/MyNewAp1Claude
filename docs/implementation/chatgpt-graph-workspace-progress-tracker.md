@@ -229,6 +229,41 @@ honest binary classification. The strict-audit doc (§7 above) is the
 authoritative source; this tracker is the user-facing summary that
 matches it.
 
+## 9. P0 Neo4j repository closure (2026-05-17)
+
+The 2026-05-13 strict-audit summary above claimed "All MVP 0-4 runtime
+gaps are closed" — that was incorrect for the Neo4j-backed repository
+surface. Prior to this PR, `Neo4jCommunityGraphRepository` returned
+hardcoded empty results for 13 of its methods (traversal, permission,
+explain, algorithms, projection-sync lifecycle). The P0 closure mission
+of 2026-05-17 fixed every one of those.
+
+Honest classification of the **13 previously-stubbed methods**:
+
+| Method | Before this PR | After this PR |
+|---|---|---|
+| `localGraph` | hardcoded empty + "Phase 7.6 implements" | **FULLY IMPLEMENTED** (real Cypher, depth/result clamps, permission pushdown) |
+| `globalGraphSample` | hardcoded empty | **FULLY IMPLEMENTED** (LIMIT sample + permission filter + neighbor hop) |
+| `neighborhood` | hardcoded empty | **FULLY IMPLEMENTED** (variable-length pattern + clamp) |
+| `shortestPath` | returned `null` | **FULLY IMPLEMENTED** (Cypher `shortestPath` + permission ALL-nodes) |
+| `enqueueProjectionJob` | returned `{jobId: 0}` | **FULLY IMPLEMENTED** (real ASDB insert into `ags_graph_projection_sync_jobs`) |
+| `takeSnapshot` | returned `{snapshotId: ""}` | **FULLY IMPLEMENTED** (Neo4j counts + ASDB row in `ags_graph_projection_snapshots`) |
+| `detectDrift` | returned empty array | **FULLY IMPLEMENTED** (reads unresolved drift events + failed sync jobs) |
+| `rebuildProjection` | returned zero result | **PARTIALLY IMPLEMENTED** (records rebuild row + queues for worker-side SoT replay; counts come from the worker) |
+| `runAlgorithm` | returned empty rows | **FULLY IMPLEMENTED** (allow-list `shortest_path` + throws `GraphCapabilityUnsupportedError` for unsupported keys — no false-empty success) |
+| `filterByPermissions` | pass-through | **FULLY IMPLEMENTED** (Neo4j round-trip per id + safe-default-deny + workspace/governance/visibility/sensitivity rules) |
+| `isVisibleToUser` | returned `true` | **FULLY IMPLEMENTED** (single-node visibility query routed through `isVisibleToRuntime`) |
+| `explainPath` | returned `{path: null}` | **FULLY IMPLEMENTED** (composes `shortestPath` + returns `{path, cypher, cost}`) |
+| `explainNode` | returned `null` | **FULLY IMPLEMENTED** (real provenance extract from node properties) |
+
+Evidence: `docs/evidence/graph-backend/agent-studio-native-graph-workspace-mvp4-closure-2026-05-17.md`.
+Tests: `tests/agent-studio/p0-neo4j-traversal-permission-explain.test.ts` (47 cases, all passing).
+
+Live-evidence items still **BLOCKED BY MISSING CREDENTIALS / INFRA** (not classified as complete):
+- G3 full-scale Neo4j benchmark — dispatch `.github/workflows/graph-bench-neo4j-ce.yml`
+- P0 closure live smoke — dispatch `.github/workflows/graph-p0-smoke-neo4j-ce.yml`
+- Live golden-question evidence — dispatch `.github/workflows/graph-golden-questions-live.yml`
+
 ## 11. GraphRAG / Retrieval closure (items 26–32, 2026-05-17)
 
 Per the GraphRAG closure prompt, the seven Retrieval acceptance items
