@@ -834,3 +834,107 @@ executor (Cypher templates) — a multi-PR arc that deserves its own
 ADR and design pass; (2) the Neo4j CE performance benchmark — needs
 a running Neo4j deployment, infra-dependent. Both are appropriate
 to gate on explicit user direction.
+
+## 21. T-G.5.β impact-analysis traversal executor stub (2026-05-17)
+
+Continues full-autonomous execution. One additive PR ships the
+operator-facing `runImpactAnalysis` query procedure as an
+**anchor-only stub** — closes the §20 "DEFERRED — needs Cypher-
+template review (T-G.5.β candidate)" line item at the **stub-
+plumbing** level. The full template-backed executor remains
+deferred (still gated on the ADR + Cypher review).
+
+### Ledger
+
+| # | PR | Slice | Surface |
+|---|---|---|---|
+| 1 | #1428 | T-G.5.β | `agentStudio.impactAnalysis.runImpactAnalysis` (stub) |
+
+### What ships
+
+1. New file `server/agent-studio/services/graph-lens/impact-analysis-executor.ts`:
+   - `runImpactAnalysisStub(request: ImpactAnalysisRequest):
+     ImpactAnalysisResult` — returns anchor-only result honoring
+     the T-F.3 contract (`nodes[0]` = starting node, `depth:0`,
+     `visible:true`, `edges:[]`, `truncated:false`,
+     `hiddenNodeCount:0`).
+   - `classifyImpactAnalysisExecutorMode(kind):
+     "stub" | "template"` — closed taxonomy classifier; today
+     always `"stub"` since no templates are seeded. Future:
+     returns `"template"` for kinds with seeded
+     `ags_query_templates` entries.
+2. `impact-analysis-router.ts` gains the `runImpactAnalysis`
+   procedure (`adminProcedure` + `query`) that wraps both helpers
+   into the `RunImpactAnalysisEnvelope`:
+   ```ts
+   { result: ImpactAnalysisResult, mode: "stub" | "template" }
+   ```
+3. Doc-block updated: the prior "Deferred — actual traversal
+   executor" caveat is replaced with "Stub executor surface
+   (T-G.5.β)" — preserves the deferral note for the
+   *template-backed* executor while accurately reflecting that
+   stub plumbing is shipped.
+
+### Why ship a stub before the templates
+
+**Dashboard wiring unblocked.** The operator-facing dashboard
+component → tRPC procedure → response shape can land in parallel
+with Cypher-template authoring. Without the stub, the dashboard
+work blocks on every kind getting a template.
+
+**Contract path tested today.** The T-F.3 permission-filter shape
+(`visible:false` preservation, `hiddenNodeCount` exposure) is
+exercised by the stub even though there's nothing to filter — the
+envelope contract is testable without waiting for traversal logic.
+
+**Mode discriminant prevents UX confusion.** The `mode: "stub" |
+"template"` field on the envelope is the critical UX signal so
+operators don't read an anchor-only result as "no impact" when
+the truth is "we haven't authored a Cypher template for this kind
+yet." Dashboard renders a "Stub mode — no template registered"
+badge per kind.
+
+### Hard-rule compliance (CLAUDE.md)
+
+- ✓ No `neo4j-driver` import. The stub does no graph I/O. Future
+  template-backed executor reaches Neo4j via
+  `GraphRepository.executeTemplate(...)`.
+- ✓ No `dispatchMcpToolCall` / `openrouter` / `credential-resolver`.
+- ✓ No `process.env.*_API_KEY` reads.
+- ✓ `adminProcedure` floor preserved (no permission downgrade).
+- ✓ Procedure is `query` not `mutation` — read-only by hard rule;
+  remains read-only when template-backed (mutations on graph state
+  route through the change-proposal flow).
+
+### T-G acceptance status after §21
+
+| Item | Status after §21 |
+|---|---|
+| Impact analysis read surface (kinds + summary) | ✓ (T-G.5.α §20) |
+| Impact analysis traversal executor (stub) | ✓ (T-G.5.β §21 — anchor-only) |
+| Impact analysis traversal executor (Cypher-template-backed) | **DEFERRED** — needs ADR + Cypher review (T-G.5.γ candidate) |
+| Neo4j CE performance benchmark | **BLOCKED** — needs running Neo4j (infra-dependent) |
+| Permission rules enforced | ✓ (§20 audit) |
+
+### Sub-arc carry-forward lesson (single, since this is a closure)
+
+**"Stub the executor surface before authoring the engine."** The
+T-G.5.β slice ships the plumbing (executor function + router
+procedure + envelope shape + mode discriminant) at <100 LoC of
+production code, unblocking dashboard work without prejudging
+Cypher-template decisions. The `mode: "stub" | "template"`
+discriminant is the critical seam — it lets future template-backed
+kinds slot in per-kind, one at a time, without breaking the
+envelope or forcing a flag-day cutover. **Pattern**: when the
+contract is locked but the engine isn't, ship the contract-honoring
+stub + the future-state discriminator. The dashboard never sees
+the engine swap.
+
+Recommendation: full-autonomous execution continues. Remaining
+T-G work (template-backed executor + Neo4j perf benchmark) both
+require operator direction (ADR + infra). Natural next pivots:
+T-D quality-agent runtime detection slice, T-F.4 quality-lens UI,
+or T-I cross-cutting governance hardening. The plan's §6 PR
+sequencing recommendation favors T-D detection runtime as it
+unblocks T-F.4 quality-lens and closes the largest remaining
+strict-audit gap.
