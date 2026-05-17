@@ -64,15 +64,23 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
     expect(src).toMatch(/readonly\s+errors:\s+ReadonlyArray<ParseError>/);
   });
 
-  it("parser/code-graph-parser.ts factory throws T-G.2.2 placeholder", () => {
+  it("parser/code-graph-parser.ts exports the createCodeGraphParser factory (wired in T-G.2.2)", () => {
     const src = read("parser/code-graph-parser.ts");
     expect(src).toMatch(/export\s+function\s+createCodeGraphParser/);
-    expect(src).toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.2/);
+    // Negative: pre-T-G.2.2 placeholder string must be gone (regression guard)
+    expect(src).not.toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.2/);
   });
 
-  it("parser/ has NO tree-sitter import (added in T-G.2.2)", () => {
-    const src = read("parser/code-graph-parser.ts");
-    expect(src).not.toMatch(/from\s+["']tree-sitter/);
+  it("parser/ tree-sitter import lives only in tree-sitter-emitter.ts (T-G.2.2)", () => {
+    // Production parser delegates to the sibling emitter; the
+    // public factory file itself does NOT import tree-sitter, so
+    // consumers without the native binding can compile against
+    // the surface.
+    const factorySrc = read("parser/code-graph-parser.ts");
+    expect(factorySrc).not.toMatch(/from\s+["']tree-sitter["']/);
+    const emitterSrc = read("parser/tree-sitter-emitter.ts");
+    expect(emitterSrc).toMatch(/from\s+["']tree-sitter["']/);
+    expect(emitterSrc).toMatch(/from\s+["']tree-sitter-typescript["']/);
   });
 
   // ── persistence/ ─────────────────────────────────────────────────
@@ -134,29 +142,35 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
 
   // ── factory invocation behavior ──────────────────────────────────
 
-  it("all three factories throw T-G.2.1-tagged placeholder errors today", async () => {
-    const { createCodeGraphParser } = await import(
-      "../../server/agent-studio/services/code-graph/parser/code-graph-parser.js"
-    );
+  it("persistence + projection factories still throw T-G.2.1-tagged placeholders (parser wired in T-G.2.2)", async () => {
+    // Parser factory was the first to be wired (T-G.2.2). The
+    // other two (persistence + projection) remain placeholders
+    // until T-G.2.3 / T-G.2.4 — this test flips one assertion
+    // per sub-slice as it ships.
     const { createCodeGraphStore } = await import(
       "../../server/agent-studio/services/code-graph/persistence/code-graph-store.js"
     );
     const { createCodeGraphProjection } = await import(
       "../../server/agent-studio/services/code-graph/projection/code-graph-projection.js"
     );
-    expect(() => createCodeGraphParser()).toThrow(/T-G\.2\.1/);
     expect(() => createCodeGraphStore()).toThrow(/T-G\.2\.1/);
     expect(() => createCodeGraphProjection()).toThrow(/T-G\.2\.1/);
   });
 
-  it("top-level public-api re-exports the closed-taxonomy validators (sanity)", async () => {
-    const mod = await import(
-      "../../server/agent-studio/services/code-graph/public-api.js"
-    );
-    expect(typeof mod.isCodeGraphNodeType).toBe("function");
-    expect(typeof mod.isCodeGraphEdgeType).toBe("function");
-    expect(typeof mod.validateCodeGraphEdgeBatch).toBe("function");
-    expect(Array.isArray(mod.CODE_GRAPH_NODE_TYPES)).toBe(true);
-    expect(Array.isArray(mod.CODE_GRAPH_EDGE_TYPES)).toBe(true);
+  it("top-level public-api source-scans show the contracts re-exports (validator surface)", () => {
+    // Source-scan rather than dynamic-import because the parser
+    // public-api transitively pulls `tree-sitter-emitter.ts` which
+    // requires the native tree-sitter binding. Source-scan keeps
+    // this test runnable on environments without the binding
+    // installed (Termux, fresh checkouts) while still locking
+    // that the barrel re-exports the public contracts surface.
+    const src = read("public-api.ts");
+    expect(src).toMatch(/from\s+["']\.\/contracts\/public-api\.js["']/);
+    const contractsBarrel = read("contracts/public-api.ts");
+    expect(contractsBarrel).toMatch(/isCodeGraphNodeType/);
+    expect(contractsBarrel).toMatch(/isCodeGraphEdgeType/);
+    expect(contractsBarrel).toMatch(/validateCodeGraphEdgeBatch/);
+    expect(contractsBarrel).toMatch(/CODE_GRAPH_NODE_TYPES/);
+    expect(contractsBarrel).toMatch(/CODE_GRAPH_EDGE_TYPES/);
   });
 });
