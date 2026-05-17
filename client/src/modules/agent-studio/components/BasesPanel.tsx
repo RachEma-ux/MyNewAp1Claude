@@ -28,6 +28,7 @@ import {
   parseFilterDocument,
   applyFilterDocument,
   extractFolderIdConstraint,
+  type FilterCondition,
   type FilterDocument,
   type FilterableNote,
 } from "@shared/bases-filter-language";
@@ -1410,6 +1411,20 @@ function BaseRowDetail({
             className="space-y-2"
             data-testid={`bases-row-detail-filters-editor-${base.id}`}
           >
+            {/* T-F.119 (T-F.2-γ-polish α): rich-form condition summary.
+                Parses the current draft and renders each condition as
+                a chip with field / op / value; per-chip Remove rewrites
+                the draft JSON. Operator sees structured view of what's
+                enforced without parsing JSON mentally. Read-only display
+                + Remove only — full add/edit per-condition form is
+                deferred to β/γ follow-ups (kind picker + adaptive value
+                inputs by field type). */}
+            <FilterConditionsSummary
+              baseId={base.id}
+              draft={filterEdit.draft}
+              disabled={filterEdit.isPending}
+              onChange={filterEdit.onChange}
+            />
             <label
               className="block text-muted-foreground"
               htmlFor={`bases-row-detail-filters-textarea-${base.id}`}
@@ -1637,6 +1652,118 @@ function BaseRowDetail({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * T-F.119 (T-F.2-γ-polish α) FilterConditionsSummary — read-only
+ * structured visualization of the conditions currently encoded in
+ * the filter-edit draft JSON. Each condition renders as a chip
+ * naming field / op / value; a per-chip Remove button rewrites the
+ * draft JSON (drops that condition; re-serializes the rest with
+ * stable 2-space indent matching the textarea's existing format).
+ *
+ * Unparseable / non-V1 drafts fall back to a "structured view
+ * unavailable — edit the JSON directly" hint so the operator
+ * always has an editing path. The textarea remains the primary
+ * (and currently only) ADD surface; add/edit-per-condition forms
+ * are deferred to β/γ follow-ups.
+ */
+function FilterConditionsSummary({
+  baseId,
+  draft,
+  disabled,
+  onChange,
+}: {
+  baseId: number;
+  draft: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}) {
+  // Parse defensively — operator may be mid-edit with invalid JSON.
+  let parsed: FilterDocument | null = null;
+  try {
+    parsed = parseFilterDocument(JSON.parse(draft));
+  } catch {
+    parsed = null;
+  }
+
+  if (parsed === null) {
+    return (
+      <div
+        className="rounded border border-border bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground"
+        data-testid={`bases-row-detail-filters-summary-unavailable-${baseId}`}
+      >
+        Structured view unavailable — current draft does not parse as
+        a V1 filter document. Edit the JSON below directly.
+      </div>
+    );
+  }
+
+  if (parsed.conditions.length === 0) {
+    return (
+      <div
+        className="rounded border border-border bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground"
+        data-testid={`bases-row-detail-filters-summary-empty-${baseId}`}
+      >
+        No conditions — base matches all notes.
+      </div>
+    );
+  }
+
+  function describeCondition(c: FilterCondition): string {
+    switch (c.field) {
+      case "folderId":
+        return `folderId = ${c.value}`;
+      case "slug":
+        return `slug = "${c.value}"`;
+      case "title":
+        return `title contains "${c.value}"`;
+      case "governanceStatus":
+        return `governanceStatus in [${c.value.map((v) => `"${v}"`).join(", ")}]`;
+      case "updatedAt":
+        return `updatedAt ${c.op} ${c.value}`;
+    }
+  }
+
+  function removeConditionAt(idx: number): void {
+    if (parsed === null) return;
+    const next: FilterDocument = {
+      version: 1,
+      conditions: parsed.conditions.filter((_, i) => i !== idx),
+    };
+    onChange(JSON.stringify(next, null, 2));
+  }
+
+  return (
+    <div
+      className="space-y-1 rounded border border-border bg-muted/20 px-2 py-1"
+      data-testid={`bases-row-detail-filters-summary-${baseId}`}
+    >
+      <div className="text-[10px] text-muted-foreground">
+        Parsed conditions ({parsed.conditions.length}):
+      </div>
+      <ul className="space-y-0.5">
+        {parsed.conditions.map((c, idx) => (
+          <li
+            key={idx}
+            className="flex items-center gap-2 text-[10px]"
+            data-testid={`bases-row-detail-filters-summary-row-${baseId}-${idx}`}
+          >
+            <span className="font-mono">{describeCondition(c)}</span>
+            <button
+              type="button"
+              className="ml-auto underline text-muted-foreground disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => removeConditionAt(idx)}
+              data-testid={`bases-row-detail-filters-summary-remove-${baseId}-${idx}`}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
