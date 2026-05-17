@@ -130,10 +130,11 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
     expect(src).toMatch(/Promise<ProjectCodeGraphResult>/);
   });
 
-  it("projection/code-graph-projection.ts factory throws T-G.2.4 placeholder", () => {
+  it("projection/code-graph-projection.ts exports the createCodeGraphProjection factory (wired in T-G.2.4)", () => {
     const src = read("projection/code-graph-projection.ts");
     expect(src).toMatch(/export\s+function\s+createCodeGraphProjection/);
-    expect(src).toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.4/);
+    // Negative: pre-T-G.2.4 placeholder string must be gone.
+    expect(src).not.toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.4/);
   });
 
   it("projection/ has NO direct neo4j-driver import (always — projects via GraphRepository)", () => {
@@ -143,14 +144,23 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
 
   // ── factory invocation behavior ──────────────────────────────────
 
-  it("projection factory still throws T-G.2.1-tagged placeholder (parser + persistence wired)", async () => {
-    // Parser was wired in T-G.2.2; persistence in T-G.2.3. Only
-    // projection remains until T-G.2.4 — this test flips one
-    // assertion per sub-slice as it ships.
-    const { createCodeGraphProjection } = await import(
-      "../../server/agent-studio/services/code-graph/projection/code-graph-projection.js"
-    );
-    expect(() => createCodeGraphProjection()).toThrow(/T-G\.2\.1/);
+  it("all three factories are wired (parser T-G.2.2, persistence T-G.2.3, projection T-G.2.4)", () => {
+    // Source-scan rather than behavioral — the source-scan tests
+    // in each sub-slice's `*-wired.test.ts` lock the actual
+    // implementation contracts. This assertion is the negative
+    // sanity check: no factory still carries the T-G.2.1
+    // placeholder error string.
+    for (const path of [
+      "parser/code-graph-parser.ts",
+      "persistence/code-graph-store.ts",
+      "projection/code-graph-projection.ts",
+    ]) {
+      const src = read(path);
+      expect(
+        src.match(/\[T-G\.2\.1\]\s+CodeGraph(?:Parser|Store|Projection)/),
+        `${path} still carries the T-G.2.1 placeholder string`,
+      ).toBeNull();
+    }
   });
 
   it("top-level public-api source-scans show the contracts re-exports (validator surface)", () => {
