@@ -30,8 +30,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import { agsVaultTemplateInstantiations } from "../../../../drizzle/tables/agent-studio-vault-template-instantiations.js";
-import { agsVaultNotes } from "../../../../drizzle/tables/agent-studio.js";
-import { agsVaults } from "../../../../drizzle/tables/agent-studio.js";
+import { agsVaultNotes, agsVaults } from "../../../../drizzle/tables/agent-studio-vault.js";
 
 export function computeTemplateDigest(contentMd: string): string {
   return createHash("sha256").update(contentMd, "utf8").digest("hex");

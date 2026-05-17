@@ -80,6 +80,7 @@ import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
 import { impactAnalysisRouter } from "../services/graph-lens/impact-analysis-router";
 import { semanticEnrichmentRouter } from "../services/graph-enrichment/semantic-enrichment-router";
 import { graphChangeProposalsRouter } from "../services/graph-change-proposals/router";
+import { vaultRouter } from "../services/vault/router";
 import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
@@ -3016,6 +3017,18 @@ export const agentStudioRouter = router({
   // ags_graph_change_proposals for Phase 11.5 agent-initiated mutation
   // proposals.
   graphChangeProposals: graphChangeProposalsRouter,
+  // Native Graph Workspace MVP 1 — Vault subsystem (markdown notes,
+  // vault membership, search, templates, attachments, saved views,
+  // template instantiations). Heavy client surface
+  // (BasesPanel.tsx, AttachmentListPanel.tsx,
+  // SavedViewVersionHistoryPanel.tsx, AttachmentQuotaPanel.tsx +
+  // many more) calls `trpc.agentStudio.vault.*` — without this
+  // mount every one of those calls 404s at runtime. The router
+  // file's own doc-block specified the expected mount key
+  // (`vault: vaultRouter` into agentStudio) but no file actually
+  // performed the assignment until now. Source-scan integrity test
+  // guards future drift.
+  vault: vaultRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
