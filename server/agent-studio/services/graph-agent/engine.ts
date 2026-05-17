@@ -13,6 +13,7 @@
 
 import type { GraphRepository, RuntimeContext } from "../graph/repository/index.js";
 import { GraphRetrievalRouter } from "../graph/retrieval/retrieval-router.js";
+import { pickGraphRagStrategy } from "../graph/retrieval/strategy-selector.js";
 import type { GraphAgentAnswer, GraphAgentAnswerCitation, GraphAgentRunInput } from "./contracts.js";
 import type {
   AgenticPlanner,
@@ -543,7 +544,13 @@ export class GraphAgentEngine {
 
   private pickRetrievalMode(input: GraphAgentRunInput) {
     if (input.retrievalPreference !== "auto") return input.retrievalPreference;
-    return "graphrag_local";
+    // Item 58 (Advanced GraphRAG, slice 1): query-shape-aware
+    // strategy selection. Pure, deterministic, no model call.
+    // Differentiates neighborhood / shortest_path / algorithm /
+    // local / global based on query keywords + caller hints — was
+    // previously hard-coded to graphrag_local.
+    const selected = pickGraphRagStrategy({ query: input.query });
+    return selected.mode;
   }
 
   private buildAgenticSystemPrompt(terminationReason: string): string {

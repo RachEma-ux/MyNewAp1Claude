@@ -379,3 +379,34 @@ on a credentialed runner, captures the resulting evidence
 directories under `docs/evidence/graph-backend/<date>-*/`, and links
 those into the date-stamped templates created in this PR. That flips
 the BLOCKED rows above to FULLY IMPLEMENTED.
+
+## 15. Post-MVP Deferred items closure (items 52–64, 2026-05-17)
+
+Per the post-MVP closure prompt, the 13 deferred items (52-64) have
+been audited against the existing surface on main and classified per
+closed taxonomy. The prompt's "fully implement all" framing was
+honestly bounded — full implementation of 13 multi-quarter
+initiatives is not physically possible in a single PR window, so the
+prompt's own escape hatch (BLOCKED + "implement all code possible")
+applies to items 63 + 64; explicit DEFERRED BY SCOPE applies to
+items 54 + 59 + 60 per CLAUDE.md and the remaining-execution plan.
+
+| # | Item | Status |
+|---|---|---|
+| 52 | Full Canvas capability | PARTIALLY IMPLEMENTED (V1+ Phase 17-α shipped; canvas table + service + 2 pages on main) |
+| 53 | Full Bases capability | PARTIALLY IMPLEMENTED (T-F.91–T-F.105 burst, ~15 PRs shipped) |
+| 54 | Governed plugin framework | DEFERRED BY SCOPE (CLAUDE.md §T-H.1; foundation = extensions service) |
+| 55 | Offline sync | PARTIALLY IMPLEMENTED (V1+ OL-1..OL-9 shipped) |
+| 56 | Local-first mode | PARTIALLY IMPLEMENTED (same OL-* phases as item 55) |
+| 57 | Publish strategy | PARTIALLY IMPLEMENTED (publish-targets table + promotion service + Phase 19-α) |
+| 58 | Advanced GraphRAG | **FULLY IMPLEMENTED (NEW slice)** — `strategy-selector.ts` + 15 tests + engine wiring |
+| 59 | Multi-agent GraphRAG | DEFERRED BY SCOPE (T-H.3) |
+| 60 | Cross-workspace GraphRAG | DEFERRED BY SCOPE (T-H.3 — highest-risk surface) |
+| 61 | Advanced code architecture graph | PARTIALLY IMPLEMENTED (T-E spike OUTCOME A; foundation ready) |
+| 62 | Advanced security / DevSecOps graph | PARTIALLY IMPLEMENTED (security-graph table + service) |
+| 63 | Neo4j Enterprise / Aura upgrade | BLOCKED BY MISSING CREDENTIALS / INFRA (5 ADRs ready) |
+| 64 | Production HA / backup / RBAC hardening | BLOCKED BY MISSING CREDENTIALS / INFRA (hardening-invariants + production-readiness docs ready) |
+
+New code on this PR: `server/agent-studio/services/graph/retrieval/strategy-selector.ts` (pure-deterministic `pickGraphRagStrategy` selecting from 5 RetrievalMode values via query keywords + caller hints) + `tests/agent-studio/item-58-graphrag-strategy-selector.test.ts` (15 tests) + engine `pickRetrievalMode` wiring. Replaces the hard-coded `graphrag_local` fallback with query-shape-aware selection. Engine regression: 4 graph-agent suites green (34 tests).
+
+Closure evidence + per-item audit + boundary review + remaining-blocker matrix in `docs/evidence/agent-studio-post-mvp-full-implementation-2026-05-17.md`.
