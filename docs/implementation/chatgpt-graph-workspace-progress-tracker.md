@@ -1229,3 +1229,130 @@ modes. Defer to a follow-up audit slice when time allows. For
 the current arc, T-F.4 Quality Lens UI, T-I cross-cutting
 governance, and T-D.1 quality-agent operator-trigger mutations
 all remain ready to pick up.
+
+## 24. Comprehensive mount-drift guard (2026-05-17)
+
+Continues full-autonomous execution. One additive PR closes the
+"the next mount-drift bug should fail the test suite, not silently
+404 in production" gap left by §23.
+
+### Ledger
+
+| # | PR | Slice | Surface |
+|---|---|---|---|
+| 1 | #1437 | comprehensive mount-drift guard | `tests/agent-studio/agent-studio-router-mount-drift-guard.test.ts` walks `services/**/router.ts` + asserts each is imported + mounted in `api/router.ts` |
+
+### What ships
+
+A single source-scan test that:
+
+  1. Walks `server/agent-studio/services/**` recursively for `*.ts`
+     files matching `/router/i`.
+  2. For each file, extracts the `export const \w+Router = router(`
+     declaration (skipping files without one).
+  3. Asserts `api/router.ts` contains BOTH an import line
+     (`import { fooRouter } from "..."`) AND a mount key
+     (`<key>: fooRouter,`) for the export.
+  4. Allows an explicit `KNOWN_NON_DIRECT_MOUNTS` exception list
+     (empty as of this PR) — each entry requires a justifying
+     comment to discourage casually adding bypasses.
+
+When the test fails, the error message names the orphan router(s),
+their file paths, and which half (import vs mount-key) is missing
+— actionable per the carry-forward lesson "failure messages should
+make the fix obvious".
+
+### Why the per-router `*-router-mounted.test.ts` files weren't enough
+
+The per-router pattern (e.g., `vault-router-mounted.test.ts`,
+`graph-change-proposals-router-mounted.test.ts`) only catches
+drift on routers that **someone remembered to write a test for**.
+A future author who adds `services/foo/router.ts` and forgets the
+test would re-introduce the drift class. The comprehensive guard
+catches every router definition automatically — no per-router
+test-authoring burden.
+
+### What the guard does NOT cover
+
+- **Outside `server/agent-studio/services/**`.** Top-level
+  `server/` routers (mount through `server/routers.ts` +
+  `server/platform/modules/`) need their own audit. The Python
+  audit run during §23 found zero orphans across the entire
+  `server/` tree today, but no automated guard exists at the
+  broader scope yet.
+- **Nested sub-routers.** A router file that exports MULTIPLE
+  `export const \w+Router` would only have its first export
+  detected by `head -1`. Today this isn't a concern because
+  services define one router per file, but a future refactor
+  splitting routers within a file would silently lose coverage
+  on subsequent exports. (Documented as a known limitation; if
+  it ever matters, switch the regex from `head -1` to a global
+  scan.)
+- **Mount-key mismatch with the client's invocation path.** The
+  guard asserts `<key>: fooRouter` exists somewhere in
+  api/router.ts — it does NOT cross-check that `<key>` matches
+  the client's `trpc.agentStudio.<key>.*` usage. A mount at the
+  wrong key (e.g., `agentStudioVault: vaultRouter` instead of
+  `vault: vaultRouter`) would pass the guard but still 404 at
+  runtime. Mitigated by the per-router `*-router-mounted.test.ts`
+  files which DO assert specific key names, and by the
+  [[mount-drift-audit-pattern]] memory which lists the canonical
+  key for each newly-mounted router.
+
+### Hard-rule compliance (CLAUDE.md)
+
+- ✓ Pure source-scan test (no DB / no boot / no tRPC caller).
+- ✓ Same shape as the other `*-router-mounted.test.ts` files +
+  the existing `graph-agent-router-shape.test.ts`.
+- ✓ Doesn't import `neo4j-driver` / `dispatchMcpToolCall` /
+  `openrouter` / `credential-resolver`.
+
+### T-G governance acceptance status after §22-§24
+
+| Item | Status after this arc |
+|---|---|
+| Operator-facing tRPC surface uniform across T-G.1-.5 + T-D.3 | ✓ |
+| Source-scan mount integrity per-router (T-G.2/.3/.4/.5/.6 + T-D.3 + vault) | ✓ |
+| Comprehensive mount-drift guard (auto-catch new orphans) | ✓ §24 #1437 |
+| Adapter-wiring asymmetry detection | DEFERRED (no current orphans; would surface if a future PR adds an adapter without its router mount) |
+| Cross-key-mismatch detection (mount-key vs client path) | DEFERRED (mitigated by per-router tests + memory) |
+
+### Sub-arc carry-forward lessons
+
+1. **Per-instance tests vs class-of-bug guards.** The
+   `*-router-mounted.test.ts` files catch one bug per file but
+   require test-authoring discipline. The §24 comprehensive guard
+   catches the entire class with zero per-instance burden. **Both
+   layers add value** — per-instance tests give richer assertions
+   (procedure shape spot-checks, mount-key specifics); the guard
+   ensures coverage when the per-instance test is forgotten.
+2. **Failure messages should make the fix obvious.** The guard
+   reports orphan name + file path + which half is missing
+   (import vs mount-key) so the author can fix in seconds. Pattern
+   for future structural tests: surface the offending names + the
+   action verb, not just a boolean assertion.
+3. **Exemption lists need justifying comments.** The
+   `KNOWN_NON_DIRECT_MOUNTS` exception list requires a "why" per
+   entry — empty today, but the structure exists so future
+   bypasses are auditable. Pattern: every "OK to skip" should
+   carry the reasoning, not just the skip.
+
+Recommendation: with the mount-drift class formally guarded for
+`server/agent-studio/services/**`, the autonomous-execution arc
+can return to feature work. Top of the queue:
+
+  - **T-D.3.δ** semantic-enrichment trigger mutation (needs
+    candidate-selection layer plumbed)
+  - **T-F.4** Quality Lens UI (now that read surfaces are
+    uniform across T-D.3 + graph-quality + graph-correction)
+  - **Golden-questions persistence + caller** —
+    `runLiveEvaluation` exists at
+    `services/graph-skill/golden-questions/live-evaluator.ts` but
+    has no caller AND no persistence write to
+    `ags_golden_question_runs/results`; building this is a
+    3-slice mini-arc that opens the operator surface
+    surfaces in tandem (cron + manual trigger + result store)
+  - **Broader `server/**/router.ts` audit** — analogous guard
+    for the top-level mount path (`server/routers.ts` +
+    `server/platform/modules/module-routers.ts`); zero orphans
+    today but no automated guard exists.
