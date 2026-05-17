@@ -1,7 +1,54 @@
-# Graph Backend Benchmark Evidence
+# Graph Backend Evidence
 
-This directory archives the output of the `Graph Backend Benchmark — Neo4j CE (G3)`
-workflow_dispatch GitHub Actions workflow.
+This directory archives evidence for the graph backend surface —
+benchmark output, connectivity probes, permission proof,
+active-backend smoke runs, and per-date operator-dispatched
+workflow artifacts.
+
+## Index (date-stamped, items 45–50)
+
+Per the 2026-05-17 Backend / Operational Evidence closure (items
+45–51), the following date-stamped evidence files live alongside the
+historical benchmark artifacts:
+
+| Item | File | Status |
+|---|---|---|
+| 45 | [`active-backend-smoke-2026-05-17.md`](./active-backend-smoke-2026-05-17.md) | Deterministic half FULLY IMPLEMENTED (4 tests); live half BLOCKED BY CREDENTIALS |
+| 46 | [`neo4j-connectivity-2026-05-17.md`](./neo4j-connectivity-2026-05-17.md) | BLOCKED BY CREDENTIALS — operator dispatches `graph-p0-smoke-neo4j-ce.yml` |
+| 47 | [`projection-benchmark-2026-05-17.md`](./projection-benchmark-2026-05-17.md) | BLOCKED BY CREDENTIALS — operator dispatches `graph-bench-neo4j-ce.yml` |
+| 48 | [`traversal-benchmark-2026-05-17.md`](./traversal-benchmark-2026-05-17.md) | BLOCKED BY CREDENTIALS — same workflow, traversal scenario subset |
+| 49 | [`permission-evidence-2026-05-17.md`](./permission-evidence-2026-05-17.md) | Deterministic half FULLY IMPLEMENTED (77 tests); live half BLOCKED BY CREDENTIALS |
+| 50 | This README + the 5 files above | Done |
+
+Closure docs that link to this directory:
+
+- `docs/evidence/agent-studio-native-graph-workspace-mvp4-closure-2026-05-17.md` (item 1, PR #1397)
+- `docs/evidence/agent-studio-graphrag-retrieval-closure-2026-05-17.md` (items 26–32, PR #1398)
+- `docs/evidence/agent-studio-graph-agent-runtime-closure-2026-05-17.md` (items 33–37, PR #1400)
+- `docs/evidence/agent-studio-self-correction-loop-closure-2026-05-17.md` (items 38–44, PR #1401)
+- `2026-05-17-graph-agent-reasoning-bench/report.md` (PR #1400 deterministic bench evidence — actually run, 6/6 PASS)
+
+## How to add a new evidence file
+
+1. Pick the appropriate template above (or create a new
+   `<surface>-YYYY-MM-DD.md`).
+2. Replace `YYYY-MM-DD` with today's UTC date.
+3. Replace placeholder fields:
+   - **Commit SHA** — fill from `git rev-parse HEAD`
+   - **Status** — use closed-taxonomy: FULLY IMPLEMENTED /
+     PARTIALLY IMPLEMENTED / NOT IMPLEMENTED / BLOCKED BY MISSING
+     CREDENTIALS / INFRA / DEFERRED BY SCOPE
+   - **Endpoint hostname** — record without secrets
+   - **Failure summary** — if applicable
+4. Reference the new file from the closure doc that's tracking the
+   relevant item.
+5. Update the index table above.
+
+## Historical benchmark workflow
+
+The `Graph Backend Benchmark — Neo4j CE (G3)` workflow_dispatch
+GitHub Actions workflow is the primary source of date-stamped
+benchmark archives.
 
 ## Directory shape
 
