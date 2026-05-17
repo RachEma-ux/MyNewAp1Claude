@@ -99,6 +99,28 @@ Full sub-arc summary in V1+ plan §6.1.bis (added by T-A.1 / PR #1172). Per-PR l
 
 Historical "next material work" items (MR caller-migration sub-arc, concrete lane hooks, App.tsx/main.tsx OL bootstrap call site, y-protocols framing) have either landed in the burst above or remain assigned to T-B.
 
+**2026-05-16 → 2026-05-17 continuation — 89-PR burst (#1272–#1360):** UI-saturation territory continuation across **11 sub-arcs**:
+
+1. **Layout-renderer ladder** (T-F.78–T-F.81, #1275–#1278) — timeline + matrix + tree + dangling-edge gap renderers per precedent (n) at 3/5 enum values (closed at operator-visible boundary per lesson 45).
+2. **Quality Lens opening+saturation** (T-F.83–T-F.90, #1280–#1290) — 4-slice opening + 3-slice saturation + 2-slice bulk-dismiss; zero new server work, all 9 consume pre-existing `graphQuality.*` tRPC.
+3. **Bases MVP** (T-F.91–T-F.105, #1292–#1311) — α-shell + CRUD saturation + filter language ADR + ζ apply-filter + within-Bases NARROW (preview drill-into-note + open-into-edit).
+4. **Inbox arc** (T-F.107–T-F.111, #1314–#1319) — α-shell + mark-read/dismiss mutations + kind-filter + bulk-by-kind; new precedent (o)-discriminator opener.
+5. **Retrofit breakdown** (T-F.112–T-F.115, #1321–#1324) — 4-card SingleAxisBreakdownCard batch.
+6. **Bases polish + bulk + rich-form + type-aware inputs** (T-F.116–T-F.124, #1326–#1338) — closeAllRowEdits + bulk-select/delete + rich filter conditions + type-aware folderId/updatedAt/governanceStatus chip inputs.
+7. **j₂ intra-panel deeplink** (T-F.125–T-F.129, #1340–#1346) — 5 panels gain log→registry click-through; new precedent (p) + lessons 93/94.
+8. **Layout extension** (T-F.130, #1348) — DependencyPathGraphViz as 4th renderer per (n) extension.
+9. **Taxonomy-color-coding** (T-F.131–T-F.134, #1350–#1354) — StepKindBadge + NotificationKindBadge + failure-state severity + RAC mode 8→4 clustering; lessons 95–97.
+10. **URL-deeplink primitive** (T-F.135–T-F.138, #1356–#1359) — first cross-panel deeplink primitive (n) at 4 panels × 3 axis-shape variants; lessons 98–99.
+11. **T-A.* ledger refresh cadence** (T-A.18–T-A.42, ~20 PRs interleaved) — one ledger refresh per arc closure; rhythm maintained throughout.
+
+**Next material work (post-#1360):** Still substantially open candidates:
+- **T-B.4** Concrete extension lane hooks (unchanged from post-#1171 list).
+- **T-D Phase 23 Graph Quality Agent runtime** — first material runtime work outside V1+ saturation; depends on T-A doc-drift completing (T-A.43+ for tracker §1/§7 catch-up, this PR) so new ledger rows anchor honestly.
+- **T-C CLAUDE.md Non-Build List reconciliation** — text still describes CRDT/offline/multi-region as "eternal deferrals" despite V1+ plan having shipped α-slices of all three.
+- **T-B.1** G3 evidence runbook + **T-B.3** MR-1 caller-migration tail + **T-B.5** OL-1 / CRDT App.tsx bootstrap call site — saturation tail on opened V1+ phases.
+
+Per-PR detail in memory entries `project_v1_plus_lens_stack_arc_2026_05_16` / `project_v1_plus_layout_renderer_arc_2026_05_16` / `project_v1_plus_quality_lens_arc_2026_05_16` / `project_v1_plus_url_deeplink_subarc_2026_05_17`. Tracker §7 sweep row for #1272–#1360 added by T-A.43 (this doc-drift PR).
+
 The historical (pre-strict-audit) recovery context follows.
 
 ---
