@@ -5,6 +5,7 @@
 export {
   createSecurityGraphProjection,
   type SecurityGraphProjection,
+  type SecurityGraphProjectionOptions,
   type ProjectSecurityGraphInput,
   type ProjectSecurityGraphResult,
 } from "./security-graph-projection.js";
