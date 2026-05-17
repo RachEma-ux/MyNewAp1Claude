@@ -1681,6 +1681,19 @@ function FilterConditionsSummary({
   disabled: boolean;
   onChange: (next: string) => void;
 }) {
+  // ── T-F.120 (T-F.2-γ-polish β): add-condition inline form ──
+  // The form is mounted at the panel level (not per-row) since
+  // only one summary is visible at a time (one row is in
+  // filter-edit mode). Single composite state slice for the form;
+  // draftValue is a string regardless of target field type (typed
+  // parsing happens at Add-time).
+  const [addField, setAddField] = useState<
+    "" | "folderId" | "slug" | "title" | "governanceStatus" | "updatedAt"
+  >("");
+  const [addOp, setAddOp] = useState<"gte" | "lte">("gte");
+  const [addValue, setAddValue] = useState<string>("");
+  const [addError, setAddError] = useState<string | null>(null);
+
   // Parse defensively — operator may be mid-edit with invalid JSON.
   let parsed: FilterDocument | null = null;
   try {
@@ -1690,6 +1703,8 @@ function FilterConditionsSummary({
   }
 
   if (parsed === null) {
+    // Unparseable: skip the rich summary (and the add-condition
+    // form which depends on it) — operator must fix the JSON first.
     return (
       <div
         className="rounded border border-border bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground"
@@ -1697,17 +1712,6 @@ function FilterConditionsSummary({
       >
         Structured view unavailable — current draft does not parse as
         a V1 filter document. Edit the JSON below directly.
-      </div>
-    );
-  }
-
-  if (parsed.conditions.length === 0) {
-    return (
-      <div
-        className="rounded border border-border bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground"
-        data-testid={`bases-row-detail-filters-summary-empty-${baseId}`}
-      >
-        No conditions — base matches all notes.
       </div>
     );
   }
@@ -1736,34 +1740,192 @@ function FilterConditionsSummary({
     onChange(JSON.stringify(next, null, 2));
   }
 
+  // T-F.120 (T-F.2-γ-polish β): build a typed FilterCondition from
+  // the form state. Returns the condition on success, null on
+  // validation failure (caller sets addError to operator-friendly
+  // explanation). The Zod schema would reject everything that
+  // wouldn't parse, but inline messages are friendlier than
+  // "Schema validation failed" — so we validate here first.
+  function buildConditionFromForm(): FilterCondition | null {
+    setAddError(null);
+    const trimmed = addValue.trim();
+    if (trimmed === "" && addField !== "") {
+      setAddError("Value required.");
+      return null;
+    }
+    switch (addField) {
+      case "":
+        setAddError("Pick a field.");
+        return null;
+      case "folderId": {
+        const n = Number(trimmed);
+        if (!Number.isInteger(n) || n <= 0) {
+          setAddError("folderId must be a positive integer.");
+          return null;
+        }
+        return { field: "folderId", op: "eq", value: n };
+      }
+      case "slug":
+        return { field: "slug", op: "eq", value: trimmed };
+      case "title":
+        return { field: "title", op: "contains", value: trimmed };
+      case "governanceStatus": {
+        const values = trimmed
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (values.length === 0) {
+          setAddError(
+            "governanceStatus requires at least one comma-separated value.",
+          );
+          return null;
+        }
+        return { field: "governanceStatus", op: "in", value: values };
+      }
+      case "updatedAt":
+        if (Number.isNaN(Date.parse(trimmed))) {
+          setAddError("updatedAt requires a valid ISO-8601 timestamp.");
+          return null;
+        }
+        return { field: "updatedAt", op: addOp, value: trimmed };
+    }
+  }
+
+  function addCondition(): void {
+    if (parsed === null) {
+      setAddError("Current draft does not parse — fix the JSON first.");
+      return;
+    }
+    if (parsed.conditions.length >= 32) {
+      setAddError("Max 32 conditions.");
+      return;
+    }
+    const c = buildConditionFromForm();
+    if (c === null) return;
+    const next: FilterDocument = {
+      version: 1,
+      conditions: [...parsed.conditions, c],
+    };
+    onChange(JSON.stringify(next, null, 2));
+    setAddField("");
+    setAddValue("");
+    setAddOp("gte");
+    setAddError(null);
+  }
+
   return (
     <div
       className="space-y-1 rounded border border-border bg-muted/20 px-2 py-1"
       data-testid={`bases-row-detail-filters-summary-${baseId}`}
     >
-      <div className="text-[10px] text-muted-foreground">
-        Parsed conditions ({parsed.conditions.length}):
-      </div>
-      <ul className="space-y-0.5">
-        {parsed.conditions.map((c, idx) => (
-          <li
-            key={idx}
-            className="flex items-center gap-2 text-[10px]"
-            data-testid={`bases-row-detail-filters-summary-row-${baseId}-${idx}`}
+      {parsed.conditions.length === 0 ? (
+        <div
+          className="text-[10px] text-muted-foreground"
+          data-testid={`bases-row-detail-filters-summary-empty-${baseId}`}
+        >
+          No conditions — base matches all notes.
+        </div>
+      ) : (
+        <>
+          <div className="text-[10px] text-muted-foreground">
+            Parsed conditions ({parsed.conditions.length}):
+          </div>
+          <ul className="space-y-0.5">
+            {parsed.conditions.map((c, idx) => (
+              <li
+                key={idx}
+                className="flex items-center gap-2 text-[10px]"
+                data-testid={`bases-row-detail-filters-summary-row-${baseId}-${idx}`}
+              >
+                <span className="font-mono">{describeCondition(c)}</span>
+                <button
+                  type="button"
+                  className="ml-auto underline text-muted-foreground disabled:opacity-50"
+                  disabled={disabled}
+                  onClick={() => removeConditionAt(idx)}
+                  data-testid={`bases-row-detail-filters-summary-remove-${baseId}-${idx}`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {/* T-F.120 (T-F.2-γ-polish β): add-condition inline form. */}
+      <div
+        className="mt-1 flex flex-wrap items-center gap-1 border-t border-border pt-1 text-[10px]"
+        data-testid={`bases-row-detail-filters-add-${baseId}`}
+      >
+        <select
+          className="rounded border border-border bg-background px-1 py-0.5"
+          value={addField}
+          onChange={(e) =>
+            setAddField(e.target.value as typeof addField)
+          }
+          disabled={disabled}
+          data-testid={`bases-row-detail-filters-add-field-${baseId}`}
+        >
+          <option value="">+ Add condition…</option>
+          <option value="folderId">folderId</option>
+          <option value="slug">slug</option>
+          <option value="title">title</option>
+          <option value="governanceStatus">governanceStatus</option>
+          <option value="updatedAt">updatedAt</option>
+        </select>
+        {addField === "updatedAt" ? (
+          <select
+            className="rounded border border-border bg-background px-1 py-0.5"
+            value={addOp}
+            onChange={(e) => setAddOp(e.target.value as "gte" | "lte")}
+            disabled={disabled}
+            data-testid={`bases-row-detail-filters-add-op-${baseId}`}
           >
-            <span className="font-mono">{describeCondition(c)}</span>
+            <option value="gte">gte</option>
+            <option value="lte">lte</option>
+          </select>
+        ) : null}
+        {addField !== "" ? (
+          <>
+            <input
+              type="text"
+              className="rounded border border-border bg-background px-1 py-0.5 font-mono"
+              value={addValue}
+              onChange={(e) => setAddValue(e.target.value)}
+              placeholder={
+                addField === "folderId"
+                  ? "positive integer"
+                  : addField === "governanceStatus"
+                    ? "draft,published (comma-separated)"
+                    : addField === "updatedAt"
+                      ? "ISO-8601 (e.g. 2026-01-01T00:00:00Z)"
+                      : addField === "title"
+                        ? "substring"
+                        : "exact match"
+              }
+              disabled={disabled}
+              data-testid={`bases-row-detail-filters-add-value-${baseId}`}
+            />
             <button
               type="button"
-              className="ml-auto underline text-muted-foreground disabled:opacity-50"
+              className="rounded border border-border bg-background px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+              onClick={addCondition}
               disabled={disabled}
-              onClick={() => removeConditionAt(idx)}
-              data-testid={`bases-row-detail-filters-summary-remove-${baseId}-${idx}`}
+              data-testid={`bases-row-detail-filters-add-submit-${baseId}`}
             >
-              Remove
+              Add
             </button>
-          </li>
-        ))}
-      </ul>
+          </>
+        ) : null}
+        {addError !== null ? (
+          <span
+            className="ml-1 text-destructive"
+            data-testid={`bases-row-detail-filters-add-error-${baseId}`}
+          >
+            {addError}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
