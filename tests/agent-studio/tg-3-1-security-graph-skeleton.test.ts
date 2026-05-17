@@ -130,15 +130,17 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
     expect(src).toMatch(/Promise<SecurityGraphIngestionResult>/);
   });
 
-  it("persistence/security-graph-store.ts factory throws T-G.3.3 placeholder", () => {
+  it("persistence/security-graph-store.ts exports the createSecurityGraphStore factory (wired in T-G.3.3)", () => {
     const src = read("persistence/security-graph-store.ts");
     expect(src).toMatch(/export\s+function\s+createSecurityGraphStore/);
-    expect(src).toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.3/);
+    expect(src).not.toMatch(/\[T-G\.3\.1\][\s\S]*T-G\.3\.3/);
   });
 
-  it("persistence/ has NO neo4j-driver import (projection owns that boundary)", () => {
+  it("persistence/ has NO neo4j-driver import (projection owns that boundary; T-G.3.3 wired drizzle only)", () => {
     const src = read("persistence/security-graph-store.ts");
     expect(src).not.toMatch(/from\s+["']neo4j-driver["']/);
+    expect(src).toMatch(/from\s+["']drizzle-orm["']/);
+    expect(src).toMatch(/getAsDb/);
   });
 
   // ── projection/ ──────────────────────────────────────────────────
@@ -169,14 +171,10 @@ describe("T-G.3.1 — Security/DevSecOps Graph production skeleton", () => {
 
   // ── Factory invocation (placeholder errors) ──────────────────────
 
-  it("persistence + projection factories still throw T-G.3.1-tagged placeholders (cve-feed wired in T-G.3.2)", async () => {
-    const { createSecurityGraphStore } = await import(
-      "../../server/agent-studio/services/security-graph/persistence/security-graph-store.js"
-    );
+  it("projection factory still throws T-G.3.1 placeholder (cve-feed + persistence wired)", async () => {
     const { createSecurityGraphProjection } = await import(
       "../../server/agent-studio/services/security-graph/projection/security-graph-projection.js"
     );
-    expect(() => createSecurityGraphStore()).toThrow(/T-G\.3\.1/);
     expect(() => createSecurityGraphProjection()).toThrow(/T-G\.3\.1/);
   });
 
