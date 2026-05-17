@@ -12,4 +12,5 @@ export {
   type SecurityGraphIngestionListRow,
   type SecurityGraphIngestionStats,
   type SecurityGraphSourceSummaryRow,
+  type SecurityGraphRecentRejectionRow,
 } from "./security-graph-store.js";

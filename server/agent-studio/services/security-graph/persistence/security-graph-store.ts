@@ -91,6 +91,23 @@ export interface SecurityGraphIngestionListRow {
 }
 
 /**
+ * One reason+count entry in the rejection-by-reason rollup. Persistence
+ * stores rejections as a count map (`{ reason: count }`) on each
+ * ingestion's `metadata.rejectionsByReason`; this row shape carries
+ * the unioned + source-attributed flatten of that map across recent
+ * ingestions. Operators see "schema_violation: 12 across 3 NVD runs"
+ * for triage.
+ */
+export interface SecurityGraphRecentRejectionRow {
+  readonly ingestionId: string;
+  readonly sourceKey: string;
+  readonly reason: string;
+  readonly count: number;
+  /** Temporal anchor — `startedAt` of the parent ingestion. */
+  readonly ingestionStartedAt: Date;
+}
+
+/**
  * Per-source-key summary row — most-recent ingestion's status +
  * counts + freshness, keyed by `sourceKey`. Used by the operator
  * dashboard's "feed freshness" panel to decide which security
@@ -193,6 +210,20 @@ export interface SecurityGraphStore {
   listSources(limit: number): Promise<
     ReadonlyArray<SecurityGraphSourceSummaryRow>
   >;
+
+  /**
+   * Operator dashboard — recent rejections unioned across the
+   * most-recent ingestions. Each ingestion stores rejections as a
+   * count map on `metadata.rejectionsByReason`; this method
+   * flattens those out with source context. Newest-first by
+   * `ingestionStartedAt`, then by `reason` for deterministic order.
+   * Capped by `ingestionLimit` (ingestions scanned) and `rowLimit`
+   * (total rows returned).
+   */
+  listRecentRejectionsByReason(input: {
+    readonly ingestionLimit: number;
+    readonly rowLimit: number;
+  }): Promise<ReadonlyArray<SecurityGraphRecentRejectionRow>>;
 }
 
 /**
@@ -363,6 +394,55 @@ export function createSecurityGraphStore(): SecurityGraphStore {
         properties: r.properties ?? undefined,
       }));
       return { nodes, edges };
+    },
+
+    async listRecentRejectionsByReason(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      // Prefilter ingestions where edgesRejected > 0 so we don't
+      // scan ingestions with no rejections to flatten. Each
+      // ingestion's metadata.rejectionsByReason is a small
+      // count-map; total iteration is bounded by ingestionLimit ×
+      // (unique reasons per ingestion).
+      const ingestions = await conn
+        .select({
+          ingestionId: agsSecurityGraphIngestions.ingestionId,
+          sourceKey: agsSecurityGraphIngestions.sourceKey,
+          startedAt: agsSecurityGraphIngestions.startedAt,
+          metadata: agsSecurityGraphIngestions.metadata,
+          edgesRejected: agsSecurityGraphIngestions.edgesRejected,
+        })
+        .from(agsSecurityGraphIngestions)
+        .where(sql`${agsSecurityGraphIngestions.edgesRejected} > 0`)
+        .orderBy(desc(agsSecurityGraphIngestions.startedAt))
+        .limit(input.ingestionLimit);
+
+      const out: SecurityGraphRecentRejectionRow[] = [];
+      for (const row of ingestions) {
+        const metadata = row.metadata as
+          | { rejectionsByReason?: unknown }
+          | null;
+        const rawMap = metadata?.rejectionsByReason;
+        if (!rawMap || typeof rawMap !== "object") continue;
+        // Sort reasons for deterministic order within ingestion.
+        const reasonEntries = Object.entries(
+          rawMap as Record<string, unknown>,
+        )
+          .filter(([, v]) => typeof v === "number" && (v as number) > 0)
+          .sort(([a], [b]) => a.localeCompare(b));
+        for (const [reason, countRaw] of reasonEntries) {
+          if (out.length >= input.rowLimit) break;
+          out.push({
+            ingestionId: row.ingestionId,
+            sourceKey: row.sourceKey,
+            reason,
+            count: Number(countRaw),
+            ingestionStartedAt: row.startedAt,
+          });
+        }
+        if (out.length >= input.rowLimit) break;
+      }
+      return out;
     },
 
     async listSources(limit: number) {

@@ -53,6 +53,7 @@ import {
   type SecurityGraphIngestionListRow,
   type SecurityGraphIngestionStats,
   type SecurityGraphNode,
+  type SecurityGraphRecentRejectionRow,
   type SecurityGraphSourceSummaryRow,
 } from "./persistence/public-api.js";
 import {
@@ -96,6 +97,13 @@ const ListSourcesInput = z
   })
   .optional();
 
+const ListRecentRejectionsByReasonInput = z
+  .object({
+    ingestionLimit: z.number().int().positive().max(200).optional(),
+    rowLimit: z.number().int().positive().max(500).optional(),
+  })
+  .optional();
+
 // ============================================================================
 // Defaults
 // ============================================================================
@@ -106,6 +114,10 @@ export const SECURITY_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
 export const SECURITY_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
 export const SECURITY_GRAPH_LIST_SOURCES_DEFAULT_LIMIT = 50;
 export const SECURITY_GRAPH_LIST_SOURCES_ABSOLUTE_LIMIT = 200;
+export const SECURITY_GRAPH_RECENT_REJECTIONS_DEFAULT_INGESTION_LIMIT = 20;
+export const SECURITY_GRAPH_RECENT_REJECTIONS_DEFAULT_ROW_LIMIT = 100;
+export const SECURITY_GRAPH_RECENT_REJECTIONS_ABSOLUTE_INGESTION_LIMIT = 200;
+export const SECURITY_GRAPH_RECENT_REJECTIONS_ABSOLUTE_ROW_LIMIT = 500;
 
 // ============================================================================
 // Output envelopes
@@ -129,6 +141,10 @@ export type SecurityGraphListIngestionEdgesEnvelope =
 
 export interface SecurityGraphListSourcesEnvelope {
   readonly sources: ReadonlyArray<SecurityGraphSourceSummaryRow>;
+}
+
+export interface SecurityGraphRecentRejectionsEnvelope {
+  readonly rejections: ReadonlyArray<SecurityGraphRecentRejectionRow>;
 }
 
 /**
@@ -194,6 +210,47 @@ export const securityGraphRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message:
               err instanceof Error ? err.message : "getIngestionStats failed",
+          });
+        }
+      },
+    ),
+
+  /**
+   * Recent rejections-by-reason rollup flattened across the
+   * most-recent ingestions that had `edgesRejected > 0`. Operators
+   * see "schema_violation: 12 across 3 NVD runs" for triage —
+   * actionable signal for closed-taxonomy edge-constraint registry
+   * tuning or feed-shape corrections.
+   *
+   * Per-ingestion metadata.rejectionsByReason is the source-of-
+   * record (written by the persistence layer at ingest time); this
+   * procedure unioned + flattens it with source context attached at
+   * read-time.
+   */
+  listRecentRejectionsByReason: adminProcedure
+    .input(ListRecentRejectionsByReasonInput)
+    .query(
+      async ({ input }): Promise<SecurityGraphRecentRejectionsEnvelope> => {
+        const ingestionLimit =
+          input?.ingestionLimit ??
+          SECURITY_GRAPH_RECENT_REJECTIONS_DEFAULT_INGESTION_LIMIT;
+        const rowLimit =
+          input?.rowLimit ??
+          SECURITY_GRAPH_RECENT_REJECTIONS_DEFAULT_ROW_LIMIT;
+        try {
+          const store = createSecurityGraphStore();
+          const rejections = await store.listRecentRejectionsByReason({
+            ingestionLimit,
+            rowLimit,
+          });
+          return { rejections };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error
+                ? err.message
+                : "listRecentRejectionsByReason failed",
           });
         }
       },
