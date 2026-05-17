@@ -90,22 +90,22 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
 
   // ── factory-throws placeholders (precedent (p)) ───────────────
 
-  it("agent / evidence-collector / proposer still throw T-D.3.1 placeholders (store flipped @ T-D.3.2)", () => {
+  it("agent / proposer still throw T-D.3.1 placeholders (store flipped @ T-D.3.2, evidence flipped @ T-D.3.3)", () => {
     const expected: Array<[string, string]> = [
       ["semantic-enrichment-agent.ts", "T-D.3.1] createSemanticEnrichmentAgent"],
-      [
-        "semantic-enrichment-evidence-collector.ts",
-        "T-D.3.1] createSemanticEnrichmentEvidenceCollector",
-      ],
       ["semantic-enrichment-proposer.ts", "T-D.3.1] createSemanticEnrichmentProposer"],
     ];
     for (const [file, marker] of expected) {
       const src = readFile(join(DIR, file));
       expect(src).toContain(marker);
     }
-    // Store has been flipped — must no longer carry the placeholder tag.
+    // Store + evidence collector flipped — must no longer carry the placeholder tag.
     const storeSrc = readFile(join(DIR, "semantic-enrichment-store.ts"));
     expect(storeSrc).not.toMatch(/\[T-D\.3\.1\][\s\S]*createSemanticEnrichmentStore/);
+    const collectorSrc = readFile(join(DIR, "semantic-enrichment-evidence-collector.ts"));
+    expect(collectorSrc).not.toMatch(
+      /\[T-D\.3\.1\][\s\S]*createSemanticEnrichmentEvidenceCollector/,
+    );
   });
 
   // ── boundary discipline (hard rules) ──────────────────────────
@@ -152,16 +152,16 @@ describe("T-D.3.1 — Semantic Enrichment Agent skeleton", () => {
     }
   });
 
-  it("no drizzle-orm import in agent / proposer / evidence-collector (store-only boundary)", () => {
-    // Store CAN import drizzle (it's the persistence boundary, T-D.3.2);
-    // the other layers must not.
-    const nonStoreFiles = [
+  it("no drizzle-orm import in agent / proposer / contracts (persistence-layer boundary)", () => {
+    // Store CAN import drizzle (T-D.3.2 persistence boundary).
+    // Evidence collector CAN import drizzle (T-D.3.3 read-only KB).
+    // Agent + proposer + contracts must not.
+    const nonPersistenceFiles = [
       "semantic-enrichment-agent.ts",
       "semantic-enrichment-proposer.ts",
-      "semantic-enrichment-evidence-collector.ts",
       "contracts.ts",
     ];
-    for (const file of nonStoreFiles) {
+    for (const file of nonPersistenceFiles) {
       const src = readFile(join(DIR, file));
       expect(src, `${file} should not import drizzle-orm`).not.toMatch(
         /from\s+["']drizzle-orm/,
@@ -254,7 +254,7 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
     expect(isSemanticEnrichmentProposalKind(undefined)).toBe(false);
   });
 
-  it("agent / evidence-collector / proposer factory-throws fire with [T-D.3.1] tagged messages (store flipped @ T-D.3.2)", async () => {
+  it("agent / proposer factory-throws fire with [T-D.3.1] tagged messages (store @ T-D.3.2 + evidence @ T-D.3.3 flipped)", async () => {
     const {
       createSemanticEnrichmentAgent,
       createSemanticEnrichmentStore,
@@ -264,9 +264,7 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
       "../../server/agent-studio/services/graph-enrichment/public-api"
     );
     const store = createSemanticEnrichmentStore();
-    const collector = createSemanticEnrichmentEvidenceCollector({
-      noteVersionReader: {},
-    });
+    const collector = createSemanticEnrichmentEvidenceCollector();
     const proposer = createSemanticEnrichmentProposer({ modelAccess: {} });
     const agent = createSemanticEnrichmentAgent({
       store,
@@ -274,9 +272,6 @@ describe("T-D.3.1 — normalization helpers (behavioral)", () => {
       proposer,
     });
     await expect(agent.run({ workspaceId: 1 })).rejects.toThrow(/T-D\.3\.1/);
-    await expect(
-      collector.collect({ workspaceId: 1, targetTypeKey: "note", targetId: 1 }),
-    ).rejects.toThrow(/T-D\.3\.1/);
     await expect(
       proposer.propose({
         workspaceId: 1,
