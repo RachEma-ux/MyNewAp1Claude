@@ -53,6 +53,7 @@ import {
   type SecurityGraphIngestionListRow,
   type SecurityGraphIngestionStats,
   type SecurityGraphNode,
+  type SecurityGraphSourceSummaryRow,
 } from "./persistence/public-api.js";
 import {
   SECURITY_GRAPH_NODE_TYPES,
@@ -89,6 +90,12 @@ const ListIngestionEdgesInput = z.object({
   limit: z.number().int().positive().max(500).optional(),
 });
 
+const ListSourcesInput = z
+  .object({
+    limit: z.number().int().positive().max(200).optional(),
+  })
+  .optional();
+
 // ============================================================================
 // Defaults
 // ============================================================================
@@ -97,6 +104,8 @@ export const SECURITY_GRAPH_LIST_INGESTIONS_DEFAULT_LIMIT = 50;
 export const SECURITY_GRAPH_LIST_INGESTIONS_ABSOLUTE_LIMIT = 200;
 export const SECURITY_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
 export const SECURITY_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
+export const SECURITY_GRAPH_LIST_SOURCES_DEFAULT_LIMIT = 50;
+export const SECURITY_GRAPH_LIST_SOURCES_ABSOLUTE_LIMIT = 200;
 
 // ============================================================================
 // Output envelopes
@@ -117,6 +126,10 @@ export type SecurityGraphListIngestionNodesEnvelope =
 export type SecurityGraphListIngestionEdgesEnvelope =
   | { readonly status: "ok"; readonly edges: ReadonlyArray<SecurityGraphEdge> }
   | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
+
+export interface SecurityGraphListSourcesEnvelope {
+  readonly sources: ReadonlyArray<SecurityGraphSourceSummaryRow>;
+}
 
 /**
  * Closed-taxonomy enumeration shipped to the client so the
@@ -181,6 +194,33 @@ export const securityGraphRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message:
               err instanceof Error ? err.message : "getIngestionStats failed",
+          });
+        }
+      },
+    ),
+
+  /**
+   * Per-source-key summary keyed on the most-recent ingestion.
+   * Newest-first by `latestStartedAt` so stale feeds sink to the
+   * bottom of the dashboard panel — the operator-actionable signal
+   * for re-ingest cron decisions. Mirrors
+   * `codeGraph.listRepositories`.
+   */
+  listSources: adminProcedure
+    .input(ListSourcesInput)
+    .query(
+      async ({ input }): Promise<SecurityGraphListSourcesEnvelope> => {
+        const limit =
+          input?.limit ?? SECURITY_GRAPH_LIST_SOURCES_DEFAULT_LIMIT;
+        try {
+          const store = createSecurityGraphStore();
+          const sources = await store.listSources(limit);
+          return { sources };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listSources failed",
           });
         }
       },

@@ -91,6 +91,26 @@ export interface SecurityGraphIngestionListRow {
 }
 
 /**
+ * Per-source-key summary row — most-recent ingestion's status +
+ * counts + freshness, keyed by `sourceKey`. Used by the operator
+ * dashboard's "feed freshness" panel to decide which security
+ * feeds need re-ingest (the cron trigger). Mirrors
+ * `CodeGraphRepositorySummaryRow` shape with `sourceKey`
+ * substituting for `repositoryId`.
+ */
+export interface SecurityGraphSourceSummaryRow {
+  readonly sourceKey: string;
+  readonly latestIngestionId: string;
+  readonly latestStatus: string;
+  readonly latestNodesUpserted: number;
+  readonly latestEdgesUpserted: number;
+  readonly latestEdgesRejected: number;
+  readonly latestStartedAt: Date;
+  readonly latestCompletedAt: Date | null;
+  readonly totalIngestionCount: number;
+}
+
+/**
  * Per-ingestion drill-in stats — counts only, no rows. Mirrors
  * `CodeGraphIngestionStats` shape.
  */
@@ -164,6 +184,15 @@ export interface SecurityGraphStore {
     readonly edgeTypeKey?: string;
     readonly limit: number;
   }): Promise<ReadonlyArray<SecurityGraphEdge>>;
+
+  /**
+   * Operator dashboard — per-source-key summary keyed on the
+   * most-recent ingestion. Newest-first by latestStartedAt.
+   * Mirrors `CodeGraphStore.listRepositories`.
+   */
+  listSources(limit: number): Promise<
+    ReadonlyArray<SecurityGraphSourceSummaryRow>
+  >;
 }
 
 /**
@@ -334,6 +363,67 @@ export function createSecurityGraphStore(): SecurityGraphStore {
         properties: r.properties ?? undefined,
       }));
       return { nodes, edges };
+    },
+
+    async listSources(limit: number) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      // DISTINCT ON pattern mirrors code-graph's listRepositories —
+      // one round-trip per side, joined in JS via a Map. Postgres-
+      // specific, but matches the existing pattern elsewhere in this
+      // codebase.
+      const latestRows = (await conn.execute(sql`
+        SELECT DISTINCT ON (source_key)
+          source_key,
+          ingestion_id,
+          status,
+          nodes_upserted,
+          edges_upserted,
+          edges_rejected,
+          started_at,
+          completed_at
+        FROM ags_security_graph_ingestions
+        ORDER BY source_key, started_at DESC
+      `)) as unknown as {
+        rows: ReadonlyArray<{
+          source_key: string;
+          ingestion_id: string;
+          status: string;
+          nodes_upserted: number;
+          edges_upserted: number;
+          edges_rejected: number;
+          started_at: Date;
+          completed_at: Date | null;
+        }>;
+      };
+      const totalRows = (await conn.execute(sql`
+        SELECT source_key, cast(count(*) as int) AS total
+        FROM ags_security_graph_ingestions
+        GROUP BY source_key
+      `)) as unknown as {
+        rows: ReadonlyArray<{ source_key: string; total: number }>;
+      };
+      const totalBySource = new Map<string, number>();
+      for (const r of totalRows.rows) {
+        totalBySource.set(r.source_key, Number(r.total));
+      }
+      const merged: SecurityGraphSourceSummaryRow[] = latestRows.rows.map(
+        (r) => ({
+          sourceKey: r.source_key,
+          latestIngestionId: r.ingestion_id,
+          latestStatus: r.status,
+          latestNodesUpserted: r.nodes_upserted,
+          latestEdgesUpserted: r.edges_upserted,
+          latestEdgesRejected: r.edges_rejected,
+          latestStartedAt: r.started_at,
+          latestCompletedAt: r.completed_at,
+          totalIngestionCount: totalBySource.get(r.source_key) ?? 0,
+        }),
+      );
+      merged.sort(
+        (a, b) => b.latestStartedAt.getTime() - a.latestStartedAt.getTime(),
+      );
+      return merged.slice(0, limit);
     },
 
     async listIngestionNodes(input) {
