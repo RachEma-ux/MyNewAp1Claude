@@ -33,3 +33,16 @@ export type {
   BulkRejectCorrectionProposalsInput,
   BulkRejectCorrectionProposalsResult,
 } from "./lifecycle.js";
+
+export {
+  createRollbackProposal,
+  isRollbackableProposalKind,
+  ROLLBACKABLE_PROPOSAL_KINDS,
+  ProposalNotApprovedForRollbackError,
+  NonReversibleProposalKindError,
+  AlreadyHasRollbackInFlightError,
+} from "./rollback.js";
+export type {
+  CreateRollbackProposalInput,
+  RollbackProposalLink,
+} from "./rollback.js";

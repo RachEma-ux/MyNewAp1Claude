@@ -336,6 +336,29 @@ Operator-runnable benchmark evidence: `docs/evidence/graph-backend/2026-05-17-gr
 
 Engine change: `retrieve` step output now records `graphNodeIds: string[]` (additive on JSONB) so `provenance-enricher` can attach `explainNode` provenance per node in a future explain-reader update.
 
+## 13. Governance / Self-Correction closure (items 38–44, 2026-05-17)
+
+Per the Governance / Self-Correction closure prompt, the seven
+acceptance items have been driven to FULLY IMPLEMENTED at the code +
+test + (where applicable) workflow level. Full loop diagram + step-by-
+step evidence ledger + per-rule invariant mapping in `docs/evidence/agent-studio-self-correction-loop-closure-2026-05-17.md`.
+
+| # | Item | Status |
+|---|---|---|
+| 38 | Golden-question execution evidence | FULLY IMPLEMENTED at script + workflow level (live evidence BLOCKED BY CREDENTIALS) |
+| 39 | Failure → correction proposal merged | FULLY IMPLEMENTED via PR #1395 (T-D.5) |
+| 40 | Correction proposal approval / rejection evidence | FULLY IMPLEMENTED (lifecycle + approve-and-apply + 33 tests) |
+| 41 | Approved correction → Neo4j reprojection proof | **FULLY IMPLEMENTED (NEW)** — `repository-backed-applier.ts` replaces stub appliers with real `enqueueProjectionJob` calls; live Cypher round-trip BLOCKED BY CREDENTIALS |
+| 42 | Rollback proof | **FULLY IMPLEMENTED (NEW)** — `rollback.ts` with closed-taxonomy reversal derivation + duplicate-rollback guard + status-precondition guards |
+| 43 | Benchmark CI evidence | FULLY IMPLEMENTED at workflow level (6 workflows; live artifact BLOCKED BY CREDENTIALS) |
+| 44 | Self-correction loop closure doc | **FULLY IMPLEMENTED (NEW)** |
+
+Two new code surfaces close real gaps that PR #1395 / #1397 / #1398 / #1400 didn't touch:
+- `server/agent-studio/services/graph-quality/repository-backed-applier.ts` — `createRepositoryBackedApplierRegistry(repo, {runtime})` overlay registry. Three real applier kinds call `repository.enqueueProjectionJob()` with the correct payload; `manual_review` stays no-op-by-design; enqueue failures propagate (no silent success).
+- `server/agent-studio/services/graph-correction/rollback.ts` — `createRollbackProposal(originalProposalId, requestedByUserId, reason)`. Reversal payload derived deterministically per closed taxonomy (archive_node→restore_node / merge_into_canonical→unmerge_duplicate / re_promote_with_source_version→unpin_source_version). Rollback proposal goes through the same approval flow — NO direct mutation. `rollbackOf` marker preserves audit linkage.
+
+Tests: `tests/agent-studio/item-41-42-repository-backed-applier-and-rollback.test.ts` (18 tests / 5 sections) plus 4 adjacent regression suites = **79 tests across 5 suites green** via `pnpm exec vitest run --pool=forks --poolOptions.forks.singleFork`.
+
 ## 14. Backend / Operational Evidence closure (items 45–51, 2026-05-17)
 
 Per the Backend / Operational Evidence closure prompt, the seven items
