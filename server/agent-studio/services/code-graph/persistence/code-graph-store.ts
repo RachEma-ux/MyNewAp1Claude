@@ -95,6 +95,30 @@ export interface CodeGraphIngestionListRow {
 }
 
 /**
+ * Per-repository summary row — most-recent ingestion's status +
+ * counts + freshness, keyed by `repositoryId`. Used by the operator
+ * dashboard's "stale repos" panel to decide which repositories need
+ * re-ingest (the cron trigger).
+ */
+export interface CodeGraphRepositorySummaryRow {
+  readonly repositoryId: string;
+  /** ingestionId of the most-recent run for this repo. */
+  readonly latestIngestionId: string;
+  /** Status of the most-recent run. */
+  readonly latestStatus: string;
+  /** Counts of the most-recent run. */
+  readonly latestNodesUpserted: number;
+  readonly latestEdgesUpserted: number;
+  readonly latestEdgesRejected: number;
+  /** `startedAt` of the most-recent run — freshness anchor. */
+  readonly latestStartedAt: Date;
+  /** `completedAt` of the most-recent run; null while still running. */
+  readonly latestCompletedAt: Date | null;
+  /** Total ingestion-row count for this repository, across all runs. */
+  readonly totalIngestionCount: number;
+}
+
+/**
  * Per-ingestion drill-in stats — counts only, no rows. Operators
  * use this to see a typeKey breakdown without loading the full
  * symbol list. The list-of-typeKey-counts shape mirrors the
@@ -172,6 +196,16 @@ export interface CodeGraphStore {
     readonly edgeTypeKey?: string;
     readonly limit: number;
   }): Promise<ReadonlyArray<ParsedCodeEdge>>;
+
+  /**
+   * Operator dashboard — per-repository summary keyed on the
+   * most-recent ingestion. Newest-first by latestStartedAt so the
+   * stalest repos sink to the bottom. Capped by `limit` (caller
+   * clamps). Used to drive the re-ingest cron decision.
+   */
+  listRepositories(limit: number): Promise<
+    ReadonlyArray<CodeGraphRepositorySummaryRow>
+  >;
 }
 
 /**
@@ -383,6 +417,68 @@ export function createCodeGraphStore(): CodeGraphStore {
         startedAt: r.startedAt,
         completedAt: r.completedAt,
       }));
+    },
+
+    async listRepositories(limit: number) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      // Pull the most-recent ingestion per repositoryId using a
+      // DISTINCT ON pattern, then attach the per-repo total count
+      // via a second aggregate. DISTINCT ON is Postgres-specific but
+      // mirrors the pattern already used elsewhere in this codebase
+      // (graph-quality stats) — keeps a single round trip per side.
+      const latestRows = (await conn.execute(sql`
+        SELECT DISTINCT ON (repository_id)
+          repository_id,
+          ingestion_id,
+          status,
+          nodes_upserted,
+          edges_upserted,
+          edges_rejected,
+          started_at,
+          completed_at
+        FROM ags_code_graph_ingestions
+        ORDER BY repository_id, started_at DESC
+      `)) as unknown as {
+        rows: ReadonlyArray<{
+          repository_id: string;
+          ingestion_id: string;
+          status: string;
+          nodes_upserted: number;
+          edges_upserted: number;
+          edges_rejected: number;
+          started_at: Date;
+          completed_at: Date | null;
+        }>;
+      };
+      const totalRows = (await conn.execute(sql`
+        SELECT repository_id, cast(count(*) as int) AS total
+        FROM ags_code_graph_ingestions
+        GROUP BY repository_id
+      `)) as unknown as {
+        rows: ReadonlyArray<{ repository_id: string; total: number }>;
+      };
+      const totalByRepo = new Map<string, number>();
+      for (const r of totalRows.rows) {
+        totalByRepo.set(r.repository_id, Number(r.total));
+      }
+      const merged: CodeGraphRepositorySummaryRow[] = latestRows.rows.map(
+        (r) => ({
+          repositoryId: r.repository_id,
+          latestIngestionId: r.ingestion_id,
+          latestStatus: r.status,
+          latestNodesUpserted: r.nodes_upserted,
+          latestEdgesUpserted: r.edges_upserted,
+          latestEdgesRejected: r.edges_rejected,
+          latestStartedAt: r.started_at,
+          latestCompletedAt: r.completed_at,
+          totalIngestionCount: totalByRepo.get(r.repository_id) ?? 0,
+        }),
+      );
+      merged.sort(
+        (a, b) => b.latestStartedAt.getTime() - a.latestStartedAt.getTime(),
+      );
+      return merged.slice(0, limit);
     },
 
     async listIngestionNodes(input) {

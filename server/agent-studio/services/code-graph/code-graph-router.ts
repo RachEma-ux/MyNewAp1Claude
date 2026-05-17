@@ -51,6 +51,7 @@ import {
   createCodeGraphStore,
   type CodeGraphIngestionListRow,
   type CodeGraphIngestionStats,
+  type CodeGraphRepositorySummaryRow,
 } from "./persistence/public-api.js";
 import type {
   ParsedCodeEdge,
@@ -83,6 +84,12 @@ const ListIngestionEdgesInput = z.object({
   limit: z.number().int().positive().max(500).optional(),
 });
 
+const ListRepositoriesInput = z
+  .object({
+    limit: z.number().int().positive().max(200).optional(),
+  })
+  .optional();
+
 // ============================================================================
 // Defaults
 // ============================================================================
@@ -91,6 +98,8 @@ export const CODE_GRAPH_LIST_INGESTIONS_DEFAULT_LIMIT = 50;
 export const CODE_GRAPH_LIST_INGESTIONS_ABSOLUTE_LIMIT = 200;
 export const CODE_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
 export const CODE_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
+export const CODE_GRAPH_LIST_REPOSITORIES_DEFAULT_LIMIT = 50;
+export const CODE_GRAPH_LIST_REPOSITORIES_ABSOLUTE_LIMIT = 200;
 
 // ============================================================================
 // Output envelopes
@@ -98,6 +107,10 @@ export const CODE_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
 
 export interface CodeGraphListIngestionsEnvelope {
   readonly ingestions: ReadonlyArray<CodeGraphIngestionListRow>;
+}
+
+export interface CodeGraphListRepositoriesEnvelope {
+  readonly repositories: ReadonlyArray<CodeGraphRepositorySummaryRow>;
 }
 
 export type CodeGraphGetIngestionStatsEnvelope =
@@ -146,6 +159,33 @@ export const codeGraphRouter = router({
         });
       }
     }),
+
+  /**
+   * Per-repository summary: most-recent ingestion + freshness anchor
+   * + total ingestion count for each repositoryId. Newest-first by
+   * `latestStartedAt` so stale repos sink to the bottom of the
+   * dashboard panel — the operator-actionable signal for re-ingest
+   * cron decisions.
+   */
+  listRepositories: adminProcedure
+    .input(ListRepositoriesInput)
+    .query(
+      async ({ input }): Promise<CodeGraphListRepositoriesEnvelope> => {
+        const limit =
+          input?.limit ?? CODE_GRAPH_LIST_REPOSITORIES_DEFAULT_LIMIT;
+        try {
+          const store = createCodeGraphStore();
+          const repositories = await store.listRepositories(limit);
+          return { repositories };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listRepositories failed",
+          });
+        }
+      },
+    ),
 
   /**
    * Per-ingestion typeKey breakdown. Returns a discriminated envelope
