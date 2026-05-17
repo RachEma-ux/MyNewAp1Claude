@@ -1,12 +1,33 @@
 /**
  * KGIA Infrastructure — Neo4j Adapter
  *
- * Connection boundary adapter for Neo4j graph databases.
- * Supports both bolt:// and neo4j:// protocols.
- * All queries are read-only by default (enforced by governance).
+ * Phase 7.5a (2026-05-17): wired against the real `neo4j-driver`
+ * package. Pre-7.5a, this file was a stub that returned empty
+ * record arrays + a logger line — see `docs/architecture/agent-studio-phase-7-5-neo4j-blocker.md`
+ * for the verified-stubbed inventory + unblock sequence.
+ *
+ * Connection boundary adapter for Neo4j graph databases. Supports
+ * both `bolt://` and `neo4j://` URIs. All queries default to
+ * read-only access mode at the session level; mutations route
+ * through the Phase 11.5 graph-change-proposal pipeline.
+ *
+ * Driver pooling: a single `Driver` instance is cached per
+ * (endpoint, username, database) triple. Drivers are stateful and
+ * the official Neo4j docs recommend one per application; the
+ * cache keeps reuse honest across concurrent callers without
+ * forcing them through a singleton boundary.
+ *
+ * Hard-rule compliance (CLAUDE.md):
+ *   - `neo4j-driver` imports are permitted here per the canonical
+ *     allowlist (`server/modules/kgia/**` is one of two non-spike
+ *     locations; the other is `server/agent-studio/services/graph/repository/**`).
+ *   - This adapter does NOT call `dispatchMcpToolCall`.
+ *   - No `process.env.*_API_KEY` reads (driver auth is per-GraphSource).
  */
 
-import type { GraphSource, SchemaSlice } from "../domain/types";
+import neo4j, { type Driver } from "neo4j-driver";
+
+import type { GraphSource } from "../domain/types";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -26,27 +47,82 @@ export interface Neo4jQueryResult {
   };
 }
 
+// ── Driver pool ──────────────────────────────────────────────────
+
+/**
+ * Driver cache keyed by (endpoint, username, database). One Driver
+ * per unique config so concurrent callers reuse the same connection
+ * pool. Driver construction is expensive; reuse it.
+ */
+const driverCache = new Map<string, Driver>();
+
+function driverKey(config: Neo4jConnectionConfig): string {
+  return `${config.endpoint}||${config.username ?? ""}||${config.database ?? "neo4j"}`;
+}
+
+function getDriver(config: Neo4jConnectionConfig): Driver {
+  const key = driverKey(config);
+  const existing = driverCache.get(key);
+  if (existing) return existing;
+  const auth = config.username
+    ? neo4j.auth.basic(config.username, config.password ?? "")
+    : neo4j.auth.none();
+  const driver = neo4j.driver(config.endpoint, auth);
+  driverCache.set(key, driver);
+  return driver;
+}
+
+/**
+ * Graceful shutdown helper. Closes all cached drivers + clears
+ * the cache. Call from process-shutdown handlers (or test
+ * teardown) so the Node process can exit cleanly without
+ * lingering bolt connections.
+ */
+export async function closeAllNeo4jDrivers(): Promise<void> {
+  const drivers = Array.from(driverCache.values());
+  driverCache.clear();
+  await Promise.all(drivers.map((d) => d.close()));
+}
+
 // ── Schema Reader ────────────────────────────────────────────────
 
 export async function readNeo4jSchema(
-  source: GraphSource
+  source: GraphSource,
 ): Promise<Record<string, unknown>> {
   const config = parseNeo4jConfig(source);
 
-  // In a real deployment, this would use the neo4j-driver to query:
-  // CALL db.schema.visualization() or CALL apoc.meta.schema()
-  // For now, return from schema snapshot if available
+  // Fast path: GraphSource carries a cached schema snapshot. The
+  // schema-discovery query (CALL db.schema.visualization()) is
+  // expensive enough that production code pre-bakes the result.
   if (source.schemaSnapshot) {
     return source.schemaSnapshot as unknown as Record<string, unknown>;
   }
 
-  // Return a placeholder schema indicating the source needs schema discovery
-  return {
-    nodes: [],
-    relationships: [],
-    needsDiscovery: true,
-    endpoint: config.endpoint,
-  };
+  // Real schema discovery via Neo4j. `db.schema.visualization()`
+  // returns one row with `{ nodes, relationships }` — both arrays
+  // of internal Neo4j nodes. We surface them as-is; downstream
+  // consumers reshape into the KGIA SchemaSlice format.
+  const driver = getDriver(config);
+  const session = driver.session({ database: config.database ?? "neo4j" });
+  try {
+    const result = await session.run("CALL db.schema.visualization()");
+    const record = result.records[0];
+    if (!record) {
+      return {
+        nodes: [],
+        relationships: [],
+        needsDiscovery: true,
+        endpoint: config.endpoint,
+      };
+    }
+    return {
+      nodes: record.get("nodes"),
+      relationships: record.get("relationships"),
+      endpoint: config.endpoint,
+    };
+  } finally {
+    await session.close();
+  }
 }
 
 // ── Query Executor ───────────────────────────────────────────────
@@ -54,40 +130,89 @@ export async function readNeo4jSchema(
 export async function executeNeo4jQuery(
   source: GraphSource,
   queryText: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
 ): Promise<Neo4jQueryResult> {
   const config = parseNeo4jConfig(source);
+  const driver = getDriver(config);
+  const session = driver.session({
+    database: config.database ?? "neo4j",
+    defaultAccessMode: neo4j.session.READ,
+  });
   const startTime = Date.now();
+  try {
+    const result = await session.run(queryText, params ?? {});
+    return {
+      records: result.records.map(
+        (r) => r.toObject() as Record<string, unknown>,
+      ),
+      summary: {
+        resultAvailableAfter:
+          typeof result.summary.resultAvailableAfter?.toNumber === "function"
+            ? result.summary.resultAvailableAfter.toNumber()
+            : (result.summary.resultAvailableAfter as unknown as number) ??
+              (Date.now() - startTime),
+        resultConsumedAfter:
+          typeof result.summary.resultConsumedAfter?.toNumber === "function"
+            ? result.summary.resultConsumedAfter.toNumber()
+            : (result.summary.resultConsumedAfter as unknown as number) ??
+              (Date.now() - startTime),
+        counters: extractCounters(result.summary.counters),
+      },
+    };
+  } finally {
+    await session.close();
+  }
+}
 
-  // Connection boundary: in production, this uses neo4j-driver
-  // const driver = neo4j.driver(config.endpoint, neo4j.auth.basic(config.username, config.password));
-  // const session = driver.session({ database: config.database, defaultAccessMode: neo4j.session.READ });
-  // const result = await session.run(queryText, params);
-
-  // For adapter boundary: return structured response
-  console.log(`[KGIA/Neo4j] Executing query on ${config.endpoint}: ${queryText.slice(0, 100)}`);
-
-  return {
-    records: [],
-    summary: {
-      resultAvailableAfter: Date.now() - startTime,
-      resultConsumedAfter: Date.now() - startTime,
-      counters: {},
-    },
-  };
+/**
+ * Neo4j's QueryStatistics surfaces counters as a structured object
+ * (nodesCreated, relationshipsCreated, etc.). Flatten the
+ * non-zero counters into a plain key→count record for the
+ * Neo4jQueryResult contract.
+ */
+function extractCounters(
+  counters: unknown,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!counters || typeof counters !== "object") return out;
+  // neo4j-driver QueryStatistics exposes both `_stats` and direct
+  // methods like `nodesCreated()`. Read the `_stats` field when
+  // present (driver internal shape that matches release 5.x).
+  const stats = (counters as { _stats?: Record<string, number> })._stats;
+  if (stats && typeof stats === "object") {
+    for (const [k, v] of Object.entries(stats)) {
+      if (typeof v === "number" && v !== 0) out[k] = v;
+    }
+  }
+  return out;
 }
 
 // ── Connection Test ──────────────────────────────────────────────
 
 export async function testNeo4jConnection(
-  source: GraphSource
+  source: GraphSource,
 ): Promise<{ connected: boolean; version?: string; error?: string }> {
   const config = parseNeo4jConfig(source);
 
   try {
-    // In production: driver.verifyConnectivity()
-    console.log(`[KGIA/Neo4j] Testing connection to ${config.endpoint}`);
-    return { connected: true, version: "adapter-boundary" };
+    const driver = getDriver(config);
+    await driver.verifyConnectivity();
+    // Fetch the running Neo4j version via dbms.components(). One
+    // row per component; the kernel row carries the version array.
+    const session = driver.session({
+      database: config.database ?? "neo4j",
+    });
+    try {
+      const result = await session.run(
+        "CALL dbms.components() YIELD name, versions WHERE name = 'Neo4j Kernel' RETURN versions[0] AS version",
+      );
+      const versionRecord = result.records[0];
+      const version =
+        (versionRecord?.get("version") as string | undefined) ?? "unknown";
+      return { connected: true, version };
+    } finally {
+      await session.close();
+    }
   } catch (err) {
     return {
       connected: false,
