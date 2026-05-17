@@ -85,6 +85,7 @@ import { publishTargetsAdminRouter } from "../services/publish-targets/admin-rou
 import { canvasRouter } from "../services/canvas/canvas-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
+import { codeGraphRouter } from "../services/code-graph/code-graph-router";
 import { promotionRouter } from "../services/promotion/router";
 import {
   agentIdSchema,
@@ -2967,6 +2968,11 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 23 §1: graph quality scan + agent run +
   // findings + finding→proposal conversion surface for operator UI.
   graphQuality: graphQualityRouter,
+  // Native Graph Workspace Phase 25 T-G.2.α: code-graph ingestion read
+  // surface — listIngestions + getIngestionStats. Operator dashboard
+  // entry point for the code-graph stack (parser + persistence +
+  // projection + lens already shipped).
+  codeGraph: codeGraphRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
