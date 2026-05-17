@@ -335,3 +335,47 @@ New tests: `tests/agent-studio/item-34-provenance-enrichment.test.ts` (13) + `te
 Operator-runnable benchmark evidence: `docs/evidence/graph-backend/2026-05-17-graph-agent-reasoning-bench/report.md` — 6/6 PASS.
 
 Engine change: `retrieve` step output now records `graphNodeIds: string[]` (additive on JSONB) so `provenance-enricher` can attach `explainNode` provenance per node in a future explain-reader update.
+
+## 14. Backend / Operational Evidence closure (items 45–51, 2026-05-17)
+
+Per the Backend / Operational Evidence closure prompt, the seven items
+have been driven to FULLY IMPLEMENTED at the code + test level where
+the surface is deterministic, and to BLOCKED BY MISSING CREDENTIALS /
+INFRA where live Cypher round-trip is required (per the prompt's
+rule "Do not mark workflow-ready as complete unless a run exists").
+
+| # | Item | Status |
+|---|---|---|
+| 45 | Live `GRAPH_BACKEND=neo4j-ce` smoke | **FULLY IMPLEMENTED** (deterministic half — 4 tests in `item-45-active-backend-selection.test.ts`); **BLOCKED BY MISSING CREDENTIALS / INFRA** (live Cypher half — operator-runnable via `graph-p0-smoke-neo4j-ce.yml`) |
+| 46 | Neo4j connectivity evidence | **BLOCKED BY MISSING CREDENTIALS / INFRA** — evidence template `docs/evidence/graph-backend/neo4j-connectivity-2026-05-17.md` ready for operator-completed run |
+| 47 | Projection write benchmark evidence | **BLOCKED BY MISSING CREDENTIALS / INFRA** — workflow `graph-bench-neo4j-ce.yml` + script `run-benchmark.ts` ready; template `projection-benchmark-2026-05-17.md` ready |
+| 48 | Traversal benchmark evidence | **BLOCKED BY MISSING CREDENTIALS / INFRA** — same workflow, traversal scenario subset; template `traversal-benchmark-2026-05-17.md` ready |
+| 49 | Permission benchmark / evidence | **FULLY IMPLEMENTED** (deterministic half — 77 tests across 5 suites covering permission propagation through traversal + safety filter + ranker + provenance enricher + reasoning bench); **BLOCKED BY MISSING CREDENTIALS / INFRA** (live `permission-filter` scenario in the smoke runner) |
+| 50 | Evidence docs under `docs/evidence/graph-backend/` | **FULLY IMPLEMENTED** — README index updated; 5 new date-stamped evidence files added |
+| 51 | Tracker honesty pass | **FULLY IMPLEMENTED** — this section + §11/§12/§13 use closed-taxonomy classification (FULLY IMPLEMENTED / PARTIALLY IMPLEMENTED / NOT IMPLEMENTED / BLOCKED BY MISSING CREDENTIALS / INFRA / DEFERRED BY SCOPE). No "addressed" / "formalized" / "workflow-backed" / "operator territory" / "residual sliver" / "essentially complete" phrasing remains in §11–§14. |
+
+### Honesty discipline pinned in §11–§14
+
+Per the closure prompt's "Do not overclaim" rule:
+
+- Every item that is BLOCKED carries the exact reason (missing
+  credentials / missing infrastructure) AND the operator action that
+  would unblock it (workflow + dispatch).
+- Every item that is FULLY IMPLEMENTED at deterministic level but
+  has a live-evidence carry-over surfaces the carry-over as a
+  separate row classified BLOCKED.
+- "Implemented and tested" is reserved for items where code + tests
+  + (where applicable) deterministic evidence runs all pass.
+- "Workflow-ready" is treated as PARTIALLY IMPLEMENTED at the live
+  layer until a run produces evidence.
+
+### Continuation-state next-step
+
+The next exact implementation step (per the closure prompt's
+acceptance for §51): an operator dispatches **all four** workflows
+(`graph-p0-smoke-neo4j-ce.yml` / `graph-bench-neo4j-ce.yml` /
+`graph-golden-questions-live.yml` / `graph-agent-reasoning-bench.yml`)
+on a credentialed runner, captures the resulting evidence
+directories under `docs/evidence/graph-backend/<date>-*/`, and links
+those into the date-stamped templates created in this PR. That flips
+the BLOCKED rows above to FULLY IMPLEMENTED.
