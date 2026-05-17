@@ -95,6 +95,25 @@ export interface CodeGraphIngestionListRow {
 }
 
 /**
+ * Per-ingestion parser-error audit row — surfaced verbatim from
+ * `metadata.parserErrors` (which the store persists capped at 50
+ * rows per ingestion to keep the metadata column bounded). Used by
+ * the operator dashboard's "parser failures" panel for triage.
+ *
+ * `ingestionId` is attached at read-time so the rows can be unioned
+ * across recent ingestions without losing source-of-record context.
+ */
+export interface CodeGraphRecentParserErrorRow {
+  readonly ingestionId: string;
+  readonly repositoryId: string;
+  readonly filePath: string;
+  readonly reason: string;
+  readonly message: string;
+  /** `startedAt` of the parent ingestion — temporal anchor for triage. */
+  readonly ingestionStartedAt: Date;
+}
+
+/**
  * Per-repository summary row — most-recent ingestion's status +
  * counts + freshness, keyed by `repositoryId`. Used by the operator
  * dashboard's "stale repos" panel to decide which repositories need
@@ -206,6 +225,21 @@ export interface CodeGraphStore {
   listRepositories(limit: number): Promise<
     ReadonlyArray<CodeGraphRepositorySummaryRow>
   >;
+
+  /**
+   * Operator dashboard — recent parser errors unioned across the
+   * most-recent ingestions (per ingestion row's `metadata.parserErrors`
+   * audit list, capped at 50 by the persistence layer). Newest-first
+   * by `ingestionStartedAt`, then by `filePath` for deterministic
+   * order within an ingestion. Drives the "parser failures" panel
+   * for triage.
+   */
+  listRecentParserErrors(input: {
+    /** Cap on the number of ingestions scanned for parser errors. */
+    readonly ingestionLimit: number;
+    /** Cap on the total number of parser-error rows returned. */
+    readonly errorLimit: number;
+  }): Promise<ReadonlyArray<CodeGraphRecentParserErrorRow>>;
 }
 
 /**
@@ -417,6 +451,60 @@ export function createCodeGraphStore(): CodeGraphStore {
         startedAt: r.startedAt,
         completedAt: r.completedAt,
       }));
+    },
+
+    async listRecentParserErrors(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      // Pull the most-recent N ingestions, then flatten parser-error
+      // rows out of `metadata.parserErrors`. The metadata cap (50
+      // rows per ingestion at persistence time) bounds the per-ingestion
+      // explosion; the caller-supplied `errorLimit` caps the total
+      // returned across all scanned ingestions.
+      const ingestions = await conn
+        .select({
+          ingestionId: agsCodeGraphIngestions.ingestionId,
+          repositoryId: agsCodeGraphIngestions.repositoryId,
+          startedAt: agsCodeGraphIngestions.startedAt,
+          metadata: agsCodeGraphIngestions.metadata,
+          parserErrorCount: agsCodeGraphIngestions.parserErrorCount,
+        })
+        .from(agsCodeGraphIngestions)
+        .where(sql`${agsCodeGraphIngestions.parserErrorCount} > 0`)
+        .orderBy(desc(agsCodeGraphIngestions.startedAt))
+        .limit(input.ingestionLimit);
+
+      const out: CodeGraphRecentParserErrorRow[] = [];
+      for (const row of ingestions) {
+        const errors = Array.isArray(
+          (row.metadata as Record<string, unknown> | null)?.parserErrors,
+        )
+          ? ((row.metadata as { parserErrors: ReadonlyArray<unknown> })
+              .parserErrors as ReadonlyArray<{
+              filePath?: unknown;
+              reason?: unknown;
+              message?: unknown;
+            }>)
+          : [];
+        const sorted = [...errors].sort((a, b) => {
+          const fa = typeof a.filePath === "string" ? a.filePath : "";
+          const fb = typeof b.filePath === "string" ? b.filePath : "";
+          return fa.localeCompare(fb);
+        });
+        for (const e of sorted) {
+          if (out.length >= input.errorLimit) break;
+          out.push({
+            ingestionId: row.ingestionId,
+            repositoryId: row.repositoryId,
+            filePath: typeof e.filePath === "string" ? e.filePath : "",
+            reason: typeof e.reason === "string" ? e.reason : "unknown",
+            message: typeof e.message === "string" ? e.message : "",
+            ingestionStartedAt: row.startedAt,
+          });
+        }
+        if (out.length >= input.errorLimit) break;
+      }
+      return out;
     },
 
     async listRepositories(limit: number) {

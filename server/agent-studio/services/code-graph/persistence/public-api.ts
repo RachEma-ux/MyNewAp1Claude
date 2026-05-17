@@ -10,4 +10,5 @@ export {
   type CodeGraphIngestionListRow,
   type CodeGraphIngestionStats,
   type CodeGraphRepositorySummaryRow,
+  type CodeGraphRecentParserErrorRow,
 } from "./code-graph-store.js";
