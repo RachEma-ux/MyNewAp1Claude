@@ -31,19 +31,27 @@ The measurement test (`tests/agent-studio/code-graph-spike-perf-measurement.test
 
 ## 2. Recorded results
 
-**Evidence source:** PR #TBD CI logs — `tests/agent-studio/code-graph-spike-perf-measurement.test.ts` console.log lines tagged `[T-E.3]`.
+**Evidence source:** GitHub Actions run [25989137260](https://github.com/RachEma-ux/MyNewAp1Claude/actions/runs/25989137260) (workflow_dispatch on `te3-code-graph-spike-perf-measurement` @ `02143176`, 2026-05-17 11:09 UTC, ubuntu-latest, Node 20). Workflow `run-tests.yml` with input `test_path=tests/agent-studio/code-graph-spike-perf-measurement.test.ts`. Console.log lines tagged `[T-E.3]` transcribed verbatim below.
 
 | Metric | Target | Recorded | Verdict |
 |---|---|---|---|
-| Files parsed | n/a (informational) | TBD | — |
-| Per-file p50 (ms) | n/a (informational) | TBD | — |
-| Per-file p95 (ms) | < 50 | TBD | TBD |
-| Per-file max (ms) | n/a (informational) | TBD | — |
-| Total parse time (ms) | < 5000 | TBD | TBD |
-| Node count by type | n/a (correctness) | TBD | — |
-| Edge count by type | n/a (correctness) | TBD | — |
+| Files parsed | n/a (informational) | 14 | — |
+| Per-file p50 (ms) | n/a (informational) | 0.73 | — |
+| Per-file p95 (ms) | < 50 | **2.02** | **PASS** (25× margin) |
+| Per-file max (ms) | n/a (informational) | 3.97 | — |
+| Total parse time (ms) | < 5000 | **15.12** | **PASS** (330× margin) |
+| Node count by type | n/a (correctness) | File=14, Function=40, Class=4 | — |
+| Edge count by type | n/a (correctness) | IMPORTS=30, DECLARES=44, CALLS=202, EXPORTS=87 | — |
 
-**Follow-up:** once #TBD CI logs are captured, a 1-line follow-up PR replaces the `TBD` cells with actual values + sets the `Verdict` column to `PASS` / `FAIL`. The test itself fails loudly on gate violation, so if this PR merges green, the parse-time half of the spike has answered §0's question with "yes" for the parse-time half.
+**Verdict: parse-time half of the §4 performance gate PASSES.** Both gates clear by >25× margin — the spike's parse-time hypothesis is comprehensively validated for the §2 sample-ingest scope. The Phase 25 prerequisite question §0 ("can we get a useful Code Intelligence Graph out of Neo4j CE for ~150k-LoC repos without triggering the Phase 27 Aura upgrade?") is half-answered with "yes — parse-time scales generously." The other half (projection + query latency) remains for T-E.4.
+
+**Correctness cross-checks:**
+- File node count (14) matches files-parsed count → no silent file-skip in the walker.
+- DECLARES edge count (44) matches `Function (40) + Class (4)` → every declaration emits a DECLARES edge.
+- IMPORTS edge count (30) at ~2 imports/file is consistent with `extensions/`'s tight import surface.
+- CALLS count (202) at ~14 calls/file is consistent with the dispatcher-routing pattern (each lane-hook + tool-invocation site contributes call edges).
+
+**Margin observation:** the 25× / 330× margins on a 14-file corpus suggest the §4 gate is easily met at the spike target's scale. The T-E.4 follow-up (or T-E.5 scale-up to `services/`) should retest at ~120 files to confirm the margin holds an order of magnitude up.
 
 ---
 
@@ -70,9 +78,11 @@ Three outcomes — the operator picks one in the T-E.4 follow-up based on the §
 ## 4. Test plan
 
 - [x] Measurement test (`code-graph-spike-perf-measurement.test.ts`) added; asserts both parse-time gates; logs `[T-E.3]`-tagged metrics to stdout.
-- [ ] CI run (this PR) captures actual parse-time numbers in the `test` job log.
-- [ ] Follow-up 1-line PR transcribes the captured numbers into §2's `Recorded` column.
-- [ ] T-E.4 PR opens with the verdict (Outcome A/B/C) + the actual decision based on the recorded numbers + (for Outcome A/B) the projection/query-latency measurement plan.
+- [x] Workflow_dispatch run on `te3-code-graph-spike-perf-measurement` (run 25989137260) captured actual parse-time numbers via the `Run additional tests` step (`run-tests.yml` `test_path` input).
+- [x] §2 `Recorded` column transcribed verbatim from the captured run.
+- [ ] T-E.4 PR opens with the verdict (Outcome A/B/C) + the actual decision based on the recorded numbers + (for Outcome A/B) the projection/query-latency measurement plan. **Recommended outcome: B for now** (parse-time PASS) pending projection measurement; revise to **A** once T-E.4 ships Neo4j projection + query-latency measurement and both pass.
+
+**Note on CI coverage gap discovered during T-E.3:** the regular `test` job in `run-tests.yml` only runs `tests/contracts/`, `tests/governance/`, `tests/integration/ai-types/`, `tests/integration/runtime-db/`, and one runtime-governance E2E file. The `tests/agent-studio/` directory (where the spike measurement test lives, along with ~100 other source-scan tests) is **not** in the per-PR test job; the only way to run those in CI is via `workflow_dispatch` with a `test_path` input, as done here. Future T-E.4 (or a separate CI-coverage PR) may want to add `tests/agent-studio/code-graph-spike-*` to the per-PR test job so spike regressions surface automatically on every PR rather than requiring an operator dispatch.
 
 ---
 
