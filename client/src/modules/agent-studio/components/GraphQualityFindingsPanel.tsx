@@ -76,6 +76,29 @@ const FINDINGS_LIST_LIMIT = 50;
  */
 const BULK_DISMISS_MAX = 500;
 
+/**
+ * T-F.136 — read `?findingId=N` from the page URL on first render.
+ *
+ * Mechanical replication of the T-F.135 `readLensIdFromUrl` primitive
+ * to a numeric selection axis: GraphQualityFindings drill-in tracks
+ * the expanded row via `expandedFindingId: number | null`, so the
+ * URL→state reader must coerce the raw param through `Number` and
+ * reject `NaN` / non-finite values rather than the string-non-empty
+ * check the lens-id reader uses.
+ *
+ * Lazy-init pattern: same as T-F.135 — React only invokes useState
+ * initializers on first render, so the URL parse runs once on mount.
+ * SSR-safe via `typeof window` guard.
+ */
+function readFindingIdFromUrl(): number | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("findingId");
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function GraphQualityFindingsPanel() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
@@ -87,7 +110,7 @@ export function GraphQualityFindingsPanel() {
   // open at a time — keeps the operator surface focused + makes the
   // trail tRPC query gated (enabled only when a row is expanded).
   const [expandedFindingId, setExpandedFindingId] = useState<number | null>(
-    null,
+    () => readFindingIdFromUrl(),
   );
   // T-F.87: per-row "dismiss with reason" textarea expansion. Only
   // one row's reason editor is open at a time; the textarea content
@@ -399,6 +422,29 @@ export function GraphQualityFindingsPanel() {
                 onClick={clearAllFilters}
               >
                 Clear all filters
+              </button>
+            ) : null}
+            {/* T-F.136 — copy a shareable link with `?findingId=N`
+                pre-filled. Gated on `expandedFindingId` because the
+                URL has no row to deep-link to before the operator
+                expands a triage drill-down. `ml-auto` is conditional
+                so the button right-aligns when no filters are
+                active; otherwise it tucks next to Clear all filters
+                with the default flex gap. */}
+            {expandedFindingId !== null ? (
+              <button
+                type="button"
+                className={`rounded border border-border bg-background px-2 py-0.5 text-xs hover:bg-muted ${
+                  hasAnyFilter ? "" : "ml-auto"
+                }`}
+                data-testid="graph-quality-copy-link-button"
+                title={`Copy a shareable link with ?findingId=${expandedFindingId}`}
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?findingId=${encodeURIComponent(String(expandedFindingId))}`;
+                  void navigator.clipboard?.writeText(url);
+                }}
+              >
+                Copy link
               </button>
             ) : null}
           </div>
