@@ -33,6 +33,12 @@ name: Code Graph Spike — T-E.4 Projection + Query Measurement
 
 on:
   workflow_dispatch:
+    inputs:
+      target_dir:
+        description: 'Spike target directory (default: services/extensions for T-E.3/.4; set to services for T-E.5 scale-up)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   measure:
@@ -85,7 +91,15 @@ jobs:
           exit 1
 
       - name: Run T-E.4 projection + measurement
+        env:
+          # T-E.5: when the operator passes a target_dir input, forward
+          # it to the script. Empty input → script default
+          # (services/extensions = §2 spike scope, T-E.3/.4 measurement).
+          CODE_GRAPH_SPIKE_TARGET_DIR: ${{ github.event.inputs.target_dir }}
         run: |
+          if [ -n "${CODE_GRAPH_SPIKE_TARGET_DIR}" ]; then
+            echo "[T-E.5] target dir override: ${CODE_GRAPH_SPIKE_TARGET_DIR}"
+          fi
           npx tsx server/agent-studio/services/code-graph/spike/project-and-measure.ts
 
       - name: Summary

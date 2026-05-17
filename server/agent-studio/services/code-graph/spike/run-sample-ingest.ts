@@ -49,7 +49,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const REPO_ROOT = resolve(__dirname, "../../../../..");
-const SPIKE_TARGET_DIR = "server/agent-studio/services/extensions";
+
+/**
+ * T-E.5 scale-up hook: the orchestrator's target dir is overridable
+ * via the `CODE_GRAPH_SPIKE_TARGET_DIR` env var so the same
+ * `aggregate()` + `summarize()` + measurement infrastructure can
+ * point at a larger corpus (e.g., `server/agent-studio/services/`
+ * ~450 files) without forking the code. Default stays at the §2
+ * spike scope so T-E.3 perf test keeps measuring the same surface.
+ *
+ * @ts-ignore — process.env typing in mixed-bundler context
+ */
+// @ts-ignore
+const SPIKE_TARGET_DIR =
+  // @ts-ignore
+  (typeof process !== "undefined" &&
+    // @ts-ignore
+    process.env.CODE_GRAPH_SPIKE_TARGET_DIR) ||
+  "server/agent-studio/services/extensions";
 
 interface PerFileTiming {
   readonly path: string;
