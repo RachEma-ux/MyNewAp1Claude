@@ -79,7 +79,17 @@ describe("Phase 7.5a — Neo4jKgiaAdapter wired against neo4j-driver", () => {
     // The pre-7.5a stub returned `{ records: [], summary: { ... } }`
     // hardcoded. The wired version must call session.run.
     expect(src).toMatch(/await\s+session\.run\(queryText,\s*params\s*\?\?\s*\{\}\)/);
-    expect(src).toMatch(/driver\.session\(\{[\s\S]*?defaultAccessMode:\s*neo4j\.session\.READ/);
+    expect(src).toMatch(/defaultAccessMode:\s*mode/);
+    // READ is the default for the read-mode export
+    expect(src).toMatch(/neo4j\.session\.READ/);
+  });
+
+  it("Phase 7.5b adds executeNeo4jWrite (WRITE-mode sibling for projection writes)", () => {
+    const src = readAdapter();
+    expect(src).toMatch(
+      /export\s+async\s+function\s+executeNeo4jWrite\(/,
+    );
+    expect(src).toMatch(/neo4j\.session\.WRITE/);
   });
 
   it("testNeo4jConnection calls driver.verifyConnectivity()", () => {
