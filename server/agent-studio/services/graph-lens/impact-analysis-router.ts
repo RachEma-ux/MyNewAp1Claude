@@ -16,13 +16,12 @@
  *     cached) and want the deterministic summary shape without
  *     re-implementing the aggregator in JS.
  *
- * **Deferred — actual traversal executor.**
- * T-F.4 / T-F.5 promise to wire each `ImpactAnalysisKind` to a
- * parameterized Cypher template in `ags_query_templates`. That work
- * needs careful Cypher review + cross-graph composition logic; it's
- * NOT shipped here. A future slice (T-G.5.β?) can add the
- * `runImpactAnalysis` mutation/query that executes the template.
- * This router stays read-only + pure for now.
+ * **Stub executor surface (T-G.5.β).** `runImpactAnalysis` is wired
+ * to the stub executor in `impact-analysis-executor.ts`, returning an
+ * anchor-only result for every kind. The envelope carries a `mode:
+ * "stub" | "template"` discriminant so the dashboard can render a
+ * "Stub mode" badge per kind. When templates land in T-F.4, per-kind
+ * modes flip to `"template"` without breaking the envelope shape.
  *
  * Mounted at `agentStudio.impactAnalysis.*`. Both procedures are
  * `adminProcedure` and read-only.
@@ -43,9 +42,14 @@ import {
   summarizeImpactAnalysisResult,
   type ImpactAnalysisKind,
   type ImpactAnalysisKindMetadata,
+  type ImpactAnalysisRequest,
   type ImpactAnalysisResult,
   type ImpactAnalysisResultSummary,
 } from "./impact-analysis-contracts.js";
+import {
+  classifyImpactAnalysisExecutorMode,
+  runImpactAnalysisStub,
+} from "./impact-analysis-executor.js";
 
 // ============================================================================
 // Input schemas
@@ -75,6 +79,19 @@ const SummarizeResultInput = z.object({
   hiddenNodeCount: z.number().int().min(0),
 });
 
+const RunImpactAnalysisInput = z.object({
+  kind: z.enum(IMPACT_ANALYSIS_KINDS),
+  startingNode: z.object({
+    typeKey: z.string().min(1).max(120),
+    id: z.string().min(1).max(512),
+  }),
+  maxDepth: z.number().int().min(1).max(64).optional(),
+  nodeTypeKeyFilter: z
+    .array(z.string().min(1).max(120))
+    .max(64)
+    .optional(),
+});
+
 // ============================================================================
 // Output envelopes
 // ============================================================================
@@ -88,6 +105,19 @@ export interface ListImpactAnalysisKindsEnvelope {
 
 export interface SummarizeImpactAnalysisResultEnvelope {
   readonly summary: ImpactAnalysisResultSummary;
+}
+
+/**
+ * `runImpactAnalysis` envelope. The `mode` discriminant tells the
+ * dashboard whether the result came from the stub (anchor-only) or
+ * from a future template-backed executor. Today every kind is
+ * `"stub"` — see `classifyImpactAnalysisExecutorMode`. When templates
+ * land (T-F.4 work), per-kind modes flip to `"template"` without
+ * breaking the envelope shape.
+ */
+export interface RunImpactAnalysisEnvelope {
+  readonly result: ImpactAnalysisResult;
+  readonly mode: "stub" | "template";
 }
 
 // ============================================================================
@@ -135,6 +165,38 @@ export const impactAnalysisRouter = router({
           hiddenNodeCount: input.hiddenNodeCount,
         };
         return { summary: summarizeImpactAnalysisResult(result) };
+      },
+    ),
+
+  /**
+   * Stub executor surface (T-G.5.β). Delegates to
+   * `runImpactAnalysisStub` — returns an anchor-only result for every
+   * kind. The `mode` field on the envelope tells the dashboard
+   * whether this kind has a Cypher template registered (future state)
+   * or is still anchor-only (today: always `"stub"`).
+   *
+   * Procedure is `query` not `mutation` because the stub does no
+   * side-effects. When templates land in T-F.4, this stays `query`
+   * (the underlying executeTemplate path is read-only by hard rule —
+   * mutations on graph state route through the change-proposal flow
+   * per CLAUDE.md §Native Graph Workspace).
+   */
+  runImpactAnalysis: adminProcedure
+    .input(RunImpactAnalysisInput)
+    .query(
+      ({ input }): RunImpactAnalysisEnvelope => {
+        const request: ImpactAnalysisRequest = {
+          kind: input.kind,
+          startingNode: input.startingNode,
+          ...(input.maxDepth !== undefined ? { maxDepth: input.maxDepth } : {}),
+          ...(input.nodeTypeKeyFilter !== undefined
+            ? { nodeTypeKeyFilter: input.nodeTypeKeyFilter }
+            : {}),
+        };
+        return {
+          result: runImpactAnalysisStub(request),
+          mode: classifyImpactAnalysisExecutorMode(input.kind),
+        };
       },
     ),
 });
