@@ -233,3 +233,10 @@ export type {
   QualityScannerRegistrySummary,
   ScannerRegistrationLike,
 } from "./scanner-metadata.js";
+
+export {
+  createRepositoryBackedApplierRegistry,
+} from "./repository-backed-applier.js";
+export type {
+  RepositoryBackedApplierOptions,
+} from "./repository-backed-applier.js";
