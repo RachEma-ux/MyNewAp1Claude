@@ -46,6 +46,30 @@ const WINDOW_OPTIONS = [
 
 const DEFAULT_WINDOW_MS = WINDOW_OPTIONS[1].value; // 7 days
 
+/**
+ * T-F.138 — read `?skillKey=X` from the page URL on first render.
+ *
+ * Mechanical replication of T-F.135's URL-deeplink primitive onto
+ * GraphSkillUsagePanel's `skillKeyFilter` axis. The input is bound
+ * to a controlled string (not nullable), so the helper returns ""
+ * — the empty-string default — on missing/empty param, which keeps
+ * the `value={skillKeyFilter}` controlled-input contract intact
+ * without ternary noise at the call site.
+ *
+ * This is the third axis-shape variant in the deeplink sub-arc:
+ *   - T-F.135 / T-F.137 — string | null (Lens / Inbox)
+ *   - T-F.136          — number | null (Quality Findings drill-in)
+ *   - T-F.138 (this)   — string (empty-default controlled input)
+ *
+ * SSR-safe via `typeof window` guard, same as the sibling helpers.
+ */
+function readSkillKeyFromUrl(): string {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("skillKey");
+  return raw ?? "";
+}
+
 function formatLatest(d: Date | null): string {
   if (!d) return "—";
   const ms = Date.now() - d.getTime();
@@ -57,7 +81,9 @@ function formatLatest(d: Date | null): string {
 
 export default function GraphSkillUsagePanel() {
   const [windowMs, setWindowMs] = useState<number>(DEFAULT_WINDOW_MS);
-  const [skillKeyFilter, setSkillKeyFilter] = useState<string>("");
+  const [skillKeyFilter, setSkillKeyFilter] = useState<string>(
+    () => readSkillKeyFromUrl(),
+  );
 
   const trimmedKey = skillKeyFilter.trim();
   const usageQuery = trpc.agentStudio.graphSkill.listUsageCounts.useQuery(
@@ -127,6 +153,31 @@ export default function GraphSkillUsagePanel() {
               maxLength={100}
             />
           </div>
+
+          {/* T-F.138 — copy a shareable link with `?skillKey=X`
+              pre-filled. Gated on `trimmedKey.length > 0` because a
+              bare/empty filter has no shareable narrowing — the
+              receiving page would just land on the default view.
+              Lives in the controls row before the right-aligned
+              Totals card so it visually clusters with the filter
+              input it deeplinks. */}
+          {trimmedKey.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <SectionLabel>Share</SectionLabel>
+              <button
+                type="button"
+                className="h-8 rounded border border-border bg-background px-2 text-xs hover:bg-muted"
+                data-testid="graph-skill-usage-copy-link-button"
+                title={`Copy a shareable link with ?skillKey=${trimmedKey}`}
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?skillKey=${encodeURIComponent(trimmedKey)}`;
+                  void navigator.clipboard?.writeText(url);
+                }}
+              >
+                Copy link
+              </button>
+            </div>
+          ) : null}
 
           <div className="ml-auto text-right">
             <SectionLabel>Total calls</SectionLabel>
