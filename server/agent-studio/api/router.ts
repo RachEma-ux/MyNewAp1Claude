@@ -78,6 +78,7 @@ import { graphProjectionRouter } from "../services/graph/projection/router";
 import { graphHealthRouter } from "../services/graph/health-router";
 import { graphLensRouter } from "../services/graph-lens/graph-lens-router";
 import { impactAnalysisRouter } from "../services/graph-lens/impact-analysis-router";
+import { semanticEnrichmentRouter } from "../services/graph-enrichment/semantic-enrichment-router";
 import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
@@ -2995,6 +2996,14 @@ export const agentStudioRouter = router({
   // Contracts shipped at T-F.3. The actual traversal executor is
   // deferred to a future T-G.5.β slice (needs Cypher-template review).
   impactAnalysis: impactAnalysisRouter,
+  // Native Graph Workspace Phase 23 T-D.3.α: Semantic Enrichment Agent
+  // operator-facing read surface — listKnownProposalKinds (closed
+  // taxonomy enumeration). Contracts + agent + store + proposer +
+  // evidence-collector all shipped via T-D.3/.3.1-.3.5; this is the
+  // missing tRPC mount so the operator dashboard can populate the
+  // proposal-kind picker. Recent-runs + per-run drill-in deferred to
+  // T-D.3.β (needs ASDB read methods on the store).
+  semanticEnrichment: semanticEnrichmentRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
