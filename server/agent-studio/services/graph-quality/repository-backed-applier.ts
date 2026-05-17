@@ -97,9 +97,14 @@ export function createRepositoryBackedApplierRegistry(
     payload: Record<string, unknown>,
   ): Promise<ApplierResult> {
     try {
+      // ProjectionSyncJobInput shape (graph/repository/types.ts):
+      //   { projectionKey, triggerEvent, triggerPayload, snapshotId? }
+      // Map proposal payload to a projectionKey + trigger-event pair
+      // the projection worker can dispatch on.
       const result = await repository.enqueueProjectionJob({
-        jobKind: `apply_proposal_${payloadKind}`,
-        payload,
+        projectionKey: `apply_proposal_${payloadKind}`,
+        triggerEvent: "graph_correction_proposal_approved",
+        triggerPayload: payload,
       });
       return {
         applied: true,

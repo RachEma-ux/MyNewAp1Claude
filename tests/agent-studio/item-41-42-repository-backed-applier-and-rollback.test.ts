@@ -59,8 +59,9 @@ import type {
 
 interface StubRepoCalls {
   enqueueProjectionJob: Array<{
-    jobKind: string;
-    payload: Record<string, unknown>;
+    projectionKey: string;
+    triggerEvent: string;
+    triggerPayload: unknown;
   }>;
 }
 
@@ -70,8 +71,9 @@ function makeStubRepo(
   const calls: StubRepoCalls = { enqueueProjectionJob: [] };
   const repo = {
     async enqueueProjectionJob(input: {
-      jobKind: string;
-      payload: Record<string, unknown>;
+      projectionKey: string;
+      triggerEvent: string;
+      triggerPayload: unknown;
     }) {
       if (behavior.enqueueShouldThrow) {
         throw new Error(behavior.enqueueShouldThrow);
@@ -108,10 +110,10 @@ describe("Item 41 §1 — repository-backed applier handlers", () => {
     expect(result.details?.stub).toBe(false);
     expect(result.details?.projectionJobId).toBe(1001);
     expect(calls.enqueueProjectionJob.length).toBe(1);
-    expect(calls.enqueueProjectionJob[0]!.jobKind).toBe(
+    expect(calls.enqueueProjectionJob[0]!.projectionKey).toBe(
       "apply_proposal_archive_node",
     );
-    expect(calls.enqueueProjectionJob[0]!.payload).toEqual({
+    expect(calls.enqueueProjectionJob[0]!.triggerPayload).toEqual({
       typeKey: "note",
       nodeId: "n1",
     });
@@ -133,10 +135,10 @@ describe("Item 41 §1 — repository-backed applier handlers", () => {
       canonicalNodeId: "c1",
       duplicateNodeId: "d2",
     } as never);
-    expect(calls.enqueueProjectionJob[0]!.jobKind).toBe(
+    expect(calls.enqueueProjectionJob[0]!.projectionKey).toBe(
       "apply_proposal_merge_into_canonical",
     );
-    expect(calls.enqueueProjectionJob[0]!.payload).toEqual({
+    expect(calls.enqueueProjectionJob[0]!.triggerPayload).toEqual({
       typeKey: "agent",
       canonicalNodeId: "c1",
       duplicateNodeId: "d2",
@@ -154,10 +156,10 @@ describe("Item 41 §1 — repository-backed applier handlers", () => {
       sourceId: "src:n1",
       targetNodeId: "n1",
     } as never);
-    expect(calls.enqueueProjectionJob[0]!.jobKind).toBe(
+    expect(calls.enqueueProjectionJob[0]!.projectionKey).toBe(
       "apply_proposal_re_promote_with_source_version",
     );
-    expect(calls.enqueueProjectionJob[0]!.payload).toEqual({
+    expect(calls.enqueueProjectionJob[0]!.triggerPayload).toEqual({
       sourceTypeKey: "vault_note",
       sourceId: "src:n1",
       targetNodeId: "n1",
