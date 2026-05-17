@@ -144,7 +144,47 @@ These are real **resolution-layer quality concerns** for a production code-graph
 
 ---
 
-## 7. Related artifacts
+## 7. T-E.5 — scale-up validation (services/, ~454 files)
+
+The §0 question's "for ~150k-LoC repos" framing implies the spike target's 14 files / 58 nodes / 363 edges sample is too small to commit Phase 25 T-G.2 on. T-E.5 re-runs the same projection + 5 queries against `server/agent-studio/services/` (~454 non-test .ts files — 3.8× larger than the spike doc's "~120" estimate) to confirm margins hold at the larger scale.
+
+**Mechanism:** the orchestrator's `SPIKE_TARGET_DIR` is overridable via the `CODE_GRAPH_SPIKE_TARGET_DIR` env var (added in this PR); the workflow accepts a `target_dir` input that forwards through. The script + emit pipeline + projection + queries are unchanged — only the target dir scales.
+
+### 7.1 §4 gates at scale-up
+
+The same gates from §6.1 apply. Scale-up PASS means **margins hold at 1.5× minimum** at the larger surface:
+
+| Gate | Spike-target margin (T-E.3/.4) | Scale-up margin (T-E.5, target ≥ 1.5×) |
+|---|---|---|
+| Per-file parse p95 | 25× | TBD |
+| Total parse | 330× | n/a (corpus-size-proportional; not gate-bounded) |
+| Projection time | 2.4× | TBD |
+| Q1-Q5 latency p95 | 19-40× | TBD |
+
+### 7.2 Recorded results
+
+**Evidence source:** GitHub Actions workflow `code-graph-spike-measurement.yml` run #TBD on `main` @ TBD-SHA with `target_dir=server/agent-studio/services`. Console.log lines tagged `[T-E.4]` (script tag unchanged — same script, different target) transcribed below.
+
+| Metric | Target | Recorded | Verdict |
+|---|---|---|---|
+| Files parsed | — | TBD | — |
+| Nodes / Edges | — | TBD | — |
+| Per-file parse p95 (ms) | < 50 | TBD | TBD |
+| Total parse (ms) | n/a (informational) | TBD | — |
+| Projection time (ms) | < 10000 | TBD | TBD |
+| Q1 p95 (ms) | < 100 | TBD | TBD |
+| Q2 p95 (ms) | < 100 | TBD | TBD |
+| Q3 p95 (ms) | < 100 | TBD | TBD |
+| Q4 p95 (ms) | < 100 | TBD | TBD |
+| Q5 p95 (ms) | < 100 | TBD | TBD |
+
+**Verdict (T-E.5 isolated, post-dispatch transcription): TBD.**
+
+**Combined verdict (T-E.3 + T-E.4 + T-E.5):** if T-E.5 PASSES, the spike is comprehensively validated; greenlight Phase 7.5 production unblock + T-G.2 Code Intelligence Graph buildout. If T-E.5 FAILS, the small-scope T-E.4 PASS doesn't generalize; trigger §4 fallback (drop Python OR Phase 27 Aura) OR scope-reduce T-G.2.
+
+---
+
+## 8. Related artifacts
 
 - Spike ADR: `docs/implementation/agent-studio-code-graph-parser-spike-2026.md`
 - Spike emitter: `server/agent-studio/services/code-graph/spike/parse-ts-file.ts`

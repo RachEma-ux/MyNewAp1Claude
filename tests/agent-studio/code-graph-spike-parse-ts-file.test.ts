@@ -105,10 +105,18 @@ describe("T-E.2 — Code Graph Spike emitter (parse-ts-file.ts)", () => {
 });
 
 describe("T-E.2 — Code Graph Spike sample-ingest (run-sample-ingest.ts)", () => {
-  it("targets services/extensions/ per spike doc §2 sample-ingest scope", () => {
+  it("targets services/extensions/ per spike doc §2 sample-ingest scope (default; overridable via env for T-E.5 scale-up)", () => {
     const src = readSampleIngest();
+    // T-E.5 made the target dir overridable via the
+    // CODE_GRAPH_SPIKE_TARGET_DIR env var. Match either the
+    // pre-T-E.5 literal-only form OR the post-T-E.5 env-fallback
+    // form (both must keep the "services/extensions" default
+    // string so the §2 sample-ingest scope is the fallback).
     expect(src).toMatch(
-      /SPIKE_TARGET_DIR\s*=\s*"server\/agent-studio\/services\/extensions"/,
+      /"server\/agent-studio\/services\/extensions"/,
+    );
+    expect(src).toMatch(
+      /SPIKE_TARGET_DIR\s*=/,
     );
   });
 
