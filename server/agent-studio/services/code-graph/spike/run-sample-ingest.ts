@@ -30,7 +30,8 @@
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   parseTsFile,
@@ -38,6 +39,14 @@ import {
   type CodeGraphEdge,
   type CodeGraphNode,
 } from "./parse-ts-file.js";
+
+// ESM-safe replacement for CommonJS `__dirname`. The repo's
+// package.json sets `"type": "module"`, so `__dirname` is
+// undefined when this file runs under `npx tsx` directly (the T-E.4
+// measurement workflow's path). Vitest shims `__dirname` in its
+// loader so T-E.3's perf test sees it, but the workflow does not.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const REPO_ROOT = resolve(__dirname, "../../../../..");
 const SPIKE_TARGET_DIR = "server/agent-studio/services/extensions";
