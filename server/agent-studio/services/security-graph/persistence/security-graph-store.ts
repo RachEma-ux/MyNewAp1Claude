@@ -143,6 +143,27 @@ export interface SecurityGraphStore {
   getIngestionStats(
     ingestionId: string,
   ): Promise<SecurityGraphIngestionStats | null>;
+
+  /**
+   * Operator drill-in — sample rows from `ags_security_graph_nodes`
+   * scoped to one ingestion. Filterable by `typeKey`. Mirrors
+   * `CodeGraphStore.listIngestionNodes`.
+   */
+  listIngestionNodes(input: {
+    readonly ingestionId: string;
+    readonly typeKey?: string;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<SecurityGraphNode>>;
+
+  /**
+   * Operator drill-in — sample rows from `ags_security_graph_edges`
+   * scoped to one ingestion. Filterable by `edgeTypeKey`.
+   */
+  listIngestionEdges(input: {
+    readonly ingestionId: string;
+    readonly edgeTypeKey?: string;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<SecurityGraphEdge>>;
 }
 
 /**
@@ -313,6 +334,49 @@ export function createSecurityGraphStore(): SecurityGraphStore {
         properties: r.properties ?? undefined,
       }));
       return { nodes, edges };
+    },
+
+    async listIngestionNodes(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const whereClause =
+        input.typeKey !== undefined
+          ? sql`${agsSecurityGraphNodes.ingestionId} = ${input.ingestionId} AND ${agsSecurityGraphNodes.typeKey} = ${input.typeKey}`
+          : eq(agsSecurityGraphNodes.ingestionId, input.ingestionId);
+      const rows = await conn
+        .select()
+        .from(agsSecurityGraphNodes)
+        .where(whereClause)
+        .orderBy(agsSecurityGraphNodes.nodeId)
+        .limit(input.limit);
+      return rows.map((r) => ({
+        id: r.nodeId,
+        typeKey: r.typeKey as SecurityGraphNodeType,
+        name: r.name,
+        properties: r.properties ?? undefined,
+      }));
+    },
+
+    async listIngestionEdges(input) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const whereClause =
+        input.edgeTypeKey !== undefined
+          ? sql`${agsSecurityGraphEdges.ingestionId} = ${input.ingestionId} AND ${agsSecurityGraphEdges.edgeTypeKey} = ${input.edgeTypeKey}`
+          : eq(agsSecurityGraphEdges.ingestionId, input.ingestionId);
+      const rows = await conn
+        .select()
+        .from(agsSecurityGraphEdges)
+        .where(whereClause)
+        .orderBy(agsSecurityGraphEdges.edgeId)
+        .limit(input.limit);
+      return rows.map((r) => ({
+        id: r.edgeId,
+        sourceId: r.sourceNodeId,
+        edgeTypeKey: r.edgeTypeKey as SecurityGraphEdgeType,
+        targetId: r.targetNodeId,
+        properties: r.properties ?? undefined,
+      }));
     },
 
     async listIngestions(limit: number) {
