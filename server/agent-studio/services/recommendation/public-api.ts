@@ -36,3 +36,7 @@ export {
   type AssembleRecommendationResponseOptions,
   type RecommendationCandidateListSummary,
 } from "./assemble-response.js";
+
+// T-G.4.1 — runtime that composes the candidate fetcher + assembler
+// into a runnable service.
+export * from "./runtime/public-api.js";
