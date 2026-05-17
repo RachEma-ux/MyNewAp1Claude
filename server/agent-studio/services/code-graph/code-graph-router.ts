@@ -52,6 +52,10 @@ import {
   type CodeGraphIngestionListRow,
   type CodeGraphIngestionStats,
 } from "./persistence/public-api.js";
+import type {
+  ParsedCodeEdge,
+  ParsedCodeNode,
+} from "./parser/code-graph-parser.js";
 
 // ============================================================================
 // Input schemas
@@ -67,12 +71,26 @@ const GetIngestionStatsInput = z.object({
   ingestionId: z.string().min(1).max(255),
 });
 
+const ListIngestionNodesInput = z.object({
+  ingestionId: z.string().min(1).max(255),
+  typeKey: z.string().min(1).max(50).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+});
+
+const ListIngestionEdgesInput = z.object({
+  ingestionId: z.string().min(1).max(255),
+  edgeTypeKey: z.string().min(1).max(50).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+});
+
 // ============================================================================
 // Defaults
 // ============================================================================
 
 export const CODE_GRAPH_LIST_INGESTIONS_DEFAULT_LIMIT = 50;
 export const CODE_GRAPH_LIST_INGESTIONS_ABSOLUTE_LIMIT = 200;
+export const CODE_GRAPH_DRILL_IN_DEFAULT_LIMIT = 100;
+export const CODE_GRAPH_DRILL_IN_ABSOLUTE_LIMIT = 500;
 
 // ============================================================================
 // Output envelopes
@@ -85,6 +103,22 @@ export interface CodeGraphListIngestionsEnvelope {
 export type CodeGraphGetIngestionStatsEnvelope =
   | { readonly status: "ok"; readonly stats: CodeGraphIngestionStats }
   | { readonly status: "not_found"; readonly ingestionId: string };
+
+/**
+ * Discriminated envelope for the node/edge drill-in procedures.
+ * Stats lookup runs first as a cheap existence-check — if the
+ * ingestion row is missing, return `ingestion_not_found` before
+ * paying for the sample query. Saves operators from
+ * misinterpreting "empty list" as "this ingestion exists but has
+ * no rows".
+ */
+export type CodeGraphListIngestionNodesEnvelope =
+  | { readonly status: "ok"; readonly nodes: ReadonlyArray<ParsedCodeNode> }
+  | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
+
+export type CodeGraphListIngestionEdgesEnvelope =
+  | { readonly status: "ok"; readonly edges: ReadonlyArray<ParsedCodeEdge> }
+  | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
 
 // ============================================================================
 // Router
@@ -134,6 +168,79 @@ export const codeGraphRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message:
               err instanceof Error ? err.message : "getIngestionStats failed",
+          });
+        }
+      },
+    ),
+
+  /**
+   * Per-ingestion node drill-in. Returns sample rows ordered by
+   * `nodeId` (stable parser-emitted id), optionally filtered by
+   * `typeKey`. Existence-checks the ingestion first via
+   * `getIngestionStats === null` so an unknown ingestionId gets the
+   * `ingestion_not_found` envelope instead of an ambiguous empty
+   * list.
+   */
+  listIngestionNodes: adminProcedure
+    .input(ListIngestionNodesInput)
+    .query(
+      async ({ input }): Promise<CodeGraphListIngestionNodesEnvelope> => {
+        const limit = input.limit ?? CODE_GRAPH_DRILL_IN_DEFAULT_LIMIT;
+        try {
+          const store = createCodeGraphStore();
+          const stats = await store.getIngestionStats(input.ingestionId);
+          if (stats === null) {
+            return {
+              status: "ingestion_not_found",
+              ingestionId: input.ingestionId,
+            };
+          }
+          const nodes = await store.listIngestionNodes({
+            ingestionId: input.ingestionId,
+            typeKey: input.typeKey,
+            limit,
+          });
+          return { status: "ok", nodes };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listIngestionNodes failed",
+          });
+        }
+      },
+    ),
+
+  /**
+   * Per-ingestion edge drill-in. Mirror of `listIngestionNodes`
+   * with `edgeTypeKey` filter. Same ingestion-existence
+   * pre-check + discriminated envelope.
+   */
+  listIngestionEdges: adminProcedure
+    .input(ListIngestionEdgesInput)
+    .query(
+      async ({ input }): Promise<CodeGraphListIngestionEdgesEnvelope> => {
+        const limit = input.limit ?? CODE_GRAPH_DRILL_IN_DEFAULT_LIMIT;
+        try {
+          const store = createCodeGraphStore();
+          const stats = await store.getIngestionStats(input.ingestionId);
+          if (stats === null) {
+            return {
+              status: "ingestion_not_found",
+              ingestionId: input.ingestionId,
+            };
+          }
+          const edges = await store.listIngestionEdges({
+            ingestionId: input.ingestionId,
+            edgeTypeKey: input.edgeTypeKey,
+            limit,
+          });
+          return { status: "ok", edges };
+        } catch (err) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof Error ? err.message : "listIngestionEdges failed",
           });
         }
       },
