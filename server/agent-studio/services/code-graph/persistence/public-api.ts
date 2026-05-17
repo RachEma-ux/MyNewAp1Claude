@@ -7,4 +7,6 @@ export {
   type CodeGraphStore,
   type CodeGraphIngestionInput,
   type CodeGraphIngestionResult,
+  type CodeGraphIngestionListRow,
+  type CodeGraphIngestionStats,
 } from "./code-graph-store.js";

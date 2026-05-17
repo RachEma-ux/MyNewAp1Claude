@@ -29,7 +29,7 @@
  *   - No `process.env.*_API_KEY` reads.
  */
 
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import {
   agsCodeGraphIngestions,
@@ -78,6 +78,42 @@ export interface CodeGraphIngestionResult {
   readonly parserErrorCount: number;
 }
 
+/**
+ * One row in the operator dashboard's ingestion list — denormalized
+ * snapshot of `agsCodeGraphIngestions` for display + drill-in.
+ */
+export interface CodeGraphIngestionListRow {
+  readonly ingestionId: string;
+  readonly repositoryId: string;
+  readonly status: string;
+  readonly nodesUpserted: number;
+  readonly edgesUpserted: number;
+  readonly edgesRejected: number;
+  readonly parserErrorCount: number;
+  readonly startedAt: Date;
+  readonly completedAt: Date | null;
+}
+
+/**
+ * Per-ingestion drill-in stats — counts only, no rows. Operators
+ * use this to see a typeKey breakdown without loading the full
+ * symbol list. The list-of-typeKey-counts shape mirrors the
+ * graph-quality stats panel so the dashboard composition is uniform.
+ */
+export interface CodeGraphIngestionStats {
+  readonly ingestionId: string;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly nodeTypeCounts: ReadonlyArray<{
+    readonly typeKey: string;
+    readonly count: number;
+  }>;
+  readonly edgeTypeCounts: ReadonlyArray<{
+    readonly edgeTypeKey: string;
+    readonly count: number;
+  }>;
+}
+
 export interface CodeGraphStore {
   /**
    * Persist a parsed batch into ASDB. Idempotent on re-ingest of
@@ -98,6 +134,20 @@ export interface CodeGraphStore {
     readonly nodes: ReadonlyArray<ParsedCodeNode>;
     readonly edges: ReadonlyArray<ParsedCodeEdge>;
   }>;
+
+  /**
+   * Operator dashboard surface — list recent ingestions newest-first.
+   * Bounded by `limit` (clamped at the caller; this method trusts
+   * the input). T-G.2.α (codeGraph tRPC) consumer.
+   */
+  listIngestions(limit: number): Promise<ReadonlyArray<CodeGraphIngestionListRow>>;
+
+  /**
+   * Per-ingestion typeKey breakdown — counts only. Used by the
+   * drill-in panel after the operator picks an ingestion from
+   * `listIngestions`. Returns `null` if the ingestion doesn't exist.
+   */
+  getIngestionStats(ingestionId: string): Promise<CodeGraphIngestionStats | null>;
 }
 
 /**
@@ -288,6 +338,75 @@ export function createCodeGraphStore(): CodeGraphStore {
         properties: r.properties ?? undefined,
       }));
       return { nodes, edges };
+    },
+
+    async listIngestions(limit: number) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      const rows = await conn
+        .select()
+        .from(agsCodeGraphIngestions)
+        .orderBy(desc(agsCodeGraphIngestions.startedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        ingestionId: r.ingestionId,
+        repositoryId: r.repositoryId,
+        status: r.status,
+        nodesUpserted: r.nodesUpserted,
+        edgesUpserted: r.edgesUpserted,
+        edgesRejected: r.edgesRejected,
+        parserErrorCount: r.parserErrorCount,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+      }));
+    },
+
+    async getIngestionStats(ingestionId: string) {
+      const conn = getAsDb();
+      if (!conn) throw new Error("ASDB unavailable");
+      // Confirm the ingestion row exists — otherwise return null so
+      // the caller can distinguish "unknown ingestion" from "zero rows".
+      const ingestionRows = await conn
+        .select({ id: agsCodeGraphIngestions.id })
+        .from(agsCodeGraphIngestions)
+        .where(eq(agsCodeGraphIngestions.ingestionId, ingestionId))
+        .limit(1);
+      if (ingestionRows.length === 0) return null;
+
+      // typeKey + edgeTypeKey breakdowns via GROUP BY. Two
+      // independent aggregate queries (no join), one per side. Counts
+      // come back as bigint-ish; coerce to number for the wire shape.
+      const nodeCounts = await conn
+        .select({
+          typeKey: agsCodeGraphNodes.typeKey,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsCodeGraphNodes)
+        .where(eq(agsCodeGraphNodes.ingestionId, ingestionId))
+        .groupBy(agsCodeGraphNodes.typeKey);
+      const edgeCounts = await conn
+        .select({
+          edgeTypeKey: agsCodeGraphEdges.edgeTypeKey,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(agsCodeGraphEdges)
+        .where(eq(agsCodeGraphEdges.ingestionId, ingestionId))
+        .groupBy(agsCodeGraphEdges.edgeTypeKey);
+
+      const nodeCount = nodeCounts.reduce((a, r) => a + Number(r.count), 0);
+      const edgeCount = edgeCounts.reduce((a, r) => a + Number(r.count), 0);
+
+      return {
+        ingestionId,
+        nodeCount,
+        edgeCount,
+        nodeTypeCounts: nodeCounts
+          .map((r) => ({ typeKey: r.typeKey, count: Number(r.count) }))
+          .sort((a, b) => b.count - a.count),
+        edgeTypeCounts: edgeCounts
+          .map((r) => ({ edgeTypeKey: r.edgeTypeKey, count: Number(r.count) }))
+          .sort((a, b) => b.count - a.count),
+      };
     },
   };
 }
