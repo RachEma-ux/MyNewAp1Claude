@@ -314,8 +314,20 @@ export function validateCodeGraphEdgeBatch(
     if (outcome.ok) {
       accepted.push(e.edgeId);
     } else {
-      rejected.push({ edgeId: e.edgeId, reason: outcome.reason });
-      rejectionsByReason[outcome.reason]++;
+      // tsconfig.json has `strict: false` + `strictNullChecks: false`,
+      // which disables TypeScript's discriminated-union narrowing on
+      // `if (outcome.ok)`. Cast the narrowed branch explicitly so
+      // `.reason` is accessible. Pre-T-G.2.5 this file was not in
+      // the tsc include graph (no non-excluded importer); T-G.2.5
+      // added the code_intelligence lens runner which imports from
+      // the public-api barrel, pulling this file into compilation
+      // for the first time and exposing the strictness gap.
+      const failed = outcome as Extract<
+        CodeGraphEdgeValidationOutcome,
+        { readonly ok: false }
+      >;
+      rejected.push({ edgeId: e.edgeId, reason: failed.reason });
+      rejectionsByReason[failed.reason]++;
     }
   }
   return {
