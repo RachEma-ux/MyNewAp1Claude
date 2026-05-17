@@ -84,20 +84,23 @@ export function createRepositoryBackedApplierRegistry(
   repository: GraphRepository,
   options: RepositoryBackedApplierOptions,
 ): ApplierRegistry {
-  const runtime = options.runtime;
+  // The runtime is captured on the closure so future expansions of
+  // `enqueueProjectionJob` (which today takes only `input`) can
+  // thread the approver's RuntimeContext without changing this
+  // applier registry's contract. The current repository signature
+  // doesn't accept runtime — the void reference here keeps the
+  // option in the public API while satisfying tsc.
+  void options.runtime;
 
   async function enqueueOrThrow(
     payloadKind: string,
     payload: Record<string, unknown>,
   ): Promise<ApplierResult> {
     try {
-      const result = await repository.enqueueProjectionJob(
-        {
-          jobKind: `apply_proposal_${payloadKind}`,
-          payload,
-        },
-        runtime,
-      );
+      const result = await repository.enqueueProjectionJob({
+        jobKind: `apply_proposal_${payloadKind}`,
+        payload,
+      });
       return {
         applied: true,
         details: {
