@@ -103,11 +103,34 @@ function aggregate(repoRoot: string, targetDir: string): AggregateEmit {
   const timings: PerFileTiming[] = [];
   let totalParseMs = 0;
 
+  // T-E.5 fix: tree-sitter throws "Invalid argument" on some files
+  // in services/ (likely .ts files containing JSX, files exceeding
+  // an internal size limit, or non-UTF-8 byte sequences). The spike
+  // is a measurement, not a correctness gate — log + skip per file
+  // rather than abort the entire run. The skipped count surfaces in
+  // the summary so the operator can decide whether the parser
+  // strategy needs hardening before T-G.2 production.
+  let parseErrors = 0;
   for (const abs of files) {
     const rel = abs.slice(repoRoot.length + 1);
-    const src = readFileSync(abs, "utf8");
+    let src: string;
+    try {
+      src = readFileSync(abs, "utf8");
+    } catch {
+      parseErrors += 1;
+      continue;
+    }
     const t0 = performance.now();
-    const emit: CodeGraphEmit = parseTsFile(rel, src);
+    let emit: CodeGraphEmit;
+    try {
+      emit = parseTsFile(rel, src);
+    } catch (err) {
+      parseErrors += 1;
+      console.warn(
+        `[T-E.5] parse-skip ${rel} (${src.length} bytes): ${(err as Error).message}`,
+      );
+      continue;
+    }
     const dt = performance.now() - t0;
     totalParseMs += dt;
     timings.push({
@@ -118,6 +141,11 @@ function aggregate(repoRoot: string, targetDir: string): AggregateEmit {
     });
     for (const n of emit.nodes) allNodes.push(n);
     for (const e of emit.edges) allEdges.push(e);
+  }
+  if (parseErrors > 0) {
+    console.warn(
+      `[T-E.5] skipped ${parseErrors} of ${files.length} files due to parse errors (see [T-E.5] parse-skip lines above)`,
+    );
   }
 
   return {
