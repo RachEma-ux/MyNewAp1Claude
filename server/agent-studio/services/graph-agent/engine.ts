@@ -190,6 +190,16 @@ export class GraphAgentEngine {
         runtimeRunId: runId,
       });
       if (this.options.decisionTrace && graphAgentRunId !== undefined) {
+        // Item 34: record the graph node ids retrieved from each
+        // GraphRAG block so `provenance-enricher` can later attach
+        // `explainNode` provenance per node. Additive on JSONB —
+        // existing readers ignore the new field. Path-mode blocks
+        // (graphrag_shortest_path) emit a single block whose payload
+        // carries `from` + `to` instead of a single node id; we
+        // surface both endpoints so the path enricher can be called.
+        const graphNodeIds = extractGraphNodeIdsFromContextBlocks(
+          retrieval.contextBlocks,
+        );
         await this.options.decisionTrace.recordStep({
           graphAgentRunId,
           stepIndex: 2,
@@ -199,6 +209,7 @@ export class GraphAgentEngine {
             contextBlockCount: retrieval.contextBlocks.length,
             truncated: retrieval.truncated,
             rejectionReason: retrieval.rejectionReason,
+            graphNodeIds,
           },
           durationMs: Date.now() - retrieveStartedAt,
         });
@@ -553,4 +564,70 @@ export class GraphAgentEngine {
       "Do not invent graph paths that are not in the context.",
     ].join("\n");
   }
+}
+
+/**
+ * Item 34 helper — extract graph node ids from a retrieval result's
+ * context blocks. Used by the engine's `retrieve` step to surface
+ * the ids in `stepOutput.graphNodeIds` so `provenance-enricher` can
+ * later attach `explainNode` / `explainPath` provenance.
+ *
+ * Coverage:
+ *   - node-shaped blocks (graphrag_local / graphrag_global /
+ *     graphrag_neighborhood / graphrag_algorithm): pull `payload.node.id`
+ *     when present, else fall back to the block's own `id`.
+ *   - path-shaped blocks (graphrag_shortest_path): pull
+ *     `payload.from` + `payload.to` + `payload.nodes`.
+ *   - non-graph blocks (cypher_template / retrieval-router /
+ *     retrieval-router.text2cypher / etc.): contribute nothing —
+ *     the field stays empty so non-graph-derived runs don't get a
+ *     spurious enrich call.
+ *
+ * Returns a deduplicated, order-preserving array.
+ */
+export function extractGraphNodeIdsFromContextBlocks(
+  blocks: ReadonlyArray<{
+    readonly id?: string;
+    readonly sourceKind: string;
+    readonly payload?: unknown;
+  }>,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  function push(id: unknown): void {
+    if (typeof id === "string" && id.length > 0 && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const b of blocks) {
+    const p = b.payload as Record<string, unknown> | undefined;
+    if (b.sourceKind === "graph_path") {
+      push(p?.from);
+      push(p?.to);
+      const ns = p?.nodes;
+      if (Array.isArray(ns)) for (const n of ns) push(n);
+      continue;
+    }
+    // GraphRAG node blocks carry `payload.node = NodeIdentity`. Fall
+    // back to the block's own `id` (which the router sets to the
+    // node id).
+    const node = p?.node as { id?: unknown } | undefined;
+    if (node && typeof node.id === "string") {
+      push(node.id);
+    } else if (typeof b.id === "string") {
+      // Only treat the block id as a graph node id when the
+      // sourceKind looks node-like — guard against accidentally
+      // promoting cypher_template / retrieval-router synthetic ids.
+      if (
+        b.sourceKind !== "cypher_template" &&
+        b.sourceKind !== "retrieval-router" &&
+        !b.sourceKind.startsWith("retrieval-router.") &&
+        b.sourceKind !== "graph-template-executor"
+      ) {
+        push(b.id);
+      }
+    }
+  }
+  return out;
 }

@@ -129,3 +129,14 @@ export type {
   ProjectionDrainLoaders,
   BuildProjectionWritesOptions,
 } from "./projection-drain.js";
+
+export {
+  enrichWithGraphProvenance,
+  enrichPathWithGraphProvenance,
+  countHiddenInProvenance,
+  isVisibleProvenance,
+} from "./provenance-enricher.js";
+export type {
+  NodeProvenanceEnvelope,
+  PathProvenanceEnvelope,
+} from "./provenance-enricher.js";

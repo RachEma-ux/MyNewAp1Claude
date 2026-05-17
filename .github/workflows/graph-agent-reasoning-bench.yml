@@ -1,0 +1,72 @@
+# Graph Agent reasoning benchmark — Item 35.
+#
+# Operator-triggered deterministic benchmark. Runs the 6-scenario
+# walk through `GraphAgentEngine` and writes evidence under
+# `docs/evidence/graph-backend/<date>-graph-agent-reasoning-bench/`.
+#
+# Deterministic mode does NOT require Neo4j credentials, an
+# OpenRouter API key, or any external service — it exercises the
+# engine against a stub `GraphRepository` + stub model so the same
+# inputs always produce the same pass/fail. Live-mode (a future
+# variant that swaps in real OpenRouter via Model Access) will be
+# added as a separate workflow when credentials are wired.
+#
+# Exit codes from the runner:
+#   - 0  → all 6 scenarios PASS
+#   - 1  → at least one scenario FAIL (do not mark closure)
+#   - 2  → unhandled error in the bench runner
+#   - 78 → skip (reserved for future live-mode variant)
+
+name: Graph Agent Reasoning Benchmark — Deterministic
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_evidence:
+        description: 'Commit the generated evidence back to the branch (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm ci --loglevel=error
+
+      - name: Run benchmark
+        run: |
+          pnpm tsx scripts/graph-bench/run-graph-agent-reasoning-bench.ts
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graph-agent-reasoning-bench-${{ github.run_id }}
+          path: docs/evidence/graph-backend/*-graph-agent-reasoning-bench/
+          retention-days: 90
+
+      - name: Commit evidence (optional)
+        if: github.event.inputs.commit_evidence == 'true' && success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/evidence/graph-backend/
+          if git diff --cached --quiet; then
+            echo "No evidence changes to commit"
+          else
+            git commit -m "evidence: graph-agent-reasoning-bench (${{ github.run_id }})"
+            git push
+          fi

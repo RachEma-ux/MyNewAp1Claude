@@ -1,0 +1,283 @@
+{
+  "runAt": "2026-05-17T17:58:56.139Z",
+  "commitSha": "unknown",
+  "mode": "deterministic-stub",
+  "scenarios": [
+    {
+      "key": "simple_fact_lookup",
+      "description": "Single visible node → answer cites it",
+      "passed": true,
+      "durationMs": 10,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 1 cited fact(s): src:n1",
+        "citationCount": 1,
+        "citedSourceIds": [
+          "src:n1"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "n1"
+        ]
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 1",
+          "passed": true,
+          "note": "got 1"
+        },
+        {
+          "name": "cited sourceId includes \"src:n1\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"n1\"",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "key": "multi_hop_relationship",
+      "description": "2-hop traversal from seed yields multiple cited facts",
+      "passed": true,
+      "durationMs": 2,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 3 cited fact(s): src:n1, src:n2, src:n3",
+        "citationCount": 3,
+        "citedSourceIds": [
+          "src:n1",
+          "src:n2",
+          "src:n3"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "n1",
+          "n2",
+          "n3"
+        ]
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 2",
+          "passed": true,
+          "note": "got 3"
+        },
+        {
+          "name": "cited sourceId includes \"src:n1\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId includes \"src:n2\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"n1\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"n2\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"n3\"",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "key": "shortest_path_reasoning",
+      "description": "Local-graph retrieval that includes shortest-path endpoints in citations",
+      "passed": true,
+      "durationMs": 1,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 3 cited fact(s): src:a, src:b, src:c",
+        "citationCount": 3,
+        "citedSourceIds": [
+          "src:a",
+          "src:b",
+          "src:c"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 2",
+          "passed": true,
+          "note": "got 3"
+        },
+        {
+          "name": "cited sourceId includes \"src:a\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId includes \"src:c\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"a\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"c\"",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "key": "impact_style_reasoning",
+      "description": "Downstream impact view (neighborhood depth 2) — cites downstream facts",
+      "passed": true,
+      "durationMs": 1,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 4 cited fact(s): src:root, src:d1, src:d2, src:d3",
+        "citationCount": 4,
+        "citedSourceIds": [
+          "src:root",
+          "src:d1",
+          "src:d2",
+          "src:d3"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "root",
+          "d1",
+          "d2",
+          "d3"
+        ]
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 3",
+          "passed": true,
+          "note": "got 4"
+        },
+        {
+          "name": "cited sourceId includes \"src:d1\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId includes \"src:d2\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId includes \"src:d3\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"root\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"d1\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"d2\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"d3\"",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "key": "permission_hidden_distractor",
+      "description": "High-value SECRET node is hidden; answer cites only visible facts and trace must not carry its label",
+      "passed": true,
+      "durationMs": 1,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 2 cited fact(s): src:pub1, src:pub2",
+        "citationCount": 2,
+        "citedSourceIds": [
+          "src:pub1",
+          "src:pub2"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "pub1",
+          "pub2"
+        ]
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 2",
+          "passed": true,
+          "note": "got 2"
+        },
+        {
+          "name": "cited sourceId includes \"src:pub1\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId includes \"src:pub2\"",
+          "passed": true
+        },
+        {
+          "name": "cited sourceId DOES NOT include \"src:SECRET\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"pub1\"",
+          "passed": true
+        },
+        {
+          "name": "decision-trace graphNodeIds includes \"pub2\"",
+          "passed": true
+        },
+        {
+          "name": "no hidden label leaks into answer or trace",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "key": "stale_projection_warning",
+      "description": "Truncated retrieval is surfaced as a stale-projection operator signal",
+      "passed": true,
+      "durationMs": 0,
+      "observations": {
+        "retrievalMode": "graphrag_global",
+        "answer": "Answer using 2 cited fact(s): src:n1, src:n2",
+        "citationCount": 2,
+        "citedSourceIds": [
+          "src:n1",
+          "src:n2"
+        ],
+        "hiddenSourceLeaked": false,
+        "graphNodeIdsInTrace": [
+          "n1",
+          "n2"
+        ],
+        "truncationOrRejection": "truncated"
+      },
+      "assertions": [
+        {
+          "name": "citation count >= 1",
+          "passed": true,
+          "note": "got 2"
+        },
+        {
+          "name": "retrieve step records truncation or rejectionReason",
+          "passed": true,
+          "note": "truncated"
+        }
+      ]
+    }
+  ],
+  "overallPassed": true,
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0
+  }
+}
