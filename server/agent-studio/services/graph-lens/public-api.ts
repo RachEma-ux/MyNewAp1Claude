@@ -319,6 +319,7 @@ export {
   type InstitutionalMemoryLensReadFn,
   type InstitutionalMemoryLensReadParams,
   type InstitutionalMemoryLensReadResult,
+  type InstitutionalMemoryLensWorkflowRow,
 } from "./runners/institutional-memory-lens-runner.js";
 
 export {
