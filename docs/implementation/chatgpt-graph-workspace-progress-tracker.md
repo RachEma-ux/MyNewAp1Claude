@@ -672,3 +672,77 @@ not row-list). Otherwise the natural next pivot is T-G.4
 (Recommendation Service) per remaining-execution-plan — or the
 mutation-side work for T-G.2/T-G.3 (cron + operator-trigger) on
 explicit user direction.
+
+## 19. T-G.4 Recommendation Service operator-facing tRPC surface (2026-05-17)
+
+Pivot from T-G.3 to T-G.4 per session direction. Same "completion
+gap" pattern that T-G.2 and T-G.3 had pre-pivot: the underlying
+service is already shipped (contracts at T-G.4, assemble-response
+decision logic at T-G.8, runtime at T-G.4.1, GraphRAG-backed
+candidate fetcher at T-G.4.2) — only the operator-facing tRPC mount
+was missing.
+
+This sub-arc ships a 2-PR ladder closing that mount + adding a
+batch convenience for multi-panel dashboard surfaces:
+
+| Slice | PR | Procedure | Purpose |
+|---|---|---|---|
+| α | #1422 | `recommend` + `listKnownKinds` | Single-kind recommend + closed-taxonomy enumeration |
+| β | #1423 | `recommendBatch` | Multi-kind recommend in one round-trip (one router construction, N parallel `service.recommend(...)` via `Promise.all`) |
+
+Mounted at `agentStudio.recommendation.*`. All 3 procedures are
+`adminProcedure` and read-only. The Recommendation Service is
+read-only by design.
+
+Discriminated envelopes:
+- `recommend` → `ok` (full `RecommendationResponse`) | `graphrag_unavailable`
+- `recommendBatch` → `ok` (per-kind results, each with their own
+  `status: "ok" | "error"`) | `graphrag_unavailable`
+
+The batch envelope's per-kind discriminator preserves partial-success
+visibility — if one kind fails, the dashboard sees that one kind
+failed and the other 7 succeeded, rather than an opaque whole-batch
+reject.
+
+Sub-arc carry-forward lessons:
+1. **Pre-flight discovery before shipping a slice.** When pivoting to
+   a new sub-system, audit the existing surface first. T-G.4
+   appeared to be a green-field 3-4 PR slice per the
+   remaining-execution-plan, but in fact only the tRPC mount was
+   missing. Saved ~80% of the work by not duplicating what was
+   already there.
+2. **Cross-graph tRPC-mount pattern is repeatable.** Same shape as
+   T-G.2.α and T-G.3.α: adminProcedure floor, discriminated envelope
+   with `_unavailable` fallback, source-scan mount-drift guard test.
+   Three sub-systems now ship with the same surface, which makes the
+   client-side composition uniform.
+3. **Lazy per-request construction respects the boot phase.**
+   `GraphRetrievalRouter` constructs via `new` (not a singleton);
+   doing this per-request matches the existing
+   `golden-questions/live-engine-factory.ts` pattern. The catch
+   path returns `graphrag_unavailable` rather than throwing — future
+   environments without a graph backend still see a graceful empty
+   state.
+4. **Batch convenience earns its place when N × construction cost is
+   real.** The batch slice shaves N−1 router constructions per
+   request. For 8-panel dashboards that fetch all kinds in parallel,
+   that's ~8× faster than the N×single-recommend approach. Cheap
+   slice, real win.
+5. **Partial-success discriminator at the per-item level.** Standard
+   precedent that we've now applied across T-G.2.β/ε, T-G.3.β, and
+   T-G.4.β — when the response can have heterogeneous outcomes per
+   slot, each slot carries its own discriminator. Don't collapse to
+   a whole-batch outcome.
+
+Recommendation: T-G.4 substantially closed at β (2 procedures + 1
+batch optimization across 2 PRs). Per the remaining-execution-plan
+T-G acceptance criteria, the three open items are:
+  - Impact analysis can traverse institutional / code / security
+    graphs (likely needs a router-level cross-graph traversal slice)
+  - Neo4j CE performance benchmark
+  - Permission rules enforced (largely done across T-G.1-.4; needs
+    a cross-cutting audit memo)
+
+The natural next pivot is the cross-graph impact-analysis surface
+(read-side, can mount at `agentStudio.crossGraphImpact.*` if a new
+router is needed) or the T-G.3.ε rejection-telemetry follow-up.
