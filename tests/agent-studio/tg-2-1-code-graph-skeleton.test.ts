@@ -98,16 +98,17 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
     expect(src).toMatch(/Promise<CodeGraphIngestionResult>/);
   });
 
-  it("persistence/code-graph-store.ts factory throws T-G.2.3 placeholder", () => {
+  it("persistence/code-graph-store.ts exports the createCodeGraphStore factory (wired in T-G.2.3)", () => {
     const src = read("persistence/code-graph-store.ts");
     expect(src).toMatch(/export\s+function\s+createCodeGraphStore/);
-    expect(src).toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.3/);
+    // Negative: pre-T-G.2.3 placeholder string must be gone.
+    expect(src).not.toMatch(/\[T-G\.2\.1\][\s\S]*T-G\.2\.3/);
   });
 
-  it("persistence/ has NO drizzle import (added in T-G.2.3)", () => {
+  it("persistence/ uses drizzle + ASDB connection (wired in T-G.2.3)", () => {
     const src = read("persistence/code-graph-store.ts");
-    expect(src).not.toMatch(/from\s+["']drizzle-orm/);
-    expect(src).not.toMatch(/from\s+["']\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/drizzle\//);
+    expect(src).toMatch(/from\s+["']drizzle-orm["']/);
+    expect(src).toMatch(/getAsDb/);
   });
 
   it("persistence/ has NO neo4j-driver import (projection owns that boundary)", () => {
@@ -142,18 +143,13 @@ describe("T-G.2.1 — Code Graph production skeleton", () => {
 
   // ── factory invocation behavior ──────────────────────────────────
 
-  it("persistence + projection factories still throw T-G.2.1-tagged placeholders (parser wired in T-G.2.2)", async () => {
-    // Parser factory was the first to be wired (T-G.2.2). The
-    // other two (persistence + projection) remain placeholders
-    // until T-G.2.3 / T-G.2.4 — this test flips one assertion
-    // per sub-slice as it ships.
-    const { createCodeGraphStore } = await import(
-      "../../server/agent-studio/services/code-graph/persistence/code-graph-store.js"
-    );
+  it("projection factory still throws T-G.2.1-tagged placeholder (parser + persistence wired)", async () => {
+    // Parser was wired in T-G.2.2; persistence in T-G.2.3. Only
+    // projection remains until T-G.2.4 — this test flips one
+    // assertion per sub-slice as it ships.
     const { createCodeGraphProjection } = await import(
       "../../server/agent-studio/services/code-graph/projection/code-graph-projection.js"
     );
-    expect(() => createCodeGraphStore()).toThrow(/T-G\.2\.1/);
     expect(() => createCodeGraphProjection()).toThrow(/T-G\.2\.1/);
   });
 
