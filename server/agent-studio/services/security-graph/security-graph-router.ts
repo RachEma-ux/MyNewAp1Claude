@@ -54,6 +54,14 @@ import {
   type SecurityGraphIngestionStats,
   type SecurityGraphNode,
 } from "./persistence/public-api.js";
+import {
+  SECURITY_GRAPH_NODE_TYPES,
+  SECURITY_GRAPH_EDGE_TYPES,
+  SECURITY_GRAPH_EDGE_CONSTRAINTS,
+  type SecurityGraphEdgeConstraint,
+  type SecurityGraphEdgeType,
+  type SecurityGraphNodeType,
+} from "./contracts.js";
 
 // ============================================================================
 // Input schemas
@@ -110,6 +118,21 @@ export type SecurityGraphListIngestionEdgesEnvelope =
   | { readonly status: "ok"; readonly edges: ReadonlyArray<SecurityGraphEdge> }
   | { readonly status: "ingestion_not_found"; readonly ingestionId: string };
 
+/**
+ * Closed-taxonomy enumeration shipped to the client so the
+ * dashboard filter dropdowns don't have to hard-code the 10+8
+ * enums. Edge constraints are surfaced so the dashboard can
+ * preview the allowed source/target typeKey pairs for each edge.
+ * Mirrors `CodeGraphKnownTypesEnvelope`.
+ */
+export interface SecurityGraphKnownTypesEnvelope {
+  readonly nodeTypes: ReadonlyArray<SecurityGraphNodeType>;
+  readonly edgeTypes: ReadonlyArray<SecurityGraphEdgeType>;
+  readonly edgeConstraints: Readonly<
+    Record<SecurityGraphEdgeType, SecurityGraphEdgeConstraint>
+  >;
+}
+
 // ============================================================================
 // Router
 // ============================================================================
@@ -162,6 +185,19 @@ export const securityGraphRouter = router({
         }
       },
     ),
+
+  /**
+   * Closed-taxonomy enumeration. No DB I/O — just exposes the
+   * compile-time constants from `contracts.ts`. Parameterless by
+   * design; mirrors `codeGraph.listKnownTypes`.
+   */
+  listKnownTypes: adminProcedure.query(
+    (): SecurityGraphKnownTypesEnvelope => ({
+      nodeTypes: SECURITY_GRAPH_NODE_TYPES,
+      edgeTypes: SECURITY_GRAPH_EDGE_TYPES,
+      edgeConstraints: SECURITY_GRAPH_EDGE_CONSTRAINTS,
+    }),
+  ),
 
   listIngestionNodes: adminProcedure
     .input(ListIngestionNodesInput)
