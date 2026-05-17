@@ -53,26 +53,38 @@ describe("Bases sort + columns editors a.3-slice (T-F.105 / T-F.2-a.3)", () => {
     );
   });
 
-  it("openSortEditor + openColumnsEditor extend the multi-way mutual exclusion (each clears all other row-mutation slices)", () => {
+  it("openSortEditor + openColumnsEditor call closeAllRowEdits + set their own slices", () => {
+    // T-F.116 refactor: the 4-other-slice cross-clear in each
+    // open*() helper is now centralised in closeAllRowEdits(). The
+    // multi-way mutual exclusion invariant lives on through that
+    // single helper.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openSortEditor[\s\S]{0,1200}setSortEditBaseId\(baseId\)[\s\S]{0,200}setRenameBaseId\(null\)[\s\S]{0,200}setConfirmDeleteBaseId\(null\)[\s\S]{0,200}setFilterEditBaseId\(null\)[\s\S]{0,200}setColumnsEditBaseId\(null\)/,
+      /function\s+openSortEditor[\s\S]{0,400}closeAllRowEdits\(\)[\s\S]{0,300}setSortEditBaseId\(baseId\)[\s\S]{0,150}setSortEditDraft\(currentJson\)/,
     );
     expect(src).toMatch(
-      /function\s+openColumnsEditor[\s\S]{0,1200}setColumnsEditBaseId\(baseId\)[\s\S]{0,200}setRenameBaseId\(null\)[\s\S]{0,200}setConfirmDeleteBaseId\(null\)[\s\S]{0,200}setFilterEditBaseId\(null\)[\s\S]{0,200}setSortEditBaseId\(null\)/,
+      /function\s+openColumnsEditor[\s\S]{0,400}closeAllRowEdits\(\)[\s\S]{0,300}setColumnsEditBaseId\(baseId\)[\s\S]{0,150}setColumnsEditDraft\(currentJson\)/,
     );
   });
 
-  it("existing rename / delete-confirm / filter-edit open* helpers now ALSO clear sort + columns slices", () => {
+  it("closeAllRowEdits clears ALL 5 mutation slices in one place (refactor invariant)", () => {
+    // T-F.116: the cross-clear of sort + columns slices is now in
+    // closeAllRowEdits() rather than inlined in each existing
+    // open*() helper. Test the contract via the helper presence
+    // for all 5 mutation slices.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openRenameEditor[\s\S]{0,1200}setSortEditBaseId\(null\)[\s\S]{0,300}setColumnsEditBaseId\(null\)/,
+      /function\s+closeAllRowEdits[\s\S]{0,1200}setRenameBaseId\(null\)[\s\S]{0,800}setConfirmDeleteBaseId\(null\)[\s\S]{0,800}setFilterEditBaseId\(null\)[\s\S]{0,800}setSortEditBaseId\(null\)[\s\S]{0,800}setColumnsEditBaseId\(null\)/,
+    );
+    // All 3 existing open* helpers now call closeAllRowEdits:
+    expect(src).toMatch(
+      /function\s+openRenameEditor[\s\S]{0,400}closeAllRowEdits\(\)/,
     );
     expect(src).toMatch(
-      /function\s+openDeleteConfirm[\s\S]{0,1200}setSortEditBaseId\(null\)[\s\S]{0,300}setColumnsEditBaseId\(null\)/,
+      /function\s+openDeleteConfirm[\s\S]{0,400}closeAllRowEdits\(\)/,
     );
     expect(src).toMatch(
-      /function\s+openFilterEditor[\s\S]{0,1200}setSortEditBaseId\(null\)[\s\S]{0,300}setColumnsEditBaseId\(null\)/,
+      /function\s+openFilterEditor[\s\S]{0,400}closeAllRowEdits\(\)/,
     );
   });
 

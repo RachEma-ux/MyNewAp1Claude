@@ -44,20 +44,31 @@ describe("Bases per-row delete η-slice (T-F.96 / T-F.2-η)", () => {
     );
   });
 
-  it("openDeleteConfirm clears expandedBaseId + rename slices (4-way mutual exclusion)", () => {
+  it("openDeleteConfirm clears expandedBaseId + rename slices via closeAllRowEdits + sets confirm id", () => {
+    // T-F.116 refactor: rename/filter/sort/columns clears moved
+    // into closeAllRowEdits(). openDeleteConfirm calls
+    // closeAllRowEdits() THEN setExpandedBaseId(null) THEN
+    // setConfirmDeleteBaseId(baseId). The 4-way mutual exclusion
+    // invariant lives on through the helper.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openDeleteConfirm[\s\S]{0,600}setConfirmDeleteBaseId\(baseId\)[\s\S]{0,200}setDeleteError\(null\)[\s\S]{0,200}setRenameBaseId\(null\)[\s\S]{0,200}setRenameDraft\(""\)[\s\S]{0,200}setExpandedBaseId\(null\)/,
+      /function\s+openDeleteConfirm[\s\S]{0,400}closeAllRowEdits\(\)[\s\S]{0,200}setExpandedBaseId\(null\)[\s\S]{0,200}setConfirmDeleteBaseId\(baseId\)/,
     );
     expect(src).toMatch(
       /function\s+closeDeleteConfirm[\s\S]{0,200}setConfirmDeleteBaseId\(null\)/,
     );
   });
 
-  it("openRenameEditor (ε) now ALSO clears confirmDeleteBaseId to enforce mutual exclusion", () => {
+  it("openRenameEditor (ε) clears confirmDeleteBaseId via closeAllRowEdits", () => {
+    // T-F.116: the confirmDelete clear is now inside
+    // closeAllRowEdits(), which openRenameEditor calls. Test the
+    // contract via the helper presence.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openRenameEditor[\s\S]{0,600}setConfirmDeleteBaseId\(null\)/,
+      /function\s+openRenameEditor[\s\S]{0,400}closeAllRowEdits\(\)/,
+    );
+    expect(src).toMatch(
+      /function\s+closeAllRowEdits[\s\S]{0,600}setConfirmDeleteBaseId\(null\)/,
     );
   });
 

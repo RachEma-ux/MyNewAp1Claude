@@ -55,23 +55,36 @@ describe("Bases filter-edit γ-slice (T-F.101 / T-F.2-filter-γ)", () => {
     );
   });
 
-  it("openFilterEditor + closeFilterEditor helpers manage the slices + extend mutual exclusion to rename/delete", () => {
+  it("openFilterEditor calls closeAllRowEdits + sets filter-edit slices", () => {
+    // T-F.116 refactor: cross-clear of rename/delete/sort/columns
+    // moved into closeAllRowEdits(). openFilterEditor calls
+    // closeAllRowEdits() THEN sets filter-edit-specific state. Does
+    // NOT clear expandedBaseId because filter-edit lives INSIDE the
+    // detail expansion.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openFilterEditor[\s\S]{0,700}setFilterEditBaseId\(baseId\)[\s\S]{0,200}setFilterEditDraft\(currentJson\)[\s\S]{0,200}setFilterEditError\(null\)[\s\S]{0,200}setRenameBaseId\(null\)[\s\S]{0,200}setConfirmDeleteBaseId\(null\)/,
+      /function\s+openFilterEditor[\s\S]{0,400}closeAllRowEdits\(\)[\s\S]{0,300}setFilterEditBaseId\(baseId\)[\s\S]{0,150}setFilterEditDraft\(currentJson\)/,
     );
     expect(src).toMatch(
       /function\s+closeFilterEditor[\s\S]{0,300}setFilterEditBaseId\(null\)[\s\S]{0,200}setFilterEditDraft\(""\)[\s\S]{0,200}setFilterEditError\(null\)/,
     );
   });
 
-  it("openRenameEditor + openDeleteConfirm now ALSO clear filter-edit state for symmetric mutual exclusion", () => {
+  it("closeAllRowEdits clears filter-edit state so rename/delete open* helpers achieve mutual exclusion", () => {
+    // T-F.116: filter-edit-side of the mutual exclusion is now
+    // enforced by closeAllRowEdits() rather than per-helper
+    // inlining. Assert: (1) closeAllRowEdits clears
+    // setFilterEditBaseId; (2) openRenameEditor + openDeleteConfirm
+    // both call closeAllRowEdits.
     const src = readPanel();
     expect(src).toMatch(
-      /function\s+openRenameEditor[\s\S]{0,700}setFilterEditBaseId\(null\)/,
+      /function\s+closeAllRowEdits[\s\S]{0,800}setFilterEditBaseId\(null\)/,
     );
     expect(src).toMatch(
-      /function\s+openDeleteConfirm[\s\S]{0,700}setFilterEditBaseId\(null\)/,
+      /function\s+openRenameEditor[\s\S]{0,400}closeAllRowEdits\(\)/,
+    );
+    expect(src).toMatch(
+      /function\s+openDeleteConfirm[\s\S]{0,400}closeAllRowEdits\(\)/,
     );
   });
 
