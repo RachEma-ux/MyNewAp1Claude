@@ -110,22 +110,26 @@ export async function listSemanticEnrichmentCandidates(
     input.proposalKind !== "description_enrichment" &&
     input.proposalKind !== "missing_property_fill"
   ) {
-    // TODO(T-D.3.δ-followup): plumb selectors for the remaining 3
-    // proposal kinds. NOTE: each requires a `SemanticEnrichmentCandidate`
-    // contract extension because their targets are NOT nodes:
-    //   - stale_fact_refresh        → target is a property
-    //                                  (node, propertyKey) tuple where
-    //                                  source-version diverges from
-    //                                  property update time
-    //   - entity_disambiguation     → target is an entity row (not a
-    //                                  node), found by COUNT(*) > 1
-    //                                  grouped by canonical_label
-    //   - relationship_label_repair → target is an edge row (not a
-    //                                  node), found by generic-label
-    //                                  blacklist (RELATED_TO etc.)
-    // The contract needs a `targetKind: "node" | "edge" | "entity"`
-    // (or similar discriminant) before these selectors can land — a
-    // separate ADR-shaped slice, not a single PR.
+    // T-D.3.δ-followup α (contract extension) landed: `SemanticEnrichmentCandidate`
+    // is now a discriminated union over `targetKind` (`"node" | "node_property"
+    // | "entity" | "edge"`), so each of the remaining 3 selectors can ship in
+    // its own follow-up PR without contract churn:
+    //
+    //   - stale_fact_refresh        → produces `targetKind: "node_property"`
+    //                                  (carries `propertyKey`); SQL: (node,
+    //                                  property) tuples where source-version
+    //                                  diverges from latest property update
+    //   - entity_disambiguation     → produces `targetKind: "entity"`; SQL:
+    //                                  `ags_graph_entities` rows with COUNT(*)
+    //                                  > 1 grouped by `canonical_label`
+    //   - relationship_label_repair → produces `targetKind: "edge"`; SQL:
+    //                                  `ags_graph_edges` rows whose `type_key`
+    //                                  hits the generic-label blacklist
+    //                                  (RELATED_TO etc.)
+    //
+    // Each variant interface lives in `semantic-enrichment-agent.ts`. The
+    // runner's `SUPPORTED_TRIGGER_PROPOSAL_KINDS` gate keeps the kinds out
+    // of the agent loop until their selector + agent-side handler land.
     return {
       proposalKind: input.proposalKind,
       candidates: [],
@@ -195,6 +199,7 @@ async function listDescriptionEnrichmentCandidates(
   const trimmed = truncated ? rows.slice(0, limit) : rows;
 
   const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetKind: "node" as const,
     targetTypeKey: r.typeKey,
     targetId: r.nodeId,
     proposalKind: "description_enrichment" as const,
@@ -278,6 +283,7 @@ async function listMissingPropertyFillCandidates(
   const trimmed = truncated ? rows.slice(0, limit) : rows;
 
   const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetKind: "node" as const,
     targetTypeKey: r.typeKey,
     targetId: r.nodeId,
     proposalKind: "missing_property_fill" as const,

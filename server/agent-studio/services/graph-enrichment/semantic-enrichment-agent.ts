@@ -50,16 +50,108 @@ import type { SemanticEnrichmentEvidenceCollector } from "./semantic-enrichment-
 import type { SemanticEnrichmentProposer } from "./semantic-enrichment-proposer.js";
 
 /**
+ * Closed taxonomy for the candidate's target shape — T-D.3.δ-followup α.
+ *
+ * Discriminator the agent + downstream consumers branch on. Today only
+ * `"node"` candidates exist in production (the 2 wired selectors). The
+ * other three variants are reserved for the 2026-05-18 selector
+ * follow-ups (β/γ/δ):
+ *
+ *   - `"node_property"` → stale_fact_refresh (per-property tuple)
+ *   - `"entity"`        → entity_disambiguation (entity row, not a node)
+ *   - `"edge"`          → relationship_label_repair (edge row)
+ *
+ * Extending the taxonomy is a 2-place change: add to the literal array,
+ * add the matching variant interface below. Source-scan-tested.
+ */
+export const SEMANTIC_ENRICHMENT_CANDIDATE_TARGET_KINDS = [
+  "node",
+  "node_property",
+  "entity",
+  "edge",
+] as const;
+
+export type SemanticEnrichmentCandidateTargetKind =
+  (typeof SEMANTIC_ENRICHMENT_CANDIDATE_TARGET_KINDS)[number];
+
+/**
+ * Common fields across all candidate variants. Every variant carries
+ * a `targetTypeKey` + `targetId` so the existing agent loop
+ * (`candidate.targetTypeKey`, `candidate.targetId`) keeps working
+ * unchanged on the call paths it owns; downstream consumers narrow on
+ * `targetKind` when they need variant-specific fields.
+ */
+export interface SemanticEnrichmentCandidateBase {
+  readonly targetTypeKey: string;
+  readonly targetId: number;
+  readonly proposalKind: SemanticEnrichmentProposalKind;
+}
+
+export interface SemanticEnrichmentNodeCandidate
+  extends SemanticEnrichmentCandidateBase {
+  readonly targetKind: "node";
+}
+
+/**
+ * `stale_fact_refresh` target — a (nodeId, propertyKey) tuple where the
+ * source-note version backing the property has been superseded by a
+ * newer revision. The `propertyKey` lives on the candidate so the
+ * evidence collector + proposer can target the specific property
+ * without re-querying the ontology.
+ */
+export interface SemanticEnrichmentNodePropertyCandidate
+  extends SemanticEnrichmentCandidateBase {
+  readonly targetKind: "node_property";
+  readonly propertyKey: string;
+}
+
+/**
+ * `entity_disambiguation` target — a row in `ags_graph_entities`, NOT
+ * a node. `targetTypeKey` carries the entity's `entity_type`;
+ * `targetId` carries the entity row id.
+ */
+export interface SemanticEnrichmentEntityCandidate
+  extends SemanticEnrichmentCandidateBase {
+  readonly targetKind: "entity";
+}
+
+/**
+ * `relationship_label_repair` target — a row in `ags_graph_edges`,
+ * NOT a node. `targetTypeKey` carries the edge's current (generic)
+ * type_key (e.g., `RELATED_TO`); `targetId` carries the edge row id.
+ */
+export interface SemanticEnrichmentEdgeCandidate
+  extends SemanticEnrichmentCandidateBase {
+  readonly targetKind: "edge";
+}
+
+/**
  * Candidate target the agent should consider for enrichment.
  * The caller (cron orchestrator or operator-triggered tRPC) is
  * responsible for selecting these — typically nodes flagged as
  * "weak description" by a graph-quality scanner, or recently
  * ingested nodes lacking descriptions.
+ *
+ * **T-D.3.δ-followup α — discriminated union by `targetKind`.** Today
+ * only `"node"` candidates are produced (the 2 wired selectors —
+ * `description_enrichment`, `missing_property_fill`). The other three
+ * variants exist to unblock per-kind selector PRs that produce them.
  */
-export interface SemanticEnrichmentCandidate {
-  readonly targetTypeKey: string;
-  readonly targetId: number;
-  readonly proposalKind: SemanticEnrichmentProposalKind;
+export type SemanticEnrichmentCandidate =
+  | SemanticEnrichmentNodeCandidate
+  | SemanticEnrichmentNodePropertyCandidate
+  | SemanticEnrichmentEntityCandidate
+  | SemanticEnrichmentEdgeCandidate;
+
+export function isSemanticEnrichmentCandidateTargetKind(
+  s: unknown,
+): s is SemanticEnrichmentCandidateTargetKind {
+  return (
+    typeof s === "string" &&
+    (SEMANTIC_ENRICHMENT_CANDIDATE_TARGET_KINDS as ReadonlyArray<string>).includes(
+      s,
+    )
+  );
 }
 
 export interface SemanticEnrichmentRunInputWithCandidates
