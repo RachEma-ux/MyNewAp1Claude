@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../../../_core/trpc.js";
 import { NoteCreateInput, NoteDeleteInput, NoteUpdateInput, VaultCreateInput, VaultMemberAddInput, SearchInput } from "./contracts.js";
 import { VaultRepositoryStub } from "./repository.js";
 import { AsdbVaultRepository } from "./repository-asdb.js";
@@ -441,6 +441,32 @@ export const vaultRouter = router({
     .query(async ({ input }) => {
       const { listOutgoingWikilinksForNote } = await import("./link-queries.js");
       return await listOutgoingWikilinksForNote(input.noteId);
+    }),
+
+  /**
+   * One-shot link backfill — re-runs `persistNoteLinks` for every
+   * note in the vault using its latest version's contentMd. Use cases:
+   *   - Vault existed before #1482 (link tables were never populated)
+   *   - Operator suspects link drift (rare but possible if an
+   *     out-of-band edit bypassed the router hooks)
+   *
+   * Idempotent: REPLACE pattern in persistNoteLinks means re-runs are
+   * safe. Per-note exceptions are caught and recorded; the backfill
+   * continues. Admin-only because it touches every row in the vault's
+   * link tables.
+   */
+  backfillLinks: adminProcedure
+    .input(z.object({
+      vaultId: z.number().int().positive(),
+      limit: z.number().int().positive().max(10_000).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { backfillVaultLinks } = await import("./link-persistence.js");
+      return await backfillVaultLinks({
+        vaultId: input.vaultId,
+        repo: getRepo(),
+        limit: input.limit,
+      });
     }),
 
   /**

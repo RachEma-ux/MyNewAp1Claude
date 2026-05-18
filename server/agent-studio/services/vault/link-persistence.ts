@@ -174,3 +174,87 @@ export async function persistNoteLinks(
     embedsDeleted: deletedEmbeds.length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Backfill
+// ---------------------------------------------------------------------------
+
+export interface BackfillVaultLinksInput {
+  readonly vaultId: number;
+  readonly repo: VaultRepository;
+  /** Cap per pass. Default 1000. */
+  readonly limit?: number;
+  /** Test seam — replace `persistNoteLinks` with a stub. */
+  readonly persistFn?: (input: PersistLinksInput) => Promise<PersistLinksResult>;
+}
+
+export interface BackfillVaultLinksResult {
+  readonly notesProcessed: number;
+  readonly notesSkipped: number;
+  readonly wikilinksWritten: number;
+  readonly embedsWritten: number;
+  readonly errors: Array<{ noteId: number; error: string }>;
+}
+
+/**
+ * One-shot backfill — runs `persistNoteLinks` for every note in the
+ * vault using its latest version's contentMd. Use cases:
+ *   - Vault existed before #1482 (link extraction was running but
+ *     rows were never written); operator triggers backfill once to
+ *     populate the tables.
+ *   - Operator suspects link drift (rare but possible if an out-of-
+ *     band edit bypassed the router hooks); backfill re-derives.
+ *
+ * Idempotent — each note's wikilink/embed rows are REPLACED by the
+ * persistNoteLinks delete-then-insert pattern. Safe to re-run.
+ *
+ * Failure-tolerance: per-note exceptions are caught and recorded in
+ * `errors[]`; the backfill continues. One bad note doesn't poison
+ * the whole pass.
+ */
+export async function backfillVaultLinks(
+  input: BackfillVaultLinksInput,
+): Promise<BackfillVaultLinksResult> {
+  const limit = input.limit ?? 1000;
+  const persistFn = input.persistFn ?? persistNoteLinks;
+  const notes = await input.repo.listNotesInVault(input.vaultId, { limit });
+
+  let notesProcessed = 0;
+  let notesSkipped = 0;
+  let wikilinksWritten = 0;
+  let embedsWritten = 0;
+  const errors: Array<{ noteId: number; error: string }> = [];
+
+  for (const note of notes) {
+    try {
+      const latest = await input.repo.getLatestNoteVersion(note.id);
+      if (!latest) {
+        notesSkipped++;
+        continue;
+      }
+      const result = await persistFn({
+        vaultId: input.vaultId,
+        noteId: note.id,
+        versionId: latest.id,
+        contentMd: latest.contentMd,
+        repo: input.repo,
+      });
+      notesProcessed++;
+      wikilinksWritten += result.wikilinksWritten;
+      embedsWritten += result.embedsWritten;
+    } catch (e) {
+      errors.push({
+        noteId: note.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  return {
+    notesProcessed,
+    notesSkipped,
+    wikilinksWritten,
+    embedsWritten,
+    errors,
+  };
+}
