@@ -116,3 +116,30 @@ export {
   type PromoteAndApproveOptions,
   type PromoteAndApproveResult,
 } from "./semantic-enrichment-promote-and-approve.js";
+
+export {
+  listAutoPromotableProposals,
+  runAutoPromoteTick,
+  DEFAULT_AUTO_PROMOTE_MIN_CONFIDENCE,
+  ABSOLUTE_AUTO_PROMOTE_MIN_CONFIDENCE_FLOOR,
+  DEFAULT_AUTO_PROMOTE_PER_TICK_LIMIT,
+  ABSOLUTE_AUTO_PROMOTE_PER_TICK_LIMIT,
+  type AutoPromoteCandidate,
+  type AutoPromoteRowOutcome,
+  type AutoPromoteRowResult,
+  type AutoPromoteSelectorOptions,
+  type AutoPromoteTickResult,
+  type RunAutoPromoteOptions,
+} from "./auto-promote-orchestrator.js";
+
+export {
+  ensureAutoPromoteCronStarted,
+  getAutoPromoteCronStatus,
+  tickAutoPromoteCron,
+  DEFAULT_AUTO_PROMOTE_CRON_EXPR,
+  _resetAutoPromoteCronForTests,
+  type AutoPromoteCronInput,
+  type AutoPromoteCronStatus,
+  type TickAutoPromoteCronOptions,
+  type TickAutoPromoteCronResult,
+} from "./auto-promote-cron.js";
