@@ -82,6 +82,12 @@ import {
   runPromoteSemanticEnrichment,
 } from "./semantic-enrichment-promote-runner.js";
 import { promoteAndApproveProposal } from "./semantic-enrichment-promote-and-approve.js";
+import {
+  runPromoteBulk,
+  ABSOLUTE_BULK_PROMOTE_LIMIT,
+  BulkPromoteEmptyInputError,
+  BulkPromoteLimitExceededError,
+} from "./semantic-enrichment-promote-bulk.js";
 
 // ============================================================================
 // Limit constants
@@ -595,6 +601,64 @@ export const semanticEnrichmentRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: e.message,
+          });
+        }
+        throw e;
+      }
+    }),
+
+  /**
+   * T-D.4 carry-forward — bulk-promote endpoint.
+   *
+   * Wraps `promote` over an array of proposal ids and aggregates per-
+   * row outcomes (same bucketing as the auto-promote cron). Useful
+   * for operator-triggered batch promotions that don't want to wait
+   * on the cron's 15-minute cadence.
+   *
+   * Input validation:
+   *   - 1 ≤ `proposalIds.length` ≤ ABSOLUTE_BULK_PROMOTE_LIMIT (500)
+   *   - Each id positive integer
+   *
+   * Bridge errors are bucketed per-row inside `runPromoteBulk`; the
+   * router itself only translates the two input-validation errors
+   * into BAD_REQUEST TRPCError.
+   *
+   * Hard-rule compliance:
+   *   - `adminProcedure` floor preserved.
+   *   - Mutation goes through the existing single-promote runner;
+   *     no new DB write paths.
+   */
+  promoteBulk: adminProcedure
+    .input(
+      z.object({
+        proposalIds: z.array(z.number().int().positive()).min(1),
+        decidedByUserId: z.number().int().positive().optional(),
+        decisionRationale: z.string().min(1).max(2000).optional(),
+        proposedByAgentId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await runPromoteBulk({
+          proposalIds: input.proposalIds,
+          ...(input.decidedByUserId !== undefined
+            ? { decidedByUserId: input.decidedByUserId }
+            : {}),
+          ...(input.decisionRationale !== undefined
+            ? { decisionRationale: input.decisionRationale }
+            : {}),
+          ...(input.proposedByAgentId !== undefined
+            ? { proposedByAgentId: input.proposedByAgentId }
+            : {}),
+        });
+      } catch (e) {
+        if (e instanceof BulkPromoteEmptyInputError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+        }
+        if (e instanceof BulkPromoteLimitExceededError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `bulk promote rejected — per-call cap is ${ABSOLUTE_BULK_PROMOTE_LIMIT}`,
           });
         }
         throw e;

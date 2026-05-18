@@ -143,3 +143,14 @@ export {
   type TickAutoPromoteCronOptions,
   type TickAutoPromoteCronResult,
 } from "./auto-promote-cron.js";
+
+export {
+  runPromoteBulk,
+  ABSOLUTE_BULK_PROMOTE_LIMIT,
+  BulkPromoteEmptyInputError,
+  BulkPromoteLimitExceededError,
+  type BulkPromoteInput,
+  type BulkPromoteResult,
+  type BulkPromoteRowOutcome,
+  type BulkPromoteRowResult,
+} from "./semantic-enrichment-promote-bulk.js";
