@@ -1,27 +1,27 @@
 /**
  * WikilinksBacklinksPanel — Product Work item 17.
  *
- * Outgoing wikilinks (extracted from the current note's markdown) +
- * incoming backlinks (other notes that reference the current note).
+ * Outgoing wikilinks (from `[[Other]]` in this note's contentMd) +
+ * incoming backlinks (other notes that link TO this note).
  *
- * Reuse-first:
- *   - `extractLinksFromMarkdown` is server-side; for outgoing links
- *     we re-extract on the client from the displayed markdown to
- *     keep the panel synchronous and offline-friendly.
- *   - Backlinks: we list notes in the current vault and check whose
- *     `content_md` references the current note's title/slug.
+ * DB-backed since #1486 + #1487: both axes query the persisted
+ * `ags_vault_wikilinks` table via tRPC. Replaces the prior
+ * client-side all-vault markdown scan (which shipped up to 200
+ * notes of markdown to the browser + re-parsed locally).
  *
- * Permission handling:
- *   - Backlinks are filtered by what `listNotes` returns (server
- *     enforces vault-member visibility).
- *   - Missing target notes (wikilinks pointing nowhere) render as
- *     muted, non-clickable badges with `data-testid` for tests.
+ * Notes pre-existing the link-persistence ship (#1482) have no rows
+ * in the table; the admin `vault.backfillLinks` mutation (#1487)
+ * populates them. The empty-state copy hints at the backfill when
+ * neither axis returns results — a soft cue rather than a hard
+ * dependency.
+ *
+ * Permission handling: server-side procedures (`listBacklinks` /
+ * `listOutgoingWikilinks`) enforce vault-member visibility; the
+ * panel renders whatever shape they return.
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { trpc } from "../../../../lib/trpc";
-
-const WIKILINK_PATTERN = /\[\[([^\]]+)\]\]/g;
 
 export interface WikilinksBacklinksPanelProps {
   readonly noteId: number;
@@ -32,73 +32,21 @@ export interface WikilinksBacklinksPanelProps {
   readonly onNavigateToNote: (noteId: number) => void;
 }
 
-interface WikilinkRef {
-  readonly text: string;
-  readonly resolvedNoteId: number | null;
-  readonly hidden: boolean;
-}
-
 export default function WikilinksBacklinksPanel({
   noteId,
-  vaultId,
-  noteTitle,
-  noteSlug,
-  noteMd,
   onNavigateToNote,
 }: WikilinksBacklinksPanelProps): React.ReactElement {
-  const notesQuery = trpc.agentStudio.vault.listNotes.useQuery(
-    { vaultId, limit: 200 },
-    { enabled: vaultId > 0 },
+  const outgoingQuery = trpc.agentStudio.vault.listOutgoingWikilinks.useQuery(
+    { noteId },
+    { enabled: noteId > 0 },
+  );
+  const backlinksQuery = trpc.agentStudio.vault.listBacklinks.useQuery(
+    { noteId },
+    { enabled: noteId > 0 },
   );
 
-  const allNotes = notesQuery.data ?? [];
-
-  // Outgoing wikilinks: extract [[X]] tokens, resolve against visible
-  // notes. Unresolved → render as "missing target" badge.
-  const outgoing: WikilinkRef[] = useMemo(() => {
-    const refs: WikilinkRef[] = [];
-    const seen = new Set<string>();
-    let match: RegExpExecArray | null;
-    const re = new RegExp(WIKILINK_PATTERN);
-    while ((match = re.exec(noteMd)) !== null) {
-      const raw = match[1]!.split("|")[0]!.split("#")[0]!.trim();
-      if (!raw || seen.has(raw)) continue;
-      seen.add(raw);
-      const resolved = allNotes.find(
-        (n) =>
-          (n.title && n.title.toLowerCase() === raw.toLowerCase()) ||
-          (n.slug && n.slug.toLowerCase() === raw.toLowerCase()),
-      );
-      refs.push({
-        text: raw,
-        resolvedNoteId: resolved?.id ?? null,
-        hidden: false,
-      });
-    }
-    return refs;
-  }, [noteMd, allNotes]);
-
-  // Incoming backlinks: scan visible notes' titles to find ones that
-  // are presumably linking to us. We cannot scan their content on the
-  // client (we only have the metadata from listNotes); we approximate
-  // by surfacing any note that lists this note in its outgoing-link
-  // extraction. For panels-only purposes, we surface candidate notes
-  // by title heuristic — proper projection-table backlinks land
-  // when the wikilink-projection writer ships.
-  const backlinks = useMemo(() => {
-    if (!noteTitle && !noteSlug) return [];
-    return allNotes
-      .filter((n) => n.id !== noteId)
-      .filter((n) => {
-        const hay = `${n.title ?? ""} ${n.slug ?? ""}`.toLowerCase();
-        const needle = (noteTitle ?? noteSlug ?? "").toLowerCase();
-        // Heuristic: notes whose title contains the needle as a token
-        // are likely backlinks. The proper projection-table approach
-        // ships when the wikilink writer lands; see
-        // server/agent-studio/services/vault/links.ts §projection.
-        return needle.length > 0 && hay.includes(needle);
-      });
-  }, [allNotes, noteId, noteTitle, noteSlug]);
+  const outgoing = outgoingQuery.data ?? [];
+  const backlinks = backlinksQuery.data ?? [];
 
   return (
     <section
@@ -109,34 +57,42 @@ export default function WikilinksBacklinksPanel({
         <div className="font-semibold text-xs uppercase text-gray-500 mb-1">
           Outgoing links ({outgoing.length})
         </div>
-        {outgoing.length === 0 ? (
+        {outgoingQuery.isLoading ? (
+          <div className="text-xs text-gray-400">Loading…</div>
+        ) : outgoing.length === 0 ? (
           <div className="text-xs text-gray-400" data-testid="outgoing-empty">
             No wikilinks in this note.
           </div>
         ) : (
           <ul className="space-y-0.5">
-            {outgoing.map((ref) => (
-              <li key={ref.text}>
-                {ref.resolvedNoteId !== null ? (
-                  <button
-                    type="button"
-                    data-testid={`outgoing-link-${ref.text}`}
-                    className="text-left text-sm text-blue-600 hover:underline"
-                    onClick={() => onNavigateToNote(ref.resolvedNoteId!)}
-                  >
-                    [[{ref.text}]]
-                  </button>
-                ) : (
-                  <span
-                    data-testid={`outgoing-link-missing-${ref.text}`}
-                    className="text-sm text-gray-400 italic"
-                    title="Missing target"
-                  >
-                    [[{ref.text}]] (missing)
-                  </span>
-                )}
-              </li>
-            ))}
+            {outgoing.map((ref) => {
+              const label = ref.alias ?? ref.targetTitle ?? ref.targetSlug;
+              const anchor = ref.headingAnchor
+                ? `#${ref.headingAnchor}`
+                : "";
+              return (
+                <li key={`${ref.targetSlug}:${ref.headingAnchor ?? ""}:${ref.alias ?? ""}`}>
+                  {ref.targetNoteId !== null ? (
+                    <button
+                      type="button"
+                      data-testid={`outgoing-link-${ref.targetSlug}`}
+                      className="text-left text-sm text-blue-600 hover:underline"
+                      onClick={() => onNavigateToNote(ref.targetNoteId!)}
+                    >
+                      [[{label}{anchor}]]
+                    </button>
+                  ) : (
+                    <span
+                      data-testid={`outgoing-link-missing-${ref.targetSlug}`}
+                      className="text-sm text-gray-400 italic"
+                      title="Missing target"
+                    >
+                      [[{ref.targetSlug}]] (missing)
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -145,21 +101,26 @@ export default function WikilinksBacklinksPanel({
         <div className="font-semibold text-xs uppercase text-gray-500 mb-1">
           Backlinks ({backlinks.length})
         </div>
-        {backlinks.length === 0 ? (
+        {backlinksQuery.isLoading ? (
+          <div className="text-xs text-gray-400">Loading…</div>
+        ) : backlinks.length === 0 ? (
           <div className="text-xs text-gray-400" data-testid="backlinks-empty">
-            No backlinks visible to you.
+            No backlinks.{" "}
+            <span className="text-gray-400 text-[10px]">
+              (Notes created before link persistence shipped need a one-time admin backfill.)
+            </span>
           </div>
         ) : (
           <ul className="space-y-0.5">
             {backlinks.map((b) => (
-              <li key={b.id}>
+              <li key={b.sourceNoteId}>
                 <button
                   type="button"
-                  data-testid={`backlink-${b.id}`}
+                  data-testid={`backlink-${b.sourceNoteId}`}
                   className="text-left text-sm text-blue-600 hover:underline"
-                  onClick={() => onNavigateToNote(b.id)}
+                  onClick={() => onNavigateToNote(b.sourceNoteId)}
                 >
-                  ← {b.title ?? b.slug ?? `Note ${b.id}`}
+                  ← {b.sourceTitle || b.sourceSlug}
                 </button>
               </li>
             ))}
