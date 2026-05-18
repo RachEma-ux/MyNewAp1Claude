@@ -8,6 +8,19 @@
  * documented performance ceiling for Postgres in the backend decision ADR
  * (`agent-studio-active-graph-backend-decision.md`). Production deployments
  * promote `Neo4jCommunityGraphRepository` per Phase 1.5.
+ *
+ * ⚠️ **STATUS — ORPHAN as of 2026-05-18.** This implementation is
+ * NOT wired into `getGraphRepository()` in `./index.ts`. The Postgres
+ * path there instantiates the 176-LoC SKELETON
+ * `PostgresGraphRepository` from `./postgres-graph-repository.ts`,
+ * not this 319-LoC Phase 7 implementation. Operator triage required
+ * — three decision paths:
+ *   1. Wire it in (swap `case "postgres"` in `getGraphRepository()`
+ *      to use this class + add source-scan + integration tests)
+ *   2. Delete it (if Phase 7 ASDB-backed path is closed)
+ *   3. Document + leave in place pending ADR
+ * Discovery context recorded in
+ * `~/.claude/projects/-root/memory/project_phase_7_asdb_graph_repo_orphan.md`.
  */
 
 import { and, eq, sql } from "drizzle-orm";
