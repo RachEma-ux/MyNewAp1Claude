@@ -28,6 +28,8 @@ import {
   runStalenessCheck,
 } from "./staleness-detector.js";
 import { getProjectionStalenessCronStatus } from "./staleness-cron.js";
+import { drainPendingProjectionJobs } from "./queue-drain.js";
+import { getProjectionDrainCronStatus } from "./queue-drain-cron.js";
 
 const RunStalenessCheckInput = z
   .object({
@@ -91,4 +93,41 @@ export const graphProjectionRouter = router({
   runDriftScan: adminProcedure.mutation(async () => {
     return runProjectionDriftScan({});
   }),
+
+  /**
+   * Drain cron status surface (#1480). Same shape as the drift +
+   * staleness cron status; the operator panel renders all three side
+   * by side. `lastResult` carries `{processed, completed, failed,
+   * unknownEventKind, drainedAt}`.
+   */
+  getDrainCronStatus: adminProcedure.query(async () => {
+    return getProjectionDrainCronStatus();
+  }),
+
+  /**
+   * Manual drain trigger — admin-only on-demand path to process the
+   * `ags_graph_projection_sync_jobs` queue without waiting for the
+   * `*\/5 * * * *` cron tick. Use cases:
+   *   - Just-created note should appear in the graph immediately
+   *     (instead of waiting up to 5 minutes).
+   *   - Backfill after a Neo4j outage when pending rows have piled
+   *     up and the operator wants visibility into the drain progress.
+   *   - Smoke-test the end-to-end producer → drain → Neo4j path.
+   *
+   * Returns the full `DrainSummary` so the operator can see per-row
+   * outcomes (completed / failed / unknown_event_kind) and the
+   * specific lastError for any failed row.
+   */
+  runDrainNow: adminProcedure
+    .input(
+      z
+        .object({
+          /** Max rows to drain. Default 100 (matches cron default). */
+          limit: z.number().int().positive().max(1000).optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      return drainPendingProjectionJobs({ limit: input?.limit });
+    }),
 });
