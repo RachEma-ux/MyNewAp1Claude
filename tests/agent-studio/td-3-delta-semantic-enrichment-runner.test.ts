@@ -99,9 +99,9 @@ beforeEach(() => {
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ — supported-kind gate", () => {
-  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists exactly the 2 wired kinds", () => {
+  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists exactly the 3 wired kinds", () => {
     expect([...SUPPORTED_TRIGGER_PROPOSAL_KINDS].sort()).toEqual(
-      ["description_enrichment", "missing_property_fill"].sort(),
+      ["description_enrichment", "entity_disambiguation", "missing_property_fill"].sort(),
     );
   });
 
@@ -113,9 +113,12 @@ describe("T-D.3.δ — supported-kind gate", () => {
     expect(isSupportedTriggerProposalKind("missing_property_fill")).toBe(true);
   });
 
-  it("isSupportedTriggerProposalKind returns false for the 3 deferred kinds", () => {
+  it("isSupportedTriggerProposalKind returns true for entity_disambiguation (T-D.3.δ-followup β)", () => {
+    expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(true);
+  });
+
+  it("isSupportedTriggerProposalKind returns false for the 2 deferred kinds", () => {
     expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
-    expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(false);
     expect(isSupportedTriggerProposalKind("relationship_label_repair")).toBe(
       false,
     );
@@ -143,7 +146,7 @@ describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
     if (result.status === "kind_not_yet_supported") {
       expect(result.proposalKind).toBe("stale_fact_refresh");
       expect([...result.supportedKinds].sort()).toEqual(
-        ["description_enrichment", "missing_property_fill"].sort(),
+        ["description_enrichment", "entity_disambiguation", "missing_property_fill"].sort(),
       );
       expect(result.message).toMatch(/contract extension/i);
     }
@@ -151,22 +154,20 @@ describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
     expect(createAgentMock).not.toHaveBeenCalled();
   });
 
-  it("returns kind_not_yet_supported for entity_disambiguation + relationship_label_repair", async () => {
-    for (const kind of ["entity_disambiguation", "relationship_label_repair"] as const) {
-      const result = await runSemanticEnrichment(
-        {
-          workspaceId: 1,
-          proposalKind: kind,
-          providerConnectionId: 11,
-          modelRef: "anthropic/claude-haiku-4-5",
-          actorId: 99,
-        },
-        { modelAccessExecute: vi.fn() },
-      );
-      expect(result.status).toBe("kind_not_yet_supported");
-      if (result.status === "kind_not_yet_supported") {
-        expect(result.proposalKind).toBe(kind);
-      }
+  it("returns kind_not_yet_supported for relationship_label_repair (only deferred non-stale kind)", async () => {
+    const result = await runSemanticEnrichment(
+      {
+        workspaceId: 1,
+        proposalKind: "relationship_label_repair",
+        providerConnectionId: 11,
+        modelRef: "anthropic/claude-haiku-4-5",
+        actorId: 99,
+      },
+      { modelAccessExecute: vi.fn() },
+    );
+    expect(result.status).toBe("kind_not_yet_supported");
+    if (result.status === "kind_not_yet_supported") {
+      expect(result.proposalKind).toBe("relationship_label_repair");
     }
   });
 });

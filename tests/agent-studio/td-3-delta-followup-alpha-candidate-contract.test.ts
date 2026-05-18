@@ -163,7 +163,9 @@ describe("T-D.3.δ-followup α — per-variant proposalKind constraint", () => {
   it("selector doc-block names the contract-extension landing", () => {
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
     expect(src).toMatch(/T-D\.3\.δ-followup α/);
-    expect(src).toMatch(/discriminated union/);
+    // Allow either "discriminated union" or "discriminated-union" so
+    // β can refine wording without coupling.
+    expect(src).toMatch(/discriminated[\s-]union/);
     expect(src).toMatch(/"node_property"/);
     expect(src).toMatch(/"entity"/);
     expect(src).toMatch(/"edge"/);
@@ -182,14 +184,21 @@ describe("T-D.3.δ-followup α — existing 2 selectors emit targetKind=\"node\"
    * `"entity"` / `"edge"` / `"node_property"` literals — at which
    * point this assertion's allowed-set widens.
    */
-  it("candidate-selector only literal-assigns targetKind=\"node\" today", () => {
+  it("candidate-selector targetKind literals are within the wired allow-set", () => {
+    // Allow-set widens as per-kind selectors land:
+    //   T-D.3.δ-followup α (this file)  → only "node"
+    //   T-D.3.δ-followup β              → adds "entity"
+    //   T-D.3.δ-followup γ              → adds "edge"
+    //   T-D.3.δ-followup δ              → adds "node_property"
+    // Each follow-up PR widens this set + adds its own selector test.
+    const ALLOWED: ReadonlyArray<string> = ["node", "entity"];
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
     const allLiterals = [
       ...src.matchAll(/targetKind:\s*"([^"]+)"\s*as\s*const/g),
     ].map((m) => m[1]);
     expect(allLiterals.length).toBeGreaterThan(0);
     for (const k of allLiterals) {
-      expect(k).toBe("node");
+      expect(ALLOWED).toContain(k);
     }
   });
 });

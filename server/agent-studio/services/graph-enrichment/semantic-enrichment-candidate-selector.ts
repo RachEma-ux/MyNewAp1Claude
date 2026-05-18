@@ -1,28 +1,35 @@
 /**
- * Semantic Enrichment candidate selector — T-D.3.δ-prep.
+ * Semantic Enrichment candidate selector — T-D.3.δ-prep + T-D.3.δ-followup α/β.
  *
- * Surfaces nodes that the Semantic Enrichment Agent should consider
- * for proposal generation. Today covers two of the five kinds:
+ * Surfaces graph entities that the Semantic Enrichment Agent should
+ * consider for proposal generation. Coverage today is **3/5 kinds**:
+ *
  *   - `description_enrichment` — nodes whose `description` property
  *     is missing OR whose stringified `property_value` is shorter
  *     than `weakDescriptionMaxLength` (default 40 chars including
- *     JSON quoting).
+ *     JSON quoting). Emits `targetKind: "node"`.
  *   - `missing_property_fill` — nodes that have at least one
  *     `agsGraphOntologyPropertyDefinitions[required=true]` row
  *     with no corresponding `agsGraphNodeProperties` row. Returned
  *     once per node; the agent collector enumerates the specific
- *     missing properties at run-time.
+ *     missing properties at run-time. Emits `targetKind: "node"`.
+ *   - `entity_disambiguation` — rows in `ags_graph_entities` whose
+ *     `(workspace_id, entity_type, canonical_label)` triple resolves
+ *     to MORE THAN ONE active row. Each duplicate gets one candidate
+ *     so operators can disambiguate per row. Emits
+ *     `targetKind: "entity"` (target id is the entity row id, not a
+ *     node id; `targetTypeKey` echoes the entity's `entity_type`).
+ *     **MVP caveat:** the existing evidence collector heuristic
+ *     `content_text ILIKE '%<targetId>%'` won't match entity row ids
+ *     against KB text in any useful way — entity candidates will
+ *     count as `candidatesSkippedNoCitations` in the agent run until
+ *     a future entity-aware collector PR lands. The signal "N
+ *     duplicates detected" is still actionable for operators even
+ *     without per-candidate proposals.
  *
- * Why 2/5 and not 5/5 yet — both implemented kinds target NODES,
- * matching the current `SemanticEnrichmentCandidate` contract
- * (`targetTypeKey` + `targetId` are interpreted as node coords by
- * the proposer + evidence collector). The three remaining kinds
- * each target a non-node thing — `stale_fact_refresh` a (node,
- * property) tuple, `entity_disambiguation` an `agsGraphEntities`
- * row, `relationship_label_repair` an `agsGraphEdges` row — and
- * landing them requires extending the candidate contract with a
- * `targetKind` discriminant. That contract extension is its own
- * ADR-shaped slice and waits behind the trigger-mutation work.
+ * The two deferred kinds — `relationship_label_repair` (edge target)
+ * and `stale_fact_refresh` (node-property tuple) — wait behind their
+ * own selector PRs (T-D.3.δ-followup γ + δ).
  *
  * Why a separate module rather than extending
  * `semantic-enrichment-store.ts`:
@@ -38,9 +45,10 @@
  *     accidentally surface cross-tenant candidates.
  */
 
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import {
+  agsGraphEntities,
   agsGraphNodes,
   agsGraphNodeProperties,
   agsGraphOntologyPropertyDefinitions,
@@ -108,24 +116,19 @@ export async function listSemanticEnrichmentCandidates(
 
   if (
     input.proposalKind !== "description_enrichment" &&
-    input.proposalKind !== "missing_property_fill"
+    input.proposalKind !== "missing_property_fill" &&
+    input.proposalKind !== "entity_disambiguation"
   ) {
-    // T-D.3.δ-followup α (contract extension) landed: `SemanticEnrichmentCandidate`
-    // is now a discriminated union over `targetKind` (`"node" | "node_property"
-    // | "entity" | "edge"`), so each of the remaining 3 selectors can ship in
-    // its own follow-up PR without contract churn:
+    // T-D.3.δ-followup α landed the discriminated-union contract;
+    // β ships the `entity_disambiguation` selector below. The two
+    // remaining deferred selectors wait behind their own PRs:
     //
-    //   - stale_fact_refresh        → produces `targetKind: "node_property"`
-    //                                  (carries `propertyKey`); SQL: (node,
-    //                                  property) tuples where source-version
-    //                                  diverges from latest property update
-    //   - entity_disambiguation     → produces `targetKind: "entity"`; SQL:
-    //                                  `ags_graph_entities` rows with COUNT(*)
-    //                                  > 1 grouped by `canonical_label`
-    //   - relationship_label_repair → produces `targetKind: "edge"`; SQL:
-    //                                  `ags_graph_edges` rows whose `type_key`
-    //                                  hits the generic-label blacklist
-    //                                  (RELATED_TO etc.)
+    //   - relationship_label_repair → produces `targetKind: "edge"`;
+    //     SQL: `ags_graph_edges` rows whose `type_key` hits the
+    //     generic-label blacklist (RELATED_TO etc.) — T-D.3.δ-followup γ
+    //   - stale_fact_refresh → produces `targetKind: "node_property"`;
+    //     SQL: (node, property) tuples where source-version diverges
+    //     from latest property update — T-D.3.δ-followup δ
     //
     // Each variant interface lives in `semantic-enrichment-agent.ts`. The
     // runner's `SUPPORTED_TRIGGER_PROPOSAL_KINDS` gate keeps the kinds out
@@ -150,6 +153,10 @@ export async function listSemanticEnrichmentCandidates(
 
   if (input.proposalKind === "missing_property_fill") {
     return await listMissingPropertyFillCandidates(input, db, limit);
+  }
+
+  if (input.proposalKind === "entity_disambiguation") {
+    return await listEntityDisambiguationCandidates(input, db, limit);
   }
 
   return await listDescriptionEnrichmentCandidates(input, db, limit);
@@ -291,6 +298,110 @@ async function listMissingPropertyFillCandidates(
 
   return {
     proposalKind: "missing_property_fill",
+    candidates,
+    truncated,
+    weakDescriptionMaxLengthUsed: null,
+  };
+}
+
+/**
+ * `entity_disambiguation` candidate set — T-D.3.δ-followup β.
+ *
+ * Selects entity rows that share `(workspace_id, entity_type,
+ * canonical_label)` with at least one other ACTIVE row. Each
+ * conflicting row is emitted as its own candidate so the agent
+ * (eventually — after the entity-aware evidence collector lands)
+ * can reason over per-row disambiguating evidence.
+ *
+ * SQL outline (semantic; see Drizzle below):
+ *
+ *   SELECT id, entity_type
+ *   FROM ags_graph_entities
+ *   WHERE workspace_id = $1
+ *     AND governance_status = 'active'
+ *     AND (entity_type, canonical_label) IN (
+ *       SELECT entity_type, canonical_label
+ *       FROM ags_graph_entities
+ *       WHERE workspace_id = $1 AND governance_status = 'active'
+ *       GROUP BY entity_type, canonical_label
+ *       HAVING COUNT(*) > 1
+ *     )
+ *
+ * The `typeKey` filter narrows by `entity_type` so operators can
+ * focus disambiguation on one entity class (e.g., only `Person`
+ * dupes).
+ *
+ * Workspace handling: `ags_graph_entities.workspace_id` is NULLABLE
+ * (per `drizzle/tables/agent-studio-graph.ts:223`). Workspace-scoped
+ * runs MUST exclude null-workspace rows to honor the runner's
+ * tenant-isolation invariant.
+ */
+async function listEntityDisambiguationCandidates(
+  input: ListSemanticEnrichmentCandidatesInput,
+  db: NonNullable<ReturnType<typeof getAsDb>>,
+  limit: number,
+): Promise<SemanticEnrichmentCandidatesEnvelope> {
+  // Inner aggregate: which (entity_type, canonical_label) pairs have
+  // more than one active row in this workspace?
+  const conflictPairs = db
+    .select({
+      entityType: agsGraphEntities.entityType,
+      canonicalLabel: agsGraphEntities.canonicalLabel,
+    })
+    .from(agsGraphEntities)
+    .where(
+      and(
+        eq(agsGraphEntities.workspaceId, input.workspaceId),
+        eq(agsGraphEntities.governanceStatus, "active"),
+        input.typeKey !== undefined
+          ? eq(agsGraphEntities.entityType, input.typeKey)
+          : undefined,
+      ),
+    )
+    .groupBy(agsGraphEntities.entityType, agsGraphEntities.canonicalLabel)
+    .having(gt(sql<number>`count(*)`, sql`1`))
+    .as("conflict_pairs");
+
+  // Outer: every active row whose (entity_type, canonical_label) is in
+  // the conflict set. Stable order on id keeps cursored re-runs
+  // deterministic across paging.
+  const rows = await db
+    .select({
+      id: agsGraphEntities.id,
+      entityType: agsGraphEntities.entityType,
+    })
+    .from(agsGraphEntities)
+    .innerJoin(
+      conflictPairs,
+      and(
+        eq(agsGraphEntities.entityType, conflictPairs.entityType),
+        eq(agsGraphEntities.canonicalLabel, conflictPairs.canonicalLabel),
+      ),
+    )
+    .where(
+      and(
+        eq(agsGraphEntities.workspaceId, input.workspaceId),
+        eq(agsGraphEntities.governanceStatus, "active"),
+        input.typeKey !== undefined
+          ? eq(agsGraphEntities.entityType, input.typeKey)
+          : undefined,
+      ),
+    )
+    .orderBy(agsGraphEntities.id)
+    .limit(limit + 1);
+
+  const truncated = rows.length > limit;
+  const trimmed = truncated ? rows.slice(0, limit) : rows;
+
+  const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetKind: "entity" as const,
+    targetTypeKey: r.entityType,
+    targetId: r.id,
+    proposalKind: "entity_disambiguation" as const,
+  }));
+
+  return {
+    proposalKind: "entity_disambiguation",
     candidates,
     truncated,
     weakDescriptionMaxLengthUsed: null,
