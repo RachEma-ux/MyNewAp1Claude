@@ -26,8 +26,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
+import { autocompletion } from "@codemirror/autocomplete";
 import CodeMirrorMdEditor from "./CodeMirrorMdEditor";
-import { wikilinkAutocomplete } from "./wikilink-autocomplete";
+import { buildTagCompletionSource } from "./tag-autocomplete";
+import { buildWikilinkCompletionSource } from "./wikilink-autocomplete";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
@@ -59,12 +61,16 @@ export default function MarkdownEditorPane({
   const noteQuery = trpc.agentStudio.vault.getNote.useQuery({ noteId });
   const updateMutation = trpc.agentStudio.vault.updateNote.useMutation();
   const utils = trpc.useUtils();
-  // Track B — B3 — vault notes for `[[wikilink]]` autocomplete.
+  // Track B — B3 + B4 — vault notes + tags for autocomplete.
   // Gated on noteQuery.data?.note?.vaultId so we don't kick off the
-  // list query until we know which vault the current note lives in.
+  // list queries until we know which vault the current note lives in.
   const vaultIdForList = noteQuery.data?.note?.vaultId ?? 0;
   const notesForLinkQuery = trpc.agentStudio.vault.listNotes.useQuery(
     { vaultId: vaultIdForList, limit: 200 },
+    { enabled: vaultIdForList > 0 },
+  );
+  const tagsForVaultQuery = trpc.agentStudio.vault.listTagsForVault.useQuery(
+    { vaultId: vaultIdForList, limit: 500 },
     { enabled: vaultIdForList > 0 },
   );
 
@@ -89,26 +95,40 @@ export default function MarkdownEditorPane({
     [draftMd, upstreamMd],
   );
 
-  // Track B — B3 — wikilink autocomplete extension. Memoized on the
-  // notes list — the editor only re-mounts when the extension array
-  // identity changes, so a stable memo keeps cursor + history alive
-  // across keystrokes. The current note is excluded from suggestions
-  // (we don't typically wikilink to ourselves).
-  const wikilinkExtensionList = useMemo(() => {
+  // Track B — B3 + B4 — combined autocomplete extension. ONE
+  // autocompletion() instance with both sources (CM6 only allows
+  // one autocompletion per state; wikilink + tag sources are
+  // bundled together). Memoized so the editor doesn't remount on
+  // every parent render (which would lose cursor + history).
+  const editorExtraExtensions = useMemo(() => {
     const sourceNotes = (notesForLinkQuery.data ?? []) as Array<{
       id: number;
       slug?: string | null;
       title?: string | null;
     }>;
-    const suggestions = sourceNotes
+    const wikilinkSuggestions = sourceNotes
       .filter((n) => n.id !== noteId && typeof n.slug === "string")
       .map((n) => ({ slug: n.slug as string, title: n.title ?? null }));
+    const tagSuggestions =
+      (tagsForVaultQuery.data?.tags ?? []) as ReadonlyArray<{
+        tag: string;
+        count: number;
+      }>;
     return [
-      wikilinkAutocomplete({
-        getSuggestions: () => suggestions,
+      autocompletion({
+        override: [
+          buildWikilinkCompletionSource({
+            getSuggestions: () => wikilinkSuggestions,
+          }),
+          buildTagCompletionSource({
+            getSuggestions: () => tagSuggestions,
+          }),
+        ],
+        activateOnTyping: true,
+        closeOnBlur: true,
       }),
     ];
-  }, [notesForLinkQuery.data, noteId]);
+  }, [notesForLinkQuery.data, tagsForVaultQuery.data, noteId]);
 
   // NOTE: handleSave + the auto-save effect live above the early
   // returns below so React's rules of hooks aren't violated when
@@ -267,7 +287,7 @@ export default function MarkdownEditorPane({
             value={liveText}
             readOnly={readOnly}
             onChange={(next) => setDraftMd(next)}
-            extraExtensions={wikilinkExtensionList}
+            extraExtensions={editorExtraExtensions}
             className="w-full h-full min-h-[300px] border rounded font-sans text-sm overflow-hidden"
           />
         )}

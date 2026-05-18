@@ -281,6 +281,43 @@ export const vaultRouter = router({
       return await getRepo().listNotesInVault(input.vaultId, { folderId: input.folderId, limit: input.limit });
     }),
 
+  /**
+   * Track B — B4 — aggregate tags across a vault for the in-app
+   * `#tag` autocomplete. Scans the latest version of every note,
+   * runs the existing extractLinksFromMarkdown over each contentMd,
+   * returns the unique tag list with occurrence counts.
+   *
+   * Performance: caps the scan at 500 notes per vault (any larger
+   * and we'd want a denormalized tags table; that's a follow-on
+   * slice). Operator latency is acceptable for the typical vault
+   * size; the response is cached client-side via TanStack.
+   */
+  listTagsForVault: protectedProcedure
+    .input(z.object({
+      vaultId: z.number().int().positive(),
+      limit: z.number().int().min(1).max(2000).default(500),
+    }))
+    .query(async ({ input }) => {
+      const repo = getRepo();
+      const notes = await repo.listNotesInVault(input.vaultId, {
+        limit: input.limit,
+      });
+      const counts = new Map<string, number>();
+      for (const note of notes) {
+        const latest = await repo.getLatestNoteVersion(note.id);
+        if (!latest) continue;
+        const { tagSlugs } = extractLinksFromMarkdown(latest.contentMd);
+        for (const tag of tagSlugs) {
+          counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        }
+      }
+      // Sort by count desc, then alpha asc.
+      const sorted = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([tag, count]) => ({ tag, count }));
+      return { tags: sorted };
+    }),
+
   search: protectedProcedure
     .input(SearchInput)
     .query(async ({ input: _input }) => {
