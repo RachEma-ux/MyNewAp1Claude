@@ -421,6 +421,12 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/mcp-manager");
       return;
     }
+    // 2026-05-18 ops-discoverability: Vault Explorer (Graph Workspace)
+    // — root entry point for "+ New vault" / "+ New note" affordances.
+    if ((key as string) === "graph-workspace") {
+      navigate("/agent-studio/graph-workspace");
+      return;
+    }
     // V1+ 15-δ slice (PR-V1-84): vault-attachments is a global view.
     if ((key as string) === "vault-attachments") {
       navigate("/agent-studio/vault-attachments");

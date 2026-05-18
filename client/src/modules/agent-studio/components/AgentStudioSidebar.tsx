@@ -107,7 +107,13 @@ export type AgentStudioView =
   // ── T-F.91 (T-F.2-α): bases ──
   | "bases"
   // ── T-F.107 (T-F.6-α): inbox ──
-  | "inbox";
+  | "inbox"
+  // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
+  // (vault tree + markdown editor + local/global graph + impact +
+  // runtime/decision trace). Previously only reachable via direct
+  // URL; this entry surfaces it under the Vaults sidebar group so
+  // operators can find "+ New vault / + New note" affordances.
+  | "graph-workspace";
 
 interface SectionGroup {
   label: string;
@@ -153,6 +159,11 @@ const HOME_GROUPS: SectionGroup[] = [
   {
     label: "Vaults",
     items: [
+      // 2026-05-18: surface the Graph Workspace explorer (vault tree +
+      // markdown editor + local/global graph + impact/decision trace)
+      // as the first Vaults entry — operators land here to find the
+      // "+ New vault" / "+ New note" affordances.
+      { key: "graph-workspace", label: "Vault Explorer", icon: BookOpen },
       { key: "vault-attachments", label: "Attachments", icon: Folder },
       { key: "vault-saved-views", label: "Saved Views", icon: GitBranch },
     ],
