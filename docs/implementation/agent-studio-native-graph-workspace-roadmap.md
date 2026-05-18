@@ -2127,19 +2127,29 @@ Audit event written
 **Data Model:** `ags_graph_quality_metrics`, `ags_graph_quality_scans`, `ags_graph_quality_findings`, `ags_graph_quality_agent_runs`, `ags_semantic_enrichment_runs`, `ags_semantic_enrichment_proposals`, `ags_graph_correction_proposals`, `ags_graph_correction_decisions`, `ags_graph_correction_audit_events`.
 
 **Acceptance Criteria:**
-- [ ] Graph quality scan runs.
-- [ ] Duplicate entities can be detected.
-- [ ] Stale graph facts can be detected.
-- [ ] Projection drift can be detected.
-- [ ] Missing required properties can be detected.
-- [ ] Semantic enrichment proposals can be created.
-- [ ] Graph Quality Agent creates proposals only.
-- [ ] Semantic Enrichment Agent creates proposals only.
-- [ ] Human/governance approval is required for source-of-truth mutation.
-- [ ] Approved correction reprojects to Neo4j CE.
-- [ ] Approved correction is auditable.
-- [ ] Rejected correction is auditable.
-- [ ] Golden question failures can create correction proposals.
+- [x] Graph quality scan runs.
+- [x] Duplicate entities can be detected.
+- [x] Stale graph facts can be detected.
+- [x] Projection drift can be detected.
+- [x] Missing required properties can be detected.
+- [x] Semantic enrichment proposals can be created.
+- [x] Graph Quality Agent creates proposals only.
+- [x] Semantic Enrichment Agent creates proposals only.
+- [x] Human/governance approval is required for source-of-truth mutation.
+- [x] Approved correction reprojects to Neo4j CE.
+- [x] Approved correction is auditable.
+- [x] Rejected correction is auditable.
+- [x] Golden question failures can create correction proposals.
+
+**Closure (2026-05-18):** Phase 23 is **FULLY IMPLEMENTED**. Shipped across:
+
+- Graph Quality Agent runtime — `server/agent-studio/services/graph-quality/` (scan, findings, agent runs, retention cron)
+- Semantic Enrichment Agent — `server/agent-studio/services/graph-enrichment/` (5 candidate-selector kinds: weak descriptions, missing properties, entity disambiguation, relationship-label repair, stale-fact refresh; row-id-aware evidence collector)
+- Promotion chain (T-D.4, 6 PRs #1499–#1504): `semantic-enrichment-promotion-bridge.ts` → `runPromoteSemanticEnrichment` → tRPC `promote` / `promoteAndApprove` / `promoteBulk` → auto-promote cron `*/15 * * * *` (env-gated, ≥0.95 confidence) → admin UI panel (`SemanticEnrichmentProposalDetailPanel.tsx` on RetrofitPage)
+- Failure-correction bridge (T-D.5) — `failure-correction-bridge.ts` routes golden-question failures into `ags_graph_correction_proposals`
+- Approve-and-apply chain — `approveAndApplyProposal` writes `ags_graph_correction_audit_events` and triggers Neo4j reprojection via the existing `GraphRepository` mutation surface
+
+See memory entries `project_td4_promotion_chain_complete.md` and `project_v1_plus_session_2026_05_16.md` for per-PR ledgers.
 
 ### Phase 24 — Full V1 Expansion: Canvas, Bases, Lenses, Impact
 

@@ -130,10 +130,22 @@ Per-PR detail in memory entries `project_v1_plus_lens_stack_arc_2026_05_16` / `p
 
 Tracker §28 added in this T-A.44 doc-drift PR records the closure receipt.
 
-**Next material work (post-#1490):** Material runtime work — the vault layer is now end-to-end:
-- **T-D.5.ζ** golden-questions evaluation caller (mutation or cron) — needs ADR review for Live Engine Factory wiring.
-- **T-D.3.δ** semantic-enrichment trigger mutation — needs candidate-selection layer plumbed (selector kinds 2/5 shipped via #1455).
-- **T-F.4** Quality Lens UI — read surfaces uniform across T-D.3 + T-D.5 + graph-quality + graph-correction; UI work fully unblocked.
+**2026-05-18 T-D.3.δ + T-D.4 sprint (14 PRs, #1491–#1504) — Phase 23 closure:**
+
+1. **#1491** — vault sidebar label closure receipt (closes the #1451 partial-rename gap fully).
+2. **#1492–#1498 (7 PRs)** — T-D.3.δ: discriminated-union candidate contract (α) + 3 new selector kinds (β entity disambiguation, γ relationship label repair, δ stale fact refresh) + row-ID-aware evidence collector. Closes the T-D.3 gate at 5/5 selectors.
+3. **#1499–#1501 (3 PRs)** — T-D.4 promotion-chain core: bridge (slice 1) + promote runner + tRPC (slice 2) + `promoteAndApprove` combo (slice 3). Semantic-enrichment proposals are now operator-callable end-to-end into the existing approve-and-apply chain.
+4. **#1502** — T-D.4 carry-forward 1/3: cron auto-promote (`*/15 * * * *`, ≥0.95 confidence, env-gated, 21 tests).
+5. **#1503** — T-D.4 carry-forward 2/3: bulk-promote endpoint (`promoteBulk` adminProcedure, max 500 per call, mirrors cron's 5-outcome bucketing, 18 tests).
+6. **#1504** — T-D.4 carry-forward 3/3: promote UI panel (`SemanticEnrichmentProposalDetailPanel.tsx` on RetrofitPage, status-gated affordances, 15 tests). **T-D.4 chain FULLY COMPLETE end-to-end.**
+
+Per-PR detail in `project_td4_promotion_chain_complete.md`. Tracker §29 added in T-A.45 doc-drift PR records this closure receipt + ticks Phase 23 acceptance criteria.
+
+**Next material work (post-#1504):** With Phase 23 closed, forward roadmap items:
+- **T-D.5 runtime loop** — Graph Quality Agent feedback circuit: wire 5 selectors into `QualityAgentEngine.decideNextAction()`, persist via `applyGraphCorrection()` → `ags_graph_correction_proposals`. Phase 23 finale (~2–3 PRs).
+- **T-F.1 Bases MVP** — `ags_bases` / `ags_base_rows` / `ags_base_columns` tables + CRUD tRPC + vault wire-up. Phase 24 opener.
+- **T-F.2 Bases → KG projection** — mirror note-projection pattern; cron `*/5`. Phase 24 tier 2.
+- **T-B.2 attachment-quota integration** — wire `assertWithinQuota` into `uploadFile` + inline-attachment paths.
 - **Phase 7 ASDB graph-repo wire-in or delete** — operator-triage decision per #1445 header + memory `project_phase_7_asdb_graph_repo_orphan.md`.
 - **T-C CLAUDE.md Non-Build List reconciliation** — text was already updated for CRDT/offline/multi-region (per the V1+ plan scope block); audit for any residual contradictions remains a one-PR doc sweep.
 

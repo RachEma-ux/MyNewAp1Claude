@@ -1893,3 +1893,114 @@ end-to-end Knowledge Graph projection + DB-backed backlinks +
 labels aligned. Remaining material work flips back to runtime
 slices (T-D Quality Agent / T-F Quality Lens UI) or operator-
 direction sub-arcs.
+
+## 29. T-D.3.δ + T-D.4 promotion chain — Phase 23 closure (2026-05-18)
+
+A 14-PR sprint (#1491–#1504) closed the Semantic Self-Correction
+loop end-to-end and ticked all 13 Phase 23 acceptance criteria.
+The roadmap doc now carries a "Phase 23 FULLY IMPLEMENTED"
+closure block; this section records the per-arc PR breakdown.
+
+#### 29.1 — Vault sidebar label closure receipt (#1491)
+
+Closes the partial-rename gap surfaced in §28.1 #1451 / §28.4
+#1490. Sidebar + PageHeader + `nav.ts` + `routes.tsx` + test
+suites now all read "Vault Explorer".
+
+#### 29.2 — T-D.3.δ semantic-enrichment candidate selectors (#1492–#1498, 7 PRs)
+
+Closes the T-D.3 candidate-selection gate at 5/5 selector kinds:
+
+| PR | Slice |
+|---|---|
+| #1494 | α — discriminated-union candidate contract |
+| #1495 | β — `entity_disambiguation` selector |
+| #1496 | γ — `relationship_label_repair` selector |
+| #1497 | δ — `stale_fact_refresh` selector (closes the gate) |
+| #1498 | row-ID-aware evidence collector (closes β/γ
+no-citations caveat) |
+
+Earlier selectors (kinds 1 + 2): `weak_description` and
+`missing_property_fill` shipped in #1455 (§28.1) + earlier T-D.3
+slices. Selector ladder is now closed at 5/5.
+
+#### 29.3 — T-D.4 promotion chain core (#1499–#1501, 3 PRs)
+
+End-to-end operator-callable path from a pending enrichment
+proposal into the existing graph-correction approve-and-apply
+chain:
+
+| PR | Slice | Adds |
+|---|---|---|
+| #1499 | 1 — bridge | `semantic-enrichment-promotion-bridge.ts` — pure conversion + writer with 4 DI seams; state guards + idempotency + concurrent-race detection via `wasUpdated: false` |
+| #1500 | 2 — runner + tRPC | `semantic-enrichment-promote-runner.ts` — production Drizzle wiring; new `agentStudio.semanticEnrichment.promote` mutation; 4 bridge errors → TRPCError codes |
+| #1501 | 3 — combo | `semantic-enrichment-promote-and-approve.ts` — one-call composition of promote + `approveAndApplyProposal`; new `agentStudio.semanticEnrichment.promoteAndApprove` mutation |
+
+End-to-end shape:
+
+```
+operator → semanticEnrichment.promoteAndApprove
+  → runPromoteSemanticEnrichment
+    → store.getProposalDetail
+    → INSERT ags_graph_correction_proposals (pending)
+    → UPDATE ags_semantic_enrichment_proposals SET status=promoted
+    → INSERT ags_semantic_enrichment_decisions
+  → approveAndApplyProposal (existing chain)
+    → INSERT ags_graph_correction_decisions (approved)
+    → applyApprovedProposal → graph mutation + reprojection
+    → INSERT ags_graph_correction_audit_events (applied)
+```
+
+#### 29.4 — T-D.4 carry-forwards (#1502–#1504, 3 PRs) — chain FULLY COMPLETE
+
+| PR | Carry-forward | Adds |
+|---|---|---|
+| #1502 | 1/3 — cron auto-promote | `auto-promote-orchestrator.ts` + `auto-promote-cron.ts` + boot Step 3.25.c. `*/15 * * * *`, ≥0.95 confidence, per-tick cap 25/500, env-gated via `AGS_SEMANTIC_ENRICHMENT_AUTO_PROMOTE_CRON_DISABLED`. 21 tests. |
+| #1503 | 2/3 — bulk-promote endpoint | `runPromoteBulk` + `promoteBulk` adminProcedure (max 500 per call). Same 5-outcome bucketing as the cron. 18 tests. |
+| #1504 | 3/3 — promote UI panel | `SemanticEnrichmentProposalDetailPanel.tsx` mounted on RetrofitPage as "Semantic Enrichment Promote" tab. Lookup-by-id + status-gated Promote / Promote & apply affordances. 15 tests. |
+
+After #1504 the T-D.4 chain is **FULLY COMPLETE** end-to-end —
+operators can promote via tRPC (one-off), cron (auto, ≥0.95),
+batch endpoint (manual list), or admin UI (lookup-and-click).
+
+#### 29.5 — Phase 23 acceptance criteria — all ticked
+
+All 13 acceptance criteria in `agent-studio-native-graph-workspace-roadmap.md`
+Phase 23 now read `[x]`. Closure block added under acceptance
+criteria with file-pointer + PR list.
+
+### Carry-forward lessons (5)
+
+1. **JSDoc `*/` terminates the comment block.** PR #1503 caught
+   in CI: `cron's */15 cadence` inside a JSDoc `/** ... */`
+   terminated the comment at `*/` mid-sentence and the rest of
+   the block became loose TypeScript. Always escape or rephrase
+   cron expressions inside JSDoc. The fix: rephrase to
+   "15-minute cadence".
+2. **React state-update tests need `act()` wrap when firing
+   useMutation onSuccess directly.** `fireEvent` auto-wraps in
+   `act`, but calling a captured `onSuccess` callback by hand
+   does not — React batches the `setState` and the assertion
+   reads stale DOM. Wrap manual callback invocations in `act()`
+   from `@testing-library/react`.
+3. **Bridge / runner / combo is a 3-PR shape.** The bridge (pure
+   composition + DI seams) ships first, then the runner (DB
+   wiring), then the combo (composition with downstream steps).
+   Each half is independently reviewable; the combo lands trivially
+   after both halves are verified.
+4. **Per-row error bucketing mirrors across cron, bulk, and UI.**
+   The 5-outcome enum (`promoted` / `skipped_already_promoted` /
+   `skipped_not_promotable` / `skipped_not_found` / `failed`) is
+   identical in `auto-promote-orchestrator.ts` and
+   `semantic-enrichment-promote-bulk.ts` so a single dashboard UI
+   can render either source. Bucketing once and reusing the
+   shape is the right call.
+5. **Field-name asymmetry is real and discoverable.** `promote`
+   uses `decisionRationale`; `promoteAndApprove` uses `rationale`
+   (matches the downstream `approveAndApplyProposal` field).
+   The UI handles both correctly via a test assertion. Don't
+   force renaming during a carry-forward PR — the asymmetry
+   reflects two different upstream contracts that pre-date the
+   bridge.
+
+T-A.45 closure receipt — Phase 23 doc-drift reconciled.
