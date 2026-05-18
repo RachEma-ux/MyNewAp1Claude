@@ -24,6 +24,12 @@ export {
   type WikilinkAutocompleteOptions,
 } from "./wikilink-autocomplete";
 export {
+  buildTagCompletionSource,
+  tagAutocomplete,
+  type TagSuggestion,
+  type TagAutocompleteOptions,
+} from "./tag-autocomplete";
+export {
   default as WorkspaceStateLayer,
   WORKSPACE_STATE_METADATA,
   classifyWorkspaceState,

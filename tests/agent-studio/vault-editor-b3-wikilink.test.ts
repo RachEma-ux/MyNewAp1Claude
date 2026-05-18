@@ -144,19 +144,22 @@ describe("B3 — module + editor wiring", () => {
     expect(src).toMatch(/\.\.\.\(extraExtensions\s*\?\?\s*\[\]\)/);
   });
 
-  it("MarkdownEditorPane mounts wikilinkAutocomplete and feeds vault notes", () => {
+  it("MarkdownEditorPane mounts the wikilink completion source", () => {
     const src = read(PANE);
+    // After B4, the wikilink + tag sources are bundled into ONE
+    // autocompletion() instance (CM6 allows only one per state).
+    // Lock the source-import + composition shape.
     expect(src).toMatch(
-      /import\s+\{\s*wikilinkAutocomplete\s*\}\s+from\s+["']\.\/wikilink-autocomplete["']/,
+      /import\s+\{\s*buildWikilinkCompletionSource\s*\}\s+from\s+["']\.\/wikilink-autocomplete["']/,
     );
-    expect(src).toContain("wikilinkAutocomplete({");
+    expect(src).toContain("buildWikilinkCompletionSource({");
     // Sources from the vault's listNotes (existing tRPC query).
     expect(src).toContain("agentStudio.vault.listNotes");
     // Excludes the current note from its own suggestion list.
     expect(src).toMatch(/n\.id\s*!==\s*noteId/);
     // The extension list is memoized so the editor doesn't tear down
     // on every parent render.
-    expect(src).toContain("wikilinkExtensionList");
-    expect(src).toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?wikilinkAutocomplete/);
+    expect(src).toContain("editorExtraExtensions");
+    expect(src).toMatch(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?autocompletion/);
   });
 });
