@@ -413,6 +413,37 @@ export const vaultRouter = router({
     }),
 
   /**
+   * Notes that link TO the given note via `[[<this-note's-slug>]]`.
+   * Backed by `ags_vault_wikilinks` (populated on every
+   * createNote/updateNote since #1482). Replaces the
+   * WikilinksBacklinksPanel's client-side all-vault markdown scan;
+   * one indexed JOIN instead of shipping N notes of contentMd to
+   * the browser.
+   */
+  listBacklinks: protectedProcedure
+    .input(z.object({
+      noteId: z.number().int().positive(),
+    }))
+    .query(async ({ input }) => {
+      const { listBacklinksForNote } = await import("./link-queries.js");
+      return await listBacklinksForNote(input.noteId);
+    }),
+
+  /**
+   * Outgoing wikilinks from the given note. LEFT JOIN against
+   * `ags_vault_notes` so resolved + unresolved both surface (the
+   * latter with `targetNoteId=null` / `targetTitle=null`).
+   */
+  listOutgoingWikilinks: protectedProcedure
+    .input(z.object({
+      noteId: z.number().int().positive(),
+    }))
+    .query(async ({ input }) => {
+      const { listOutgoingWikilinksForNote } = await import("./link-queries.js");
+      return await listOutgoingWikilinksForNote(input.noteId);
+    }),
+
+  /**
    * Track B — B4 — aggregate tags across a vault for the in-app
    * `#tag` autocomplete. Scans the latest version of every note,
    * runs the existing extractLinksFromMarkdown over each contentMd,
