@@ -45,6 +45,22 @@ interface Bucket {
   readonly count: number;
 }
 
+/**
+ * Server returns `findingsByStatus` / `findingsBySeverity` as
+ * `Record<string, number>` (e.g. `{ open: 5, dismissed: 2 }`) per
+ * `getGraphQualityStats`. Render expects an array of `{ value,
+ * count }` rows. Sort newest/highest-count first so the operator
+ * picker shows the actionable buckets at the top.
+ */
+function bucketsFromRecord(
+  record: Readonly<Record<string, number>> | null | undefined,
+): ReadonlyArray<Bucket> {
+  if (!record) return [];
+  return Object.entries(record)
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 function renderBucketList(buckets: ReadonlyArray<Bucket>, emptyHint: string) {
   if (buckets.length === 0) {
     return (
@@ -329,7 +345,7 @@ export function GraphQualityFindingsPanel() {
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Findings by status</SectionLabel>
           {renderBucketList(
-            findingsByStatus,
+            bucketsFromRecord(findingsByStatus),
             "No findings yet — scans haven't produced any quality alerts.",
           )}
         </CardContent>
@@ -339,7 +355,7 @@ export function GraphQualityFindingsPanel() {
         <CardContent className="space-y-3 p-4">
           <SectionLabel>Findings by severity</SectionLabel>
           {renderBucketList(
-            findingsBySeverity,
+            bucketsFromRecord(findingsBySeverity),
             "No findings yet — scans haven't produced any quality alerts.",
           )}
         </CardContent>
