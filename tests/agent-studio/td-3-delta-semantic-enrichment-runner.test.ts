@@ -99,35 +99,28 @@ beforeEach(() => {
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ — supported-kind gate", () => {
-  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists exactly the 4 wired kinds", () => {
+  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists ALL 5 SemanticEnrichmentProposalKind values", () => {
     expect([...SUPPORTED_TRIGGER_PROPOSAL_KINDS].sort()).toEqual(
       [
         "description_enrichment",
         "entity_disambiguation",
         "missing_property_fill",
         "relationship_label_repair",
+        "stale_fact_refresh",
       ].sort(),
     );
   });
 
-  it("isSupportedTriggerProposalKind returns true for description_enrichment", () => {
-    expect(isSupportedTriggerProposalKind("description_enrichment")).toBe(true);
-  });
-
-  it("isSupportedTriggerProposalKind returns true for missing_property_fill", () => {
-    expect(isSupportedTriggerProposalKind("missing_property_fill")).toBe(true);
-  });
-
-  it("isSupportedTriggerProposalKind returns true for entity_disambiguation (T-D.3.δ-followup β)", () => {
-    expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(true);
-  });
-
-  it("isSupportedTriggerProposalKind returns true for relationship_label_repair (T-D.3.δ-followup γ)", () => {
-    expect(isSupportedTriggerProposalKind("relationship_label_repair")).toBe(true);
-  });
-
-  it("isSupportedTriggerProposalKind returns false for the 1 remaining deferred kind", () => {
-    expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
+  it("isSupportedTriggerProposalKind returns true for every wired kind", () => {
+    for (const k of [
+      "description_enrichment",
+      "missing_property_fill",
+      "entity_disambiguation",
+      "relationship_label_repair",
+      "stale_fact_refresh",
+    ] as const) {
+      expect(isSupportedTriggerProposalKind(k)).toBe(true);
+    }
   });
 });
 
@@ -136,11 +129,22 @@ describe("T-D.3.δ — supported-kind gate", () => {
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
-  it("returns kind_not_yet_supported for stale_fact_refresh — the last remaining deferred kind", async () => {
+  /**
+   * After T-D.3.δ-followup δ, all 5 `SemanticEnrichmentProposalKind`
+   * values are admitted to `SUPPORTED_TRIGGER_PROPOSAL_KINDS`. The
+   * `kind_not_yet_supported` envelope remains as a DEFENSIVE GUARD —
+   * a fake-kind cast triggers it to validate the guard still works.
+   * If a future contracts.ts expansion adds a kind without admitting
+   * it to the runner gate, this guard catches the omission at
+   * runtime.
+   */
+  it("defensive guard: unknown proposalKind hits the kind_not_yet_supported envelope", async () => {
     const result = await runSemanticEnrichment(
       {
         workspaceId: 1,
-        proposalKind: "stale_fact_refresh",
+        // Type-cast a non-canonical literal to simulate a future kind
+        // shipped in contracts.ts but not yet admitted to the gate.
+        proposalKind: "future_unknown_kind" as any,
         providerConnectionId: 11,
         modelRef: "anthropic/claude-haiku-4-5",
         actorId: 99,
@@ -150,16 +154,17 @@ describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
 
     expect(result.status).toBe("kind_not_yet_supported");
     if (result.status === "kind_not_yet_supported") {
-      expect(result.proposalKind).toBe("stale_fact_refresh");
+      expect(result.proposalKind).toBe("future_unknown_kind");
       expect([...result.supportedKinds].sort()).toEqual(
         [
           "description_enrichment",
           "entity_disambiguation",
           "missing_property_fill",
           "relationship_label_repair",
+          "stale_fact_refresh",
         ].sort(),
       );
-      expect(result.message).toMatch(/contract extension/i);
+      expect(result.message).toMatch(/no wired selector/i);
     }
     expect(listCandidatesMock).not.toHaveBeenCalled();
     expect(createAgentMock).not.toHaveBeenCalled();

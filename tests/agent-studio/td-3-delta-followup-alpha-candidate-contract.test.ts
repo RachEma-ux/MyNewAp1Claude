@@ -160,15 +160,16 @@ describe("T-D.3.δ-followup α — per-variant proposalKind constraint", () => {
     expect(src).toMatch(/"edge"[\s\S]*?relationship_label_repair/);
   });
 
-  it("selector doc-block names the contract-extension landing", () => {
+  it("selector doc-block references the α follow-up tag and the 4 targetKind values somewhere in the file", () => {
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
     expect(src).toMatch(/T-D\.3\.δ-followup α/);
-    // Allow either "discriminated union" or "discriminated-union" so
-    // β can refine wording without coupling.
-    expect(src).toMatch(/discriminated[\s-]union/);
+    // The 4 targetKind literals MUST be present somewhere in the file
+    // (header doc, candidate emission, or both). Don't pin specific
+    // sentence structure — each follow-up slice rewrites prose.
     expect(src).toMatch(/"node_property"/);
     expect(src).toMatch(/"entity"/);
     expect(src).toMatch(/"edge"/);
+    expect(src).toMatch(/"node"/);
   });
 });
 
@@ -191,7 +192,7 @@ describe("T-D.3.δ-followup α — existing 2 selectors emit targetKind=\"node\"
     //   T-D.3.δ-followup γ              → adds "edge"
     //   T-D.3.δ-followup δ              → adds "node_property"
     // Each follow-up PR widens this set + adds its own selector test.
-    const ALLOWED: ReadonlyArray<string> = ["node", "entity", "edge"];
+    const ALLOWED: ReadonlyArray<string> = ["node", "entity", "edge", "node_property"];
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
     const allLiterals = [
       ...src.matchAll(/targetKind:\s*"([^"]+)"\s*as\s*const/g),

@@ -403,6 +403,14 @@ export const semanticEnrichmentRouter = router({
           .max(SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT)
           .optional(),
         temperature: z.number().min(0).max(2).optional(),
+        // T-D.3.δ-followup δ — operator-tunable stale-fact grace window.
+        // Bounded to [0, 1 day] to prevent absurd values.
+        staleFactGraceMs: z
+          .number()
+          .int()
+          .min(0)
+          .max(24 * 60 * 60 * 1000)
+          .optional(),
       }),
     )
     .mutation(
@@ -428,6 +436,9 @@ export const semanticEnrichmentRouter = router({
             : {}),
           ...(input.temperature !== undefined
             ? { temperature: input.temperature }
+            : {}),
+          ...(input.staleFactGraceMs !== undefined
+            ? { staleFactGraceMs: input.staleFactGraceMs }
             : {}),
         });
       },
