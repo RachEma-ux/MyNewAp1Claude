@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Agent.ai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink-950:#131426; --ink-900:#1A1B2E; --ink-800:#22243B; --ink-700:#2D2F4A;
+  --cream:#F4F3F8; --white:#FFFFFF; --hairline:#ECECF1; --hairline-2:#E1E1EA;
+  --text-950:#0F1024; --text-900:#1A1B2E; --text-700:#4A4B63; --text-500:#8A8B9F;
+  --text-400:#B4B5C5; --text-on-dark:#E8E8F0; --text-on-dark-dim:#8E90A8;
+  --lime:#D7FE4F; --lime-deep:#BBE93A; --purple:#7C6BF4; --purple-soft:#A99CFF; --purple-bg:#EDEAFE;
+  --c-green:#6BD68A; --c-purple:#7C6BF4; --c-teal:#4DD0C7; --c-violet:#9B6BE0;
+  --c-coral:#F26B6B; --c-amber:#F0A23A; --c-blue:#5B8FF9; --c-pink:#EE7CB8;
+  --radius-card:22px; --radius-lg:18px; --radius-md:14px; --radius-pill:999px;
+  --shadow-card:0 1px 2px rgba(20,21,42,.04),0 8px 24px rgba(20,21,42,.04);
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; }
+body {
+  font-family:'Geist',system-ui,-apple-system,sans-serif;
+  background:radial-gradient(ellipse at 0% 50%,rgba(124,107,244,.18),transparent 40%),linear-gradient(180deg,#0E0F22 0%,#15162B 100%);
+  color:var(--text-900); min-height:100vh; padding:18px;
+  -webkit-font-smoothing:antialiased; touch-action:manipulation;
+}
+button { font-family:inherit; cursor:pointer; border:0; background:transparent; color:inherit; }
+input, textarea, select { font-family:inherit; }
+
+.app { display:grid; grid-template-columns:56px 264px 1fr 360px; background:var(--ink-900);
+  border-radius:28px; overflow:hidden; min-height:calc(100vh - 36px);
+  box-shadow:0 30px 80px rgba(0,0,0,.4); position:relative; }
+.app.is-sidebar-collapsed { grid-template-columns:56px 1fr 360px; }
+.app.is-sidebar-collapsed > .sidebar { display:none !important; }
+
+/* RAIL */
+.rail { background:var(--ink-950); display:flex; flex-direction:column; align-items:center;
+  padding:14px 0 16px; gap:4px; border-right:1px solid rgba(255,255,255,.04); }
+.rail-logo { width:42px; min-height:46px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:1px; padding:4px 0; margin-bottom:8px;
+  border:0; background:transparent; cursor:pointer; border-radius:10px;
+  transition:background .18s; }
+.rail-logo:hover { background:rgba(215,254,79,.08); }
+.rail-logo:active { transform:scale(.95); }
+.rail-logo-text { font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:21px;
+  color:var(--lime); letter-spacing:-0.04em; line-height:1; }
+.rail-logo-chev { width:10px; height:10px; color:rgba(215,254,79,.55);
+  transition:transform .25s; }
+.app:not(.is-sidebar-collapsed) .rail-logo-chev { transform:rotate(180deg); }
+.rail-btn { width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+  color:var(--text-on-dark-dim); transition:all .2s; border:0; background:transparent; cursor:pointer; }
+.rail-btn:hover { color:var(--text-on-dark); background:rgba(255,255,255,.04); }
+.rail-btn.is-active { color:var(--purple-soft); background:rgba(124,107,244,.1); }
+.rail-spacer { flex:1; }
+.rail-bottom { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.rail-avatar-btn { width:38px; height:38px; border-radius:11px; border:0; padding:0;
+  cursor:pointer; overflow:hidden; position:relative; background:transparent; }
+.rail-avatar-btn svg { width:100%; height:100%; display:block; }
+.rail-avatar-btn .status-dot { position:absolute; bottom:1px; right:1px; width:9px; height:9px;
+  background:#D7FE4F; border:2px solid var(--ink-950); border-radius:50%; }
+
+/* SIDEBAR */
+.sidebar { background:var(--ink-900); padding:22px 18px 18px; display:flex; flex-direction:column;
+  border-right:1px solid rgba(255,255,255,.04); }
+.brand { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 26px; }
+.brand-name { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:26px;
+  color:var(--white); letter-spacing:-0.03em; }
+.brand-name .ai-accent { color:var(--lime); }
+.sidebar-collapse-btn { width:30px; height:30px; border:0; background:transparent;
+  color:var(--text-on-dark-dim); display:grid; place-items:center; cursor:pointer;
+  border-radius:8px; transition:background .18s, color .18s; }
+.sidebar-collapse-btn:hover { background:rgba(255,255,255,.06); color:var(--text-on-dark); }
+.sidebar-collapse-btn:active { transform:scale(.92); }
+.nav { display:flex; flex-direction:column; gap:4px; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:13px 14px;
+  border-radius:var(--radius-md); color:var(--text-on-dark-dim); font-size:14.5px; font-weight:500;
+  transition:all .18s; width:100%; text-align:left; }
+.nav-item:hover { color:var(--text-on-dark); background:rgba(255,255,255,.04); }
+.nav-item.is-active { background:var(--ink-700); color:var(--white); }
+.nav-item svg { flex-shrink:0; }
+.nav-item .dot { width:6px; height:6px; border-radius:50%; background:var(--c-coral);
+  margin-left:6px; box-shadow:0 0 8px rgba(242,107,107,.7); }
+
+.sidebar-bottom { margin-top:auto; display:flex; flex-direction:column; gap:14px; }
+.secondary-links { display:flex; flex-direction:column; gap:12px; padding:4px 14px; }
+.secondary-links a { color:var(--text-on-dark-dim); font-size:13.5px; font-weight:500;
+  text-decoration:none; }
+.profile-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06);
+  border-radius:var(--radius-md); padding:10px; display:flex; align-items:center; gap:10px;
+  position:relative; }
+.profile-card .avatar { width:38px; height:38px; border-radius:10px;
+  background:linear-gradient(135deg,#5b3f9c,#e6a8b8); display:grid; place-items:center;
+  color:white; font-weight:600; font-size:13px; flex-shrink:0; overflow:hidden; position:relative; }
+.profile-card .avatar svg { width:100%; height:100%; display:block; }
+.profile-card .status-dot { position:absolute; top:8px; right:8px; width:10px; height:10px;
+  background:#D7FE4F; border:2px solid var(--ink-900); border-radius:50%; }
+.profile-meta { flex:1; min-width:0; }
+.profile-name { display:flex; align-items:center; gap:6px; color:var(--white);
+  font-size:13.5px; font-weight:600; }
+.pro-badge { background:var(--purple); color:white; font-size:9.5px; font-weight:600;
+  padding:2px 7px; border-radius:var(--radius-pill); }
+.profile-email { color:var(--text-on-dark-dim); font-size:11.5px; margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.logout-btn { display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:11px 14px; border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.03); border-radius:var(--radius-pill); cursor:pointer;
+  color:var(--text-on-dark); font-size:13px; font-weight:500; transition:all .18s; }
+.logout-btn:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.14); }
+.logout-btn:active { transform:scale(.98); }
+.theme-toggle-pill { display:grid; grid-template-columns:1fr 1fr; gap:0;
+  background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.06);
+  border-radius:var(--radius-pill); padding:3px; }
+.theme-opt { display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:8px 10px; border:0; background:transparent; cursor:pointer;
+  color:var(--text-on-dark-dim); font-size:12px; font-weight:500; border-radius:var(--radius-pill);
+  transition:all .18s; }
+.theme-opt.is-active { background:var(--ink-700); color:var(--white); }
+.theme-opt:not(.is-active):hover { color:var(--text-on-dark); }
+.controls { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ctrl { height:38px; border-radius:var(--radius-pill); background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.06); color:var(--text-on-dark); display:flex;
+  align-items:center; justify-content:center; gap:7px; font-size:12.5px; font-weight:500; }
+
+/* MAIN */
+.main { background:var(--cream); border-radius:24px 0 0 24px; overflow-y:auto; padding:30px 36px; }
+.feed { background:var(--cream); padding:30px 24px; overflow-y:auto; border-left:1px solid var(--hairline); }
+
+.page-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:26px; }
+.page-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:30px;
+  letter-spacing:-0.025em; color:var(--text-950); line-height:1.15; }
+.page-sub { color:var(--text-500); font-size:14px; margin-top:8px; }
+.add-btn { width:48px; height:48px; background:var(--purple); color:white; border-radius:14px;
+  display:grid; place-items:center; box-shadow:0 6px 16px rgba(124,107,244,.35); flex-shrink:0; }
+.add-btn:active { transform:scale(.95); }
+
+/* HOME */
+.cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.topic-card { background:var(--white); border-radius:var(--radius-card); padding:22px;
+  transition:all .22s; border:1px solid transparent; position:relative; min-width:0; text-align:left; width:100%; }
+.topic-card:hover { box-shadow:var(--shadow-card); border-color:var(--hairline); }
+.topic-card:active { transform:scale(.98); }
+.topic-icon { width:42px; height:42px; display:grid; place-items:center; margin-bottom:22px; }
+.topic-name { font-family:'Bricolage Grotesque',sans-serif; font-size:19px; font-weight:600;
+  color:var(--text-900); letter-spacing:-0.015em; }
+.topic-meta { position:absolute; bottom:22px; right:22px; color:var(--text-500); font-size:12px; font-weight:500; }
+
+.cta { margin-top:18px; background:linear-gradient(135deg,#2A2C45 0%,#1B1D33 100%);
+  border-radius:var(--radius-card); padding:30px; color:white; position:relative; overflow:hidden; }
+.cta-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:28px;
+  letter-spacing:-0.025em; line-height:1.15; max-width:380px; margin-bottom:8px; }
+.cta-title .lime { color:var(--lime); }
+.cta-sub { color:var(--text-on-dark-dim); font-size:13.5px; margin-bottom:18px; }
+.cta-search { display:flex; gap:8px; background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.07); padding:6px; border-radius:var(--radius-pill); }
+.cta-input { flex:1; display:flex; align-items:center; gap:10px; padding:0 16px; min-width:0; }
+.cta-input input { background:transparent; border:0; color:white; font-size:13.5px;
+  outline:none; width:100%; min-width:0; }
+.cta-input input::placeholder { color:var(--text-on-dark-dim); }
+.cta-btn { background:var(--lime); color:var(--text-950); padding:0 28px; height:40px;
+  border-radius:var(--radius-pill); font-weight:600; font-size:13.5px; flex-shrink:0; }
+
+/* FEED */
+.feed-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:18px; }
+.feed-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:22px;
+  letter-spacing:-0.02em; color:var(--text-950); }
+.feed-sub { color:var(--text-500); font-size:12.5px; margin-top:3px; }
+.refresh-btn { background:var(--purple-bg); color:var(--purple); padding:7px 12px;
+  border-radius:var(--radius-pill); font-size:12px; font-weight:500;
+  display:flex; align-items:center; gap:5px; }
+
+.promo { margin-top:14px;
+  background:radial-gradient(circle at 80% 60%,rgba(170,215,110,.65),transparent 55%),linear-gradient(135deg,#1F4733 0%,#2A6048 60%,#4A8B6A 100%);
+  border-radius:var(--radius-card); padding:24px 22px; color:white; min-height:180px; }
+.promo-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:22px;
+  letter-spacing:-0.02em; line-height:1.2; margin-bottom:4px; max-width:220px; }
+.promo-sub { font-size:12.5px; opacity:.85; margin-bottom:18px; }
+.promo-btn { background:var(--lime); color:var(--text-950); padding:10px 22px;
+  border-radius:var(--radius-pill); font-weight:600; font-size:13px; }
+
+.blog-heading { font-size:13.5px; font-weight:600; color:var(--text-900); margin:26px 0 12px; }
+.blog-list { display:flex; flex-direction:column; gap:10px; }
+.blog-card { background:var(--white); border-radius:var(--radius-lg); padding:14px;
+  border:1px solid transparent; }
+.blog-author { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.blog-avatar { width:36px; height:36px; border-radius:50%;
+  background:linear-gradient(135deg,#c7d2fe,#a5b4fc); display:grid; place-items:center;
+  font-weight:600; color:white; font-size:13px; flex-shrink:0; }
+.blog-author-meta { flex:1; min-width:0; }
+.blog-author-name { font-size:13px; font-weight:600; color:var(--text-900); }
+.blog-author-desc { font-size:11.5px; color:var(--text-500); }
+.blog-text { font-size:13px; color:var(--text-700); line-height:1.45; margin-bottom:12px; }
+.blog-foot { display:flex; align-items:center; gap:14px; }
+.blog-stat { display:flex; align-items:center; gap:5px; color:var(--text-500); font-size:12px; }
+.open-btn { margin-left:auto; background:var(--purple-bg); color:var(--purple);
+  padding:5px 14px; border-radius:var(--radius-pill); font-size:11.5px; font-weight:600; }
+
+.av-1 { background:linear-gradient(135deg,#1a1a2e,#4a4a6e); }
+.av-2 { background:linear-gradient(135deg,#f4c2a1,#e8a47b); }
+.av-3 { background:linear-gradient(135deg,#b8c5d6,#8b9bb0); }
+.av-4 { background:linear-gradient(135deg,#d4a574,#b8895a); }
+.av-5 { background:linear-gradient(135deg,#7C6BF4,#A99CFF); }
+.av-6 { background:linear-gradient(135deg,#4DD0C7,#6BD68A); }
+.av-7 { background:linear-gradient(135deg,#F26B6B,#F0A23A); }
+.av-8 { background:linear-gradient(135deg,#5B8FF9,#7C6BF4); }
+
+/* PILLS / TABS */
+.pill-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:22px; }
+.pill { background:var(--white); border:1px solid var(--hairline); color:var(--text-700);
+  padding:8px 14px; border-radius:var(--radius-pill); font-size:13px; font-weight:500;
+  display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+.pill.is-active { background:var(--ink-900); color:var(--white); border-color:var(--ink-900); }
+.pill .count { background:var(--hairline); color:var(--text-700); font-size:11px;
+  padding:1px 7px; border-radius:var(--radius-pill); font-weight:600; }
+.pill.is-active .count { background:rgba(255,255,255,.15); color:var(--white); }
+
+/* PROJECTS */
+.proj-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.proj-card { background:var(--white); border-radius:var(--radius-card); padding:22px;
+  position:relative; overflow:hidden; min-width:0; text-align:left; width:100%;
+  border:1px solid transparent; transition:border-color .2s; }
+.proj-card:hover { border-color:var(--hairline); }
+.proj-stripe { position:absolute; left:0; top:0; bottom:0; width:4px; }
+.proj-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.proj-tag { font-size:11px; font-weight:600; padding:4px 10px; border-radius:var(--radius-pill);
+  letter-spacing:.02em; text-transform:uppercase; }
+.proj-name { font-family:'Bricolage Grotesque',sans-serif; font-size:19px; font-weight:600;
+  color:var(--text-900); letter-spacing:-0.015em; margin-bottom:6px; }
+.proj-desc { font-size:13px; color:var(--text-500); line-height:1.45; margin-bottom:18px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.proj-progress-head { display:flex; justify-content:space-between; font-size:11.5px;
+  color:var(--text-500); font-weight:500; margin-bottom:6px; }
+.proj-progress-bar { height:6px; background:var(--hairline); border-radius:var(--radius-pill); overflow:hidden; margin-bottom:16px; }
+.proj-progress-fill { height:100%; border-radius:var(--radius-pill); transition:width .6s ease-out; }
+.proj-foot { display:flex; align-items:center; justify-content:space-between; }
+.avatar-stack { display:flex; }
+.avatar-stack .avatar { width:26px; height:26px; border-radius:50%;
+  border:2px solid var(--white); display:grid; place-items:center; color:white;
+  font-weight:600; font-size:10px; margin-left:-8px; }
+.avatar-stack .avatar:first-child { margin-left:0; }
+.avatar-stack .more { background:var(--hairline); color:var(--text-700); }
+.proj-due { display:flex; align-items:center; gap:6px; font-size:12px;
+  color:var(--text-500); font-weight:500; }
+.proj-delete { color:var(--text-400); width:24px; height:24px; border-radius:6px;
+  display:grid; place-items:center; }
+.proj-delete:hover { background:#FCE5E5; color:var(--c-coral); }
+
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:22px; }
+.stat-card { background:var(--white); border-radius:var(--radius-lg); padding:14px; }
+.stat-label { font-size:11.5px; color:var(--text-500); font-weight:500; margin-bottom:6px; }
+.stat-val { font-family:'Bricolage Grotesque',sans-serif; font-size:24px; font-weight:700;
+  color:var(--text-950); letter-spacing:-0.02em; }
+.stat-delta { font-size:11px; color:var(--c-green); font-weight:600; margin-top:4px; }
+.stat-delta.neg { color:var(--c-coral); }
+
+.activity { background:var(--white); border-radius:var(--radius-card); padding:18px; }
+.activity-list { display:flex; flex-direction:column; gap:14px; }
+.activity-item { display:flex; gap:10px; align-items:flex-start; }
+.activity-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.activity-text { font-size:12.5px; color:var(--text-700); line-height:1.45; }
+.activity-text strong { color:var(--text-950); font-weight:600; }
+.activity-time { font-size:11px; color:var(--text-400); margin-top:2px; }
+
+/* AGENTS */
+.agent-featured { background:radial-gradient(circle at 90% 30%,rgba(215,254,79,.25),transparent 50%),radial-gradient(circle at 10% 80%,rgba(124,107,244,.35),transparent 50%),linear-gradient(135deg,#1F1B3A 0%,#2D2856 100%);
+  border-radius:var(--radius-card); padding:26px; color:white; margin-bottom:16px;
+  position:relative; overflow:hidden; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; }
+.agent-featured-tag { display:inline-block; background:rgba(215,254,79,.15); color:var(--lime);
+  font-size:10.5px; font-weight:600; padding:4px 10px; border-radius:var(--radius-pill);
+  letter-spacing:.04em; text-transform:uppercase; margin-bottom:12px; }
+.agent-featured-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700;
+  font-size:26px; letter-spacing:-0.02em; line-height:1.2; margin-bottom:6px; }
+.agent-featured-desc { font-size:13.5px; color:var(--text-on-dark-dim); margin-bottom:16px;
+  max-width:380px; line-height:1.5; }
+.agent-featured-cta { background:var(--lime); color:var(--text-950); padding:10px 20px;
+  border-radius:var(--radius-pill); font-weight:600; font-size:13px;
+  display:inline-flex; align-items:center; gap:6px; }
+.agent-orb { width:130px; height:130px; border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#D7FE4F,#6BD68A 40%,#2A6048 80%);
+  box-shadow:0 0 60px rgba(215,254,79,.4),inset -10px -20px 40px rgba(0,0,0,.3);
+  animation:pulse 4s ease-in-out infinite; flex-shrink:0; }
+@keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
+
+.agent-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.agent-card { background:var(--white); border-radius:var(--radius-card); padding:20px;
+  border:1px solid transparent; min-width:0; }
+.agent-card:hover { border-color:var(--hairline); }
+.agent-avatar { width:48px; height:48px; border-radius:14px; display:grid; place-items:center;
+  color:white; margin-bottom:14px; }
+.agent-name { font-family:'Bricolage Grotesque',sans-serif; font-size:17px; font-weight:600;
+  color:var(--text-900); letter-spacing:-0.015em; }
+.agent-role { font-size:12px; color:var(--c-purple); font-weight:500; margin-top:2px; }
+.agent-desc { font-size:12.5px; color:var(--text-500); line-height:1.45; margin:10px 0 14px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.agent-stats { display:flex; align-items:center; justify-content:space-between;
+  padding-top:14px; border-top:1px solid var(--hairline); }
+.agent-stat-group { display:flex; gap:12px; }
+.agent-stat { display:flex; align-items:center; gap:4px; font-size:11.5px; color:var(--text-500); }
+.agent-stat strong { color:var(--text-900); font-weight:600; }
+.agent-use-btn { background:var(--ink-900); color:white; padding:6px 14px;
+  border-radius:var(--radius-pill); font-size:11.5px; font-weight:600; }
+.agent-use-btn:active { transform:scale(.95); background:var(--purple); }
+
+/* TASKS */
+.task-quickadd { background:var(--white); border-radius:var(--radius-card); padding:14px 18px;
+  display:flex; align-items:center; gap:12px; margin-bottom:18px; border:1px solid var(--hairline); }
+.task-quickadd input { flex:1; border:0; outline:none; font-size:14px;
+  color:var(--text-900); background:transparent; min-width:0; }
+.task-quickadd-icon { width:32px; height:32px; background:var(--purple); color:white;
+  border-radius:10px; display:grid; place-items:center; flex-shrink:0; }
+.task-quickadd-icon:active { transform:scale(.92); }
+
+.tabs { display:flex; gap:4px; background:var(--white); padding:4px; border-radius:var(--radius-pill);
+  border:1px solid var(--hairline); margin-bottom:18px; width:fit-content; max-width:100%; overflow-x:auto; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { padding:7px 16px; border-radius:var(--radius-pill); font-size:13px; font-weight:500;
+  color:var(--text-500); display:flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0; }
+.tab.is-active { background:var(--ink-900); color:var(--white); }
+.tab .count { background:var(--hairline); color:var(--text-700); font-size:10.5px;
+  padding:1px 6px; border-radius:var(--radius-pill); font-weight:600; }
+.tab.is-active .count { background:rgba(255,255,255,.15); color:var(--white); }
+
+.task-list { background:var(--white); border-radius:var(--radius-card); overflow:hidden;
+  border:1px solid var(--hairline); }
+.task-row { display:flex; align-items:center; gap:14px; padding:14px 20px;
+  border-bottom:1px solid var(--hairline); transition:background .15s; }
+.task-row:last-child { border-bottom:0; }
+.task-row.is-done .task-title { text-decoration:line-through; color:var(--text-400); }
+.task-empty { padding:40px 20px; text-align:center; color:var(--text-500); font-size:14px; }
+.task-check { width:22px; height:22px; border:2px solid var(--text-400); border-radius:6px;
+  display:grid; place-items:center; flex-shrink:0; background:transparent; color:white;
+  font-size:14px; line-height:1; }
+.task-check.is-checked { background:var(--c-green); border-color:var(--c-green); }
+.task-priority { width:6px; height:24px; border-radius:3px; flex-shrink:0; }
+.task-priority.p-high { background:var(--c-coral); }
+.task-priority.p-med { background:var(--c-amber); }
+.task-priority.p-low { background:var(--c-blue); }
+.task-body { flex:1; min-width:0; }
+.task-title { font-size:14px; font-weight:500; color:var(--text-900); }
+.task-meta-row { display:flex; gap:12px; align-items:center; margin-top:4px; flex-wrap:wrap; }
+.task-project { font-size:11px; padding:2px 8px; border-radius:var(--radius-pill); font-weight:600; }
+.task-time { font-size:11.5px; color:var(--text-500); display:flex; align-items:center; gap:4px; }
+.task-assignee { width:28px; height:28px; border-radius:50%; display:grid; place-items:center;
+  color:white; font-weight:600; font-size:11px; flex-shrink:0; }
+.task-delete { color:var(--text-400); width:28px; height:28px; border-radius:6px;
+  display:grid; place-items:center; flex-shrink:0; }
+.task-delete:hover { background:#FCE5E5; color:var(--c-coral); }
+
+.progress-ring-card { background:var(--white); border-radius:var(--radius-card); padding:22px;
+  text-align:center; margin-bottom:14px; }
+.progress-ring { width:140px; height:140px; margin:0 auto 12px; position:relative; }
+.progress-ring-text { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; }
+.progress-ring-num { font-family:'Bricolage Grotesque',sans-serif; font-size:30px; font-weight:700;
+  color:var(--text-950); letter-spacing:-0.02em; }
+.progress-ring-label { font-size:11px; color:var(--text-500); }
+.progress-ring-title { font-family:'Bricolage Grotesque',sans-serif; font-size:16px;
+  font-weight:600; color:var(--text-900); margin-bottom:4px; }
+.progress-ring-sub { font-size:12.5px; color:var(--text-500); }
+
+.focus-timer { background:linear-gradient(135deg,var(--ink-900),var(--ink-800));
+  border-radius:var(--radius-card); padding:22px; color:white; text-align:center; }
+.focus-time { font-family:'Bricolage Grotesque',sans-serif; font-size:36px; font-weight:700;
+  letter-spacing:-0.02em; margin:8px 0; font-variant-numeric:tabular-nums; }
+.focus-label { font-size:12px; color:var(--text-on-dark-dim); text-transform:uppercase; letter-spacing:.05em; }
+.focus-btn { background:var(--lime); color:var(--text-950); padding:8px 24px;
+  border-radius:var(--radius-pill); font-weight:600; font-size:12px; margin-top:10px; }
+
+/* CALENDAR */
+.cal-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.cal-nav-btn { width:36px; height:36px; background:var(--white); border:1px solid var(--hairline);
+  border-radius:10px; color:var(--text-700); display:grid; place-items:center; }
+.cal-today-btn { background:var(--ink-900); color:white; padding:9px 16px;
+  border-radius:10px; font-size:13px; font-weight:500; }
+.cal-view-toggle { margin-left:auto; display:flex; background:var(--white);
+  border:1px solid var(--hairline); border-radius:10px; padding:3px; }
+.cal-view-opt { padding:6px 14px; border-radius:8px; font-size:12.5px; font-weight:500;
+  color:var(--text-500); }
+.cal-view-opt.is-active { background:var(--ink-900); color:white; }
+
+.cal-grid { background:var(--white); border-radius:var(--radius-card); overflow:hidden;
+  border:1px solid var(--hairline); }
+.cal-week-head { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); background:#FAFAFD;
+  border-bottom:1px solid var(--hairline); }
+.cal-week-head-cell { padding:12px 2px; font-size:11px; font-weight:600; color:var(--text-500);
+  text-transform:uppercase; letter-spacing:.05em; text-align:center; }
+.cal-body { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); }
+.cal-day { min-height:90px; padding:8px; border-right:1px solid var(--hairline);
+  border-bottom:1px solid var(--hairline); display:flex; flex-direction:column; gap:4px;
+  min-width:0; text-align:left; }
+.cal-day:nth-child(7n) { border-right:0; }
+.cal-day.is-other-month .cal-day-num { color:var(--text-400); }
+.cal-day.is-today .cal-day-num { background:var(--ink-900); color:white;
+  width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-weight:700; }
+.cal-day-num { font-size:12.5px; font-weight:600; color:var(--text-700); }
+.cal-event { font-size:10.5px; font-weight:500; padding:3px 6px; border-radius:4px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:100%; }
+
+.timeline { background:var(--white); border-radius:var(--radius-card); padding:18px; margin-bottom:14px; }
+.timeline-list { display:flex; flex-direction:column; }
+.timeline-item { display:grid; grid-template-columns:50px 1fr; gap:12px; padding:10px 0;
+  border-bottom:1px solid var(--hairline); }
+.timeline-item:last-child { border-bottom:0; }
+.timeline-time { font-size:11px; color:var(--text-500); font-weight:600; padding-top:2px; }
+.timeline-block { padding:10px 12px; border-radius:10px; border-left:3px solid; }
+.timeline-block-title { font-size:12.5px; font-weight:600; color:var(--text-900); }
+.timeline-block-meta { font-size:11px; color:var(--text-500); margin-top:2px; }
+.timeline-empty { padding:20px; text-align:center; color:var(--text-500); font-size:13px; }
+
+.upcoming-card { background:var(--white); border-radius:var(--radius-card); padding:18px; }
+.upcoming-title { font-family:'Bricolage Grotesque',sans-serif; font-size:14.5px;
+  font-weight:600; margin-bottom:14px; }
+.up-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--hairline); }
+.up-item:last-child { border-bottom:0; }
+.up-date { width:42px; background:#F4F3F8; border-radius:8px; padding:6px 0; text-align:center;
+  flex-shrink:0; }
+.up-date-d { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:700;
+  color:var(--text-950); line-height:1; }
+.up-date-m { font-size:9.5px; color:var(--text-500); font-weight:600;
+  text-transform:uppercase; letter-spacing:.05em; }
+.up-body { flex:1; min-width:0; }
+.up-name { font-size:12.5px; font-weight:600; color:var(--text-900); }
+.up-time { font-size:11px; color:var(--text-500); margin-top:2px; }
+
+/* MODAL */
+.modal-host { position:fixed; inset:0; pointer-events:none; z-index:1000; }
+.modal-host.is-open { pointer-events:auto; }
+.modal-backdrop { position:absolute; inset:0; background:rgba(20,21,42,.55);
+  backdrop-filter:blur(4px); opacity:0; transition:opacity .2s; }
+.modal-host.is-open .modal-backdrop { opacity:1; }
+.modal { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.95);
+  opacity:0; background:var(--white); border-radius:var(--radius-card); padding:24px;
+  width:90%; max-width:440px; box-shadow:0 30px 60px rgba(0,0,0,.3); max-height:90vh; overflow-y:auto;
+  transition:transform .2s, opacity .2s; }
+.modal-host.is-open .modal { transform:translate(-50%,-50%) scale(1); opacity:1; }
+.modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.modal-title { font-family:'Bricolage Grotesque',sans-serif; font-size:20px; font-weight:700;
+  color:var(--text-950); letter-spacing:-0.02em; }
+.modal-close { color:var(--text-500); width:32px; height:32px; border-radius:8px;
+  display:grid; place-items:center; }
+.modal-close:hover { background:var(--hairline); }
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:11.5px; font-weight:600; color:var(--text-700);
+  margin-bottom:6px; }
+.field input, .field textarea, .field select {
+  width:100%; padding:10px 12px; border:1px solid var(--hairline); border-radius:10px;
+  font-size:13.5px; color:var(--text-900); outline:none; background:var(--white); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--purple-soft); }
+.field textarea { resize:vertical; min-height:70px; }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.color-row { display:flex; gap:8px; flex-wrap:wrap; }
+.color-swatch { width:32px; height:32px; border-radius:8px; border:2px solid transparent; }
+.color-swatch.is-selected { border-color:var(--text-950); transform:scale(1.1); }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+.btn-primary { background:var(--ink-900); color:white; padding:10px 18px;
+  border-radius:10px; font-size:13px; font-weight:600; }
+.btn-primary:active { background:var(--purple); transform:scale(.97); }
+.btn-secondary { background:var(--hairline); color:var(--text-700); padding:10px 18px;
+  border-radius:10px; font-size:13px; font-weight:600; }
+
+/* MOBILE HEADER + DRAWER */
+.mobile-header { display:none; position:sticky; top:0; left:0; right:0; height:56px;
+  background:var(--ink-900); align-items:center; padding:0 14px; z-index:50;
+  border-bottom:1px solid rgba(255,255,255,.06); }
+.mobile-header-brand { font-family:'Bricolage Grotesque',sans-serif; font-weight:700;
+  font-size:20px; color:var(--white); letter-spacing:-0.03em; flex:1; }
+.mobile-header-brand .ai-accent { color:var(--lime); }
+.mobile-menu-btn { width:38px; height:38px; background:rgba(255,255,255,.06);
+  border-radius:10px; color:var(--text-on-dark); display:grid; place-items:center;
+  margin-right:10px; }
+.sidebar-backdrop { display:none; }
+
+@media (max-width:1280px) {
+  .app { grid-template-columns:56px 240px 1fr 320px; }
+  .app.is-sidebar-collapsed { grid-template-columns:56px 1fr 320px; }
+  .main { padding:26px 28px; }
+  .page-title { font-size:26px; }
+  .cards, .proj-grid, .agent-grid { gap:12px; }
+}
+@media (max-width:1024px) {
+  .app { grid-template-columns:56px 240px 1fr; }
+  .app.is-sidebar-collapsed { grid-template-columns:56px 1fr; }
+  .feed { display:none; }
+}
+@media (max-width:768px) {
+  body { padding:0; min-height:100vh; overflow-x:hidden; }
+  .app { grid-template-columns:minmax(0,1fr); border-radius:0; min-height:auto;
+    box-shadow:none; width:100%; max-width:100vw; }
+  .app.is-sidebar-collapsed { grid-template-columns:minmax(0,1fr); }
+  .app.is-sidebar-collapsed > .sidebar { display:flex; }
+  .sidebar-collapse-btn { display:none; }
+  .rail { display:none; }
+  .sidebar { position:fixed; top:0; bottom:0; left:0; width:280px; z-index:200;
+    transform:translateX(-100%); transition:transform .25s ease; border-right:0;
+    border-radius:0; padding-bottom:20px; }
+  .sidebar.is-open { transform:translateX(0); box-shadow:8px 0 30px rgba(0,0,0,.4); }
+  .sidebar-backdrop { display:block; position:fixed; inset:0; background:rgba(0,0,0,.55);
+    z-index:150; opacity:0; pointer-events:none; transition:opacity .25s; }
+  .sidebar-backdrop.is-open { opacity:1; pointer-events:auto; }
+  .mobile-header { display:flex; }
+  .main { padding:20px 16px; border-radius:0; overflow:visible;
+    min-width:0; max-width:100%; }
+  .page-title { font-size:22px; line-height:1.2; }
+  .page-sub { font-size:13px; }
+  .add-btn { width:44px; height:44px; }
+  .cards, .proj-grid, .agent-grid { grid-template-columns:minmax(0,1fr); gap:10px; }
+  .stats-grid { grid-template-columns:1fr 1fr; }
+  .cal-day { min-height:54px; padding:4px; }
+  .cal-day-num { font-size:11px; }
+  .cal-event { font-size:9px; padding:2px 4px; }
+  .cal-week-head-cell { padding:8px 2px; font-size:9.5px; }
+  .field-row { grid-template-columns:1fr; }
+  .pill-row { overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px;
+    margin-left:-16px; margin-right:-16px; padding-left:16px; padding-right:16px;
+    scrollbar-width:none; }
+  .pill-row::-webkit-scrollbar { display:none; }
+  .cta { padding:22px 20px 20px; }
+  .cta-title { font-size:22px; }
+  .topic-card { padding:18px; min-width:0; }
+  .topic-name { font-size:17px; }
+  .agent-featured { grid-template-columns:minmax(0,1fr); padding:20px; }
+  .agent-orb { width:80px; height:80px; justify-self:flex-end; }
+  .agent-featured-title { font-size:20px; }
+  .agent-card, .proj-card { padding:18px; min-width:0; }
+  .proj-name, .agent-name { font-size:17px; }
+  .task-quickadd { padding:10px 12px; }
+  .task-row { padding:12px 14px; gap:10px; }
+  .task-title { font-size:13.5px; }
+  .modal { max-width:92%; padding:20px; }
+  .modal-title { font-size:18px; }
+  .focus-time { font-size:30px; }
+}
+/* LIGHT THEME */
+body[data-theme="light"] { background:linear-gradient(135deg,#EFEEF4,#F4F3F8); }
+body[data-theme="light"] .app { background:#FAFAFD; box-shadow:0 30px 80px rgba(60,55,90,.15); }
+body[data-theme="light"] .rail { background:#F1F0F6; border-right-color:rgba(0,0,0,.06); }
+body[data-theme="light"] .rail-logo:hover { background:rgba(124,107,244,.08); }
+body[data-theme="light"] .rail-logo-text { color:#6B5DD3; }
+body[data-theme="light"] .rail-logo-chev { color:rgba(107,93,211,.55); }
+body[data-theme="light"] .rail-btn { color:#8A8AA0; }
+body[data-theme="light"] .rail-btn:hover { color:#1A1B2E; background:rgba(0,0,0,.04); }
+body[data-theme="light"] .rail-btn.is-active { color:#6B5DD3; background:rgba(124,107,244,.1); }
+body[data-theme="light"] .rail-avatar-btn .status-dot { border-color:#F1F0F6; background:#7DD96A; }
+body[data-theme="light"] .sidebar { background:#FAFAFD; border-right-color:rgba(0,0,0,.06); }
+body[data-theme="light"] .brand-name { color:#1A1B2E; }
+body[data-theme="light"] .brand-name .ai-accent { color:#7C6BF4; }
+body[data-theme="light"] .sidebar-collapse-btn { color:#8A8AA0; }
+body[data-theme="light"] .sidebar-collapse-btn:hover { color:#1A1B2E; background:rgba(0,0,0,.04); }
+body[data-theme="light"] .nav-item { color:#555968; }
+body[data-theme="light"] .nav-item:hover { background:rgba(0,0,0,.03); color:#1A1B2E; }
+body[data-theme="light"] .nav-item.is-active { background:#1A1B2E; color:#fff; }
+body[data-theme="light"] .secondary-links a { color:#888B9B; }
+body[data-theme="light"] .profile-card { background:rgba(0,0,0,.03); border-color:rgba(0,0,0,.07); }
+body[data-theme="light"] .profile-card .status-dot { border-color:#FAFAFD; background:#7DD96A; }
+body[data-theme="light"] .profile-name { color:#1A1B2E; }
+body[data-theme="light"] .profile-email { color:#7E8294; }
+body[data-theme="light"] .logout-btn { background:rgba(0,0,0,.03); border-color:rgba(0,0,0,.08); color:#1A1B2E; }
+body[data-theme="light"] .logout-btn:hover { background:rgba(0,0,0,.06); }
+body[data-theme="light"] .theme-toggle-pill { background:rgba(0,0,0,.04); border-color:rgba(0,0,0,.06); }
+body[data-theme="light"] .theme-opt { color:#888B9B; }
+body[data-theme="light"] .theme-opt.is-active { background:#fff; color:#1A1B2E;
+  box-shadow:0 1px 4px rgba(0,0,0,.08); }
+body[data-theme="light"] .feed { border-left-color:rgba(0,0,0,.06); }
+</style>
+</head>
+<body>
+
+<div class="mobile-header">
+  <button class="mobile-menu-btn" data-action="open-menu" aria-label="Open menu">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="mobile-header-brand">Agent<span class="ai-accent">.ai</span></div>
+</div>
+
+<div id="backdrop" class="sidebar-backdrop" data-action="close-menu"></div>
+
+<div class="app is-sidebar-collapsed">
+
+  <aside class="rail">
+    <button class="rail-logo" data-action="toggle-sidebar" aria-label="Toggle sidebar" title="Toggle sidebar">
+      <span class="rail-logo-text">ai</span>
+      <svg class="rail-logo-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+    </button>
+    <button class="rail-btn" data-action="nav" data-page="home" data-rail="home"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"/></svg></button>
+    <button class="rail-btn" data-action="nav" data-page="projects" data-rail="projects"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    <button class="rail-btn" data-action="nav" data-page="agents" data-rail="agents"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 20c0-2.5 1.6-4 3.5-4"/></svg></button>
+    <button class="rail-btn" data-action="nav" data-page="tasks" data-rail="tasks"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></button>
+    <button class="rail-btn" data-action="nav" data-page="calendar" data-rail="calendar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></button>
+    <div class="rail-spacer"></div>
+    <div class="rail-bottom">
+      <button class="rail-avatar-btn" data-action="toggle-sidebar" aria-label="Profile" title="Profile">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="railAvGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A78BFA"/><stop offset="100%" stop-color="#4DD0C7"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#railAvGrad)"/><circle cx="20" cy="15" r="5.5" fill="#fff" fill-opacity=".95"/><path d="M7 36c0-6.5 5.8-11 13-11s13 4.5 13 11" fill="#fff" fill-opacity=".95"/></svg>
+        <span class="status-dot"></span>
+      </button>
+      <button class="rail-btn" data-action="logout" aria-label="Log out" title="Log out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+      <button class="rail-btn" data-action="toggle-theme" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-name">Agent<span class="ai-accent">.ai</span></div>
+      <button class="sidebar-collapse-btn" data-action="toggle-sidebar" aria-label="Collapse sidebar" title="Collapse sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <nav class="nav">
+      <button class="nav-item" data-action="nav" data-page="home" data-nav="home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+        Home
+      </button>
+      <button class="nav-item" data-action="nav" data-page="projects" data-nav="projects">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Projects
+      </button>
+      <button class="nav-item" data-action="nav" data-page="agents" data-nav="agents">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 20c0-2.5 1.6-4 3.5-4"/></svg>
+        Agents
+      </button>
+      <button class="nav-item" data-action="nav" data-page="tasks" data-nav="tasks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Tasks<span id="task-dot"></span>
+      </button>
+      <button class="nav-item" data-action="nav" data-page="calendar" data-nav="calendar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Calendar
+      </button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="secondary-links"><a>Settings</a><a>Support</a><a>FAQ</a></div>
+      <div class="profile-card">
+        <div class="avatar">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sbAvGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A78BFA"/><stop offset="100%" stop-color="#4DD0C7"/></linearGradient></defs><rect width="40" height="40" rx="10" fill="url(#sbAvGrad)"/><circle cx="20" cy="15" r="5.5" fill="#fff" fill-opacity=".95"/><path d="M7 36c0-6.5 5.8-11 13-11s13 4.5 13 11" fill="#fff" fill-opacity=".95"/></svg>
+        </div>
+        <div class="profile-meta">
+          <div class="profile-name">Max Wilsom <span class="pro-badge">Pro</span></div>
+          <div class="profile-email">maxwilson@gmail.com</div>
+        </div>
+        <span class="status-dot"></span>
+      </div>
+      <button class="logout-btn" data-action="logout">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Log Out
+      </button>
+      <div class="theme-toggle-pill">
+        <button class="theme-opt" data-action="set-theme" data-theme="light">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+          Light
+        </button>
+        <button class="theme-opt is-active" data-action="set-theme" data-theme="dark">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          Dark
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main" id="main-host"></div>
+  <aside class="feed" id="feed-host"></aside>
+
+</div>
+
+<div id="modal-host" class="modal-host"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const todayDate = new Date();
+const isoKey = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const TODAY = isoKey(todayDate);
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MSHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+const PALETTE = [
+  { c:'#7C6BF4', bg:'#EDEAFE', fg:'#7C6BF4' },
+  { c:'#6BD68A', bg:'#E5F8EA', fg:'#2D8A4D' },
+  { c:'#F0A23A', bg:'#FDF1DA', fg:'#B47318' },
+  { c:'#4DD0C7', bg:'#E0F7F5', fg:'#2A9489' },
+  { c:'#F26B6B', bg:'#FCE5E5', fg:'#B73E3E' },
+  { c:'#9B6BE0', bg:'#F0E5FA', fg:'#6C3AA8' }
+];
+
+function seedTopics() {
+  return [
+    { id:'t1', name:'Work Projects', icon:'briefcase', color:'#6BD68A', page:'projects' },
+    { id:'t2', name:'Personal Projects', icon:'user', color:'#7C6BF4', page:'projects' },
+    { id:'t3', name:'Plan Trip', icon:'ticket', color:'#4DD0C7', page:'calendar' },
+    { id:'t4', name:'Agents Memory', icon:'pie', color:'#9B6BE0', page:'agents' },
+    { id:'t5', name:'Youtube Planning', icon:'video', color:'#F26B6B', page:'tasks' },
+    { id:'t6', name:'Portfolio Tasks', icon:'file', color:'#F0A23A', page:'tasks' }
+  ];
+}
+function seedProjects() {
+  return [
+    { id:'p1', name:'Design System Refresh', desc:'Rebuild component library, unify tokens across web + mobile, and ship Figma documentation.', category:'Design', color:'#7C6BF4', tagFg:'#7C6BF4', tagBg:'#EDEAFE', progress:78, due:'May 24', team:[{i:'MW',c:'av-1'},{i:'CH',c:'av-5'},{i:'JD',c:'av-6'}], teamMore:2, status:'active' },
+    { id:'p2', name:'Agent Orchestration Engine', desc:'Production-grade multi-agent runtime with retries, queueing, and observability.', category:'Engineering', color:'#6BD68A', tagFg:'#2D8A4D', tagBg:'#E5F8EA', progress:42, due:'Jun 12', team:[{i:'MM',c:'av-7'},{i:'DR',c:'av-8'}], teamMore:4, status:'active' },
+    { id:'p3', name:'Q3 Launch Campaign', desc:'Pre-launch waitlist, blog series, partner integrations, and announcement video production.', category:'Marketing', color:'#F0A23A', tagFg:'#B47318', tagBg:'#FDF1DA', progress:91, due:'May 20', team:[{i:'CH',c:'av-2'},{i:'MM',c:'av-3'}], teamMore:0, status:'active' },
+    { id:'p4', name:'User Behavior Study', desc:'Long-form interviews + session replays to inform the next onboarding redesign.', category:'Research', color:'#4DD0C7', tagFg:'#2A9489', tagBg:'#E0F7F5', progress:23, due:'Jul 03', team:[{i:'DR',c:'av-4'},{i:'MW',c:'av-5'}], teamMore:1, status:'hold' },
+    { id:'p5', name:'iOS Voice Companion', desc:'Hands-free agent interactions with on-device speech, push-to-talk, and contextual replies.', category:'Mobile', color:'#F26B6B', tagFg:'#B73E3E', tagBg:'#FCE5E5', progress:56, due:'Jun 28', team:[{i:'JD',c:'av-6'},{i:'CH',c:'av-7'}], teamMore:3, status:'active' },
+    { id:'p6', name:'Knowledge Base Migration', desc:'Consolidate 6 wikis into a single searchable hub with AI-assisted curation.', category:'Internal', color:'#9B6BE0', tagFg:'#6C3AA8', tagBg:'#F0E5FA', progress:34, due:'Aug 15', team:[{i:'MW',c:'av-8'},{i:'DR',c:'av-1'}], teamMore:0, status:'hold' }
+  ];
+}
+function seedAgents() {
+  return [
+    { id:'a1', name:'Quill', role:'Writing & Copy', desc:'Drafts long-form articles, marketing copy, and crisp product writeups with editorial polish.', rating:4.9, runs:12000, gradient:'linear-gradient(135deg,#7C6BF4,#A99CFF)', icon:'pencil', category:'Writing', lastUsed:null },
+    { id:'a2', name:'Cypher', role:'Code & Debug', desc:'Writes, reviews, and refactors code across 30+ languages with sharp test coverage instincts.', rating:4.8, runs:28000, gradient:'linear-gradient(135deg,#6BD68A,#4DD0C7)', icon:'code', category:'Coding', lastUsed:null },
+    { id:'a3', name:'Atlas', role:'Research & Analysis', desc:'Reads hundreds of sources, cross-references claims, and outputs concise structured briefs.', rating:5.0, runs:9400, gradient:'linear-gradient(135deg,#F26B6B,#F0A23A)', icon:'folder', category:'Research', lastUsed:null, featured:true },
+    { id:'a4', name:'Pulse', role:'Data & Insights', desc:'Turns raw spreadsheets into clear narratives — charts, takeaways, recommended actions.', rating:4.7, runs:6100, gradient:'linear-gradient(135deg,#5B8FF9,#7C6BF4)', icon:'bar', category:'Research', lastUsed:null },
+    { id:'a5', name:'Echo', role:'Customer Reply', desc:"Reads tickets, learns your tone, and drafts warm, accurate responses for inbox triage.", rating:4.6, runs:15000, gradient:'linear-gradient(135deg,#EE7CB8,#F26B6B)', icon:'smile', category:'Writing', lastUsed:null },
+    { id:'a6', name:'Forge', role:'Workflow Builder', desc:'Chains multiple agents into reliable automations — no code, just plain-English specs.', rating:4.9, runs:3200, gradient:'linear-gradient(135deg,#F0A23A,#D7FE4F)', icon:'settings', category:'Coding', lastUsed:null }
+  ];
+}
+function seedTasks() {
+  const tom = isoKey(new Date(Date.now()+86400000));
+  const yest = isoKey(new Date(Date.now()-86400000));
+  return [
+    { id:'tk1', title:'Review Q3 launch announcement video draft', project:'Q3 Campaign', pFg:'#B47318', pBg:'#FDF1DA', time:'10:30 AM', priority:'high', assignee:'MW', av:'av-1', done:false, date:TODAY, createdAt:Date.now()-3600000 },
+    { id:'tk2', title:'Pair with Marvin on agent orchestration retries', project:'Orchestration Engine', pFg:'#2D8A4D', pBg:'#E5F8EA', time:'11:00 AM', priority:'high', assignee:'MM', av:'av-7', done:false, date:TODAY, createdAt:Date.now()-7200000 },
+    { id:'tk3', title:'Coffee with Courtney to align on design tokens', project:'Design System', pFg:'#7C6BF4', pBg:'#EDEAFE', time:'9:00 AM', priority:'med', assignee:'CH', av:'av-2', done:true, date:TODAY, createdAt:Date.now()-10800000 },
+    { id:'tk4', title:'Send onboarding follow-up to 12 new beta testers', project:'Beta Program', pFg:'#B73E3E', pBg:'#FCE5E5', time:'1:00 PM', priority:'med', assignee:'DR', av:'av-5', done:false, date:TODAY, createdAt:Date.now()-14400000 },
+    { id:'tk5', title:'Draft outline for "Building Agent Workflows" blog post', project:'Content', pFg:'#B47318', pBg:'#FDF1DA', time:'3:30 PM', priority:'low', assignee:'MW', av:'av-1', done:false, date:TODAY, createdAt:Date.now()-18000000 },
+    { id:'tk6', title:"Plan next week's user research interview slots", project:'User Study', pFg:'#2A9489', pBg:'#E0F7F5', time:'4:00 PM', priority:'low', assignee:'DR', av:'av-4', done:false, date:TODAY, createdAt:Date.now()-21600000 },
+    { id:'tk7', title:'Review weekly metrics dashboard before EOD', project:'Internal', pFg:'#6C3AA8', pBg:'#F0E5FA', time:'5:30 PM', priority:'low', assignee:'MW', av:'av-8', done:false, date:TODAY, createdAt:Date.now()-25200000 },
+    { id:'tk8', title:'Q3 Launch announcement publish', project:'Q3 Campaign', pFg:'#B47318', pBg:'#FDF1DA', time:'9:00 AM', priority:'high', assignee:'CH', av:'av-2', done:false, date:tom, createdAt:Date.now()-28800000 },
+    { id:'tk9', title:'Update onboarding email copy', project:'Content', pFg:'#B47318', pBg:'#FDF1DA', time:'11:00 AM', priority:'med', assignee:'MM', av:'av-3', done:false, date:yest, createdAt:Date.now()-36000000 }
+  ];
+}
+function seedEvents() {
+  const ev = {};
+  const add = (off, e) => {
+    const d = new Date(); d.setDate(d.getDate()+off);
+    const k = isoKey(d);
+    ev[k] = ev[k] || [];
+    ev[k].push(e);
+  };
+  add(0,{id:'e1',title:'Standup',bg:'#EDEAFE',fg:'#7C6BF4',time:'9:00 AM',meta:'15 min · 8 attendees'});
+  add(0,{id:'e2',title:'Video Review',bg:'#FDF1DA',fg:'#B47318',time:'10:30 AM',meta:'45 min · Conf Room A'});
+  add(0,{id:'e3',title:'Pair w/ Marvin',bg:'#E5F8EA',fg:'#2D8A4D',time:'11:30 AM',meta:'1 hr · Orchestration retries'});
+  add(0,{id:'e4',title:'Beta Tester Follow-ups',bg:'#FCE5E5',fg:'#B73E3E',time:'1:00 PM',meta:'Focus block · 45 min'});
+  add(0,{id:'e5',title:'Coffee w/ Courtney',bg:'#E0F7F5',fg:'#2A9489',time:'3:30 PM',meta:'30 min · Off-site'});
+  add(1,{id:'e6',title:'Engineering Sync',bg:'#E5F8EA',fg:'#2D8A4D',time:'10:00 AM',meta:'1 hr · Team-wide'});
+  add(2,{id:'e7',title:'Q3 Launch 🚀',bg:'#FDF1DA',fg:'#B47318',time:'All Day',meta:'Public'});
+  add(4,{id:'e8',title:'Sprint Retro',bg:'#FCE5E5',fg:'#B73E3E',time:'3:00 PM',meta:'1 hr'});
+  add(6,{id:'e9',title:'Design Ship',bg:'#EDEAFE',fg:'#7C6BF4',time:'All Day',meta:'Milestone'});
+  add(-1,{id:'e10',title:'Demo Day',bg:'#FDF1DA',fg:'#B47318',time:'2:00 PM',meta:'Demos to leadership'});
+  add(8,{id:'e11',title:'User Interview',bg:'#E0F7F5',fg:'#2A9489',time:'2:00 PM',meta:'Beta cohort'});
+  add(11,{id:'e12',title:'Team Lunch',bg:'#F0E5FA',fg:'#6C3AA8',time:'12:00 PM',meta:'Sushi spot'});
+  return ev;
+}
+
+const State = {
+  page: 'home',
+  topics: seedTopics(),
+  projects: seedProjects(),
+  agents: seedAgents(),
+  tasks: seedTasks(),
+  events: seedEvents(),
+  taskTab: 'today',
+  projFilter: 'all',
+  agentFilter: 'all',
+  modal: null,
+  calY: todayDate.getFullYear(),
+  calM: todayDate.getMonth(),
+  selectedDate: TODAY,
+  pomoSec: 25*60,
+  pomoRunning: false,
+  pomoTimer: null
+};
+
+// ============================================================
+// STORAGE
+// ============================================================
+const KEYS = ['page','topics','projects','agents','tasks','events'];
+const LS_PREFIX = 'agentai:';
+function hasClaudeStorage() { return typeof window !== 'undefined' && typeof window.storage !== 'undefined'; }
+function hasLocalStorage() {
+  try { return typeof localStorage !== 'undefined' && localStorage !== null; } catch(e) { return false; }
+}
+async function loadState() {
+  for (const k of KEYS) {
+    try {
+      let v = null;
+      if (hasClaudeStorage()) {
+        const r = await window.storage.get(k);
+        if (r && r.value) v = JSON.parse(r.value);
+      } else if (hasLocalStorage()) {
+        const raw = localStorage.getItem(LS_PREFIX + k);
+        if (raw) v = JSON.parse(raw);
+      }
+      if (v != null) State[k] = v;
+    } catch (e) {}
+  }
+}
+function save(k) {
+  try {
+    const v = JSON.stringify(State[k]);
+    if (hasClaudeStorage()) {
+      window.storage.set(k, v).catch(()=>{});
+    } else if (hasLocalStorage()) {
+      localStorage.setItem(LS_PREFIX + k, v);
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function applyTheme(theme) {
+  document.body.dataset.theme = theme;
+  // Toggle the two rail theme icons
+  const dark = document.querySelector('.theme-icon-dark');
+  const light = document.querySelector('.theme-icon-light');
+  if (dark && light) {
+    if (theme === 'light') { dark.style.display = 'none'; light.style.display = 'block'; }
+    else { dark.style.display = 'block'; light.style.display = 'none'; }
+  }
+  // Toggle the pill is-active
+  document.querySelectorAll('.theme-opt').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.theme === theme);
+  });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function relDay(iso) {
+  const d = new Date(iso);
+  const diff = Math.round((d - new Date(TODAY)) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  if (diff > 1 && diff < 7) return d.toLocaleDateString('en-US',{weekday:'long'});
+  return MSHORT[d.getMonth()] + ' ' + d.getDate();
+}
+function timeAgo(t) {
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + ' hr ago';
+  return Math.floor(h/24) + ' days ago';
+}
+function getCalGrid(y, m) {
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const days = [];
+  for (let i = firstDow-1; i >= 0; i--) {
+    const d = new Date(y, m, -i);
+    days.push({day:d.getDate(),m:d.getMonth(),y:d.getFullYear(),iso:isoKey(d),other:true});
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push({day:d,m,y,iso:isoKey(new Date(y,m,d)),other:false});
+  }
+  while (days.length < 42) {
+    const next = days.length - daysInMonth - firstDow + 1;
+    const d = new Date(y, m+1, next);
+    days.push({day:d.getDate(),m:d.getMonth(),y:d.getFullYear(),iso:isoKey(d),other:true});
+  }
+  return days;
+}
+function fmtTimer(s) {
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+
+// ============================================================
+// ICONS
+// ============================================================
+const ICONS = {
+  briefcase:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  user:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-5 4-7 8-7s8 2 8 7"/></svg>',
+  ticket:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z"/><path d="M9 6v12"/></svg>',
+  pie:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M21 12A9 9 0 0 0 12 3v9z"/></svg>',
+  video:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>',
+  file:'<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+};
+const AGENT_ICONS = {
+  pencil:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>',
+  code:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  folder:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  bar:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M11 16v-7"/><path d="M15 16v-3"/><path d="M19 16v-9"/></svg>',
+  smile:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
+  settings:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+};
+
+// ============================================================
+// RENDER: HOME
+// ============================================================
+function renderHome() {
+  const counts = {
+    t1: State.projects.filter(p=>p.status==='active').length,
+    t2: State.projects.length,
+    t3: Object.values(State.events).reduce((s,a)=>s+a.length,0),
+    t4: State.agents.length,
+    t5: State.tasks.filter(t=>!t.done && t.date > TODAY).length,
+    t6: State.tasks.filter(t=>!t.done && t.date === TODAY).length
+  };
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">With What You Want To Work Today?</h1>
+        <p class="page-sub">Choose Topic From List Below Or Create New Shortcut</p>
+      </div>
+      <button class="add-btn" data-action="open-modal" data-modal="topic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+    <div class="cards">
+      ${State.topics.map(t => `
+        <button class="topic-card" data-action="nav" data-page="${t.page}">
+          <div class="topic-icon" style="color:${t.color}">${ICONS[t.icon]||ICONS.briefcase}</div>
+          <div class="topic-name">${esc(t.name)}</div>
+          <div class="topic-meta">${counts[t.id]||0} Files</div>
+        </button>
+      `).join('')}
+    </div>
+    <section class="cta">
+      <h2 class="cta-title">Start Instantly With Free <span class="lime">AI Templates.</span></h2>
+      <p class="cta-sub">Check Our Free Library Of Templates For Any Purpose</p>
+      <div class="cta-search">
+        <div class="cta-input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="opacity:.6"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Type A Keyword..." />
+        </div>
+        <button class="cta-btn">Search</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeFeed() {
+  return `
+    <div class="feed-head">
+      <div>
+        <h2 class="feed-title">Feed</h2>
+        <p class="feed-sub">Get New Updates Every Day</p>
+      </div>
+      <button class="refresh-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh</button>
+    </div>
+    <div class="promo">
+      <h3 class="promo-title">New Features Is Coming</h3>
+      <p class="promo-sub">Check Our Blog</p>
+      <button class="promo-btn">Open Now</button>
+    </div>
+    <h4 class="blog-heading">New In Blog From Users</h4>
+    <div class="blog-list">
+      ${[
+        {i:'MW',c:'av-1',n:'Max Wilsom',t:'Hi! Today I want to share how to make best template to make UX work much faster',l:1524},
+        {i:'CH',c:'av-2',n:'Courtney Henry',t:'AI Agents: Bridging The Gap Between Human Capability And Machine Power',l:25},
+        {i:'MM',c:'av-3',n:'Marvin McKinney',t:'Meet Your AI Agent: Pioneering The Future Of Automation',l:56}
+      ].map(b => `
+        <article class="blog-card">
+          <div class="blog-author">
+            <div class="blog-avatar ${b.c}">${b.i}</div>
+            <div class="blog-author-meta">
+              <div class="blog-author-name">${b.n}</div>
+              <div class="blog-author-desc">Some Description</div>
+            </div>
+          </div>
+          <p class="blog-text">${b.t}</p>
+          <div class="blog-foot">
+            <div class="blog-stat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div class="blog-stat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${b.l}</div>
+            <button class="open-btn">Open</button>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: PROJECTS
+// ============================================================
+function renderProjects() {
+  const counts = {
+    all: State.projects.length,
+    active: State.projects.filter(p=>p.status==='active').length,
+    hold: State.projects.filter(p=>p.status==='hold').length,
+    completed: State.projects.filter(p=>p.progress>=100).length
+  };
+  const filtered = State.projFilter==='all' ? State.projects : State.projects.filter(p =>
+    State.projFilter==='completed' ? p.progress>=100 : p.status===State.projFilter
+  );
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Projects</h1>
+        <p class="page-sub">Track Every Initiative From Kickoff To Delivery</p>
+      </div>
+      <button class="add-btn" data-action="open-modal" data-modal="project"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+    <div class="pill-row">
+      ${[['all','All'],['active','Active'],['hold','On Hold'],['completed','Completed']].map(([k,l]) => `
+        <button class="pill${State.projFilter===k?' is-active':''}" data-action="proj-filter" data-filter="${k}">${l} <span class="count">${counts[k]}</span></button>
+      `).join('')}
+    </div>
+    <div class="proj-grid">
+      ${filtered.length===0 ? '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-500)">No projects here. Add one!</div>' : ''}
+      ${filtered.map(p => `
+        <article class="proj-card">
+          <div class="proj-stripe" style="background:${p.color}"></div>
+          <div class="proj-top">
+            <span class="proj-tag" style="background:${p.tagBg};color:${p.tagFg}">${esc(p.category)}</span>
+            <button class="proj-delete" data-action="delete-project" data-id="${p.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button>
+          </div>
+          <h3 class="proj-name">${esc(p.name)}</h3>
+          <p class="proj-desc">${esc(p.desc)}</p>
+          <div class="proj-progress-head"><span>Progress</span><span>${p.progress}%</span></div>
+          <div class="proj-progress-bar"><div class="proj-progress-fill" style="width:${p.progress}%;background:${p.color}"></div></div>
+          <div class="proj-foot">
+            <div class="avatar-stack">
+              ${p.team.map(m=>`<div class="avatar ${m.c}">${m.i}</div>`).join('')}
+              ${p.teamMore>0 ? `<div class="avatar more">+${p.teamMore}</div>` : ''}
+            </div>
+            <div class="proj-due"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>${esc(p.due)}</div>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderProjectsFeed() {
+  const active = State.projects.filter(p=>p.status==='active').length;
+  const onSched = State.projects.length ? Math.round(State.projects.filter(p=>p.progress>=50).length / State.projects.length * 100) : 0;
+  return `
+    <div class="feed-head"><div><h2 class="feed-title">Overview</h2><p class="feed-sub">Last 30 days</p></div></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Active Projects</div><div class="stat-val">${active}</div><div class="stat-delta">↑ live count</div></div>
+      <div class="stat-card"><div class="stat-label">On Schedule</div><div class="stat-val">${onSched}%</div><div class="stat-delta">↑ 4% vs last</div></div>
+      <div class="stat-card"><div class="stat-label">Team Members</div><div class="stat-val">24</div><div class="stat-delta">+2 onboarding</div></div>
+      <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-val">3</div><div class="stat-delta neg">↓ 2 from last</div></div>
+    </div>
+    <div class="activity">
+      <h3 class="upcoming-title" style="margin-bottom:14px">Recent Activity</h3>
+      <div class="activity-list">
+        <div class="activity-item"><div class="activity-dot" style="background:#6BD68A"></div><div><p class="activity-text"><strong>Courtney</strong> completed "Auth flow review"</p><div class="activity-time">12 min ago</div></div></div>
+        <div class="activity-item"><div class="activity-dot" style="background:#7C6BF4"></div><div><p class="activity-text"><strong>Marvin</strong> opened a PR on <strong>Agent Orchestration Engine</strong></p><div class="activity-time">1 hr ago</div></div></div>
+        <div class="activity-item"><div class="activity-dot" style="background:#F0A23A"></div><div><p class="activity-text"><strong>Dianne</strong> shipped the Q3 announcement video</p><div class="activity-time">3 hours ago</div></div></div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: AGENTS
+// ============================================================
+function renderAgents() {
+  const featured = State.agents.find(a=>a.featured) || State.agents[0];
+  const filtered = State.agentFilter==='all' ? State.agents : State.agents.filter(a=>a.category===State.agentFilter);
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">AI Agents</h1>
+        <p class="page-sub">Your Specialized Workforce — Pick One Or Build Your Own</p>
+      </div>
+      <button class="add-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+    ${featured ? `
+    <section class="agent-featured">
+      <div>
+        <span class="agent-featured-tag">Featured Today</span>
+        <h2 class="agent-featured-title">${esc(featured.name)} — Your Research Companion</h2>
+        <p class="agent-featured-desc">${esc(featured.desc)}</p>
+        <button class="agent-featured-cta" data-action="use-agent" data-id="${featured.id}">Start Chatting <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+      <div class="agent-orb"></div>
+    </section>` : ''}
+    <div class="pill-row">
+      ${[['all','All',State.agents.length],['Writing','Writing'],['Research','Research'],['Coding','Coding']].map(p => `
+        <button class="pill${State.agentFilter===p[0]?' is-active':''}" data-action="agent-filter" data-filter="${p[0]}">${p[1]}${p[2]!==undefined?`<span class="count">${p[2]}</span>`:''}</button>
+      `).join('')}
+    </div>
+    <div class="agent-grid">
+      ${filtered.map(a => `
+        <article class="agent-card">
+          <div class="agent-avatar" style="background:${a.gradient}">${AGENT_ICONS[a.icon]||AGENT_ICONS.pencil}</div>
+          <div class="agent-name">${esc(a.name)}</div>
+          <div class="agent-role">${esc(a.role)}</div>
+          <p class="agent-desc">${esc(a.desc)}</p>
+          <div class="agent-stats">
+            <div class="agent-stat-group">
+              <div class="agent-stat"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><strong>${a.rating}</strong></div>
+              <div class="agent-stat">${(a.runs/1000).toFixed(1)}k runs</div>
+            </div>
+            <button class="agent-use-btn" data-action="use-agent" data-id="${a.id}">Use</button>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderAgentsFeed() {
+  const total = State.agents.reduce((s,a)=>s+a.runs,0);
+  const avg = (State.agents.reduce((s,a)=>s+a.rating,0)/State.agents.length).toFixed(1);
+  const recent = State.agents.filter(a=>a.lastUsed).sort((a,b)=>b.lastUsed-a.lastUsed).slice(0,3);
+  return `
+    <div class="feed-head"><div><h2 class="feed-title">Performance</h2><p class="feed-sub">Your agents this week</p></div></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Runs</div><div class="stat-val">${total.toLocaleString()}</div><div class="stat-delta">↑ 18% vs last</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Rating</div><div class="stat-val">${avg}</div><div class="stat-delta">↑ 0.2</div></div>
+    </div>
+    <h4 class="blog-heading">Recently Used</h4>
+    <div class="blog-list">
+      ${recent.length===0 ? '<div style="padding:14px;color:var(--text-500);font-size:13px">Tap "Use" on an agent to see it here.</div>' : ''}
+      ${recent.map(a => `
+        <article class="blog-card">
+          <div class="blog-author">
+            <div class="blog-avatar" style="background:${a.gradient}">${AGENT_ICONS[a.icon]}</div>
+            <div class="blog-author-meta">
+              <div class="blog-author-name">${esc(a.name)}</div>
+              <div class="blog-author-desc">${esc(a.role)} · ${timeAgo(a.lastUsed)}</div>
+            </div>
+            <button class="open-btn" data-action="use-agent" data-id="${a.id}">Reuse</button>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: TASKS
+// ============================================================
+function renderTasks() {
+  const counts = {
+    today: State.tasks.filter(t=>t.date===TODAY && !t.done).length,
+    upcoming: State.tasks.filter(t=>t.date > TODAY).length,
+    overdue: State.tasks.filter(t=>t.date < TODAY && !t.done).length,
+    completed: State.tasks.filter(t=>t.done).length
+  };
+  let list;
+  if (State.taskTab==='today') list = State.tasks.filter(t=>t.date===TODAY).sort((a,b)=>Number(a.done)-Number(b.done));
+  else if (State.taskTab==='upcoming') list = State.tasks.filter(t=>t.date>TODAY).sort((a,b)=>a.date.localeCompare(b.date));
+  else if (State.taskTab==='overdue') list = State.tasks.filter(t=>t.date<TODAY && !t.done);
+  else list = State.tasks.filter(t=>t.done).sort((a,b)=>b.createdAt-a.createdAt);
+
+  const dueToday = State.tasks.filter(t=>t.date===TODAY && !t.done).length;
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Tasks</h1>
+        <p class="page-sub">${relDay(TODAY)}, ${MSHORT[todayDate.getMonth()]} ${todayDate.getDate()} · ${dueToday} Tasks Due Today</p>
+      </div>
+      <button class="add-btn" data-action="open-modal" data-modal="task"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+    <form class="task-quickadd" data-action="quickadd-form">
+      <button type="submit" class="task-quickadd-icon" data-action="quickadd-submit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <input id="quickadd-input" type="text" placeholder="Add a new task and press Enter…" autocomplete="off" />
+    </form>
+    <div class="tabs">
+      ${[['today','Today'],['upcoming','Upcoming'],['overdue','Overdue'],['completed','Completed']].map(([k,l]) => `
+        <button class="tab${State.taskTab===k?' is-active':''}" data-action="task-tab" data-tab="${k}">${l}<span class="count">${counts[k]}</span></button>
+      `).join('')}
+    </div>
+    <div class="task-list">
+      ${list.length===0 ? `<div class="task-empty">${State.taskTab==='completed'?'No completed tasks yet.':State.taskTab==='overdue'?'Nothing overdue. Nice.':'Nothing here. Add a task above.'}</div>` : ''}
+      ${list.map(t => `
+        <div class="task-row${t.done?' is-done':''}">
+          <button class="task-check${t.done?' is-checked':''}" data-action="toggle-task" data-id="${t.id}">${t.done?'✓':''}</button>
+          <div class="task-priority p-${t.priority}"></div>
+          <div class="task-body">
+            <div class="task-title">${esc(t.title)}</div>
+            <div class="task-meta-row">
+              <span class="task-project" style="background:${t.pBg};color:${t.pFg}">${esc(t.project)}</span>
+              ${t.time?`<span class="task-time">${esc(t.time)}</span>`:''}
+              ${State.taskTab!=='today'?`<span class="task-time">${relDay(t.date)}</span>`:''}
+            </div>
+          </div>
+          <div class="task-assignee ${t.av}">${esc(t.assignee)}</div>
+          <button class="task-delete" data-action="delete-task" data-id="${t.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderTasksFeed() {
+  const total = State.tasks.filter(t=>t.date===TODAY).length;
+  const done = State.tasks.filter(t=>t.date===TODAY && t.done).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const offset = 364 - (364 * pct / 100);
+  return `
+    <div class="feed-head"><div><h2 class="feed-title">Today</h2><p class="feed-sub">Your daily focus</p></div></div>
+    <div class="progress-ring-card">
+      <div class="progress-ring">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="58" fill="none" stroke="#ECECF1" stroke-width="12"/>
+          <circle cx="70" cy="70" r="58" fill="none" stroke="url(#rg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="364" stroke-dashoffset="${offset}" transform="rotate(-90 70 70)" style="transition:stroke-dashoffset .6s ease-out"/>
+          <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#7C6BF4"/><stop offset="100%" stop-color="#A99CFF"/></linearGradient></defs>
+        </svg>
+        <div class="progress-ring-text">
+          <div class="progress-ring-num">${pct}%</div>
+          <div class="progress-ring-label">${done} of ${total} done</div>
+        </div>
+      </div>
+      <div class="progress-ring-title">${pct>=50?"You're On Track":"Let's Get Going"}</div>
+      <div class="progress-ring-sub">${total-done===0?'All done — celebrate.':(total-done)+' task'+(total-done===1?'':'s')+' remaining'}</div>
+    </div>
+    <div class="focus-timer">
+      <div class="focus-label">Focus Session</div>
+      <div class="focus-time" id="pomo-time">${fmtTimer(State.pomoSec)}</div>
+      <button class="focus-btn" data-action="toggle-pomo">${State.pomoRunning?'Pause':'Start Pomodoro'}</button>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: CALENDAR
+// ============================================================
+function renderCalendar() {
+  const grid = getCalGrid(State.calY, State.calM);
+  const totalEvents = Object.entries(State.events).reduce((s,[k,arr]) => {
+    const d = new Date(k);
+    return d.getFullYear()===State.calY && d.getMonth()===State.calM ? s+arr.length : s;
+  }, 0);
+  return `
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">${MONTHS[State.calM]} ${State.calY}</h1>
+        <p class="page-sub">Your Month At A Glance — ${totalEvents} Events Scheduled</p>
+      </div>
+      <button class="add-btn" data-action="open-modal" data-modal="event" data-date="${TODAY}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+    <div class="cal-toolbar">
+      <button class="cal-nav-btn" data-action="cal-prev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="cal-today-btn" data-action="cal-today">Today</button>
+      <button class="cal-nav-btn" data-action="cal-next"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <div class="cal-view-toggle">
+        <button class="cal-view-opt">Day</button>
+        <button class="cal-view-opt">Week</button>
+        <button class="cal-view-opt is-active">Month</button>
+      </div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-week-head">
+        ${WDAYS.map(d=>`<div class="cal-week-head-cell">${d}</div>`).join('')}
+      </div>
+      <div class="cal-body">
+        ${grid.map(d => {
+          const events = State.events[d.iso] || [];
+          const shown = events.slice(0, 2);
+          const more = events.length - shown.length;
+          const isToday = d.iso === TODAY;
+          return `
+            <button class="cal-day${d.other?' is-other-month':''}${isToday?' is-today':''}" data-action="open-modal" data-modal="event" data-date="${d.iso}">
+              <span class="cal-day-num">${d.day}</span>
+              ${shown.map(e => `<div class="cal-event" style="background:${e.bg};color:${e.fg}">${esc(e.title)}</div>`).join('')}
+              ${more>0?`<div class="cal-event" style="background:var(--hairline);color:var(--text-700)">+${more} more</div>`:''}
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderCalendarFeed() {
+  const todayEv = State.events[TODAY] || [];
+  const upcoming = [];
+  for (let i=1; i<=14; i++) {
+    const d = new Date(); d.setDate(d.getDate()+i);
+    const k = isoKey(d);
+    (State.events[k]||[]).forEach(e => upcoming.push({...e, iso:k, d}));
+    if (upcoming.length >= 5) break;
+  }
+  return `
+    <div class="feed-head"><div><h2 class="feed-title">Today's Schedule</h2><p class="feed-sub">${relDay(TODAY)}, ${MSHORT[todayDate.getMonth()]} ${todayDate.getDate()}</p></div></div>
+    <div class="timeline">
+      ${todayEv.length===0 ? '<div class="timeline-empty">Nothing on the calendar today.</div>' : `
+        <div class="timeline-list">
+          ${todayEv.map(e => `
+            <div class="timeline-item">
+              <div class="timeline-time">${esc(e.time)}</div>
+              <div class="timeline-block" style="background:${e.bg};border-color:${e.fg}">
+                <div class="timeline-block-title">${esc(e.title)}</div>
+                <div class="timeline-block-meta">${esc(e.meta)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>`}
+    </div>
+    <div class="upcoming-card">
+      <h3 class="upcoming-title">Upcoming</h3>
+      ${upcoming.length===0 ? '<div style="padding:14px 0;color:var(--text-500);font-size:13px">Nothing scheduled yet.</div>' : ''}
+      ${upcoming.slice(0,5).map(u => `
+        <div class="up-item">
+          <div class="up-date"><div class="up-date-d">${u.d.getDate()}</div><div class="up-date-m">${WDAYS[u.d.getDay()]}</div></div>
+          <div class="up-body"><div class="up-name">${esc(u.title)}</div><div class="up-time">${esc(u.time)} · ${esc(u.meta)}</div></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function renderModal() {
+  if (!State.modal) return '';
+  const m = State.modal;
+  let body = '';
+  if (m.type === 'topic') {
+    body = `
+      <div class="modal-head"><h3 class="modal-title">New Topic</h3><button class="modal-close" data-action="close-modal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="field"><label>NAME</label><input id="m-name" placeholder="e.g. Mobile App Tasks" autofocus/></div>
+      <div class="field-row">
+        <div class="field"><label>ICON</label>
+          <select id="m-icon"><option value="briefcase">Work</option><option value="user">Personal</option><option value="ticket">Travel</option><option value="pie">Memory</option><option value="video">Media</option><option value="file">Files</option></select>
+        </div>
+        <div class="field"><label>OPENS</label>
+          <select id="m-page"><option value="projects">Projects</option><option value="tasks">Tasks</option><option value="calendar">Calendar</option><option value="agents">Agents</option></select>
+        </div>
+      </div>
+      <div class="field"><label>COLOR</label>
+        <div class="color-row">${PALETTE.map((p,i)=>`<button class="color-swatch${i===0?' is-selected':''}" data-action="swatch" data-i="${i}" style="background:${p.c}"></button>`).join('')}</div>
+      </div>
+      <div class="modal-actions"><button class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" data-action="save-topic">Add Topic</button></div>
+    `;
+  } else if (m.type === 'project') {
+    body = `
+      <div class="modal-head"><h3 class="modal-title">New Project</h3><button class="modal-close" data-action="close-modal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="field"><label>NAME</label><input id="m-name" placeholder="e.g. Marketing Site Redesign" autofocus/></div>
+      <div class="field"><label>DESCRIPTION</label><textarea id="m-desc" placeholder="What's this project about?"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>CATEGORY</label>
+          <select id="m-cat"><option>Design</option><option>Engineering</option><option>Marketing</option><option>Research</option><option>Mobile</option><option>Internal</option></select>
+        </div>
+        <div class="field"><label>DUE DATE</label><input id="m-due" placeholder="May 30"/></div>
+      </div>
+      <div class="field"><label>COLOR</label>
+        <div class="color-row">${PALETTE.map((p,i)=>`<button class="color-swatch${i===0?' is-selected':''}" data-action="swatch" data-i="${i}" style="background:${p.c}"></button>`).join('')}</div>
+      </div>
+      <div class="modal-actions"><button class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" data-action="save-project">Create Project</button></div>
+    `;
+  } else if (m.type === 'task') {
+    body = `
+      <div class="modal-head"><h3 class="modal-title">New Task</h3><button class="modal-close" data-action="close-modal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="field"><label>TITLE</label><input id="m-name" placeholder="What needs doing?" autofocus/></div>
+      <div class="field-row">
+        <div class="field"><label>PRIORITY</label>
+          <select id="m-prio"><option value="high">High</option><option value="med" selected>Medium</option><option value="low">Low</option></select>
+        </div>
+        <div class="field"><label>TIME</label><input id="m-time" placeholder="2:30 PM"/></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>DATE</label><input id="m-date" type="date" value="${TODAY}"/></div>
+        <div class="field"><label>PROJECT</label>
+          <select id="m-proj">${State.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="modal-actions"><button class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" data-action="save-task">Add Task</button></div>
+    `;
+  } else if (m.type === 'event') {
+    body = `
+      <div class="modal-head"><h3 class="modal-title">New Event</h3><button class="modal-close" data-action="close-modal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="field"><label>TITLE</label><input id="m-name" placeholder="e.g. Team standup" autofocus/></div>
+      <div class="field-row">
+        <div class="field"><label>DATE</label><input id="m-date" type="date" value="${m.date||TODAY}"/></div>
+        <div class="field"><label>TIME</label><input id="m-time" placeholder="9:00 AM"/></div>
+      </div>
+      <div class="field"><label>DETAILS</label><input id="m-meta" placeholder="Optional location or notes"/></div>
+      <div class="field"><label>COLOR</label>
+        <div class="color-row">${PALETTE.map((p,i)=>`<button class="color-swatch${i===0?' is-selected':''}" data-action="swatch" data-i="${i}" style="background:${p.c}"></button>`).join('')}</div>
+      </div>
+      <div class="modal-actions"><button class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" data-action="save-event">Add Event</button></div>
+    `;
+  } else if (m.type === 'logout') {
+    body = `
+      <div class="modal-head"><h3 class="modal-title">Log out?</h3><button class="modal-close" data-action="close-modal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <p style="color:var(--ink-700);font-size:14px;line-height:1.5;margin:0 0 18px;">You'll be signed out of <strong>maxwilson@gmail.com</strong> on this device.</p>
+      <div class="modal-actions"><button class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" data-action="confirm-logout">Log Out</button></div>
+    `;
+  }
+  return `<div class="modal-backdrop" data-action="close-modal"></div><div class="modal">${body}</div>`;
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render() {
+  // Sidebar / backdrop drawer state
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('backdrop');
+  // Active nav state
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.nav === State.page);
+  });
+  document.querySelectorAll('[data-rail]').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.rail === State.page);
+  });
+  // Task dot
+  const dueToday = State.tasks.filter(t=>t.date===TODAY && !t.done).length;
+  const dot = document.getElementById('task-dot');
+  if (dot) dot.className = dueToday > 0 ? 'dot' : '';
+
+  // Render main + feed
+  let main, feed;
+  switch(State.page) {
+    case 'home': main = renderHome(); feed = renderHomeFeed(); break;
+    case 'projects': main = renderProjects(); feed = renderProjectsFeed(); break;
+    case 'agents': main = renderAgents(); feed = renderAgentsFeed(); break;
+    case 'tasks': main = renderTasks(); feed = renderTasksFeed(); break;
+    case 'calendar': main = renderCalendar(); feed = renderCalendarFeed(); break;
+  }
+  document.getElementById('main-host').innerHTML = main;
+  document.getElementById('feed-host').innerHTML = feed;
+
+  // Modal
+  const mh = document.getElementById('modal-host');
+  mh.innerHTML = renderModal();
+  mh.classList.toggle('is-open', !!State.modal);
+
+  // Restore focus on modal
+  if (State.modal) {
+    setTimeout(() => { const i = document.getElementById('m-name'); if (i) i.focus(); }, 50);
+  }
+}
+
+// ============================================================
+// EVENT DELEGATION
+// ============================================================
+document.body.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if (!t) return;
+  const action = t.dataset.action;
+  const data = t.dataset;
+
+  switch (action) {
+    case 'nav':
+      State.page = data.page;
+      document.getElementById('sidebar').classList.remove('is-open');
+      document.getElementById('backdrop').classList.remove('is-open');
+      save('page');
+      render();
+      break;
+
+    case 'open-menu':
+      document.getElementById('sidebar').classList.add('is-open');
+      document.getElementById('backdrop').classList.add('is-open');
+      break;
+
+    case 'toggle-sidebar':
+      document.querySelector('.app').classList.toggle('is-sidebar-collapsed');
+      break;
+
+    case 'toggle-theme': {
+      const cur = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+      applyTheme(cur);
+      break;
+    }
+
+    case 'set-theme':
+      applyTheme(data.theme);
+      break;
+
+    case 'logout':
+      State.modal = { type: 'logout' };
+      render();
+      break;
+
+    case 'confirm-logout':
+      State.modal = null;
+      // Demo only — show a transient toast-style overlay
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink-950);color:#fff;padding:12px 20px;border-radius:999px;font-size:13px;font-weight:500;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.3);';
+      t.textContent = 'Logged out (demo)';
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2000);
+      render();
+      break;
+
+    case 'close-menu':
+      document.getElementById('sidebar').classList.remove('is-open');
+      document.getElementById('backdrop').classList.remove('is-open');
+      break;
+
+    case 'toggle-task': {
+      const id = data.id;
+      const task = State.tasks.find(t=>t.id===id);
+      if (task) { task.done = !task.done; save('tasks'); render(); }
+      break;
+    }
+
+    case 'delete-task':
+      e.stopPropagation();
+      State.tasks = State.tasks.filter(t=>t.id!==data.id);
+      save('tasks'); render();
+      break;
+
+    case 'delete-project':
+      e.stopPropagation();
+      State.projects = State.projects.filter(p=>p.id!==data.id);
+      save('projects'); render();
+      break;
+
+    case 'task-tab':
+      State.taskTab = data.tab;
+      render();
+      break;
+
+    case 'proj-filter':
+      State.projFilter = data.filter;
+      render();
+      break;
+
+    case 'agent-filter':
+      State.agentFilter = data.filter;
+      render();
+      break;
+
+    case 'use-agent': {
+      const a = State.agents.find(x=>x.id===data.id);
+      if (a) { a.runs++; a.lastUsed = Date.now(); save('agents'); render(); }
+      break;
+    }
+
+    case 'cal-prev':
+      if (State.calM === 0) { State.calM = 11; State.calY--; } else State.calM--;
+      render();
+      break;
+
+    case 'cal-next':
+      if (State.calM === 11) { State.calM = 0; State.calY++; } else State.calM++;
+      render();
+      break;
+
+    case 'cal-today':
+      State.calY = todayDate.getFullYear();
+      State.calM = todayDate.getMonth();
+      render();
+      break;
+
+    case 'open-modal':
+      State.modal = { type: data.modal, date: data.date, colorIdx: 0 };
+      render();
+      break;
+
+    case 'close-modal':
+      State.modal = null;
+      render();
+      break;
+
+    case 'swatch':
+      if (State.modal) {
+        State.modal.colorIdx = parseInt(data.i, 10);
+        document.querySelectorAll('.color-swatch').forEach((el,idx) => {
+          el.classList.toggle('is-selected', idx === State.modal.colorIdx);
+        });
+      }
+      break;
+
+    case 'save-topic': {
+      const name = document.getElementById('m-name').value.trim();
+      if (!name) return;
+      const icon = document.getElementById('m-icon').value;
+      const page = document.getElementById('m-page').value;
+      const p = PALETTE[State.modal.colorIdx || 0];
+      State.topics.push({ id:'t'+Date.now(), name, icon, color:p.c, page });
+      save('topics');
+      State.modal = null;
+      render();
+      break;
+    }
+
+    case 'save-project': {
+      const name = document.getElementById('m-name').value.trim();
+      if (!name) return;
+      const desc = document.getElementById('m-desc').value.trim() || 'No description yet.';
+      const category = document.getElementById('m-cat').value;
+      const due = document.getElementById('m-due').value || 'TBD';
+      const p = PALETTE[State.modal.colorIdx || 0];
+      State.projects.unshift({
+        id:'p'+Date.now(), name, desc, category, color:p.c, tagFg:p.fg, tagBg:p.bg,
+        progress:0, due, team:[{i:'MW',c:'av-1'}], teamMore:0, status:'active'
+      });
+      save('projects');
+      State.modal = null;
+      render();
+      break;
+    }
+
+    case 'save-task': {
+      const title = document.getElementById('m-name').value.trim();
+      if (!title) return;
+      const priority = document.getElementById('m-prio').value;
+      const time = document.getElementById('m-time').value.trim();
+      const date = document.getElementById('m-date').value || TODAY;
+      const projId = document.getElementById('m-proj').value;
+      const proj = State.projects.find(x=>x.id===projId);
+      State.tasks.unshift({
+        id:'tk'+Date.now(), title,
+        project: proj ? proj.name : 'Inbox',
+        pFg: proj ? proj.tagFg : '#7C6BF4',
+        pBg: proj ? proj.tagBg : '#EDEAFE',
+        time, priority,
+        assignee:'MW', av:'av-1',
+        done:false, date, createdAt:Date.now()
+      });
+      save('tasks');
+      State.modal = null;
+      render();
+      break;
+    }
+
+    case 'save-event': {
+      const title = document.getElementById('m-name').value.trim();
+      if (!title) return;
+      const date = document.getElementById('m-date').value || TODAY;
+      const time = document.getElementById('m-time').value.trim() || 'All Day';
+      const meta = document.getElementById('m-meta').value.trim();
+      const p = PALETTE[State.modal.colorIdx || 0];
+      State.events[date] = State.events[date] || [];
+      State.events[date].push({ id:'e'+Date.now(), title, time, meta, bg:p.bg, fg:p.fg });
+      save('events');
+      State.modal = null;
+      render();
+      break;
+    }
+
+    case 'toggle-pomo':
+      if (State.pomoRunning) {
+        State.pomoRunning = false;
+        clearInterval(State.pomoTimer);
+      } else {
+        State.pomoRunning = true;
+        State.pomoTimer = setInterval(() => {
+          State.pomoSec--;
+          if (State.pomoSec <= 0) {
+            State.pomoSec = 25*60;
+            State.pomoRunning = false;
+            clearInterval(State.pomoTimer);
+          }
+          const el = document.getElementById('pomo-time');
+          if (el) el.textContent = fmtTimer(State.pomoSec);
+        }, 1000);
+      }
+      render();
+      break;
+  }
+});
+
+// Task quickadd form
+document.body.addEventListener('submit', (e) => {
+  if (e.target.matches('[data-action="quickadd-form"]')) {
+    e.preventDefault();
+    const input = document.getElementById('quickadd-input');
+    if (!input) return;
+    const v = input.value.trim();
+    if (!v) return;
+    State.tasks.unshift({
+      id:'tk'+Date.now(), title: v,
+      project: 'Inbox', pFg:'#7C6BF4', pBg:'#EDEAFE',
+      time:'', priority:'low',
+      assignee:'MW', av:'av-1',
+      done:false, date:TODAY, createdAt:Date.now()
+    });
+    save('tasks');
+    input.value = '';
+    render();
+  }
+});
+
+// Escape closes modal/drawer
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (State.modal) { State.modal = null; render(); }
+    else {
+      document.getElementById('sidebar').classList.remove('is-open');
+      document.getElementById('backdrop').classList.remove('is-open');
+    }
+  }
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+(async function boot() {
+  await loadState();
+  render();
+})();
+</script>
+
+</body>
+</html>
