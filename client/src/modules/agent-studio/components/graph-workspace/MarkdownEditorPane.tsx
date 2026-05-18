@@ -20,7 +20,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
-import WorkspaceStateLayer from "./WorkspaceStateLayer";
+import WorkspaceStateLayer, {
+  classifyWorkspaceState,
+} from "./WorkspaceStateLayer";
 
 type Mode = "read" | "edit" | "source";
 
@@ -69,10 +71,20 @@ export default function MarkdownEditorPane({
     );
   }
   if (noteQuery.error) {
+    // Map the tRPC error code (FORBIDDEN / TIMEOUT / etc.) to the
+    // appropriate WorkspaceState rather than always saying
+    // "Permission denied" — a 404 / 500 / timeout each tell the
+    // operator something different about what to do next.
+    const state = classifyWorkspaceState({
+      trpcError: {
+        code: noteQuery.error.data?.code,
+        message: noteQuery.error.message,
+      },
+    });
     return (
       <div className="flex-1 p-3" data-testid="markdown-editor-pane">
         <WorkspaceStateLayer
-          state="permission_denied"
+          state={state}
           rawErrorForDevtools={noteQuery.error.message}
         />
       </div>
