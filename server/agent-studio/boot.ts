@@ -592,6 +592,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.25.c — Semantic Enrichment auto-promote cron (T-D.4).
+  // Every 15 minutes, scans ags_semantic_enrichment_proposals for
+  // pending rows whose confidence >= 0.95 and promotes them onto the
+  // graph-correction triage surface. The graph mutation step stays
+  // operator-gated. Env-flag-gated via
+  // AGS_SEMANTIC_ENRICHMENT_AUTO_PROMOTE_CRON_DISABLED.
+  try {
+    const { ensureAutoPromoteCronStarted } = await import(
+      "./services/graph-enrichment/auto-promote-cron"
+    );
+    ensureAutoPromoteCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-semantic-enrichment-auto-promote-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3.26 — V1+ Phase 19-β (2026-05-13): register default publish
   // pushers for the three target types defined in PR-V1-2 (#749):
   // staging_env, remote_vault, external_kb. PR-V1-2 shipped the
