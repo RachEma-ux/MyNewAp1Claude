@@ -49,6 +49,23 @@ export class AsdbVaultRepository implements VaultRepository {
       })
       .returning({ id: agsVaults.id });
     if (!row) throw new Error("Failed to create vault");
+    // 2026-05-18 bugfix: insert the creator into agsVaultMembers as
+    // "admin" so the vault is reachable from listVaultsForUser
+    // (which INNER JOINs on membership). Without this, the vault row
+    // exists but is invisible to its own creator. Idempotent insert —
+    // skip on unique conflict (createVault is not retried, but
+    // belt-and-suspenders against a future retry-on-error caller).
+    await conn
+      .insert(agsVaultMembers)
+      .values({
+        vaultId: row.id,
+        userId: createdByUserId,
+        role: "admin",
+        addedByUserId: createdByUserId,
+      })
+      .onConflictDoNothing({
+        target: [agsVaultMembers.vaultId, agsVaultMembers.userId],
+      });
     return { id: row.id };
   }
 
