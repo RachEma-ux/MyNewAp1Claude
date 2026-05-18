@@ -100,6 +100,24 @@ export interface GoldenQuestionResultListRow {
 }
 
 /**
+ * Full per-question detail row (T-D.5.δ). Includes the heavy
+ * `expectedPaths` JSON that the T-D.5.α list view intentionally
+ * omits. Operator drill-in for a single question's expected
+ * shape — useful when triaging why a question failed.
+ */
+export interface GoldenQuestionDetail {
+  readonly id: number;
+  readonly suiteId: number;
+  readonly suiteKey: string;
+  readonly questionKey: string;
+  readonly question: string;
+  readonly expectedAnswerPattern: string | null;
+  readonly expectedPaths: Record<string, unknown> | null;
+  readonly minimumCitationCount: number;
+  readonly createdAt: Date;
+}
+
+/**
  * Aggregate per-run stats (T-D.5.γ). Same shape as
  * `SemanticEnrichmentRunStats` but for golden-question runs.
  */
@@ -156,6 +174,16 @@ export interface GoldenQuestionsReadStore {
   listRunResults(
     runId: number,
   ): Promise<ReadonlyArray<GoldenQuestionResultListRow> | null>;
+
+  /**
+   * T-D.5.δ — Full per-question detail row, including the heavy
+   * `expectedPaths` JSON that the T-D.5.α list view omits.
+   * Returns null when the questionId isn't found (stale-link
+   * safety per §22 lesson #5).
+   */
+  getQuestionDetail(
+    questionId: number,
+  ): Promise<GoldenQuestionDetail | null>;
 }
 
 export interface CreateGoldenQuestionsReadStoreOptions {
@@ -366,6 +394,52 @@ export function createGoldenQuestionsReadStore(
           createdAt: r.createdAt,
         }),
       );
+    },
+
+    async getQuestionDetail(questionId) {
+      const db = requireDb(options.db);
+      const rows = await db
+        .select({
+          id: agsGoldenQuestions.id,
+          suiteId: agsGoldenQuestions.suiteId,
+          suiteKey: agsGoldenQuestionSuites.suiteKey,
+          questionKey: agsGoldenQuestions.questionKey,
+          question: agsGoldenQuestions.question,
+          expectedAnswerPattern: agsGoldenQuestions.expectedAnswerPattern,
+          expectedPaths: agsGoldenQuestions.expectedPaths,
+          minimumCitationCount: agsGoldenQuestions.minimumCitationCount,
+          createdAt: agsGoldenQuestions.createdAt,
+        })
+        .from(agsGoldenQuestions)
+        .innerJoin(
+          agsGoldenQuestionSuites,
+          eq(agsGoldenQuestions.suiteId, agsGoldenQuestionSuites.id),
+        )
+        .where(eq(agsGoldenQuestions.id, questionId))
+        .limit(1);
+      if (rows.length === 0) return null;
+      const r = rows[0] as {
+        id: number;
+        suiteId: number;
+        suiteKey: string;
+        questionKey: string;
+        question: string;
+        expectedAnswerPattern: string | null;
+        expectedPaths: Record<string, unknown> | null;
+        minimumCitationCount: number;
+        createdAt: Date;
+      };
+      return {
+        id: r.id,
+        suiteId: r.suiteId,
+        suiteKey: r.suiteKey,
+        questionKey: r.questionKey,
+        question: r.question,
+        expectedAnswerPattern: r.expectedAnswerPattern,
+        expectedPaths: r.expectedPaths,
+        minimumCitationCount: r.minimumCitationCount,
+        createdAt: r.createdAt,
+      };
     },
 
     async listQuestionsInSuite(suiteKey) {
