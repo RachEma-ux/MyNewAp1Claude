@@ -100,19 +100,31 @@ export async function persistNoteLinks(
     .where(eq(agsVaultEmbeds.sourceNoteId, input.noteId))
     .returning({ id: agsVaultEmbeds.id });
 
+  // ---- Classify extraction by destination table ----
+  // `[[Note]]` and `[[Note|Alias]]` → ags_vault_wikilinks (real link)
+  // `![[Note]]` (no extension) → ags_vault_embeds (embedKind="note")
+  // `![[image.png]]` (extension) → ags_vault_embeds (embedKind="attachment")
+  //
+  // Pre-PR behavior had note-shape embeds going to ags_vault_wikilinks
+  // with `isEmbed=true`, leaving the embeds table empty for the most
+  // common embed shape. The cleaner classification: each row in
+  // exactly ONE table, queried by its semantic shape.
+  const realWikilinks = extraction.wikilinks.filter((wl) => !wl.isEmbed);
+  const noteEmbeds = extraction.wikilinks.filter((wl) => wl.isEmbed);
+
   // ---- INSERT new rows ----
   let wikilinksWritten = 0;
   let embedsWritten = 0;
 
-  if (extraction.wikilinks.length > 0) {
-    const wikilinkRows = extraction.wikilinks.map((wl) => ({
+  if (realWikilinks.length > 0) {
+    const wikilinkRows = realWikilinks.map((wl) => ({
       sourceNoteId: input.noteId,
       sourceVersionId: input.versionId,
       targetSlug: wl.targetSlug,
       targetNoteId: slugToNoteId.get(wl.targetSlug) ?? null,
       headingAnchor: wl.headingAnchor,
       alias: wl.alias,
-      isEmbed: wl.isEmbed,
+      isEmbed: false,
     }));
     const inserted = await db
       .insert(agsVaultWikilinks)
@@ -121,15 +133,33 @@ export async function persistNoteLinks(
     wikilinksWritten = inserted.length;
   }
 
-  if (extraction.attachmentEmbeds.length > 0) {
-    const embedRows = extraction.attachmentEmbeds.map((e) => ({
+  const embedRows: Array<{
+    sourceNoteId: number;
+    sourceVersionId: number;
+    embedKind: "attachment" | "note";
+    targetNoteId: number | null;
+    targetAttachmentId: number | null;
+    targetSlug: string;
+  }> = [
+    ...extraction.attachmentEmbeds.map((e) => ({
       sourceNoteId: input.noteId,
       sourceVersionId: input.versionId,
-      embedKind: "attachment",
+      embedKind: "attachment" as const,
       targetNoteId: null,
       targetAttachmentId: null,
       targetSlug: e.filename,
-    }));
+    })),
+    ...noteEmbeds.map((wl) => ({
+      sourceNoteId: input.noteId,
+      sourceVersionId: input.versionId,
+      embedKind: "note" as const,
+      targetNoteId: slugToNoteId.get(wl.targetSlug) ?? null,
+      targetAttachmentId: null,
+      targetSlug: wl.targetSlug,
+    })),
+  ];
+
+  if (embedRows.length > 0) {
     const inserted = await db
       .insert(agsVaultEmbeds)
       .values(embedRows)

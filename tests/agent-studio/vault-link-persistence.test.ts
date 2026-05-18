@@ -83,6 +83,44 @@ describe("link-persistence — module shape", () => {
   });
 });
 
+describe("link-persistence — note-shape embed classification", () => {
+  it("classifies isEmbed extraction split: realWikilinks vs noteEmbeds", () => {
+    // The persist module filters extraction.wikilinks by isEmbed to
+    // route them to different tables.
+    expect(persistSrc).toMatch(
+      /realWikilinks\s*=\s*extraction\.wikilinks\.filter\(\(wl\)\s*=>\s*!wl\.isEmbed\)/,
+    );
+    expect(persistSrc).toMatch(
+      /noteEmbeds\s*=\s*extraction\.wikilinks\.filter\(\(wl\)\s*=>\s*wl\.isEmbed\)/,
+    );
+  });
+
+  it("attachment embeds get embedKind='attachment'", () => {
+    expect(persistSrc).toMatch(
+      /attachmentEmbeds\.map[\s\S]*?embedKind:\s*["']attachment["']/,
+    );
+  });
+
+  it("note-shape embeds get embedKind='note' with resolved targetNoteId", () => {
+    expect(persistSrc).toMatch(
+      /noteEmbeds\.map[\s\S]*?embedKind:\s*["']note["'][\s\S]*?targetNoteId:\s*slugToNoteId\.get\(wl\.targetSlug\)/,
+    );
+  });
+
+  it("wikilink rows force isEmbed: false (embeds are not in this table anymore)", () => {
+    expect(persistSrc).toMatch(/isEmbed:\s*false/);
+    expect(persistSrc).not.toMatch(/isEmbed:\s*wl\.isEmbed/);
+  });
+
+  it("embedRows array is combined: attachment + note in one insert", () => {
+    // The new structure builds a single `embedRows` array via
+    // spread of both sub-lists, then one bulk insert.
+    expect(persistSrc).toMatch(/const embedRows[\s\S]*?=\s*\[/);
+    expect(persistSrc).toMatch(/\.\.\.extraction\.attachmentEmbeds\.map/);
+    expect(persistSrc).toMatch(/\.\.\.noteEmbeds\.map/);
+  });
+});
+
 describe("router — link persistence wiring", () => {
   it("declares a `fireLinkPersistence` fire-and-forget helper", () => {
     expect(routerSrc).toMatch(/function fireLinkPersistence\(/);
