@@ -240,3 +240,16 @@ export {
 export type {
   RepositoryBackedApplierOptions,
 } from "./repository-backed-applier.js";
+
+export {
+  verifyPostApply,
+  isPostApplyVerificationEnabled,
+  ProposalNotFoundForVerificationError,
+} from "./post-apply-verification.js";
+export type {
+  VerifyPostApplyInput,
+  VerifyPostApplyOptions,
+  VerifyPostApplyResult,
+  VerificationOutcome,
+  VerificationSkipReason,
+} from "./post-apply-verification.js";
