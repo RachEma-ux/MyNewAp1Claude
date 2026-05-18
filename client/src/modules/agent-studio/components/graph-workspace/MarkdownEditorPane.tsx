@@ -27,6 +27,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
 import CodeMirrorMdEditor from "./CodeMirrorMdEditor";
+import { wikilinkAutocomplete } from "./wikilink-autocomplete";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
@@ -58,6 +59,14 @@ export default function MarkdownEditorPane({
   const noteQuery = trpc.agentStudio.vault.getNote.useQuery({ noteId });
   const updateMutation = trpc.agentStudio.vault.updateNote.useMutation();
   const utils = trpc.useUtils();
+  // Track B — B3 — vault notes for `[[wikilink]]` autocomplete.
+  // Gated on noteQuery.data?.note?.vaultId so we don't kick off the
+  // list query until we know which vault the current note lives in.
+  const vaultIdForList = noteQuery.data?.note?.vaultId ?? 0;
+  const notesForLinkQuery = trpc.agentStudio.vault.listNotes.useQuery(
+    { vaultId: vaultIdForList, limit: 200 },
+    { enabled: vaultIdForList > 0 },
+  );
 
   const [mode, setMode] = useState<Mode>("read");
   const [draftMd, setDraftMd] = useState<string | null>(null);
@@ -79,6 +88,27 @@ export default function MarkdownEditorPane({
     () => (draftMd !== null ? draftMd : upstreamMd),
     [draftMd, upstreamMd],
   );
+
+  // Track B — B3 — wikilink autocomplete extension. Memoized on the
+  // notes list — the editor only re-mounts when the extension array
+  // identity changes, so a stable memo keeps cursor + history alive
+  // across keystrokes. The current note is excluded from suggestions
+  // (we don't typically wikilink to ourselves).
+  const wikilinkExtensionList = useMemo(() => {
+    const sourceNotes = (notesForLinkQuery.data ?? []) as Array<{
+      id: number;
+      slug?: string | null;
+      title?: string | null;
+    }>;
+    const suggestions = sourceNotes
+      .filter((n) => n.id !== noteId && typeof n.slug === "string")
+      .map((n) => ({ slug: n.slug as string, title: n.title ?? null }));
+    return [
+      wikilinkAutocomplete({
+        getSuggestions: () => suggestions,
+      }),
+    ];
+  }, [notesForLinkQuery.data, noteId]);
 
   // NOTE: handleSave + the auto-save effect live above the early
   // returns below so React's rules of hooks aren't violated when
@@ -237,6 +267,7 @@ export default function MarkdownEditorPane({
             value={liveText}
             readOnly={readOnly}
             onChange={(next) => setDraftMd(next)}
+            extraExtensions={wikilinkExtensionList}
             className="w-full h-full min-h-[300px] border rounded font-sans text-sm overflow-hidden"
           />
         )}

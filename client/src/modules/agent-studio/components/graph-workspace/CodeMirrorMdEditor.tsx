@@ -48,6 +48,13 @@ export interface CodeMirrorMdEditorProps {
   readonly testId?: string;
   /** Optional className for layout (the inner CM root expands to fill). */
   readonly className?: string;
+  /**
+   * Track B follow-on slices (B3 wikilink, B4 tag, B6 embed) layer
+   * extra extensions on top of the base set. The editor mounts them
+   * once at construction time; reconfiguring after mount would lose
+   * cursor + history, so pass a stable array (or memoize).
+   */
+  readonly extraExtensions?: readonly import("@codemirror/state").Extension[];
 }
 
 export default function CodeMirrorMdEditor({
@@ -56,6 +63,7 @@ export default function CodeMirrorMdEditor({
   readOnly = false,
   testId = "codemirror-md-editor",
   className,
+  extraExtensions,
 }: CodeMirrorMdEditorProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -87,6 +95,7 @@ export default function CodeMirrorMdEditor({
           const next = update.state.doc.toString();
           onChangeRef.current(next);
         }),
+        ...(extraExtensions ?? []),
       ],
     });
     const view = new EditorView({

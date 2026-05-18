@@ -18,6 +18,12 @@ export { default as RuntimeAndDecisionTraceView } from "./RuntimeAndDecisionTrac
 export { default as VaultFsSyncPanel } from "./VaultFsSyncPanel";
 export { default as CodeMirrorMdEditor } from "./CodeMirrorMdEditor";
 export {
+  buildWikilinkCompletionSource,
+  wikilinkAutocomplete,
+  type WikilinkSuggestion,
+  type WikilinkAutocompleteOptions,
+} from "./wikilink-autocomplete";
+export {
   default as WorkspaceStateLayer,
   WORKSPACE_STATE_METADATA,
   classifyWorkspaceState,
