@@ -52,3 +52,12 @@ export {
   type CreateSemanticEnrichmentProposerOptions,
   type ProposeInput,
 } from "./semantic-enrichment-proposer.js";
+
+export {
+  listSemanticEnrichmentCandidates,
+  SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT,
+  SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT,
+  DEFAULT_WEAK_DESCRIPTION_MAX_LENGTH,
+  type ListSemanticEnrichmentCandidatesInput,
+  type SemanticEnrichmentCandidatesEnvelope,
+} from "./semantic-enrichment-candidate-selector.js";
