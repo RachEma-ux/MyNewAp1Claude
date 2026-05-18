@@ -70,22 +70,24 @@ import { listSemanticEnrichmentCandidates } from "./semantic-enrichment-candidat
  * candidate selector module actually returns non-empty data for —
  * keep in sync with `semantic-enrichment-candidate-selector.ts`.
  *
- * 2026-05-18: ALL 5 kinds wired (T-D.3.δ-followup α/β/γ/δ closed
- * 2026-05-18). Coverage matrix:
+ * 2026-05-18: ALL 5 kinds wired (T-D.3.δ-followup α/β/γ/δ + the
+ * row-id-aware evidence-collector follow-up). Coverage matrix:
  *
  *   - `description_enrichment` / `missing_property_fill` →
- *     `targetKind: "node"` (existing collector + proposer
- *     handle these cleanly).
- *   - `entity_disambiguation` (β) → `targetKind: "entity"` —
- *     entity row ids aren't text-matchable against KB content;
- *     candidates land as `candidatesSkippedNoCitations` until a
- *     future row-id-aware evidence-collector slice ships.
- *   - `relationship_label_repair` (γ) → `targetKind: "edge"` —
- *     same MVP caveat as `entity` targets.
- *   - `stale_fact_refresh` (δ) → `targetKind: "node_property"` —
- *     carries the stale `propertyKey`; the underlying node id IS
- *     text-matchable, so the existing collector returns citations
- *     and the agent can propose without changes.
+ *     `targetKind: "node"`; collector text-matches the node id.
+ *   - `entity_disambiguation` (β) → `targetKind: "entity"`; collector
+ *     resolves the entity's `canonical_label` from `ags_graph_entities`
+ *     and text-matches that against `content_text`.
+ *   - `relationship_label_repair` (γ) → `targetKind: "edge"`;
+ *     collector resolves the edge's `(source_node_id, target_node_id)`
+ *     and text-matches EITHER endpoint id.
+ *   - `stale_fact_refresh` (δ) → `targetKind: "node_property"`;
+ *     carries the stale `propertyKey`; collector text-matches the
+ *     node id (same as `"node"`); the `propertyKey` rides through
+ *     to the proposer.
+ *
+ * Every kind produces real citations against the KB now — the
+ * β/γ MVP "skipped_no_citations" caveat is closed.
  */
 export const SUPPORTED_TRIGGER_PROPOSAL_KINDS: ReadonlyArray<SemanticEnrichmentProposalKind> = [
   "description_enrichment",

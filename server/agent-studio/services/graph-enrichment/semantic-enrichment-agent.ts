@@ -210,6 +210,10 @@ export function createSemanticEnrichmentAgent(
             workspaceId: input.workspaceId,
             targetTypeKey: candidate.targetTypeKey,
             targetId: candidate.targetId,
+            targetKind: candidate.targetKind,
+            ...(candidate.targetKind === "node_property"
+              ? { propertyKey: candidate.propertyKey }
+              : {}),
           });
           if (citations.length === 0) {
             candidatesSkippedNoCitations++;
