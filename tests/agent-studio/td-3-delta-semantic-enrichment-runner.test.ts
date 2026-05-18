@@ -99,9 +99,14 @@ beforeEach(() => {
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ — supported-kind gate", () => {
-  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists exactly the 3 wired kinds", () => {
+  it("SUPPORTED_TRIGGER_PROPOSAL_KINDS lists exactly the 4 wired kinds", () => {
     expect([...SUPPORTED_TRIGGER_PROPOSAL_KINDS].sort()).toEqual(
-      ["description_enrichment", "entity_disambiguation", "missing_property_fill"].sort(),
+      [
+        "description_enrichment",
+        "entity_disambiguation",
+        "missing_property_fill",
+        "relationship_label_repair",
+      ].sort(),
     );
   });
 
@@ -117,11 +122,12 @@ describe("T-D.3.δ — supported-kind gate", () => {
     expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(true);
   });
 
-  it("isSupportedTriggerProposalKind returns false for the 2 deferred kinds", () => {
+  it("isSupportedTriggerProposalKind returns true for relationship_label_repair (T-D.3.δ-followup γ)", () => {
+    expect(isSupportedTriggerProposalKind("relationship_label_repair")).toBe(true);
+  });
+
+  it("isSupportedTriggerProposalKind returns false for the 1 remaining deferred kind", () => {
     expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
-    expect(isSupportedTriggerProposalKind("relationship_label_repair")).toBe(
-      false,
-    );
   });
 });
 
@@ -130,7 +136,7 @@ describe("T-D.3.δ — supported-kind gate", () => {
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
-  it("returns kind_not_yet_supported for stale_fact_refresh without touching I/O", async () => {
+  it("returns kind_not_yet_supported for stale_fact_refresh — the last remaining deferred kind", async () => {
     const result = await runSemanticEnrichment(
       {
         workspaceId: 1,
@@ -146,29 +152,17 @@ describe("T-D.3.δ — kind_not_yet_supported envelope", () => {
     if (result.status === "kind_not_yet_supported") {
       expect(result.proposalKind).toBe("stale_fact_refresh");
       expect([...result.supportedKinds].sort()).toEqual(
-        ["description_enrichment", "entity_disambiguation", "missing_property_fill"].sort(),
+        [
+          "description_enrichment",
+          "entity_disambiguation",
+          "missing_property_fill",
+          "relationship_label_repair",
+        ].sort(),
       );
       expect(result.message).toMatch(/contract extension/i);
     }
     expect(listCandidatesMock).not.toHaveBeenCalled();
     expect(createAgentMock).not.toHaveBeenCalled();
-  });
-
-  it("returns kind_not_yet_supported for relationship_label_repair (only deferred non-stale kind)", async () => {
-    const result = await runSemanticEnrichment(
-      {
-        workspaceId: 1,
-        proposalKind: "relationship_label_repair",
-        providerConnectionId: 11,
-        modelRef: "anthropic/claude-haiku-4-5",
-        actorId: 99,
-      },
-      { modelAccessExecute: vi.fn() },
-    );
-    expect(result.status).toBe("kind_not_yet_supported");
-    if (result.status === "kind_not_yet_supported") {
-      expect(result.proposalKind).toBe("relationship_label_repair");
-    }
   });
 });
 

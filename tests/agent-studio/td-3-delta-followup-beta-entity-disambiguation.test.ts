@@ -115,24 +115,16 @@ describe("T-D.3.δ-followup β — listSemanticEnrichmentCandidates dispatch", (
     expect(result.weakDescriptionMaxLengthUsed).toBeNull();
   });
 
-  it("returns empty envelope for relationship_label_repair (still deferred) even when DB exists", async () => {
-    // Even with a non-null DB, the deferred-kind branch short-circuits.
-    dbMock.mockReturnValue({});
-    const result = await listSemanticEnrichmentCandidates({
-      workspaceId: 1,
-      proposalKind: "relationship_label_repair",
-    });
-    expect(result.candidates).toEqual([]);
-    expect(result.weakDescriptionMaxLengthUsed).toBeNull();
-  });
-
-  it("returns empty envelope for stale_fact_refresh (still deferred)", async () => {
+  it("returns empty envelope for stale_fact_refresh (still deferred at γ time)", async () => {
+    // After T-D.3.δ-followup γ landed, only stale_fact_refresh hits
+    // the deferred-kind short-circuit branch.
     dbMock.mockReturnValue({});
     const result = await listSemanticEnrichmentCandidates({
       workspaceId: 1,
       proposalKind: "stale_fact_refresh",
     });
     expect(result.candidates).toEqual([]);
+    expect(result.weakDescriptionMaxLengthUsed).toBeNull();
   });
 });
 
@@ -151,8 +143,7 @@ describe("T-D.3.δ-followup β — runner gate admits entity_disambiguation", ()
     expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(true);
   });
 
-  it("predicate returns false for the 2 remaining deferred kinds", () => {
-    expect(isSupportedTriggerProposalKind("relationship_label_repair")).toBe(false);
+  it("predicate returns false for the remaining deferred kind at γ time (stale_fact_refresh)", () => {
     expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
   });
 });
@@ -162,9 +153,11 @@ describe("T-D.3.δ-followup β — runner gate admits entity_disambiguation", ()
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ-followup β — doc lockstep", () => {
-  it("selector header doc names the 3/5 coverage state", () => {
+  it("selector header doc names entity_disambiguation in the coverage list", () => {
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
-    expect(src).toMatch(/3\/5\s+kinds/);
+    // Match \"N/5 kinds\" — exact N widens as follow-ups land; β established
+    // the bullet structure. Keep this assertion permissive past γ/δ.
+    expect(src).toMatch(/[2-5]\/5\s+kinds/);
     expect(src).toMatch(/entity_disambiguation/);
   });
 
