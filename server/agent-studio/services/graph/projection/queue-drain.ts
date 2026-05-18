@@ -31,7 +31,7 @@
  * returned summary, and continues to the next row.
  */
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, lt, or, sql } from "drizzle-orm";
 import { getAsDb } from "../../../db/connection.js";
 import { agsGraphProjectionSyncJobs } from "../../../../../drizzle/tables/agent-studio-graph-projection.js";
 import { ProjectionSyncWorker } from "./sync-worker.js";
@@ -163,11 +163,29 @@ export function translatePendingRowToEvent(
 // Default ASDB-backed loaders
 // ---------------------------------------------------------------------------
 
+/**
+ * Maximum retry attempts for a failed row before the drain stops
+ * re-attempting it. After this many failures the row stays in
+ * `failed` status indefinitely; operator intervention (manual
+ * reset or `runDrainNow` via the admin tRPC after fixing the
+ * underlying issue) is required.
+ *
+ * 3 attempts is a deliberately small cap — most transient failures
+ * (Neo4j brief unavailability, deadlock retry) recover within the
+ * first 1-2 retries; persistent failures (bad payload, type
+ * mismatch, schema drift) shouldn't burn cycles on perpetual retry.
+ */
+export const MAX_DRAIN_RETRY_ATTEMPTS = 3;
+
 async function defaultFetchPending(
   limit: number,
 ): Promise<PendingProjectionJobRow[]> {
   const db = getAsDb();
   if (!db) return [];
+  // Include both fresh-pending rows AND failed rows under the retry
+  // cap. The drain re-attempts them; on success they flip to
+  // 'completed', on failure retry_count increments and they stay
+  // 'failed' (and re-appear on the next pass until exhausted).
   const rows = await db
     .select({
       id: agsGraphProjectionSyncJobs.id,
@@ -176,7 +194,18 @@ async function defaultFetchPending(
       triggerPayload: agsGraphProjectionSyncJobs.triggerPayload,
     })
     .from(agsGraphProjectionSyncJobs)
-    .where(eq(agsGraphProjectionSyncJobs.status, "pending"))
+    .where(
+      or(
+        eq(agsGraphProjectionSyncJobs.status, "pending"),
+        and(
+          eq(agsGraphProjectionSyncJobs.status, "failed"),
+          lt(
+            agsGraphProjectionSyncJobs.retryCount,
+            MAX_DRAIN_RETRY_ATTEMPTS,
+          ),
+        ),
+      ),
+    )
     .orderBy(asc(agsGraphProjectionSyncJobs.id))
     .limit(limit);
   return rows.map((r) => ({
@@ -194,14 +223,28 @@ async function defaultUpdateRowStatus(
 ): Promise<void> {
   const db = getAsDb();
   if (!db) return;
+  // Increment retry_count when transitioning to 'failed' (whether
+  // first failure or N-th retry); keep it stable on completed /
+  // unknown_event_kind. Postgres-side increment keeps the
+  // orchestrator stateless re: retry bookkeeping.
+  const set =
+    status === "failed"
+      ? {
+          status,
+          lastError,
+          retryCount: sql`${agsGraphProjectionSyncJobs.retryCount} + 1`,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        }
+      : {
+          status,
+          lastError,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        };
   await db
     .update(agsGraphProjectionSyncJobs)
-    .set({
-      status,
-      lastError,
-      completedAt: new Date(),
-      updatedAt: new Date(),
-    })
+    .set(set)
     .where(eq(agsGraphProjectionSyncJobs.id, rowId));
 }
 
