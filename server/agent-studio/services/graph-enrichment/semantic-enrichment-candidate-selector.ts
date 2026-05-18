@@ -2,18 +2,23 @@
  * Semantic Enrichment candidate selector — T-D.3.δ-prep.
  *
  * Surfaces nodes that the Semantic Enrichment Agent should consider
- * for proposal generation. Today it covers the
- * `description_enrichment` kind only — the SQL: nodes whose
- * `description` property is missing OR whose stringified
- * `property_value` is shorter than `weakDescriptionMaxLength`
- * (default 40 chars including JSON quoting).
+ * for proposal generation. Today covers two of the five kinds:
+ *   - `description_enrichment` — nodes whose `description` property
+ *     is missing OR whose stringified `property_value` is shorter
+ *     than `weakDescriptionMaxLength` (default 40 chars including
+ *     JSON quoting).
+ *   - `missing_property_fill` — nodes that have at least one
+ *     `agsGraphOntologyPropertyDefinitions[required=true]` row
+ *     with no corresponding `agsGraphNodeProperties` row. Returned
+ *     once per node; the agent collector enumerates the specific
+ *     missing properties at run-time.
  *
- * Other proposal kinds (`missing_property_fill`,
- * `stale_fact_refresh`, `entity_disambiguation`,
- * `relationship_label_repair`) return an empty list with a TODO
- * marker. Each requires its own selection signal (e.g.,
- * source-version diff for `stale_fact_refresh`) — those are added
- * in follow-up slices alongside their respective scanners.
+ * The three remaining kinds (`stale_fact_refresh`,
+ * `entity_disambiguation`, `relationship_label_repair`) return an
+ * empty list with a TODO marker. Each requires its own selection
+ * signal (e.g., source-version diff for `stale_fact_refresh`) —
+ * those are added in follow-up slices alongside their respective
+ * scanners.
  *
  * Why a separate module rather than extending
  * `semantic-enrichment-store.ts`:
@@ -34,6 +39,7 @@ import { getAsDb } from "../../db/connection.js";
 import {
   agsGraphNodes,
   agsGraphNodeProperties,
+  agsGraphOntologyPropertyDefinitions,
 } from "../../../../drizzle/tables/agent-studio-graph.js";
 import type { SemanticEnrichmentProposalKind } from "./contracts.js";
 import type { SemanticEnrichmentCandidate } from "./semantic-enrichment-agent.js";
@@ -96,10 +102,12 @@ export async function listSemanticEnrichmentCandidates(
 ): Promise<SemanticEnrichmentCandidatesEnvelope> {
   const limit = normalizeLimit(input.limit);
 
-  if (input.proposalKind !== "description_enrichment") {
-    // TODO(T-D.3.δ-followup): plumb selectors for the other 4
+  if (
+    input.proposalKind !== "description_enrichment" &&
+    input.proposalKind !== "missing_property_fill"
+  ) {
+    // TODO(T-D.3.δ-followup): plumb selectors for the remaining 3
     // proposal kinds. Each needs its own scanner:
-    //   - missing_property_fill → required-but-null property scanner
     //   - stale_fact_refresh → source-version newer than fact scanner
     //   - entity_disambiguation → duplicate canonical_label scanner
     //   - relationship_label_repair → generic-edge-label scanner
@@ -121,6 +129,18 @@ export async function listSemanticEnrichmentCandidates(
     };
   }
 
+  if (input.proposalKind === "missing_property_fill") {
+    return await listMissingPropertyFillCandidates(input, db, limit);
+  }
+
+  return await listDescriptionEnrichmentCandidates(input, db, limit);
+}
+
+async function listDescriptionEnrichmentCandidates(
+  input: ListSemanticEnrichmentCandidatesInput,
+  db: NonNullable<ReturnType<typeof getAsDb>>,
+  limit: number,
+): Promise<SemanticEnrichmentCandidatesEnvelope> {
   const threshold = normalizeWeakDescriptionMaxLength(
     input.weakDescriptionMaxLength,
   );
@@ -170,5 +190,88 @@ export async function listSemanticEnrichmentCandidates(
     candidates,
     truncated,
     weakDescriptionMaxLengthUsed: threshold,
+  };
+}
+
+/**
+ * `missing_property_fill` candidate set: nodes that have at least
+ * one ontology-required property without a corresponding
+ * `agsGraphNodeProperties` row.
+ *
+ * SQL outline (one row per (node, missing required property), then
+ * DISTINCT to one row per node):
+ *
+ *   SELECT DISTINCT n.id, n.type_key
+ *   FROM ags_graph_nodes n
+ *   JOIN ags_graph_ontology_property_definitions pd
+ *     ON pd.type_key = n.type_key AND pd.type_kind = 'node'
+ *    AND pd.required = true
+ *   LEFT JOIN ags_graph_node_properties p
+ *     ON p.node_id = n.id AND p.property_key = pd.property_key
+ *   WHERE n.workspace_id = $1
+ *     AND n.governance_status = 'active'
+ *     AND p.id IS NULL
+ *
+ * Per-property surfacing (which property is missing) is deliberately
+ * NOT carried on the candidate — the agent's collector enumerates
+ * those at run-time. Keeps the candidate contract uniform across
+ * kinds (one row per node, regardless of how many properties need
+ * filling).
+ */
+async function listMissingPropertyFillCandidates(
+  input: ListSemanticEnrichmentCandidatesInput,
+  db: NonNullable<ReturnType<typeof getAsDb>>,
+  limit: number,
+): Promise<SemanticEnrichmentCandidatesEnvelope> {
+  const rows = await db
+    .selectDistinct({
+      typeKey: agsGraphNodes.typeKey,
+      nodeId: agsGraphNodes.id,
+    })
+    .from(agsGraphNodes)
+    .innerJoin(
+      agsGraphOntologyPropertyDefinitions,
+      and(
+        eq(agsGraphOntologyPropertyDefinitions.typeKey, agsGraphNodes.typeKey),
+        eq(agsGraphOntologyPropertyDefinitions.typeKind, "node"),
+        eq(agsGraphOntologyPropertyDefinitions.required, true),
+      ),
+    )
+    .leftJoin(
+      agsGraphNodeProperties,
+      and(
+        eq(agsGraphNodeProperties.nodeId, agsGraphNodes.id),
+        eq(
+          agsGraphNodeProperties.propertyKey,
+          agsGraphOntologyPropertyDefinitions.propertyKey,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(agsGraphNodes.workspaceId, input.workspaceId),
+        eq(agsGraphNodes.governanceStatus, "active"),
+        input.typeKey !== undefined
+          ? eq(agsGraphNodes.typeKey, input.typeKey)
+          : undefined,
+        isNull(agsGraphNodeProperties.id),
+      ),
+    )
+    .limit(limit + 1);
+
+  const truncated = rows.length > limit;
+  const trimmed = truncated ? rows.slice(0, limit) : rows;
+
+  const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetTypeKey: r.typeKey,
+    targetId: r.nodeId,
+    proposalKind: "missing_property_fill" as const,
+  }));
+
+  return {
+    proposalKind: "missing_property_fill",
+    candidates,
+    truncated,
+    weakDescriptionMaxLengthUsed: null,
   };
 }
