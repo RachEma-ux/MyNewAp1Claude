@@ -8,17 +8,9 @@ name: Design App Deploy
 # minutes.
 
 on:
-  # Auto-run when the Design app or this workflow changes on the working
-  # branch. Uses defaults (duration=30, entry=index.html). Restricted to a
-  # single branch + narrow paths so we don't burn 30 min of runner time
-  # on every unrelated push.
-  push:
-    branches:
-      - 'claude/create-design-repo-JUzJD'
-    paths:
-      - 'index.html'
-      - 'dashboard.html'
-      - '.github/workflows/design-deploy.yml'
+  # Manual trigger only — click "Run workflow" in the Actions tab. The
+  # tunnel URL appears in the run summary ~90s after launch and stays
+  # open for the chosen duration.
   workflow_dispatch:
     inputs:
       duration:
