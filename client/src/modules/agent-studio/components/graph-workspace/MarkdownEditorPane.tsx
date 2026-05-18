@@ -5,8 +5,10 @@
  *
  * Reuse-first:
  *   - Read mode: AppStreamdown (existing react-markdown renderer)
- *   - Edit mode: native textarea (no new npm dep) with dirty state
- *   - Source mode: monospaced raw Markdown view (also via textarea)
+ *   - Edit mode: **CodeMirror 6** with markdown language (B2). Replaces
+ *     the prior plain textarea. Source mode keeps the textarea for
+ *     power users who want a raw view of frontmatter + wikilinks.
+ *   - Source mode: monospaced raw Markdown view (textarea)
  *
  * Save path:
  *   - trpc.agentStudio.vault.updateNote (existing CRDT-aware procedure)
@@ -24,6 +26,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
+import CodeMirrorMdEditor from "./CodeMirrorMdEditor";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
@@ -229,13 +232,12 @@ export default function MarkdownEditorPane({
       <div className="flex-1 min-h-0 overflow-auto p-3" data-testid="markdown-editor-body">
         {mode === "read" && <AppStreamdown>{liveText}</AppStreamdown>}
         {mode === "edit" && (
-          <textarea
-            data-testid="markdown-editor-textarea-edit"
-            className="w-full h-full min-h-[300px] border rounded p-2 font-sans text-sm"
+          <CodeMirrorMdEditor
+            testId="markdown-editor-cm-edit"
             value={liveText}
-            disabled={readOnly}
-            onChange={(e) => setDraftMd(e.target.value)}
-            spellCheck
+            readOnly={readOnly}
+            onChange={(next) => setDraftMd(next)}
+            className="w-full h-full min-h-[300px] border rounded font-sans text-sm overflow-hidden"
           />
         )}
         {mode === "source" && (
