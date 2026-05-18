@@ -139,14 +139,9 @@ describe("T-D.3.δ-followup γ — listSemanticEnrichmentCandidates dispatch", (
     expect(result.truncated).toBe(false);
   });
 
-  it("still routes stale_fact_refresh to the deferred empty-envelope path", async () => {
-    dbMock.mockReturnValue({});
-    const result = await listSemanticEnrichmentCandidates({
-      workspaceId: 1,
-      proposalKind: "stale_fact_refresh",
-    });
-    expect(result.candidates).toEqual([]);
-  });
+  // (γ-time "stale_fact_refresh deferred-routing" assertion removed at δ —
+  //  stale_fact_refresh has its own selector now. See
+  //  td-3-delta-followup-delta-stale-fact for the post-δ snapshot.)
 });
 
 // ────────────────────────────────────────────────────────────────────
@@ -166,9 +161,8 @@ describe("T-D.3.δ-followup γ — runner gate admits relationship_label_repair"
     );
   });
 
-  it("predicate returns false for the 1 remaining deferred kind", () => {
-    expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
-  });
+  // (γ-time "1 remaining deferred kind" assertion removed at δ — δ
+  //  closed the gate at 5/5. See td-3-delta-followup-delta-stale-fact.)
 });
 
 // ────────────────────────────────────────────────────────────────────
@@ -176,9 +170,11 @@ describe("T-D.3.δ-followup γ — runner gate admits relationship_label_repair"
 // ────────────────────────────────────────────────────────────────────
 
 describe("T-D.3.δ-followup γ — doc + barrel lockstep", () => {
-  it("selector header doc names the 4/5 coverage state", () => {
+  it("selector header doc names relationship_label_repair in the coverage list", () => {
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
-    expect(src).toMatch(/4\/5\s+kinds/);
+    // Coverage state widens past 4/5 once δ lands; keep the assertion
+    // permissive on the count.
+    expect(src).toMatch(/[3-5]\/5\s+kinds/);
     expect(src).toMatch(/relationship_label_repair/);
   });
 

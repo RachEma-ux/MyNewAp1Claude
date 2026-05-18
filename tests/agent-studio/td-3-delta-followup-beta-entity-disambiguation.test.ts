@@ -115,17 +115,11 @@ describe("T-D.3.δ-followup β — listSemanticEnrichmentCandidates dispatch", (
     expect(result.weakDescriptionMaxLengthUsed).toBeNull();
   });
 
-  it("returns empty envelope for stale_fact_refresh (still deferred at γ time)", async () => {
-    // After T-D.3.δ-followup γ landed, only stale_fact_refresh hits
-    // the deferred-kind short-circuit branch.
-    dbMock.mockReturnValue({});
-    const result = await listSemanticEnrichmentCandidates({
-      workspaceId: 1,
-      proposalKind: "stale_fact_refresh",
-    });
-    expect(result.candidates).toEqual([]);
-    expect(result.weakDescriptionMaxLengthUsed).toBeNull();
-  });
+  // (β-time "stale_fact_refresh is deferred" assertion removed at δ.
+  //  δ landed the stale_fact_refresh selector; the deferred-kind
+  //  fallthrough branch is now a defensive guard for future taxonomy
+  //  expansion only — see td-3-delta-followup-delta-stale-fact for
+  //  the post-δ snapshot.)
 });
 
 // ────────────────────────────────────────────────────────────────────
@@ -143,9 +137,8 @@ describe("T-D.3.δ-followup β — runner gate admits entity_disambiguation", ()
     expect(isSupportedTriggerProposalKind("entity_disambiguation")).toBe(true);
   });
 
-  it("predicate returns false for the remaining deferred kind at γ time (stale_fact_refresh)", () => {
-    expect(isSupportedTriggerProposalKind("stale_fact_refresh")).toBe(false);
-  });
+  // (β-time "stale_fact_refresh returns false" assertion removed at δ
+  //  per the comment above; see td-3-delta-followup-delta-stale-fact.)
 });
 
 // ────────────────────────────────────────────────────────────────────

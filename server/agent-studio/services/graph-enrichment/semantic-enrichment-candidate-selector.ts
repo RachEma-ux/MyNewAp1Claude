@@ -1,8 +1,8 @@
 /**
- * Semantic Enrichment candidate selector — T-D.3.δ-prep + T-D.3.δ-followup α/β/γ.
+ * Semantic Enrichment candidate selector — T-D.3.δ-prep + T-D.3.δ-followup α/β/γ/δ.
  *
  * Surfaces graph entities that the Semantic Enrichment Agent should
- * consider for proposal generation. Coverage today is **4/5 kinds**:
+ * consider for proposal generation. Coverage is now **5/5 kinds**:
  *
  *   - `description_enrichment` — nodes whose `description` property
  *     is missing OR whose stringified `property_value` is shorter
@@ -32,9 +32,21 @@
  *     `targetKind: "edge"`. **Same MVP caveat as entity_disambiguation:**
  *     edge row ids aren't text-matchable against KB content, so
  *     candidates land as `candidatesSkippedNoCitations` today.
- *
- * The remaining deferred kind — `stale_fact_refresh` (node-property
- * tuple, source-version divergence) — waits behind T-D.3.δ-followup δ.
+ *   - `stale_fact_refresh` — `(node, property)` tuples where the node
+ *     was re-projected more recently than the property was updated.
+ *     The schema doesn't track per-property source-version (properties
+ *     only have `created_at` / `updated_at`), so the freshness signal
+ *     is purely temporal: `node.updated_at > property.updated_at +
+ *     STALE_FACT_GRACE_MS` (default grace 1 hour). The grace prevents
+ *     false positives during normal reprojection cycles where the
+ *     node row is touched but the property delta is genuinely
+ *     unchanged. Emits `targetKind: "node_property"` carrying the
+ *     stale `propertyKey`. **MVP caveat:** the existing evidence
+ *     collector matches node ids — a node-property candidate's node id
+ *     IS text-matchable, so the collector returns citations and the
+ *     agent can propose. The proposer just sees the (node, propertyKey)
+ *     pair as a "refresh this property" hint via `proposalKind` —
+ *     no proposer changes needed.
  *
  * Why a separate module rather than extending
  * `semantic-enrichment-store.ts`:
@@ -83,6 +95,17 @@ export const GENERIC_EDGE_TYPE_KEYS = [
 ] as const;
 export type GenericEdgeTypeKey = (typeof GENERIC_EDGE_TYPE_KEYS)[number];
 
+/**
+ * Grace window (ms) used by `stale_fact_refresh` — a property is only
+ * surfaced when `node.updated_at > property.updated_at + grace`. The
+ * grace prevents false positives during normal reprojection cycles
+ * where the node row is touched but the property delta is genuinely
+ * unchanged. Configurable per-call via
+ * `ListSemanticEnrichmentCandidatesInput.staleFactGraceMs` for
+ * operator-driven tuning.
+ */
+export const DEFAULT_STALE_FACT_GRACE_MS = 60 * 60 * 1000; // 1 hour
+
 export interface ListSemanticEnrichmentCandidatesInput {
   readonly workspaceId: number;
   readonly proposalKind: SemanticEnrichmentProposalKind;
@@ -98,6 +121,12 @@ export interface ListSemanticEnrichmentCandidatesInput {
    * operator wants to focus enrichment on one slice of the graph.
    */
   readonly typeKey?: string;
+  /**
+   * Override for the `stale_fact_refresh` grace window in milliseconds.
+   * Only consulted for that kind. Defaults to
+   * `DEFAULT_STALE_FACT_GRACE_MS` (1 hour).
+   */
+  readonly staleFactGraceMs?: number;
 }
 
 export interface SemanticEnrichmentCandidatesEnvelope {
@@ -136,23 +165,18 @@ export async function listSemanticEnrichmentCandidates(
 ): Promise<SemanticEnrichmentCandidatesEnvelope> {
   const limit = normalizeLimit(input.limit);
 
+  // All 5 SemanticEnrichmentProposalKind values now have wired
+  // selectors. The future-proof guard below short-circuits with an
+  // empty envelope if a new kind ships in `contracts.ts` without a
+  // corresponding selector entry — keeping a defensive guard on a
+  // closed taxonomy that may grow.
   if (
     input.proposalKind !== "description_enrichment" &&
     input.proposalKind !== "missing_property_fill" &&
     input.proposalKind !== "entity_disambiguation" &&
-    input.proposalKind !== "relationship_label_repair"
+    input.proposalKind !== "relationship_label_repair" &&
+    input.proposalKind !== "stale_fact_refresh"
   ) {
-    // α landed the discriminated-union contract; β shipped
-    // `entity_disambiguation`; γ ships `relationship_label_repair`
-    // below. The single remaining deferred selector waits behind:
-    //
-    //   - stale_fact_refresh → produces `targetKind: "node_property"`;
-    //     SQL: (node, property) tuples where source-version diverges
-    //     from latest property update — T-D.3.δ-followup δ
-    //
-    // The variant interface lives in `semantic-enrichment-agent.ts`. The
-    // runner's `SUPPORTED_TRIGGER_PROPOSAL_KINDS` gate keeps the kind
-    // out of the agent loop until its selector + agent-side handler land.
     return {
       proposalKind: input.proposalKind,
       candidates: [],
@@ -181,6 +205,10 @@ export async function listSemanticEnrichmentCandidates(
 
   if (input.proposalKind === "relationship_label_repair") {
     return await listRelationshipLabelRepairCandidates(input, db, limit);
+  }
+
+  if (input.proposalKind === "stale_fact_refresh") {
+    return await listStaleFactRefreshCandidates(input, db, limit);
   }
 
   return await listDescriptionEnrichmentCandidates(input, db, limit);
@@ -518,6 +546,91 @@ async function listRelationshipLabelRepairCandidates(
 
   return {
     proposalKind: "relationship_label_repair",
+    candidates,
+    truncated,
+    weakDescriptionMaxLengthUsed: null,
+  };
+}
+
+/**
+ * `stale_fact_refresh` candidate set — T-D.3.δ-followup δ.
+ *
+ * Selects `(node, property)` tuples where the node was re-projected
+ * more recently than the property was updated. The schema does not
+ * track per-property `source_version_id` — `ags_graph_node_properties`
+ * only carries `created_at` / `updated_at` — so the freshness signal
+ * is purely temporal:
+ *
+ *   node.updated_at  >  property.updated_at + grace
+ *
+ * The `grace` window (default 1 hour, configurable via
+ * `staleFactGraceMs`) prevents false positives during normal
+ * reprojection cycles where the node row is touched but the property
+ * delta is genuinely unchanged.
+ *
+ * SQL outline:
+ *
+ *   SELECT n.id, n.type_key, p.property_key
+ *   FROM ags_graph_node_properties p
+ *   INNER JOIN ags_graph_nodes n ON n.id = p.node_id
+ *   WHERE n.workspace_id = $1
+ *     AND n.governance_status = 'active'
+ *     AND n.updated_at > p.updated_at + INTERVAL '$grace_ms milliseconds'
+ *     [AND n.type_key = $typeKey]
+ *   ORDER BY n.id, p.property_key
+ *   LIMIT $N + 1
+ *
+ * Returned candidates carry the stale `propertyKey` on the variant —
+ * `targetKind: "node_property"` distinguishes them from the
+ * `description_enrichment` / `missing_property_fill` node-shape paths.
+ */
+async function listStaleFactRefreshCandidates(
+  input: ListSemanticEnrichmentCandidatesInput,
+  db: NonNullable<ReturnType<typeof getAsDb>>,
+  limit: number,
+): Promise<SemanticEnrichmentCandidatesEnvelope> {
+  const graceMs =
+    input.staleFactGraceMs !== undefined && Number.isFinite(input.staleFactGraceMs)
+      ? Math.max(0, Math.trunc(input.staleFactGraceMs))
+      : DEFAULT_STALE_FACT_GRACE_MS;
+
+  const rows = await db
+    .select({
+      nodeId: agsGraphNodes.id,
+      typeKey: agsGraphNodes.typeKey,
+      propertyKey: agsGraphNodeProperties.propertyKey,
+    })
+    .from(agsGraphNodeProperties)
+    .innerJoin(
+      agsGraphNodes,
+      eq(agsGraphNodes.id, agsGraphNodeProperties.nodeId),
+    )
+    .where(
+      and(
+        eq(agsGraphNodes.workspaceId, input.workspaceId),
+        eq(agsGraphNodes.governanceStatus, "active"),
+        sql`${agsGraphNodes.updatedAt} > ${agsGraphNodeProperties.updatedAt} + (${graceMs}::bigint * INTERVAL '1 millisecond')`,
+        input.typeKey !== undefined
+          ? eq(agsGraphNodes.typeKey, input.typeKey)
+          : undefined,
+      ),
+    )
+    .orderBy(agsGraphNodes.id, agsGraphNodeProperties.propertyKey)
+    .limit(limit + 1);
+
+  const truncated = rows.length > limit;
+  const trimmed = truncated ? rows.slice(0, limit) : rows;
+
+  const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetKind: "node_property" as const,
+    targetTypeKey: r.typeKey,
+    targetId: r.nodeId,
+    propertyKey: r.propertyKey,
+    proposalKind: "stale_fact_refresh" as const,
+  }));
+
+  return {
+    proposalKind: "stale_fact_refresh",
     candidates,
     truncated,
     weakDescriptionMaxLengthUsed: null,

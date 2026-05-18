@@ -70,28 +70,29 @@ import { listSemanticEnrichmentCandidates } from "./semantic-enrichment-candidat
  * candidate selector module actually returns non-empty data for —
  * keep in sync with `semantic-enrichment-candidate-selector.ts`.
  *
- * 2026-05-18: `description_enrichment` + `missing_property_fill` +
- * `entity_disambiguation` + `relationship_label_repair` (4/5). The
- * first two emit `targetKind: "node"` candidates that flow through
- * the existing evidence collector + proposer cleanly. The third
- * (T-D.3.δ-followup β) emits `targetKind: "entity"`; the fourth
- * (T-D.3.δ-followup γ) emits `targetKind: "edge"`. The evidence
- * collector's current `content_text ILIKE '%<targetId>%'` heuristic
- * doesn't match entity or edge row ids in any useful way, so those
- * candidates land as `candidatesSkippedNoCitations` in the agent run
- * until a future row-id-aware evidence-collector slice ships.
- * Admitting the kinds at the runner gate makes the "N candidates
- * found, N skipped" signal actionable for operators even before the
- * citation surface widens.
+ * 2026-05-18: ALL 5 kinds wired (T-D.3.δ-followup α/β/γ/δ closed
+ * 2026-05-18). Coverage matrix:
  *
- * The single remaining deferred kind — `stale_fact_refresh` —
- * waits behind T-D.3.δ-followup δ.
+ *   - `description_enrichment` / `missing_property_fill` →
+ *     `targetKind: "node"` (existing collector + proposer
+ *     handle these cleanly).
+ *   - `entity_disambiguation` (β) → `targetKind: "entity"` —
+ *     entity row ids aren't text-matchable against KB content;
+ *     candidates land as `candidatesSkippedNoCitations` until a
+ *     future row-id-aware evidence-collector slice ships.
+ *   - `relationship_label_repair` (γ) → `targetKind: "edge"` —
+ *     same MVP caveat as `entity` targets.
+ *   - `stale_fact_refresh` (δ) → `targetKind: "node_property"` —
+ *     carries the stale `propertyKey`; the underlying node id IS
+ *     text-matchable, so the existing collector returns citations
+ *     and the agent can propose without changes.
  */
 export const SUPPORTED_TRIGGER_PROPOSAL_KINDS: ReadonlyArray<SemanticEnrichmentProposalKind> = [
   "description_enrichment",
   "missing_property_fill",
   "entity_disambiguation",
   "relationship_label_repair",
+  "stale_fact_refresh",
 ];
 
 export function isSupportedTriggerProposalKind(
@@ -137,6 +138,13 @@ export interface RunSemanticEnrichmentInput {
   readonly candidateLimit?: number;
   /** Optional proposer temperature (default 0.2 per the proposer factory). */
   readonly temperature?: number;
+  /**
+   * Optional `stale_fact_refresh` grace window in milliseconds (default
+   * 1 hour). Only consulted for that kind; ignored otherwise. Controls
+   * how long after a node update a property must remain un-updated
+   * before it's surfaced as a stale-fact candidate.
+   */
+  readonly staleFactGraceMs?: number;
 }
 
 export interface SemanticEnrichmentRunOkEnvelope {
@@ -192,7 +200,11 @@ export interface RunSemanticEnrichmentOptions {
  * Three terminal shapes:
  *   - `ok` — agent ran; proposalsCreated / rejected / skipped counts
  *   - `no_candidates` — selector returned zero rows (nothing to enrich)
- *   - `kind_not_yet_supported` — proposalKind is one of the 3 deferred kinds
+ *   - `kind_not_yet_supported` — DEFENSIVE GUARD only. All 5
+ *     `SemanticEnrichmentProposalKind` values are wired today; this
+ *     envelope is preserved so that any FUTURE expansion of the closed
+ *     taxonomy in `contracts.ts` fails-soft via the runtime guard
+ *     rather than producing an empty agent run.
  */
 export async function runSemanticEnrichment(
   input: RunSemanticEnrichmentInput,
@@ -204,8 +216,9 @@ export async function runSemanticEnrichment(
       proposalKind: input.proposalKind,
       supportedKinds: SUPPORTED_TRIGGER_PROPOSAL_KINDS,
       message:
-        `proposalKind="${input.proposalKind}" requires a SemanticEnrichmentCandidate contract extension ` +
-        `(target shape is not a node). Selector for this kind ships in a follow-up T-D.3.δ slice.`,
+        `proposalKind="${input.proposalKind}" has no wired selector in this build. ` +
+        `Each kind needs an entry in semantic-enrichment-candidate-selector.ts and admission to ` +
+        `SUPPORTED_TRIGGER_PROPOSAL_KINDS before the runner can dispatch it.`,
     };
   }
 
@@ -216,6 +229,9 @@ export async function runSemanticEnrichment(
     ...(input.typeKey !== undefined ? { typeKey: input.typeKey } : {}),
     ...(input.weakDescriptionMaxLength !== undefined
       ? { weakDescriptionMaxLength: input.weakDescriptionMaxLength }
+      : {}),
+    ...(input.staleFactGraceMs !== undefined
+      ? { staleFactGraceMs: input.staleFactGraceMs }
       : {}),
   });
 
