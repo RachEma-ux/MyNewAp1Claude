@@ -26,6 +26,11 @@
  *     discriminated `ok | no_candidates | kind_not_yet_supported`
  *     envelope. Composition lives in `semantic-enrichment-runner.ts`;
  *     this file only adapts inputs/outputs to the tRPC boundary.
+ *   - `promote` (T-D.4 slice 2) — promote a pending enrichment
+ *     proposal into the existing graph-correction approve-and-apply
+ *     chain. Composition lives in `semantic-enrichment-promote-runner.ts`;
+ *     this file only adapts inputs/outputs to the tRPC boundary and
+ *     maps bridge errors to TRPCError codes.
  *
  * Mounted at `agentStudio.semanticEnrichment.*`. All procedures are
  * `adminProcedure` and read-only.
@@ -40,6 +45,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
 import {
@@ -55,6 +61,9 @@ import {
   SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT,
   SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT,
   ABSOLUTE_SEMANTIC_ENRICHMENT_MAX_PROPOSALS_PER_RUN,
+  EnrichmentProposalAlreadyPromotedError,
+  EnrichmentProposalNotFoundError,
+  EnrichmentProposalNotPromotableError,
   type RunSemanticEnrichmentOutput,
   type SemanticEnrichmentCandidatesEnvelope,
   type SemanticEnrichmentProposalDetail,
@@ -63,6 +72,10 @@ import {
   type SemanticEnrichmentRunListRow,
   type SemanticEnrichmentRunStats,
 } from "./public-api.js";
+import {
+  AsdbUnavailableForPromotionError,
+  runPromoteSemanticEnrichment,
+} from "./semantic-enrichment-promote-runner.js";
 
 // ============================================================================
 // Limit constants
@@ -443,6 +456,76 @@ export const semanticEnrichmentRouter = router({
         });
       },
     ),
+
+  /**
+   * T-D.4 slice 2 — promote a pending semantic-enrichment proposal
+   * into a graph-correction proposal so the existing approve-and-apply
+   * chain can act on it.
+   *
+   * Returns the new correction-proposal id; operators continue with
+   * the existing `agentStudio.graphQuality.approveAndApply` chain
+   * (or its split approve/apply procedures).
+   *
+   * Error mapping:
+   *   - source proposal not found → `NOT_FOUND`
+   *   - source proposal already promoted → `CONFLICT` (idempotency)
+   *   - source proposal in non-pending status → `CONFLICT`
+   *   - ASDB unavailable → `INTERNAL_SERVER_ERROR`
+   *   - unknown error → re-thrown (the platform wraps it)
+   *
+   * Hard-rule compliance (CLAUDE.md):
+   *   - Graph mutation never happens here — only proposal-row +
+   *     audit-row writes. The applier chain downstream handles SoT
+   *     mutation + reprojection.
+   *   - `adminProcedure` floor preserved.
+   */
+  promote: adminProcedure
+    .input(
+      z.object({
+        proposalId: z.number().int().positive(),
+        decidedByUserId: z.number().int().positive().optional(),
+        decisionRationale: z.string().min(1).max(2000).optional(),
+        proposedByAgentId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const result = await runPromoteSemanticEnrichment({
+          proposalId: input.proposalId,
+          ...(input.decidedByUserId !== undefined
+            ? { decidedByUserId: input.decidedByUserId }
+            : {}),
+          ...(input.decisionRationale !== undefined
+            ? { decisionRationale: input.decisionRationale }
+            : {}),
+          ...(input.proposedByAgentId !== undefined
+            ? { proposedByAgentId: input.proposedByAgentId }
+            : {}),
+        });
+        return {
+          status: "ok" as const,
+          correctionProposalId: result.correctionProposalId,
+          enrichmentProposalId: result.enrichmentProposalId,
+        };
+      } catch (e) {
+        if (e instanceof EnrichmentProposalNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        if (e instanceof EnrichmentProposalAlreadyPromotedError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
+        }
+        if (e instanceof EnrichmentProposalNotPromotableError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
+        }
+        if (e instanceof AsdbUnavailableForPromotionError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: e.message,
+          });
+        }
+        throw e;
+      }
+    }),
 });
 
 export type SemanticEnrichmentRouter = typeof semanticEnrichmentRouter;
