@@ -13,12 +13,16 @@
  *     once per node; the agent collector enumerates the specific
  *     missing properties at run-time.
  *
- * The three remaining kinds (`stale_fact_refresh`,
- * `entity_disambiguation`, `relationship_label_repair`) return an
- * empty list with a TODO marker. Each requires its own selection
- * signal (e.g., source-version diff for `stale_fact_refresh`) —
- * those are added in follow-up slices alongside their respective
- * scanners.
+ * Why 2/5 and not 5/5 yet — both implemented kinds target NODES,
+ * matching the current `SemanticEnrichmentCandidate` contract
+ * (`targetTypeKey` + `targetId` are interpreted as node coords by
+ * the proposer + evidence collector). The three remaining kinds
+ * each target a non-node thing — `stale_fact_refresh` a (node,
+ * property) tuple, `entity_disambiguation` an `agsGraphEntities`
+ * row, `relationship_label_repair` an `agsGraphEdges` row — and
+ * landing them requires extending the candidate contract with a
+ * `targetKind` discriminant. That contract extension is its own
+ * ADR-shaped slice and waits behind the trigger-mutation work.
  *
  * Why a separate module rather than extending
  * `semantic-enrichment-store.ts`:
@@ -107,10 +111,21 @@ export async function listSemanticEnrichmentCandidates(
     input.proposalKind !== "missing_property_fill"
   ) {
     // TODO(T-D.3.δ-followup): plumb selectors for the remaining 3
-    // proposal kinds. Each needs its own scanner:
-    //   - stale_fact_refresh → source-version newer than fact scanner
-    //   - entity_disambiguation → duplicate canonical_label scanner
-    //   - relationship_label_repair → generic-edge-label scanner
+    // proposal kinds. NOTE: each requires a `SemanticEnrichmentCandidate`
+    // contract extension because their targets are NOT nodes:
+    //   - stale_fact_refresh        → target is a property
+    //                                  (node, propertyKey) tuple where
+    //                                  source-version diverges from
+    //                                  property update time
+    //   - entity_disambiguation     → target is an entity row (not a
+    //                                  node), found by COUNT(*) > 1
+    //                                  grouped by canonical_label
+    //   - relationship_label_repair → target is an edge row (not a
+    //                                  node), found by generic-label
+    //                                  blacklist (RELATED_TO etc.)
+    // The contract needs a `targetKind: "node" | "edge" | "entity"`
+    // (or similar discriminant) before these selectors can land — a
+    // separate ADR-shaped slice, not a single PR.
     return {
       proposalKind: input.proposalKind,
       candidates: [],
