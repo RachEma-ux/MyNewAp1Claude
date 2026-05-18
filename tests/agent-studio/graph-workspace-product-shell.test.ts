@@ -213,6 +213,26 @@ describe("PW — Hard-rule + no-mock-data discipline", () => {
     expect(src).toMatch(/agentStudio\.vault\.updateNote/);
   });
 
+  // B1 — Auto-save: dirty drafts auto-flush after AUTO_SAVE_DEBOUNCE_MS.
+  // The structural test locks the wiring so a future refactor that
+  // removes the debounce won't silently regress Obsidian-style autosave.
+  it("MarkdownEditorPane wires debounced auto-save via setTimeout + handleSave", () => {
+    const src = read(resolve(COMPONENT_DIR, "MarkdownEditorPane.tsx"));
+    expect(src).toMatch(/AUTO_SAVE_DEBOUNCE_MS/);
+    expect(src).toMatch(/setTimeout\(\s*\(\)\s*=>\s*\{[\s\S]*?handleSave\(\)/);
+    expect(src).toMatch(/clearTimeout/);
+    expect(src).toMatch(/data-testid="markdown-editor-saving-flag"/);
+    expect(src).toMatch(/Save now/);
+  });
+
+  // Auto-save must NOT fire while a conflict is unresolved — the
+  // operator has to reconcile the save_conflict surface before further
+  // edits flush. Lock the guard so it can't quietly disappear.
+  it("MarkdownEditorPane auto-save effect guards on !conflict and !readOnly", () => {
+    const src = read(resolve(COMPONENT_DIR, "MarkdownEditorPane.tsx"));
+    expect(src).toMatch(/!dirty\s*\|\|\s*readOnly\s*\|\|\s*conflict/);
+  });
+
   it("vault explorer uses existing vault.listMyVaults + vault.listNotes (reuse-first)", () => {
     const src = read(resolve(COMPONENT_DIR, "VaultExplorer.tsx"));
     expect(src).toMatch(/agentStudio\.vault\.listMyVaults/);

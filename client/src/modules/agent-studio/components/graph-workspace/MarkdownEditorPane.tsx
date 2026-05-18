@@ -11,13 +11,17 @@
  * Save path:
  *   - trpc.agentStudio.vault.updateNote (existing CRDT-aware procedure)
  *   - Conflict detection comes back as `{conflict: true, latestVersion}`
+ *   - **Auto-save (B1):** dirty drafts auto-flush after AUTO_SAVE_DEBOUNCE_MS
+ *     of typing inactivity. The "Save now" button stays as a forcing
+ *     function. Conflicts pause the debounce (the user must resolve via
+ *     the WorkspaceStateLayer save_conflict surface before continuing).
  *
  * Read-only:
  *   - Driven by the `readOnly` prop; UI disables editing affordances
  *     when true. The server enforces the same rule independently.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer, {
@@ -25,6 +29,16 @@ import WorkspaceStateLayer, {
 } from "./WorkspaceStateLayer";
 
 type Mode = "read" | "edit" | "source";
+
+/**
+ * Quiet-period after the last edit before auto-save fires. 1500ms is
+ * long enough that typing bursts coalesce into one save round-trip
+ * but short enough that the operator feels the save was "immediate"
+ * (Obsidian's autosave feels similar). Conflict detection upstream
+ * means a slightly longer debounce is safe — concurrent edits surface
+ * via the save_conflict UI rather than silently overwriting.
+ */
+const AUTO_SAVE_DEBOUNCE_MS = 1500;
 
 export interface MarkdownEditorPaneProps {
   readonly noteId: number;
@@ -63,6 +77,59 @@ export default function MarkdownEditorPane({
     [draftMd, upstreamMd],
   );
 
+  // NOTE: handleSave + the auto-save effect live above the early
+  // returns below so React's rules of hooks aren't violated when
+  // isLoading / error short-circuits a render.
+  const expectedVersion = noteQuery.data?.latestVersion?.version ?? null;
+  const handleSave = useCallback(async (): Promise<void> => {
+    if (readOnly || !dirty || draftMd === null) return;
+    try {
+      const result = await updateMutation.mutateAsync({
+        noteId,
+        contentMd: draftMd,
+        expectedVersion: expectedVersion ?? undefined,
+      } as never);
+      const r = result as { conflict?: boolean; updated?: boolean };
+      if (r.conflict) {
+        setConflict(true);
+        return;
+      }
+      setConflict(false);
+      setSavedAt(Date.now());
+      setDraftMd(null);
+      await utils.agentStudio.vault.getNote.invalidate({ noteId });
+      onNoteSaved?.(noteId);
+    } catch {
+      // The error path stays opaque to the user (we never leak raw
+      // mutation errors). The dirty draft is preserved so the
+      // operator can retry — auto-save will pick it up again on the
+      // next typing burst, or they can hit "Save now" manually.
+    }
+  }, [
+    readOnly,
+    dirty,
+    draftMd,
+    noteId,
+    expectedVersion,
+    updateMutation,
+    utils,
+    onNoteSaved,
+  ]);
+
+  // Debounced auto-save (B1). Reschedules on every keystroke (the
+  // cleanup clearTimeout) so the save only fires AUTO_SAVE_DEBOUNCE_MS
+  // after typing stops. Paused while a conflict is unresolved — the
+  // operator must reconcile via the save_conflict surface before
+  // further edits flush.
+  useEffect(() => {
+    if (!dirty || readOnly || conflict) return;
+    if (updateMutation.isPending) return;
+    const handle = setTimeout(() => {
+      void handleSave();
+    }, AUTO_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [draftMd, dirty, readOnly, conflict, updateMutation.isPending, handleSave]);
+
   if (noteQuery.isLoading) {
     return (
       <div className="flex-1 p-3" data-testid="markdown-editor-pane">
@@ -91,32 +158,6 @@ export default function MarkdownEditorPane({
     );
   }
 
-  async function handleSave(): Promise<void> {
-    if (readOnly || !dirty || draftMd === null) return;
-    const expectedVersion = noteQuery.data?.latestVersion?.version ?? null;
-    try {
-      const result = await updateMutation.mutateAsync({
-        noteId,
-        contentMd: draftMd,
-        expectedVersion: expectedVersion ?? undefined,
-      } as never);
-      const r = result as { conflict?: boolean; updated?: boolean };
-      if (r.conflict) {
-        setConflict(true);
-        return;
-      }
-      setConflict(false);
-      setSavedAt(Date.now());
-      setDraftMd(null);
-      await utils.agentStudio.vault.getNote.invalidate({ noteId });
-      onNoteSaved?.(noteId);
-    } catch {
-      // The error path stays opaque to the user (we never leak raw
-      // mutation errors). The dirty draft is preserved so the
-      // operator can retry.
-    }
-  }
-
   return (
     <section
       className="flex-1 flex flex-col min-h-0"
@@ -130,15 +171,23 @@ export default function MarkdownEditorPane({
           <span className="font-medium">
             {noteQuery.data?.note?.title ?? `Note ${noteId}`}
           </span>
-          {dirty && (
+          {updateMutation.isPending && (
+            <span
+              className="text-sky-600 text-xs"
+              data-testid="markdown-editor-saving-flag"
+            >
+              saving…
+            </span>
+          )}
+          {dirty && !updateMutation.isPending && (
             <span
               className="text-amber-600 text-xs"
               data-testid="markdown-editor-dirty-flag"
             >
-              ● unsaved
+              ● editing
             </span>
           )}
-          {savedAt !== null && !dirty && (
+          {savedAt !== null && !dirty && !updateMutation.isPending && (
             <span
               className="text-emerald-600 text-xs"
               data-testid="markdown-editor-saved-flag"
@@ -156,9 +205,10 @@ export default function MarkdownEditorPane({
             disabled={readOnly || !dirty || updateMutation.isPending}
             data-testid="markdown-editor-save"
             onClick={() => void handleSave()}
+            title="Auto-save fires after typing pauses; this button forces it immediately."
             className="ml-2 px-2 py-1 rounded border text-xs disabled:opacity-50"
           >
-            Save
+            Save now
           </button>
         </div>
       </header>
