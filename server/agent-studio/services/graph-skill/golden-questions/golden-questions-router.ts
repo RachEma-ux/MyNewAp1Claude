@@ -41,6 +41,7 @@ import { z } from "zod";
 import { adminProcedure, router } from "../../../../_core/trpc.js";
 import {
   createGoldenQuestionsReadStore,
+  type GoldenQuestionDetail,
   type GoldenQuestionListRow,
   type GoldenQuestionResultListRow,
   type GoldenQuestionRunListRow,
@@ -102,6 +103,17 @@ export interface ListGoldenQuestionRunResultsEnvelope {
   readonly status: "ok" | "not_found";
   readonly runId: number;
   readonly results?: ReadonlyArray<GoldenQuestionResultListRow>;
+}
+
+/**
+ * `getQuestionDetail` envelope (T-D.5.δ). Includes the heavy
+ * `expectedPaths` JSON the T-D.5.α list view omits. Discriminated
+ * `not_found` for stale-link safety.
+ */
+export interface GetGoldenQuestionDetailEnvelope {
+  readonly status: "ok" | "not_found";
+  readonly questionId: number;
+  readonly question?: GoldenQuestionDetail;
 }
 
 // ============================================================================
@@ -205,6 +217,27 @@ export const goldenQuestionsRouter = router({
           return { status: "not_found", runId: input.runId };
         }
         return { status: "ok", runId: input.runId, results };
+      },
+    ),
+
+  /**
+   * Full per-question detail (T-D.5.δ). Returns the heavy
+   * `expectedPaths` JSON that the T-D.5.α list view omits — useful
+   * for triaging why a question failed (compare expected paths to
+   * actual engine output). Discriminated `not_found` envelope for
+   * stale-link safety. Same pattern as
+   * semanticEnrichment.getProposalDetail (T-D.3.ε).
+   */
+  getQuestionDetail: adminProcedure
+    .input(z.object({ questionId: z.number().int().positive() }))
+    .query(
+      async ({ input }): Promise<GetGoldenQuestionDetailEnvelope> => {
+        const store = createGoldenQuestionsReadStore();
+        const question = await store.getQuestionDetail(input.questionId);
+        if (question === null) {
+          return { status: "not_found", questionId: input.questionId };
+        }
+        return { status: "ok", questionId: input.questionId, question };
       },
     ),
 });
