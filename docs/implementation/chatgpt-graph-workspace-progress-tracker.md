@@ -1606,3 +1606,128 @@ ergonomics are decided. Top of queue for next session:
     all uniform; UI work is fully unblocked
   - **T-D.3.ε** semantic-enrichment proposal detail surface (pure
     read; ship when a dashboard component actually consumes it)
+
+## 27. Detail surfaces + orphan finding (2026-05-18)
+
+Continues full-autonomous execution. Closes 2 deferred items from
+§22 + §26 by shipping the **detail-vs-list complement** at two
+operator-facing routers, plus records a 3rd finding from the
+orphan-services audit. Pattern: list rows strip heavy JSON, detail
+rows include it — codified at both endpoints rather than just in
+the §22 carry-forward memo.
+
+### Ledger
+
+| # | PR | Slice | Surface |
+|---|---|---|---|
+| 1 | #1445 | Phase 7 ASDB graph-repo orphan doc | header-comment warning on `postgres-graph-repository-asdb.ts` (`AsdbPostgresGraphRepository`, 319 LoC, never wired into `getGraphRepository()` selector); 3 decision paths documented; no runtime change |
+| 2 | #1446 | T-D.3.ε semanticEnrichment proposal detail | `agentStudio.semanticEnrichment.getProposalDetail({ proposalId })` returns full `payload` + `sourceEvidence` JSON (list view omits both); discriminated `not_found` envelope; closes the §22 "DEFERRED — detail surface" item |
+| 3 | #1447 | T-D.5.δ goldenQuestions question detail | `agentStudio.goldenQuestions.getQuestionDetail({ questionId })` returns full `expectedPaths` JSON (list view omits it); discriminated `not_found` envelope; same shape as #1446 |
+
+(This PR is the closure receipt — docs-only, no procedure
+additions.)
+
+### Detail-vs-list pattern formalized at 2 endpoints
+
+§22 lesson #4 established "list rows MUST strip heavy JSON" as
+an over-fetch-avoidance principle. The complement — "detail rows
+SHOULD include the heavy JSON for operator triage" — was implicit.
+This arc makes both halves explicit at 2 operator-facing routers:
+
+| Router | List procedure (strips heavy JSON) | Detail procedure (includes heavy JSON) |
+|---|---|---|
+| `semanticEnrichment` | `listProposals` (T-D.3.β #1431) — omits `payload`, `sourceEvidence` | `getProposalDetail` (T-D.3.ε #1446) — includes both |
+| `goldenQuestions` | `listQuestionsInSuite` (T-D.5.α #1441) — omits `expectedPaths` | `getQuestionDetail` (T-D.5.δ #1447) — includes it |
+
+The architectural invariant now ships at the code level, not just
+in carry-forward memos. Future routers adding list+detail surfaces
+can follow the established split without re-discovering the
+trade-off.
+
+### Phase 7 ASDB graph-repo orphan finding
+
+PR #1445 records (in code) a discovery from the 2026-05-18
+orphan-services audit (Python scan of 411 service files / 1424
+unique exports). Single orphan: `AsdbPostgresGraphRepository`
+(319 LoC, real Drizzle-backed) defined at
+`server/agent-studio/services/graph/repository/postgres-graph-repository-asdb.ts`
+but never wired into `getGraphRepository()` in `./index.ts`.
+The Postgres path there instantiates the 176-LoC SKELETON
+`PostgresGraphRepository` from `./postgres-graph-repository.ts`.
+
+The orphan's status is genuinely ambiguous without git archeology:
+
+  - Phase 7 was started + the Asdb impl was written + the selector
+    swap was never committed, OR
+  - Phase 7 was rolled back + the Asdb impl was left in place, OR
+  - The Asdb impl is reserved for a future activation gated on
+    schema migrations or feature flags
+
+PR #1445 chose **Path 3: document + leave in place pending ADR**
+(adds a clear "ORPHAN" warning to the file header naming the 3
+decision paths). Wire-in or delete decisions need operator
+judgment.
+
+Memory record at
+`~/.claude/projects/-root/memory/project_phase_7_asdb_graph_repo_orphan.md`
+for next-session pickup.
+
+### Hard-rule compliance (CLAUDE.md)
+
+All three PRs:
+
+- ✓ No `neo4j-driver` / `dispatchMcpToolCall` / `openrouter` /
+  `credential-resolver` imports.
+- ✓ No `process.env.*_API_KEY` reads.
+- ✓ `adminProcedure` floor on every new procedure.
+- ✓ DB I/O routes through the existing store factories — no
+  Drizzle imports in router files.
+- ✓ #1445 is doc-only; no runtime behavior change.
+
+### Sub-arc carry-forward lessons
+
+1. **Codify invariants at endpoint pairs, not just memos.** The
+   §22 lesson #4 ("list rows MUST strip heavy JSON") was a written
+   principle. This arc makes it concrete at 2 endpoint pairs
+   (semanticEnrichment list/detail + goldenQuestions list/detail).
+   Future PRs that add a list endpoint without a detail counterpart
+   are now visibly incomplete vs the established pattern.
+2. **Document, don't delete-or-wire on auto-suspect orphans.** When
+   the orphan-audit finding has genuinely ambiguous status (could
+   be reserved, could be dead code), the safe move is to add a
+   header-comment warning + memory record + leave in place. Operator
+   ADR decides wire-in vs delete vs continue-documenting. Pattern:
+   audit discoveries → document the finding + decision tree, not
+   auto-action.
+3. **Discriminated envelopes scale to 4 endpoints now.** The
+   `{ status: "ok" | "not_found", ...payload? }` envelope pattern
+   from §22 lesson #5 now ships on `codeGraph.getIngestionStats`
+   + `securityGraph.getIngestionStats` +
+   `semanticEnrichment.getRunStats` + `semanticEnrichment.getProposalDetail`
+   + `goldenQuestions.getRunStats` + `goldenQuestions.listRunResults`
+   + `goldenQuestions.listQuestionsInSuite` +
+   `goldenQuestions.getQuestionDetail`. **8 endpoints across 4
+   routers** — fully uniform stale-link safety pattern. The
+   operator dashboard can render one `<NotFoundFallback />`
+   component across all of them.
+
+Recommendation: with the detail-vs-list pattern formalized at 2
+endpoints + the orphan finding documented, the remaining
+deferred items are all bigger arcs:
+
+  - **T-D.5.ζ** (formerly T-D.5.δ — bumped after #1447 took
+    `δ`) golden-questions evaluation caller (mutation or cron) —
+    needs ADR review for Live Engine Factory wiring decisions
+  - **T-D.3.δ** semantic-enrichment trigger mutation — needs
+    candidate-selection layer plumbed
+  - **T-F.4** Quality Lens UI — read surfaces now uniform across
+    T-D.3 + T-D.5 + graph-quality + graph-correction; UI work
+    fully unblocked
+  - **Phase 7 ASDB graph-repo wire-in or delete** — operator-
+    triage decision, documented in #1445 header + memory
+
+Autonomous burst is at a natural completion point — 4 sub-systems
+fully closed at the operator-facing tRPC surface level
+(T-G.4 + T-G.5 + T-D.3 + T-D.5), mount-drift class fully guarded
+by 4 complementary layers, detail-vs-list pattern formalized,
+orphan finding documented. Remaining work needs operator direction.
