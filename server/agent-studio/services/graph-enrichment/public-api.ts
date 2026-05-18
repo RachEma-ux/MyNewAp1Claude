@@ -21,9 +21,17 @@ export {
 
 export {
   createSemanticEnrichmentAgent,
+  isSemanticEnrichmentCandidateTargetKind,
+  SEMANTIC_ENRICHMENT_CANDIDATE_TARGET_KINDS,
   type SemanticEnrichmentAgent,
   type CreateSemanticEnrichmentAgentOptions,
   type SemanticEnrichmentCandidate,
+  type SemanticEnrichmentCandidateBase,
+  type SemanticEnrichmentCandidateTargetKind,
+  type SemanticEnrichmentNodeCandidate,
+  type SemanticEnrichmentNodePropertyCandidate,
+  type SemanticEnrichmentEntityCandidate,
+  type SemanticEnrichmentEdgeCandidate,
   type SemanticEnrichmentRunInputWithCandidates,
   type SemanticEnrichmentRunOutputWithSkips,
 } from "./semantic-enrichment-agent.js";
