@@ -36,7 +36,6 @@ import {
   GraphInspector,
   ImpactAnalysisView,
   RuntimeAndDecisionTraceView,
-  WorkspaceStateLayer,
   type InspectorTarget,
 } from "../components/graph-workspace";
 import { trpc } from "../../../lib/trpc";
@@ -98,7 +97,7 @@ export default function GraphWorkspacePage(): React.ReactElement {
           <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
             {tab === "editor" && (
               selectedNoteId === null ? (
-                <WorkspaceStateLayer state="empty_vault" />
+                <NoNoteSelectedHint hasVault={selectedVaultId !== null} />
               ) : (
                 <MarkdownEditorPane noteId={selectedNoteId} />
               )
@@ -180,6 +179,31 @@ export default function GraphWorkspacePage(): React.ReactElement {
 function inspectorSeedFor(noteIdNum: number | undefined): string | null {
   if (typeof noteIdNum !== "number") return null;
   return `note:${noteIdNum}`;
+}
+
+function NoNoteSelectedHint({
+  hasVault,
+}: {
+  hasVault: boolean;
+}): React.ReactElement {
+  return (
+    <div
+      className="flex flex-col items-center justify-center h-full text-center px-6 py-12 text-gray-500"
+      data-testid="workspace-no-note-hint"
+    >
+      <div className="text-4xl mb-3" aria-hidden>
+        {hasVault ? "📄" : "📂"}
+      </div>
+      <div className="text-sm font-medium text-gray-700 mb-1">
+        {hasVault ? "Pick a note to start editing" : "Pick or create a vault"}
+      </div>
+      <div className="text-xs max-w-sm">
+        {hasVault
+          ? 'Choose a note from the explorer on the left, or click "+ New note" to add one to this vault.'
+          : 'Use the explorer on the left to select a vault, or click "+ New" to create your first one.'}
+      </div>
+    </div>
+  );
 }
 
 function WorkspaceTabs({
