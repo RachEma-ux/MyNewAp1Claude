@@ -11,10 +11,23 @@ export {
   listBaseColumns,
   createBaseRow,
   updateBaseRow,
+  deleteBaseRow,
   listBaseRows,
   BaseRowUnknownColumnsError,
 } from "./bases-service.js";
 export type { ListBasesFilter } from "./bases-service.js";
+
+export {
+  enqueueBaseProjection,
+  enqueueBaseDeletion,
+  enqueueBaseRowProjection,
+  enqueueBaseRowRemoval,
+} from "./graph-projection.js";
+export type {
+  BaseProjectionEventKind,
+  EnqueueBaseProjectionInput,
+  EnqueueBaseRowProjectionInput,
+} from "./graph-projection.js";
 
 export {
   AsdbUnavailableError,
