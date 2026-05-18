@@ -1462,3 +1462,147 @@ Top of the queue for the next feature slice:
 Or if the next session prefers a different axis: orphan-FILE
 audits beyond routers (services / adapters / factories with no
 consumers — a different class of dead-code accumulator).
+
+## 26. T-D.5 Golden Questions persistence + read surface (2026-05-18)
+
+Continues full-autonomous execution. Closes the long-standing
+"goldenQuestions has runtime + seed but no operator-facing tRPC
+surface + no persistence" gap. Three additive PRs ship the read
+surface, the write store, and the runs-drill-in read extension.
+The actual evaluation caller (operator-trigger or cron) is the
+remaining T-D.5.δ item — deferred because it requires Live Engine
+Factory wiring (OpenRouter + GraphRepository) which is heavy infra
+work that deserves its own ADR review.
+
+### Ledger
+
+| # | PR | Slice | Surface added |
+|---|---|---|---|
+| 1 | #1441 | T-D.5.α | `agentStudio.goldenQuestions.{listSuites, listQuestionsInSuite}` — operator can enumerate seeded suites + questions; closes the "browse golden-question suites" UI gap |
+| 2 | #1442 | T-D.5.β | `createGoldenQuestionsWriteStore` + `persistEvaluationSummary` helper — lets a future caller persist a `LiveEvaluationSummary` to `ags_golden_question_runs` + `ags_golden_question_results`; suiteKey-not-found returns discriminated outcome rather than throwing (local-first iteration safety) |
+| 3 | #1443 | T-D.5.γ | `agentStudio.goldenQuestions.{listRecentRuns, getRunStats, listRunResults}` — once T-D.5.β persistence is being written, operator dashboard can drill into past evaluation runs without re-implementing SQL client-side |
+
+(This PR is the closure receipt — docs-only, no procedure
+additions.)
+
+### Pre-flight discovery
+
+Same "completion gap" pattern as T-G.4 / T-G.5 / T-D.3 (now the 4th
+sub-system to exhibit this shape):
+
+| Layer | State before this arc |
+|---|---|
+| Closed-taxonomy suites + questions seeded at boot via `seed-golden-questions.ts` (ASDB) | ✓ shipped (T-D.5 initial) |
+| Evaluator runtime (`runLiveEvaluation` at `live-evaluator.ts`) | ✓ shipped — pure + boundary-agnostic per its module doc-block |
+| Scoring helper (`scoreQuestion` — failures + criteria) | ✓ shipped |
+| Failure→correction-proposal bridge (`failure-correction-bridge.ts`, T-D.5) | ✓ shipped |
+| Failure→failure-state observability bridge (`recordFailureStateEvent`) | ✓ shipped |
+| **ASDB read surface for seeded suites/questions** | **❌ missing** |
+| **ASDB write store for runs/results** | **❌ missing** |
+| **tRPC router mount** | **❌ missing — `runLiveEvaluation` has NO caller AND NO persistence** |
+| **Actual evaluation caller (cron / operator-trigger)** | **❌ STILL missing — T-D.5.δ deferred** |
+
+α + β + γ close the three middle layers without coupling to the
+evaluator. The remaining T-D.5.δ caller is the only large
+remaining item.
+
+### Why split the persistence from the evaluator
+
+The existing `runLiveEvaluation` is *pure + boundary-agnostic*
+per its module doc-block — it accepts an opaque `runner` callback,
+has no I/O, and is heavily tested. Adding DB-write side-effects
+into it would:
+
+  1. Undo the careful boundary-preservation work in the existing
+     test suite (every existing test would need a stub DB).
+  2. Couple the evaluator to ASDB, which conflicts with the
+     "evaluator returns a summary; the caller decides what to do
+     with it" contract from `agent-studio-graph-agent-runtime.md`.
+
+Instead, T-D.5.β ships a separate `persistEvaluationSummary(suites, store)`
+helper that the future caller invokes AFTER the evaluator returns.
+Same defense-in-depth pattern as the failure-state observability
+bridge: composition at the caller layer, not in the
+boundary-clean library.
+
+### Hard-rule compliance (CLAUDE.md)
+
+All three PRs:
+
+- ✓ No `neo4j-driver` import — Postgres-only persistence.
+- ✓ No `dispatchMcpToolCall` / `openrouter` / `credential-resolver`
+  imports in the read store / write store / router.
+- ✓ No `process.env.*_API_KEY` reads.
+- ✓ `adminProcedure` floor on every procedure.
+- ✓ List rows strip heavy JSON (per the §22 lesson #4 —
+  `expectedPaths` JSON omitted from question list rows;
+  result list rows include `actualAnswer` since operators need it
+  for failure triage, with the trade-off documented).
+- ✓ Discriminated `not_found` envelopes for stale-link safety
+  (per the §22 lesson #5 — `getRunStats`, `listRunResults`,
+  `listQuestionsInSuite` all use the pattern).
+- ✓ Source-scan mount integrity test added.
+
+### T-D acceptance status after this arc
+
+| Item | Status |
+|---|---|
+| Quality Agent runtime (10 scanners + scan-orchestrator + agent-run) | ✓ pre-shipped |
+| Correction-proposal pipeline (finding-to-proposal + payload builder) | ✓ pre-shipped |
+| Semantic Enrichment Agent runtime + operator-facing tRPC surface (T-D.3) | ✓ §22 (#1430-#1432) |
+| Approve → SoT mutation → reproject chain (T-D.4) | ✓ pre-shipped |
+| Golden-question failure → correction-proposal hook (T-D.5 bridge) | ✓ pre-shipped |
+| Golden-questions seeded suites + questions | ✓ pre-shipped |
+| **Golden-questions tRPC read surface (suites + questions)** | ✓ §26 (#1441) |
+| **Golden-questions write store + persist helper** | ✓ §26 (#1442) |
+| **Golden-questions tRPC runs read surface** | ✓ §26 (#1443) |
+| **Golden-questions evaluation caller (cron / operator-trigger)** | **DEFERRED** (T-D.5.δ — needs Live Engine Factory wiring; OpenRouter + GraphRepository; heavy infra) |
+| Semantic Enrichment trigger mutation | **DEFERRED** (T-D.3.δ from §22) |
+| Semantic Enrichment proposal detail surface | **DEFERRED** (T-D.3.ε from §22) |
+
+### Sub-arc carry-forward lessons
+
+1. **"Completion gap" pattern is now the 4th sub-system.** T-G.4
+   recommendation + T-G.5 impact-analysis + T-D.3 semantic-enrichment
+   + T-D.5 golden-questions all exhibit the same shape: runtime +
+   contracts + (sometimes) persistence shipped, but no operator-
+   facing tRPC mount. Each closure unblocks dashboard work that
+   was previously gated on client-side re-implementation.
+2. **Persistence as a separate concern from the boundary-clean
+   library.** Following the T-D.5.β pattern, when a library is
+   pure + boundary-agnostic, *don't* add DB I/O to it. Ship a
+   separate `persistX(result, store)` helper that the caller
+   invokes. Preserves test simplicity + module boundary discipline.
+3. **suiteKey-not-found as discriminated outcome, not throw.**
+   Local dev environments often have stale seeds. Treating "this
+   suite isn't seeded" as fatal would break iteration. The
+   discriminated `{ status: "suite_not_seeded", suiteKey }` outcome
+   lets the caller decide — log + skip in local dev, alert in prod.
+4. **The 6th parameterless-enumeration procedure.** `listSuites`
+   joins the line of `codeGraph.listKnownTypes` /
+   `securityGraph.listKnownTypes` / `recommendation.listKnownKinds` /
+   `impactAnalysis.listKnownKinds` /
+   `semanticEnrichment.listKnownProposalKinds`. Six dashboard
+   pickers backed by the same shape — the operator UI can use one
+   composable component across all of them.
+5. **Heavy infra dependencies are legitimate deferral grounds.**
+   T-D.5.δ (the actual caller) needs Live Engine Factory wiring
+   which pulls in OpenRouter Model Access + GraphRepository.
+   That's an ADR-worthy decision (which model? what budget? what
+   timeout? how to handle rate-limits during a cron run?). Deferring
+   it is correct — better than hardcoding choices in the autonomous
+   slice.
+
+Recommendation: T-D.5 substantially closed at α + β + γ. The
+remaining caller is a single-PR slice once Live Engine Factory
+ergonomics are decided. Top of queue for next session:
+
+  - **T-D.5.δ** golden-questions evaluation caller (mutation +/
+    or cron) — needs ADR review for engine wiring decisions
+  - **T-D.3.δ** semantic-enrichment trigger mutation — needs
+    candidate-selection layer plumbed (T-D.3 §candidates)
+  - **T-F.4** Quality Lens UI — graph-quality + graph-correction
+    + semantic-enrichment + golden-questions read surfaces now
+    all uniform; UI work is fully unblocked
+  - **T-D.3.ε** semantic-enrichment proposal detail surface (pure
+    read; ship when a dashboard component actually consumes it)
