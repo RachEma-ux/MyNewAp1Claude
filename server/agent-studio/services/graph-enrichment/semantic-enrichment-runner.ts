@@ -70,13 +70,25 @@ import { listSemanticEnrichmentCandidates } from "./semantic-enrichment-candidat
  * candidate selector module actually returns non-empty data for —
  * keep in sync with `semantic-enrichment-candidate-selector.ts`.
  *
- * 2026-05-18: `description_enrichment` + `missing_property_fill`.
- * Future kinds gate on the `SemanticEnrichmentCandidate` contract
- * extension (target shape ≠ node).
+ * 2026-05-18: `description_enrichment` + `missing_property_fill` +
+ * `entity_disambiguation`. The first two emit `targetKind: "node"`
+ * candidates that flow through the existing evidence collector +
+ * proposer. The third (T-D.3.δ-followup β) emits
+ * `targetKind: "entity"` candidates; the evidence collector's current
+ * `content_text ILIKE '%<targetId>%'` heuristic doesn't match entity
+ * row ids in any useful way, so those candidates land as
+ * `candidatesSkippedNoCitations` in the agent run until a future
+ * entity-aware evidence-collector slice ships. Admitting the kind to
+ * the runner gate makes the "N duplicates found, N skipped" signal
+ * actionable for operators even before the citation surface widens.
+ *
+ * The two remaining deferred kinds — `relationship_label_repair` +
+ * `stale_fact_refresh` — wait behind T-D.3.δ-followup γ + δ.
  */
 export const SUPPORTED_TRIGGER_PROPOSAL_KINDS: ReadonlyArray<SemanticEnrichmentProposalKind> = [
   "description_enrichment",
   "missing_property_fill",
+  "entity_disambiguation",
 ];
 
 export function isSupportedTriggerProposalKind(
