@@ -52,12 +52,17 @@ export async function listBacklinksForNote(
 ): Promise<BacklinkRow[]> {
   const db = getAsDb();
   if (!db) return [];
+  // Postgres rejects `SELECT DISTINCT ... ORDER BY <col not in select>`.
+  // Include `updatedAt` in the projection so the dedup + sort agree;
+  // strip it from the returned shape so the public contract stays the
+  // same (sourceNoteId / sourceSlug / sourceTitle / sourceVersionId).
   const rows = await db
     .selectDistinct({
       sourceNoteId: agsVaultWikilinks.sourceNoteId,
       sourceSlug: agsVaultNotes.slug,
       sourceTitle: agsVaultNotes.title,
       sourceVersionId: agsVaultWikilinks.sourceVersionId,
+      sourceUpdatedAt: agsVaultNotes.updatedAt,
     })
     .from(agsVaultWikilinks)
     .innerJoin(
