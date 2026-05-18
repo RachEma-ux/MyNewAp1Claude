@@ -191,7 +191,7 @@ describe("T-D.3.δ-followup α — existing 2 selectors emit targetKind=\"node\"
     //   T-D.3.δ-followup γ              → adds "edge"
     //   T-D.3.δ-followup δ              → adds "node_property"
     // Each follow-up PR widens this set + adds its own selector test.
-    const ALLOWED: ReadonlyArray<string> = ["node", "entity"];
+    const ALLOWED: ReadonlyArray<string> = ["node", "entity", "edge"];
     const src = readFile(join(DIR, "semantic-enrichment-candidate-selector.ts"));
     const allLiterals = [
       ...src.matchAll(/targetKind:\s*"([^"]+)"\s*as\s*const/g),

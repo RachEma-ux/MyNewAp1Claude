@@ -66,6 +66,8 @@ export {
   SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT,
   SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT,
   DEFAULT_WEAK_DESCRIPTION_MAX_LENGTH,
+  GENERIC_EDGE_TYPE_KEYS,
+  type GenericEdgeTypeKey,
   type ListSemanticEnrichmentCandidatesInput,
   type SemanticEnrichmentCandidatesEnvelope,
 } from "./semantic-enrichment-candidate-selector.js";

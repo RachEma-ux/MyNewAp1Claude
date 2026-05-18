@@ -1,8 +1,8 @@
 /**
- * Semantic Enrichment candidate selector — T-D.3.δ-prep + T-D.3.δ-followup α/β.
+ * Semantic Enrichment candidate selector — T-D.3.δ-prep + T-D.3.δ-followup α/β/γ.
  *
  * Surfaces graph entities that the Semantic Enrichment Agent should
- * consider for proposal generation. Coverage today is **3/5 kinds**:
+ * consider for proposal generation. Coverage today is **4/5 kinds**:
  *
  *   - `description_enrichment` — nodes whose `description` property
  *     is missing OR whose stringified `property_value` is shorter
@@ -17,19 +17,24 @@
  *     `(workspace_id, entity_type, canonical_label)` triple resolves
  *     to MORE THAN ONE active row. Each duplicate gets one candidate
  *     so operators can disambiguate per row. Emits
- *     `targetKind: "entity"` (target id is the entity row id, not a
- *     node id; `targetTypeKey` echoes the entity's `entity_type`).
- *     **MVP caveat:** the existing evidence collector heuristic
- *     `content_text ILIKE '%<targetId>%'` won't match entity row ids
- *     against KB text in any useful way — entity candidates will
- *     count as `candidatesSkippedNoCitations` in the agent run until
- *     a future entity-aware collector PR lands. The signal "N
- *     duplicates detected" is still actionable for operators even
- *     without per-candidate proposals.
+ *     `targetKind: "entity"`. **MVP caveat:** the existing evidence
+ *     collector heuristic `content_text ILIKE '%<targetId>%'` won't
+ *     match entity row ids against KB text in any useful way; entity
+ *     candidates count as `candidatesSkippedNoCitations` in the agent
+ *     run until a future entity-aware collector ships. The signal "N
+ *     duplicates detected" is still actionable.
+ *   - `relationship_label_repair` — rows in `ags_graph_edges` whose
+ *     `type_key` matches the generic-label blacklist
+ *     (`GENERIC_EDGE_TYPE_KEYS` below — RELATED_TO, ASSOCIATED_WITH,
+ *     LINKED_TO, CONNECTED_TO). Workspace-scoped via JOIN on the
+ *     edge's `source_node_id` → `ags_graph_nodes.workspace_id`
+ *     (edges don't carry workspaceId directly). Emits
+ *     `targetKind: "edge"`. **Same MVP caveat as entity_disambiguation:**
+ *     edge row ids aren't text-matchable against KB content, so
+ *     candidates land as `candidatesSkippedNoCitations` today.
  *
- * The two deferred kinds — `relationship_label_repair` (edge target)
- * and `stale_fact_refresh` (node-property tuple) — wait behind their
- * own selector PRs (T-D.3.δ-followup γ + δ).
+ * The remaining deferred kind — `stale_fact_refresh` (node-property
+ * tuple, source-version divergence) — waits behind T-D.3.δ-followup δ.
  *
  * Why a separate module rather than extending
  * `semantic-enrichment-store.ts`:
@@ -45,9 +50,10 @@
  *     accidentally surface cross-tenant candidates.
  */
 
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import {
+  agsGraphEdges,
   agsGraphEntities,
   agsGraphNodes,
   agsGraphNodeProperties,
@@ -60,6 +66,22 @@ export const SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT = 50;
 export const SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT = 500;
 
 export const DEFAULT_WEAK_DESCRIPTION_MAX_LENGTH = 40;
+
+/**
+ * Edge `type_key` values treated as generic / under-specified. Edges
+ * with one of these labels are surfaced for `relationship_label_repair`
+ * so the agent can propose a more specific label backed by source
+ * evidence. The list is intentionally short — false positives cost
+ * operator triage time. Adding a new generic label here is a
+ * deliberate widening; lockstep-tested.
+ */
+export const GENERIC_EDGE_TYPE_KEYS = [
+  "RELATED_TO",
+  "ASSOCIATED_WITH",
+  "LINKED_TO",
+  "CONNECTED_TO",
+] as const;
+export type GenericEdgeTypeKey = (typeof GENERIC_EDGE_TYPE_KEYS)[number];
 
 export interface ListSemanticEnrichmentCandidatesInput {
   readonly workspaceId: number;
@@ -117,22 +139,20 @@ export async function listSemanticEnrichmentCandidates(
   if (
     input.proposalKind !== "description_enrichment" &&
     input.proposalKind !== "missing_property_fill" &&
-    input.proposalKind !== "entity_disambiguation"
+    input.proposalKind !== "entity_disambiguation" &&
+    input.proposalKind !== "relationship_label_repair"
   ) {
-    // T-D.3.δ-followup α landed the discriminated-union contract;
-    // β ships the `entity_disambiguation` selector below. The two
-    // remaining deferred selectors wait behind their own PRs:
+    // α landed the discriminated-union contract; β shipped
+    // `entity_disambiguation`; γ ships `relationship_label_repair`
+    // below. The single remaining deferred selector waits behind:
     //
-    //   - relationship_label_repair → produces `targetKind: "edge"`;
-    //     SQL: `ags_graph_edges` rows whose `type_key` hits the
-    //     generic-label blacklist (RELATED_TO etc.) — T-D.3.δ-followup γ
     //   - stale_fact_refresh → produces `targetKind: "node_property"`;
     //     SQL: (node, property) tuples where source-version diverges
     //     from latest property update — T-D.3.δ-followup δ
     //
-    // Each variant interface lives in `semantic-enrichment-agent.ts`. The
-    // runner's `SUPPORTED_TRIGGER_PROPOSAL_KINDS` gate keeps the kinds out
-    // of the agent loop until their selector + agent-side handler land.
+    // The variant interface lives in `semantic-enrichment-agent.ts`. The
+    // runner's `SUPPORTED_TRIGGER_PROPOSAL_KINDS` gate keeps the kind
+    // out of the agent loop until its selector + agent-side handler land.
     return {
       proposalKind: input.proposalKind,
       candidates: [],
@@ -157,6 +177,10 @@ export async function listSemanticEnrichmentCandidates(
 
   if (input.proposalKind === "entity_disambiguation") {
     return await listEntityDisambiguationCandidates(input, db, limit);
+  }
+
+  if (input.proposalKind === "relationship_label_repair") {
+    return await listRelationshipLabelRepairCandidates(input, db, limit);
   }
 
   return await listDescriptionEnrichmentCandidates(input, db, limit);
@@ -402,6 +426,98 @@ async function listEntityDisambiguationCandidates(
 
   return {
     proposalKind: "entity_disambiguation",
+    candidates,
+    truncated,
+    weakDescriptionMaxLengthUsed: null,
+  };
+}
+
+/**
+ * `relationship_label_repair` candidate set — T-D.3.δ-followup γ.
+ *
+ * Selects active edges whose `type_key` is on the generic-label
+ * blacklist (`GENERIC_EDGE_TYPE_KEYS`). Workspace scoping is enforced
+ * via an inner-join on the edge's `source_node_id` →
+ * `ags_graph_nodes.workspace_id` (edges don't carry workspaceId
+ * directly — see `drizzle/tables/agent-studio-graph.ts:153`).
+ *
+ * SQL outline:
+ *
+ *   SELECT e.id, e.type_key
+ *   FROM ags_graph_edges e
+ *   INNER JOIN ags_graph_nodes n
+ *     ON n.id = e.source_node_id
+ *    AND n.workspace_id = $1
+ *   WHERE e.governance_status = 'active'
+ *     AND e.type_key IN (...GENERIC_EDGE_TYPE_KEYS)
+ *     [AND e.type_key = $typeKey]
+ *   ORDER BY e.id
+ *   LIMIT $N + 1
+ *
+ * The optional `typeKey` filter further narrows to a single generic
+ * label (operator opts in to "only repair RELATED_TO this run").
+ *
+ * Stable ordering on `e.id` keeps paged re-runs deterministic.
+ */
+async function listRelationshipLabelRepairCandidates(
+  input: ListSemanticEnrichmentCandidatesInput,
+  db: NonNullable<ReturnType<typeof getAsDb>>,
+  limit: number,
+): Promise<SemanticEnrichmentCandidatesEnvelope> {
+  // If operator passed a `typeKey` not in the blacklist, the SQL would
+  // return zero rows. Short-circuit so the envelope's reason is
+  // clearer than "empty join result".
+  if (
+    input.typeKey !== undefined &&
+    !(GENERIC_EDGE_TYPE_KEYS as ReadonlyArray<string>).includes(input.typeKey)
+  ) {
+    return {
+      proposalKind: "relationship_label_repair",
+      candidates: [],
+      truncated: false,
+      weakDescriptionMaxLengthUsed: null,
+    };
+  }
+
+  const rows = await db
+    .select({
+      id: agsGraphEdges.id,
+      typeKey: agsGraphEdges.typeKey,
+    })
+    .from(agsGraphEdges)
+    .innerJoin(
+      agsGraphNodes,
+      and(
+        eq(agsGraphNodes.id, agsGraphEdges.sourceNodeId),
+        eq(agsGraphNodes.workspaceId, input.workspaceId),
+      ),
+    )
+    .where(
+      and(
+        eq(agsGraphEdges.governanceStatus, "active"),
+        input.typeKey !== undefined
+          ? eq(agsGraphEdges.typeKey, input.typeKey)
+          : inArray(
+              agsGraphEdges.typeKey,
+              GENERIC_EDGE_TYPE_KEYS as unknown as string[],
+            ),
+      ),
+    )
+    .orderBy(agsGraphEdges.id)
+    .limit(limit + 1);
+
+  const truncated = rows.length > limit;
+  const trimmed = truncated ? rows.slice(0, limit) : rows;
+
+  const candidates: SemanticEnrichmentCandidate[] = trimmed.map((r) => ({
+    targetKind: "edge" as const,
+    targetTypeKey: r.typeKey,
+    targetId: r.id,
+    proposalKind: "relationship_label_repair" as const,
+  }));
+
+  return {
+    proposalKind: "relationship_label_repair",
     candidates,
     truncated,
     weakDescriptionMaxLengthUsed: null,
