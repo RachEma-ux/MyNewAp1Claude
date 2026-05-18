@@ -24,6 +24,7 @@
 
 import React, { useMemo, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
+import VaultFsSyncPanel from "./VaultFsSyncPanel";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
@@ -275,6 +276,13 @@ export default function VaultExplorer({
                     selectedNoteId={selectedNoteId}
                     onSelectNote={onSelectNote}
                   />
+                  {/* Track A — A7 — FS-sync settings panel for the
+                      selected vault. Lives at the bottom of the
+                      selected-vault expansion so operators see the
+                      sync state alongside the note list. */}
+                  <div className="mt-2 px-3">
+                    <FsSyncSettingsAffordance vaultId={vault.id} />
+                  </div>
                 </>
               )}
             </li>
@@ -282,6 +290,31 @@ export default function VaultExplorer({
         </ul>
       )}
     </aside>
+  );
+}
+
+/**
+ * Track A — A7. Collapsible affordance that mounts VaultFsSyncPanel.
+ * Default-collapsed so the vault row stays tidy; click to expand.
+ */
+function FsSyncSettingsAffordance({
+  vaultId,
+}: {
+  vaultId: number;
+}): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-1" data-testid="vault-explorer-fs-sync-affordance">
+      <button
+        type="button"
+        data-testid="vault-explorer-fs-sync-toggle"
+        className="text-xs text-gray-500 hover:underline"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? "▾ FS sync settings" : "▸ FS sync settings"}
+      </button>
+      {open && <VaultFsSyncPanel vaultId={vaultId} />}
+    </div>
   );
 }
 
