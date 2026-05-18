@@ -81,6 +81,7 @@ import { impactAnalysisRouter } from "../services/graph-lens/impact-analysis-rou
 import { semanticEnrichmentRouter } from "../services/graph-enrichment/semantic-enrichment-router";
 import { graphChangeProposalsRouter } from "../services/graph-change-proposals/router";
 import { vaultRouter } from "../services/vault/router";
+import { goldenQuestionsRouter } from "../services/graph-skill/golden-questions/golden-questions-router";
 import { graphWorkspaceRouter } from "../services/graph-workspace/router";
 import { regionAdminRouter } from "../services/region/region-admin-router";
 import { extensionsAdminRouter } from "../services/extensions/extensions-admin-router";
@@ -3029,6 +3030,16 @@ export const agentStudioRouter = router({
   // performed the assignment until now. Source-scan integrity test
   // guards future drift.
   vault: vaultRouter,
+  // Native Graph Workspace T-D.5.α: Golden Questions read surface —
+  // listSuites + listQuestionsInSuite. Seed file
+  // (server/agent-studio/services/graph-skill/seed-golden-questions.ts)
+  // populates ags_golden_question_suites + ags_golden_questions at
+  // boot via seedAsDb(); this mount lets the operator dashboard
+  // enumerate them without re-implementing the closed-taxonomy
+  // lookup client-side. Run-lifecycle persistence + caller deferred
+  // to T-D.5.β/.γ (runLiveEvaluation exists but has no caller AND no
+  // persistence write today).
+  goldenQuestions: goldenQuestionsRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
   // runs.pruneToolCallTracesRetention (#627), and mcp.pruneTransitionsRetention
