@@ -40,3 +40,12 @@ export {
   type FsSyncStatus,
   type FsSyncWriteResult,
 } from "./types.js";
+export {
+  defaultWatcherManager,
+  notePathUnderVault,
+  startVaultWatcher,
+  WatcherManager,
+  type FsSyncWatcherEvent,
+  type StartVaultWatcherOptions,
+  type WatcherHandle,
+} from "./watcher.js";
