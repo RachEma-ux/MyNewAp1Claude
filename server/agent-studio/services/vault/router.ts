@@ -345,6 +345,163 @@ export const vaultRouter = router({
     }),
 
   // ============================================================
+  // Track A — Obsidian-style FS-sync surface
+  // ADR: docs/architecture/agent-studio-vault-fs-sync.md
+  // ============================================================
+
+  /**
+   * Set or clear a vault's on-disk sync path. Admin-gated by the
+   * caller (the procedure itself is `protectedProcedure`; the future
+   * admin role check lives one layer up alongside other admin
+   * gates). Passing `path: null` disables sync and stops the watcher.
+   *
+   * Validation pipeline:
+   *  1. Path string shape (absolute, no obvious traversal).
+   *  2. `assertVaultRootIsConfigurable` enforces the
+   *     VAULT_FS_SYNC_ALLOWED_ROOTS env contract.
+   *  3. Persist via `setVaultFsSyncPath`.
+   *  4. Restart the watcher manager so the new root (or null) takes
+   *     effect immediately.
+   */
+  setFsSyncPath: protectedProcedure
+    .input(
+      z.object({
+        vaultId: z.number().int().positive(),
+        path: z.string().min(1).max(2048).nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { assertVaultRootIsConfigurable, defaultWatcherManager, FsSyncError } =
+        await import("./fs-sync/index.js");
+      const repo = getRepo();
+      if (input.path !== null) {
+        try {
+          assertVaultRootIsConfigurable(input.path);
+        } catch (e) {
+          if (e instanceof FsSyncError) {
+            throwTrpcAndCapture(
+              new TRPCError({ code: "BAD_REQUEST", message: e.message }),
+            );
+          }
+          throw e;
+        }
+      }
+      await repo.setVaultFsSyncPath(input.vaultId, input.path);
+      if (input.path === null) {
+        await defaultWatcherManager.stop(input.vaultId);
+      } else {
+        // The handler is wired in A6 (post-commit hooks); for now we
+        // just start the watcher with a no-op so the lifecycle works
+        // end-to-end and operators can verify the watcher is running.
+        await defaultWatcherManager.getOrStart({
+          vaultId: input.vaultId,
+          vaultRoot: input.path,
+          onEvent: () => {
+            /* A6 — DB upsert handler */
+          },
+        });
+      }
+      return { vaultId: input.vaultId, fsSyncPath: input.path };
+    }),
+
+  /**
+   * Returns the current FS-sync status for a vault. Used by the
+   * settings UI (A7) to render the path + enabled-state + watcher-
+   * running indicator.
+   */
+  getFsSyncStatus: protectedProcedure
+    .input(z.object({ vaultId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const { defaultWatcherManager } = await import("./fs-sync/index.js");
+      const repo = getRepo();
+      const fsSyncPath = await repo.getVaultFsSyncPath(input.vaultId);
+      return {
+        vaultId: input.vaultId,
+        enabled: fsSyncPath !== null,
+        fsSyncPath,
+        watcherRunning: defaultWatcherManager.has(input.vaultId),
+        watcherRoot: defaultWatcherManager.vaultRootFor(input.vaultId),
+      };
+    }),
+
+  /**
+   * Manually trigger a one-shot export of every note in the vault to
+   * disk. Idempotent — notes whose current contentMd hash matches
+   * the stored `fs_sync_last_hash` are skipped. Operators invoke this
+   * after a manual `rm -rf` of the vault folder or to verify the
+   * sync state. A8 hardens the initial-backfill flow (auto-fire on
+   * first `setFsSyncPath`); this PR ships the manual path.
+   */
+  triggerInitialBackfill: protectedProcedure
+    .input(z.object({ vaultId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const {
+        materializeNotes,
+        resolveNoteFilePath,
+        renderNoteAsMarkdownForFsSync,
+      } = await import("./fs-sync-backfill.js");
+      const repo = getRepo();
+      const vaultRoot = await repo.getVaultFsSyncPath(input.vaultId);
+      if (vaultRoot === null) {
+        throwTrpcAndCapture(
+          new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Vault ${input.vaultId} has no fs_sync_path set`,
+          }),
+        );
+      }
+      // Pull every note in the vault, render via the FS-sync helper,
+      // hand the spec set to the reconciler. Per-note hash persistence
+      // happens in the onWritten callback so a crash mid-backfill
+      // doesn't leave the DB out of sync with disk.
+      const notes = await repo.listNotesInVault(input.vaultId, {
+        limit: 10000,
+      });
+      const specs: Array<{
+        absPath: string;
+        contentMd: string;
+        lastHash: string | null;
+        noteId: number;
+      }> = [];
+      for (const note of notes) {
+        const latest = await repo.getLatestNoteVersion(note.id);
+        if (!latest) continue;
+        const rendered = renderNoteAsMarkdownForFsSync({
+          title: note.title,
+          slug: note.slug,
+          contentMd: latest.contentMd,
+          frontmatter: (latest.frontmatter ?? {}) as Record<string, unknown>,
+          version: latest.version,
+        });
+        const lookup = await repo.findNoteBySlugInVault(
+          input.vaultId,
+          note.slug,
+        );
+        specs.push({
+          absPath: resolveNoteFilePath(vaultRoot, [], note.slug),
+          contentMd: rendered,
+          lastHash: lookup?.fsSyncLastHash ?? null,
+          noteId: note.id,
+        });
+      }
+      const result = await materializeNotes({
+        vaultId: input.vaultId,
+        vaultRoot: vaultRoot!,
+        specs: specs.map(({ noteId: _, ...s }) => s),
+        onWritten: async (spec, r) => {
+          if (r.kind === "written") {
+            const noteId = specs.find((s) => s.absPath === spec.absPath)
+              ?.noteId;
+            if (noteId !== undefined) {
+              await repo.setNoteFsSyncLastHash(noteId, r.hash);
+            }
+          }
+        },
+      });
+      return result;
+    }),
+
+  // ============================================================
   // Phase 15 — Attachments
   // ============================================================
 

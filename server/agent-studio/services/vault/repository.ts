@@ -61,6 +61,36 @@ export interface VaultRepository {
     | { deleted: false; notFound: true }
   >;
   listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }): Promise<NoteSelectByIdResult[]>;
+
+  // Track A — FS-sync surface
+  // ADR: docs/architecture/agent-studio-vault-fs-sync.md
+
+  /** Returns the vault's current `fs_sync_path` (null = sync disabled). */
+  getVaultFsSyncPath(vaultId: number): Promise<string | null>;
+
+  /**
+   * Sets / clears the vault's `fs_sync_path`. Passing `null` disables
+   * sync; otherwise the caller is responsible for path validation
+   * (`assertVaultRootIsConfigurable`) — this method is purely the
+   * persistence step.
+   */
+  setVaultFsSyncPath(vaultId: number, path: string | null): Promise<void>;
+
+  /**
+   * Looks up a note by (vaultId, slug). Returns the noteId + the
+   * current `fs_sync_last_hash` so the FS→DB reader can short-circuit
+   * on echoes without an extra round-trip. Returns null on no match.
+   */
+  findNoteBySlugInVault(
+    vaultId: number,
+    slug: string,
+  ): Promise<{ noteId: number; folderId: number | null; fsSyncLastHash: string | null } | null>;
+
+  /**
+   * Updates the `fs_sync_last_hash` on a note. Called after every
+   * successful FS round-trip (both DB→FS write and FS→DB read).
+   */
+  setNoteFsSyncLastHash(noteId: number, hash: string | null): Promise<void>;
 }
 
 /**
@@ -170,6 +200,41 @@ export class VaultRepositoryStub implements VaultRepository {
   async listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }) {
     const filtered = this.notes.filter((n) => n.vaultId === vaultId);
     return filtered.slice(0, options?.limit ?? 100);
+  }
+
+  // Track A — FS-sync stub surface.
+  private vaultFsSyncPaths = new Map<number, string | null>();
+  private noteFsSyncHashes = new Map<number, string | null>();
+
+  async getVaultFsSyncPath(vaultId: number): Promise<string | null> {
+    return this.vaultFsSyncPaths.get(vaultId) ?? null;
+  }
+
+  async setVaultFsSyncPath(vaultId: number, path: string | null): Promise<void> {
+    this.vaultFsSyncPaths.set(vaultId, path);
+  }
+
+  async findNoteBySlugInVault(
+    vaultId: number,
+    slug: string,
+  ): Promise<{
+    noteId: number;
+    folderId: number | null;
+    fsSyncLastHash: string | null;
+  } | null> {
+    const match = this.notes.find(
+      (n) => n.vaultId === vaultId && n.slug === slug,
+    );
+    if (!match) return null;
+    return {
+      noteId: match.id,
+      folderId: null,
+      fsSyncLastHash: this.noteFsSyncHashes.get(match.id) ?? null,
+    };
+  }
+
+  async setNoteFsSyncLastHash(noteId: number, hash: string | null): Promise<void> {
+    this.noteFsSyncHashes.set(noteId, hash);
   }
 
   private deletedNoteIds = new Set<number>();
