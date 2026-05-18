@@ -168,6 +168,38 @@ function fireGraphProjection(
   })();
 }
 
+/**
+ * Outbound link persistence — writes `ags_vault_wikilinks` +
+ * `ags_vault_embeds` rows for the new note version. REPLACE strategy:
+ * deletes the prior rows for the note then inserts the new set.
+ * Fire-and-forget; failures don't block the response (graph projection
+ * is enqueued separately via `fireGraphProjection`).
+ */
+function fireLinkPersistence(
+  vaultId: number,
+  noteId: number,
+  versionId: number,
+  contentMd: string,
+): void {
+  void (async () => {
+    try {
+      const { persistNoteLinks } = await import("./link-persistence.js");
+      await persistNoteLinks({
+        vaultId,
+        noteId,
+        versionId,
+        contentMd,
+        repo: getRepo(),
+      });
+    } catch (e) {
+      console.warn(
+        `[link-persistence] write failed noteId=${noteId} versionId=${versionId}:`,
+        e,
+      );
+    }
+  })();
+}
+
 function fireGraphProjectionDeletion(noteId: number): void {
   void (async () => {
     try {
@@ -255,6 +287,15 @@ export const vaultRouter = router({
         input.contentMd,
         "note.created",
       );
+      // Outbound link persistence — writes Postgres rows for the
+      // operator-visible wikilinks/embeds. Independent from the graph
+      // projection; both fire concurrently.
+      void fireLinkPersistence(
+        input.vaultId,
+        note.id,
+        note.versionId,
+        input.contentMd,
+      );
       return {
         ...note,
         wikilinkCount: extraction.wikilinks.length,
@@ -286,6 +327,14 @@ export const vaultRouter = router({
           note.title,
           input.contentMd,
           "note.updated",
+        );
+        // Link persistence — REPLACE the prior version's rows with the
+        // newly-extracted wikilinks/embeds.
+        void fireLinkPersistence(
+          note.vaultId,
+          input.noteId,
+          result.versionId,
+          input.contentMd,
         );
       }
       return { conflict: false, versionId: result.versionId };
