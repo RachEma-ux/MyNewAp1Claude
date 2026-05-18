@@ -103,3 +103,9 @@ export {
   type PromoteSemanticEnrichmentDeps,
   type PromoteSemanticEnrichmentResult,
 } from "./semantic-enrichment-promotion-bridge.js";
+
+export {
+  runPromoteSemanticEnrichment,
+  AsdbUnavailableForPromotionError,
+  type RunPromoteSemanticEnrichmentOptions,
+} from "./semantic-enrichment-promote-runner.js";
