@@ -130,7 +130,7 @@ export default function GraphWorkspacePage(): React.ReactElement {
     <div className="flex flex-col h-full" data-testid="graph-workspace-page">
       <div className="px-4 pt-4 flex items-start justify-between gap-3">
         <PageHeader
-          title="Graph Workspace"
+          title="Vault Explorer"
           subtitle="Vault notes, graph exploration, impact analysis, and runtime traces — backed by the native graph workspace runtime."
           icon={<Network className="h-5 w-5" />}
         />

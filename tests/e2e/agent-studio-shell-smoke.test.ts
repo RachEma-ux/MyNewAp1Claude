@@ -61,7 +61,7 @@ describe("Layer 4 e2e — Agent Studio shell smoke (first slice)", () => {
     const entry = agentStudioRoutes.find(
       (r) => r.path === "/agent-studio/graph-workspace",
     );
-    expect(entry?.label).toBe("Graph Workspace");
+    expect(entry?.label).toBe("Vault Explorer");
   });
 
   it("registers the full canonical Agent Studio route set", () => {
@@ -103,6 +103,6 @@ describe("Layer 4 e2e — Agent Studio shell smoke (first slice)", () => {
       "../../client/src/modules/agent-studio/pages/GraphWorkspacePage"
     );
     render(createElement(GraphWorkspacePage));
-    expect(screen.getByText("Graph Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Vault Explorer")).toBeInTheDocument();
   });
 });
