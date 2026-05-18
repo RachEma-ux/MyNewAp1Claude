@@ -100,6 +100,7 @@ Hard rules:
 - Graph Agent Lite must not mutate graph facts directly. Mutations route through Phase 11.5 graph change proposals + existing approval scaffolding.
 - Cypher templates must be parameterized; no raw query strings outside `ags_query_templates` registry.
 - Read-only Text2Cypher; mutations forbidden.
+- **Vault FS-sync** (Track A, `docs/architecture/agent-studio-vault-fs-sync.md`): `.md` filesystem mirror is a writeable projection alongside the offline-local-first IndexedDB cache. Postgres remains canonical; per-vault opt-in via `ags_vaults.fs_sync_path` under operator-configured `VAULT_FS_SYNC_ALLOWED_ROOTS`. `fs.write*` / `fs.rename*` / `fs.unlink*` / `fs.mkdir*` inside `server/agent-studio/services/vault/**` are restricted to `fs-sync/` + the two sibling `fs-sync-{backfill,integration}.ts` modules (source-scan tested). Atomic `.tmp → rename` writer + SHA-256 `fs_sync_last_hash` cycle prevention + chokidar 5 watcher. CRDT/Yjs is the merge venue on concurrent edits.
 
 Out of scope for MVP 0–4 (eternal — boundary preserved even after V1+ shipments):
 - `kgra/` Python sidecar at repo root

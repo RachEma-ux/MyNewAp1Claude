@@ -69,13 +69,14 @@ describe("A5 — vault FS-sync tRPC procedures", () => {
     expect(src).toMatch(/defaultWatcherManager\.stop/);
   });
 
-  it("triggerInitialBackfill reuses the existing reconciler + path helpers", () => {
-    expect(src).toMatch(/materializeNotes/);
-    expect(src).toMatch(/resolveNoteFilePath/);
-    expect(src).toMatch(/renderNoteAsMarkdownForFsSync/);
-    // The onWritten callback persists the new hash so a crash mid-
-    // backfill doesn't leave DB and disk out of sync.
-    expect(src).toMatch(/setNoteFsSyncLastHash/);
+  it("triggerInitialBackfill delegates to runInitialBackfill (post-A8 shape)", () => {
+    // A8 collapsed the inline reconciler call into a 3-line
+    // delegation to the shared `runInitialBackfill` helper that
+    // both the manual-trigger path and the auto-fire on first
+    // enable share. Lock the delegation so a future refactor
+    // doesn't accidentally re-duplicate the logic.
+    expect(src).toMatch(/runInitialBackfill\(repo/);
+    expect(src).toMatch(/fs-sync-integration/);
   });
 });
 
