@@ -28,6 +28,7 @@ import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
 import { autocompletion } from "@codemirror/autocomplete";
 import CodeMirrorMdEditor from "./CodeMirrorMdEditor";
+import NoteFrontmatterPanel from "./NoteFrontmatterPanel";
 import { buildTagCompletionSource } from "./tag-autocomplete";
 import { buildWikilinkCompletionSource } from "./wikilink-autocomplete";
 import WorkspaceStateLayer, {
@@ -280,6 +281,18 @@ export default function MarkdownEditorPane({
       )}
 
       <div className="flex-1 min-h-0 overflow-auto p-3" data-testid="markdown-editor-body">
+        {/* Track B — B5 — Obsidian-style Properties panel above the
+            body. Edits round-trip through liveText / setDraftMd so
+            B1 auto-save catches them unchanged. Hidden in read-mode
+            because the rendered AppStreamdown already shows the
+            frontmatter inline (per the markdown-profile contract). */}
+        {mode !== "read" && (
+          <NoteFrontmatterPanel
+            value={liveText}
+            onChange={(next) => setDraftMd(next)}
+            readOnly={readOnly}
+          />
+        )}
         {mode === "read" && <AppStreamdown>{liveText}</AppStreamdown>}
         {mode === "edit" && (
           <CodeMirrorMdEditor

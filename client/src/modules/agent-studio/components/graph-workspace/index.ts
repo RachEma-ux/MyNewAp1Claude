@@ -17,6 +17,7 @@ export { default as ImpactAnalysisView } from "./ImpactAnalysisView";
 export { default as RuntimeAndDecisionTraceView } from "./RuntimeAndDecisionTraceView";
 export { default as VaultFsSyncPanel } from "./VaultFsSyncPanel";
 export { default as CodeMirrorMdEditor } from "./CodeMirrorMdEditor";
+export { default as NoteFrontmatterPanel } from "./NoteFrontmatterPanel";
 export {
   buildWikilinkCompletionSource,
   wikilinkAutocomplete,
