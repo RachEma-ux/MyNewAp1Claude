@@ -110,6 +110,26 @@ export interface SemanticEnrichmentRecentRejectionRow {
   readonly runStartedAt: Date | null;
 }
 
+/**
+ * Full per-proposal detail row used by `getProposalDetail`
+ * (T-D.3.ε). Includes the heavy `payload` + `sourceEvidence` JSON
+ * that the T-D.3.β list view intentionally omits — operator
+ * triage needs the full rationale + cite evidence to decide
+ * approve / reject.
+ */
+export interface SemanticEnrichmentProposalDetail {
+  readonly id: number;
+  readonly runId: number | null;
+  readonly proposalKind: string;
+  readonly targetTypeKey: string | null;
+  readonly targetId: number | null;
+  readonly confidence: string | null;
+  readonly status: string;
+  readonly payload: Record<string, unknown> | null;
+  readonly sourceEvidence: Record<string, unknown> | null;
+  readonly createdAt: Date;
+}
+
 export interface SemanticEnrichmentStore {
   beginRun(
     input: SemanticEnrichmentRunInput,
@@ -165,6 +185,15 @@ export interface SemanticEnrichmentStore {
     readonly runLimit: number;
     readonly rowLimit: number;
   }): Promise<ReadonlyArray<SemanticEnrichmentRecentRejectionRow>>;
+
+  /**
+   * T-D.3.ε per-proposal detail (full payload + sourceEvidence).
+   * Returns null when proposalId isn't found (stale-link safety
+   * per the §22 lesson). Operator triage drill-in.
+   */
+  getProposalDetail(
+    proposalId: number,
+  ): Promise<SemanticEnrichmentProposalDetail | null>;
 }
 
 export interface CreateSemanticEnrichmentStoreOptions {
@@ -414,6 +443,51 @@ export function createSemanticEnrichmentStore(
         return b.count - a.count;
       });
       return rows.slice(0, input.rowLimit);
+    },
+
+    async getProposalDetail(proposalId) {
+      const db = requireDb(options.db);
+      const rows = await db
+        .select({
+          id: agsSemanticEnrichmentProposals.id,
+          runId: agsSemanticEnrichmentProposals.runId,
+          proposalKind: agsSemanticEnrichmentProposals.proposalKind,
+          targetTypeKey: agsSemanticEnrichmentProposals.targetTypeKey,
+          targetId: agsSemanticEnrichmentProposals.targetId,
+          confidence: agsSemanticEnrichmentProposals.confidence,
+          status: agsSemanticEnrichmentProposals.status,
+          payload: agsSemanticEnrichmentProposals.payload,
+          sourceEvidence: agsSemanticEnrichmentProposals.sourceEvidence,
+          createdAt: agsSemanticEnrichmentProposals.createdAt,
+        })
+        .from(agsSemanticEnrichmentProposals)
+        .where(eq(agsSemanticEnrichmentProposals.id, proposalId))
+        .limit(1);
+      if (rows.length === 0) return null;
+      const r = rows[0] as {
+        id: number;
+        runId: number | null;
+        proposalKind: string;
+        targetTypeKey: string | null;
+        targetId: number | null;
+        confidence: string | null;
+        status: string;
+        payload: Record<string, unknown> | null;
+        sourceEvidence: Record<string, unknown> | null;
+        createdAt: Date;
+      };
+      return {
+        id: r.id,
+        runId: r.runId,
+        proposalKind: r.proposalKind,
+        targetTypeKey: r.targetTypeKey,
+        targetId: r.targetId,
+        confidence: r.confidence,
+        status: r.status,
+        payload: r.payload,
+        sourceEvidence: r.sourceEvidence,
+        createdAt: r.createdAt,
+      };
     },
 
     async listProposals(input) {

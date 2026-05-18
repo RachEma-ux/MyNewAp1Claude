@@ -50,6 +50,7 @@ import {
 } from "./contracts.js";
 import {
   createSemanticEnrichmentStore,
+  type SemanticEnrichmentProposalDetail,
   type SemanticEnrichmentProposalListRow,
   type SemanticEnrichmentRecentRejectionRow,
   type SemanticEnrichmentRunListRow,
@@ -99,6 +100,17 @@ export interface ListSemanticEnrichmentProposalsEnvelope {
 
 export interface ListSemanticEnrichmentRecentRejectionsEnvelope {
   readonly rejections: ReadonlyArray<SemanticEnrichmentRecentRejectionRow>;
+}
+
+/**
+ * `getProposalDetail` envelope (T-D.3.ε). Discriminated for
+ * stale-link safety — operators may click a link to a pruned /
+ * retention-deleted proposal.
+ */
+export interface GetSemanticEnrichmentProposalDetailEnvelope {
+  readonly status: "ok" | "not_found";
+  readonly proposalId: number;
+  readonly proposal?: SemanticEnrichmentProposalDetail;
 }
 
 // ============================================================================
@@ -214,6 +226,33 @@ export const semanticEnrichmentRouter = router({
    * attached at read-time (here: `runId` + `runStartedAt`; there:
    * `ingestionId` + `sourceKey`).
    */
+  /**
+   * Per-proposal full detail (T-D.3.ε). Returns the heavy
+   * `payload` + `sourceEvidence` JSON that the T-D.3.β list view
+   * intentionally omits — operator triage needs the full rationale
+   * + cite evidence to decide approve / reject. Discriminated
+   * `not_found` envelope for stale-link safety (proposals can be
+   * retention-pruned).
+   *
+   * Mirrors `securityGraph.getIngestionStats` /
+   * `goldenQuestions.getRunStats` discriminated `{ status: "ok" |
+   * "not_found", ... }` shape.
+   */
+  getProposalDetail: adminProcedure
+    .input(z.object({ proposalId: z.number().int().positive() }))
+    .query(
+      async ({
+        input,
+      }): Promise<GetSemanticEnrichmentProposalDetailEnvelope> => {
+        const store = createSemanticEnrichmentStore();
+        const proposal = await store.getProposalDetail(input.proposalId);
+        if (proposal === null) {
+          return { status: "not_found", proposalId: input.proposalId };
+        }
+        return { status: "ok", proposalId: input.proposalId, proposal };
+      },
+    ),
+
   listRecentRejectionsByKind: adminProcedure
     .input(
       z.object({
