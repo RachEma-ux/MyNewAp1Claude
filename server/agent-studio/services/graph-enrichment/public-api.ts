@@ -61,3 +61,15 @@ export {
   type ListSemanticEnrichmentCandidatesInput,
   type SemanticEnrichmentCandidatesEnvelope,
 } from "./semantic-enrichment-candidate-selector.js";
+
+export {
+  runSemanticEnrichment,
+  isSupportedTriggerProposalKind,
+  SUPPORTED_TRIGGER_PROPOSAL_KINDS,
+  type RunSemanticEnrichmentInput,
+  type RunSemanticEnrichmentOptions,
+  type RunSemanticEnrichmentOutput,
+  type SemanticEnrichmentRunOkEnvelope,
+  type SemanticEnrichmentRunNoCandidatesEnvelope,
+  type SemanticEnrichmentRunKindNotSupportedEnvelope,
+} from "./semantic-enrichment-runner.js";

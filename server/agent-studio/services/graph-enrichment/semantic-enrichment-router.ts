@@ -21,14 +21,11 @@
  *   - `listProposals` (T-D.3.β) — paged proposals for one run,
  *     optionally filtered by status (e.g.
  *     `rejected_below_threshold` for audit views).
- *
- * **Deferred — run-trigger mutation.**
- * Manually triggering an enrichment run is a mutation that needs
- * the candidate-selection layer plumbed (T-D.3 §candidates).
- * `listCandidatesByKind` (T-D.3.δ-prep) ships that layer for the
- * `description_enrichment` kind; the trigger mutation itself stays
- * deferred until model-access binding + the remaining 4 selectors
- * land.
+ *   - `triggerRun` (T-D.3.δ) — single mutation that selects
+ *     candidates → runs the agent → persists proposals. Returns a
+ *     discriminated `ok | no_candidates | kind_not_yet_supported`
+ *     envelope. Composition lives in `semantic-enrichment-runner.ts`;
+ *     this file only adapts inputs/outputs to the tRPC boundary.
  *
  * Mounted at `agentStudio.semanticEnrichment.*`. All procedures are
  * `adminProcedure` and read-only.
@@ -54,8 +51,11 @@ import {
 import {
   createSemanticEnrichmentStore,
   listSemanticEnrichmentCandidates,
+  runSemanticEnrichment,
   SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT,
   SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT,
+  ABSOLUTE_SEMANTIC_ENRICHMENT_MAX_PROPOSALS_PER_RUN,
+  type RunSemanticEnrichmentOutput,
   type SemanticEnrichmentCandidatesEnvelope,
   type SemanticEnrichmentProposalDetail,
   type SemanticEnrichmentProposalListRow,
@@ -342,6 +342,94 @@ export const semanticEnrichmentRouter = router({
           rowLimit: input.rowLimit,
         });
         return { rejections };
+      },
+    ),
+
+  /**
+   * T-D.3.δ — trigger one Semantic Enrichment run.
+   *
+   * Operator picks a `proposalKind` + a provider/model binding;
+   * server selects candidates (via the `listCandidatesByKind` selector
+   * layer), composes store + evidence-collector + LLM proposer, runs
+   * the agent, persists runs + proposals, returns the discriminated
+   * envelope.
+   *
+   * Discriminated envelope (`RunSemanticEnrichmentOutput`):
+   *   - `"ok"` — agent ran; full counts attached
+   *   - `"no_candidates"` — selector returned zero rows
+   *   - `"kind_not_yet_supported"` — proposalKind is one of the 3
+   *     deferred kinds (stale_fact_refresh / entity_disambiguation /
+   *     relationship_label_repair) — each needs the
+   *     `SemanticEnrichmentCandidate` contract extension; the message
+   *     names the constraint explicitly.
+   *
+   * Hard-rule compliance (CLAUDE.md):
+   *   - LLM access lives behind the runner's resolved openrouter
+   *     `execute` (boundary tested by the router's source-scan).
+   *   - Agent emits proposals only — never mutates graph rows.
+   *   - `adminProcedure` floor preserved.
+   */
+  triggerRun: adminProcedure
+    .input(
+      z.object({
+        workspaceId: z.number().int().positive(),
+        proposalKind: z.enum(
+          SEMANTIC_ENRICHMENT_PROPOSAL_KINDS as unknown as readonly [
+            SemanticEnrichmentProposalKind,
+            ...SemanticEnrichmentProposalKind[],
+          ],
+        ),
+        providerConnectionId: z.number().int().positive(),
+        modelRef: z.string().min(1).max(200),
+        actorId: z.number().int().positive(),
+        minConfidence: z.number().min(0).max(1).optional(),
+        maxProposals: z
+          .number()
+          .int()
+          .min(1)
+          .max(ABSOLUTE_SEMANTIC_ENRICHMENT_MAX_PROPOSALS_PER_RUN)
+          .optional(),
+        typeKey: z.string().min(1).max(100).optional(),
+        weakDescriptionMaxLength: z
+          .number()
+          .int()
+          .min(1)
+          .max(10_000)
+          .optional(),
+        candidateLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT)
+          .optional(),
+        temperature: z.number().min(0).max(2).optional(),
+      }),
+    )
+    .mutation(
+      async ({ input }): Promise<RunSemanticEnrichmentOutput> => {
+        return await runSemanticEnrichment({
+          workspaceId: input.workspaceId,
+          proposalKind: input.proposalKind,
+          providerConnectionId: input.providerConnectionId,
+          modelRef: input.modelRef,
+          actorId: input.actorId,
+          ...(input.minConfidence !== undefined
+            ? { minConfidence: input.minConfidence }
+            : {}),
+          ...(input.maxProposals !== undefined
+            ? { maxProposals: input.maxProposals }
+            : {}),
+          ...(input.typeKey !== undefined ? { typeKey: input.typeKey } : {}),
+          ...(input.weakDescriptionMaxLength !== undefined
+            ? { weakDescriptionMaxLength: input.weakDescriptionMaxLength }
+            : {}),
+          ...(input.candidateLimit !== undefined
+            ? { candidateLimit: input.candidateLimit }
+            : {}),
+          ...(input.temperature !== undefined
+            ? { temperature: input.temperature }
+            : {}),
+        });
       },
     ),
 });
