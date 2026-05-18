@@ -68,6 +68,10 @@ import {
   InvalidProposalPayloadError,
 } from "./mutation-worker.js";
 import { approveAndApplyProposal } from "./approve-and-apply.js";
+import {
+  verifyPostApply,
+  ProposalNotFoundForVerificationError,
+} from "./post-apply-verification.js";
 import { getFindingAuditTrail } from "./finding-audit-trail.js";
 import {
   dismissFinding,
@@ -314,14 +318,51 @@ export const graphQualityRouter = router({
         });
       }
       try {
-        return await approveAndApplyProposal({
-          proposalId: input.proposalId,
-          decidedByUserId: userId,
-          rationale: input.rationale,
-          notifyUserId: input.notifyMe ? userId : undefined,
-        });
+        return await approveAndApplyProposal(
+          {
+            proposalId: input.proposalId,
+            decidedByUserId: userId,
+            rationale: input.rationale,
+            notifyUserId: input.notifyMe ? userId : undefined,
+          },
+          {
+            scannerRegistry: QUALITY_SCANNER_REGISTRY,
+            repository: getGraphRepository(),
+          },
+        );
       } catch (e) {
         unwrapError(e);
+      }
+    }),
+
+  /**
+   * T-D.5 — Operator-triggered post-apply verification. Useful when
+   * the env flag wasn't set at the time of apply, or when an operator
+   * wants to re-verify an older applied proposal against the
+   * now-current graph state.
+   *
+   * Returns the same envelope as the embedded verification (skip
+   * reason or pass/fail with metadata) and writes the same
+   * `ags_graph_correction_audit_events` row. Idempotent at the row
+   * level — re-calling writes ANOTHER audit row; ops use that to see
+   * verification history over time.
+   */
+  verifyProposalApply: protectedProcedure
+    .input(z.object({ proposalId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await verifyPostApply(
+          { proposalId: input.proposalId },
+          {
+            registry: QUALITY_SCANNER_REGISTRY,
+            repository: getGraphRepository(),
+          },
+        );
+      } catch (e) {
+        if (e instanceof ProposalNotFoundForVerificationError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
       }
     }),
 

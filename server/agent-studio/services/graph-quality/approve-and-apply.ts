@@ -33,6 +33,13 @@ import type {
   ApplierRegistry,
 } from "./mutation-worker.js";
 import type { ProposalRow } from "../graph-correction/lifecycle.js";
+import {
+  isPostApplyVerificationEnabled,
+  verifyPostApply,
+  type VerifyPostApplyResult,
+} from "./post-apply-verification.js";
+import type { QualityScannerRegistration } from "./scan-orchestrator.js";
+import type { GraphRepository } from "../graph/repository/index.js";
 
 export interface ApproveAndApplyInput {
   readonly proposalId: number;
@@ -50,6 +57,19 @@ export interface ApproveAndApplyInput {
 export interface ApproveAndApplyOptions {
   readonly getDb?: typeof getAsDb;
   readonly registry?: ApplierRegistry;
+  /**
+   * Optional post-apply verification context. When provided AND the
+   * env flag `AGS_GRAPH_QUALITY_POST_APPLY_VERIFICATION_ENABLED` is
+   * truthy AND apply succeeded, the combo fires `verifyPostApply`
+   * fire-and-forget. Verification failure NEVER breaks apply.
+   *
+   * Carrying these as optional keeps the combo's call sites that
+   * don't have a scanner registry / graph repository (e.g.
+   * `semantic-enrichment-promote-and-approve.ts` for now) working
+   * without changes.
+   */
+  readonly scannerRegistry?: readonly QualityScannerRegistration[];
+  readonly repository?: GraphRepository;
 }
 
 export interface ApproveAndApplyResult {
@@ -71,5 +91,47 @@ export async function approveAndApplyProposal(
     { proposalId: input.proposalId, notifyUserId: input.notifyUserId },
     { getDb: options.getDb, registry: options.registry },
   );
+
+  // Post-apply verification (T-D.5). Fire-and-forget so verification
+  // can never break the combo. Gated on env flag + presence of the
+  // scanner registry + repository + a successful apply.
+  if (
+    apply.result.applied &&
+    options.scannerRegistry !== undefined &&
+    options.repository !== undefined &&
+    isPostApplyVerificationEnabled()
+  ) {
+    void runFireAndForgetVerification({
+      proposalId: input.proposalId,
+      registry: options.scannerRegistry,
+      repository: options.repository,
+      getDb: options.getDb,
+    });
+  }
+
   return { approval, apply };
+}
+
+async function runFireAndForgetVerification(args: {
+  readonly proposalId: number;
+  readonly registry: readonly QualityScannerRegistration[];
+  readonly repository: GraphRepository;
+  readonly getDb?: typeof getAsDb;
+}): Promise<VerifyPostApplyResult | null> {
+  try {
+    return await verifyPostApply(
+      { proposalId: args.proposalId },
+      {
+        registry: args.registry,
+        repository: args.repository,
+        ...(args.getDb !== undefined ? { getDb: args.getDb } : {}),
+      },
+    );
+  } catch {
+    // Fail-soft. Verification path runs detached from the apply
+    // promise chain so the caller never observes a verification
+    // throw. Operator dashboards see verification gaps as missing
+    // audit rows.
+    return null;
+  }
 }
