@@ -36,6 +36,8 @@ import {
   GraphInspector,
   ImpactAnalysisView,
   RuntimeAndDecisionTraceView,
+  QuickSwitcherModal,
+  useQuickSwitcherKeybinding,
   type InspectorTarget,
 } from "../components/graph-workspace";
 import { trpc } from "../../../lib/trpc";
@@ -55,6 +57,8 @@ export default function GraphWorkspacePage(): React.ReactElement {
   const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget>({
     kind: "none",
   });
+  // Track B — B7 — Cmd+P / Ctrl+P quick switcher.
+  const { open: quickSwitcherOpen, closeSwitcher } = useQuickSwitcherKeybinding();
 
   const noteQuery = trpc.agentStudio.vault.getNote.useQuery(
     { noteId: selectedNoteId ?? 0 },
@@ -172,6 +176,17 @@ export default function GraphWorkspacePage(): React.ReactElement {
           </div>
         </aside>
       </div>
+      {/* Track B — B7 — Cmd+P / Ctrl+P quick switcher overlay. */}
+      <QuickSwitcherModal
+        open={quickSwitcherOpen}
+        onClose={closeSwitcher}
+        onSelect={(vaultId, noteId) => {
+          setSelectedVaultId(vaultId);
+          setSelectedNoteId(noteId);
+          setTab("editor");
+          setInspectorTarget({ kind: "none" });
+        }}
+      />
     </div>
   );
 }

@@ -24,6 +24,13 @@ export {
   splitEmbedSegments,
 } from "./NoteEmbedAwareMarkdown";
 export {
+  default as QuickSwitcherModal,
+  filterQuickSwitcherEntries,
+  useQuickSwitcherKeybinding,
+  type QuickSwitcherEntry,
+  type QuickSwitcherModalProps,
+} from "./QuickSwitcherModal";
+export {
   buildWikilinkCompletionSource,
   wikilinkAutocomplete,
   type WikilinkSuggestion,
