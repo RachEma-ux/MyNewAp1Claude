@@ -22,6 +22,7 @@ import {
   Sparkles,
   Loader2,
   Copy,
+  BookOpen,
 } from "lucide-react";
 import {
   PageHeader,
@@ -125,6 +126,15 @@ export default function AgentStudioHomePage({
         icon={<Bot className="h-4 w-4 text-blue-500" />}
         actions={
           <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/agent-studio/graph-workspace")}
+              title="Open the Obsidian-style Vault Explorer + knowledge graph workspace"
+            >
+              <BookOpen className="h-3.5 w-3.5 mr-1" />
+              Open Vault Explorer
+            </Button>
             <Button
               size="sm"
               variant="outline"
