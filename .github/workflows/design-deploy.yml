@@ -8,6 +8,17 @@ name: Design App Deploy
 # minutes.
 
 on:
+  # Auto-run when the Design app or this workflow changes on the working
+  # branch. Uses defaults (duration=30, entry=index.html). Restricted to a
+  # single branch + narrow paths so we don't burn 30 min of runner time
+  # on every unrelated push.
+  push:
+    branches:
+      - 'claude/create-design-repo-JUzJD'
+    paths:
+      - 'index.html'
+      - 'dashboard.html'
+      - '.github/workflows/design-deploy.yml'
   workflow_dispatch:
     inputs:
       duration:
@@ -63,7 +74,7 @@ jobs:
 
       - name: Verify entry file exists
         run: |
-          ENTRY="${{ github.event.inputs.entry }}"
+          ENTRY="${{ github.event.inputs.entry || 'index.html' }}"
           if [ ! -f "$ENTRY" ]; then
             echo "::error::Entry file '$ENTRY' not found at repo root"
             echo "Files at root:"
@@ -80,8 +91,8 @@ jobs:
 
       - name: Serve Design app and open tunnel
         env:
-          ENTRY: ${{ github.event.inputs.entry }}
-          DURATION_MIN: ${{ github.event.inputs.duration }}
+          ENTRY: ${{ github.event.inputs.entry || 'index.html' }}
+          DURATION_MIN: ${{ github.event.inputs.duration || '30' }}
         run: |
           set -euo pipefail
 
