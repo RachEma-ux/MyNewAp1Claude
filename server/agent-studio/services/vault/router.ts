@@ -133,6 +133,41 @@ function fireFsFlush(vaultId: number, noteId: number): void {
   })();
 }
 
+/**
+ * Knowledge Graph projection enqueue — closes step 8 of the Phase 5b
+ * note-version pipeline. Pushes a `note.created` / `note.updated`
+ * sync-job + one `wikilink.changed` job per resolved `[[wikilink]]`
+ * onto `ags_graph_projection_sync_jobs`. Phase 7.5 sync-worker reads
+ * the queue and renders into Neo4j. Lazy-imported for the same
+ * cold-import reasons as the FS-sync helpers.
+ */
+function fireGraphProjection(
+  vaultId: number,
+  noteId: number,
+  versionId: number,
+  slug: string,
+  title: string,
+  contentMd: string,
+  eventKind: "note.created" | "note.updated",
+): void {
+  void (async () => {
+    try {
+      const { enqueueVaultNoteProjection } = await import(
+        "./graph-projection.js"
+      );
+      await enqueueVaultNoteProjection(
+        { vaultId, noteId, versionId, slug, title, contentMd, eventKind },
+        { repo: getRepo() },
+      );
+    } catch (e) {
+      console.warn(
+        `[graph-projection] enqueue failed noteId=${noteId} versionId=${versionId} kind=${eventKind}:`,
+        e,
+      );
+    }
+  })();
+}
+
 function fireFsDelete(vaultId: number, noteSlug: string): void {
   void (async () => {
     try {
@@ -184,13 +219,26 @@ export const vaultRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id ?? 1;
       const note = await getRepo().createNote(input, userId);
-      // Side-effect: extract links and stage projection event payload.
-      // The projection sync worker (when wired) picks this up.
+      // Side-effect: extract links for the projection event payload + the
+      // operator-facing counts on the response.
       const extraction = extractLinksFromMarkdown(input.contentMd);
       // Track A — A6 — DB → FS flush (fire-and-forget). The flush
       // is non-blocking (the operator's response returns before disk
       // I/O completes). FS sync no-ops when fs_sync_path is null.
       void fireFsFlush(input.vaultId, note.id);
+      // Knowledge Graph projection — fire-and-forget. Pushes the new
+      // note (and its outbound wikilinks) onto ags_graph_projection_
+      // sync_jobs so the Phase 7.5 sync-worker can render Note +
+      // NoteVersion + LINKS_TO into Neo4j.
+      void fireGraphProjection(
+        input.vaultId,
+        note.id,
+        note.versionId,
+        input.slug,
+        input.title,
+        input.contentMd,
+        "note.created",
+      );
       return {
         ...note,
         wikilinkCount: extraction.wikilinks.length,
@@ -209,7 +257,21 @@ export const vaultRouter = router({
       // Track A — A6 — DB → FS flush. Look up the note's vaultId
       // (the update input only carries noteId) before firing.
       const note = await getRepo().getNoteById(input.noteId);
-      if (note) void fireFsFlush(note.vaultId, input.noteId);
+      if (note) {
+        void fireFsFlush(note.vaultId, input.noteId);
+        // Knowledge Graph projection — wikilink set in the new
+        // contentMd may differ from the previous version, so re-enqueue
+        // on every update. The sync-worker dedups by projectionKey.
+        void fireGraphProjection(
+          note.vaultId,
+          input.noteId,
+          result.versionId,
+          note.slug,
+          note.title,
+          input.contentMd,
+          "note.updated",
+        );
+      }
       return { conflict: false, versionId: result.versionId };
     }),
 
