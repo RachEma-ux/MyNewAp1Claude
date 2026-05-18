@@ -109,3 +109,10 @@ export {
   AsdbUnavailableForPromotionError,
   type RunPromoteSemanticEnrichmentOptions,
 } from "./semantic-enrichment-promote-runner.js";
+
+export {
+  promoteAndApproveProposal,
+  type PromoteAndApproveInput,
+  type PromoteAndApproveOptions,
+  type PromoteAndApproveResult,
+} from "./semantic-enrichment-promote-and-approve.js";

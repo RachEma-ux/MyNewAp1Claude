@@ -31,6 +31,11 @@
  *     chain. Composition lives in `semantic-enrichment-promote-runner.ts`;
  *     this file only adapts inputs/outputs to the tRPC boundary and
  *     maps bridge errors to TRPCError codes.
+ *   - `promoteAndApprove` (T-D.4 slice 3) — combo: promote + immediate
+ *     `approveAndApplyProposal` so a single operator click takes an
+ *     enrichment proposal end-to-end through approval + mutation +
+ *     reprojection. Composition lives in
+ *     `semantic-enrichment-promote-and-approve.ts`.
  *
  * Mounted at `agentStudio.semanticEnrichment.*`. All procedures are
  * `adminProcedure` and read-only.
@@ -76,6 +81,7 @@ import {
   AsdbUnavailableForPromotionError,
   runPromoteSemanticEnrichment,
 } from "./semantic-enrichment-promote-runner.js";
+import { promoteAndApproveProposal } from "./semantic-enrichment-promote-and-approve.js";
 
 // ============================================================================
 // Limit constants
@@ -479,6 +485,74 @@ export const semanticEnrichmentRouter = router({
    *     mutation + reprojection.
    *   - `adminProcedure` floor preserved.
    */
+  /**
+   * T-D.4 slice 3 — promote + approve + apply in ONE operator call.
+   *
+   * Operator-convenience combo. Runs `promote` to bridge into the
+   * graph-correction surface, then immediately runs
+   * `approveAndApplyProposal` on the new correction proposal.
+   *
+   * Returns both halves' results so operators see what got promoted
+   * + what got applied + the new audit-event row id from the
+   * mutation-worker.
+   *
+   * Error mapping mirrors `promote`'s — bridge errors map to
+   * TRPCError codes; downstream approve/apply errors re-thrown
+   * verbatim (operators see the same error they'd see calling
+   * `approveAndApplyProposal` directly).
+   */
+  promoteAndApprove: adminProcedure
+    .input(
+      z.object({
+        proposalId: z.number().int().positive(),
+        decidedByUserId: z.number().int().positive(),
+        rationale: z.string().min(1).max(2000).optional(),
+        proposedByAgentId: z.number().int().positive().optional(),
+        notifyUserId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const result = await promoteAndApproveProposal({
+          proposalId: input.proposalId,
+          decidedByUserId: input.decidedByUserId,
+          ...(input.rationale !== undefined ? { rationale: input.rationale } : {}),
+          ...(input.proposedByAgentId !== undefined
+            ? { proposedByAgentId: input.proposedByAgentId }
+            : {}),
+          ...(input.notifyUserId !== undefined
+            ? { notifyUserId: input.notifyUserId }
+            : {}),
+        });
+        return {
+          status: "ok" as const,
+          enrichmentProposalId: result.promote.enrichmentProposalId,
+          correctionProposalId: result.promote.correctionProposalId,
+          applied: result.approveAndApply.apply.result.applied,
+          ...(result.approveAndApply.apply.result.reason !== undefined
+            ? { applyReason: result.approveAndApply.apply.result.reason }
+            : {}),
+        };
+      } catch (e) {
+        if (e instanceof EnrichmentProposalNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        if (e instanceof EnrichmentProposalAlreadyPromotedError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
+        }
+        if (e instanceof EnrichmentProposalNotPromotableError) {
+          throw new TRPCError({ code: "CONFLICT", message: e.message });
+        }
+        if (e instanceof AsdbUnavailableForPromotionError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: e.message,
+          });
+        }
+        throw e;
+      }
+    }),
+
   promote: adminProcedure
     .input(
       z.object({
