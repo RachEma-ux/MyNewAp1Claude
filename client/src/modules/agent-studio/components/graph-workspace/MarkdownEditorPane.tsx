@@ -28,6 +28,7 @@ import { AppStreamdown } from "../../../../components/markdown/AppStreamdown";
 import { trpc } from "../../../../lib/trpc";
 import { autocompletion } from "@codemirror/autocomplete";
 import CodeMirrorMdEditor from "./CodeMirrorMdEditor";
+import NoteEmbedAwareMarkdown from "./NoteEmbedAwareMarkdown";
 import NoteFrontmatterPanel from "./NoteFrontmatterPanel";
 import { buildTagCompletionSource } from "./tag-autocomplete";
 import { buildWikilinkCompletionSource } from "./wikilink-autocomplete";
@@ -293,7 +294,11 @@ export default function MarkdownEditorPane({
             readOnly={readOnly}
           />
         )}
-        {mode === "read" && <AppStreamdown>{liveText}</AppStreamdown>}
+        {/* Track B — B6 — read mode renders via NoteEmbedAwareMarkdown
+            which expands `![[slug]]` embeds inline (depth-capped at
+            MAX_EMBED_DEPTH). Pure markdown still flows through the
+            existing AppStreamdown — embeds wrap it. */}
+        {mode === "read" && <NoteEmbedAwareMarkdown source={liveText} />}
         {mode === "edit" && (
           <CodeMirrorMdEditor
             testId="markdown-editor-cm-edit"

@@ -19,6 +19,11 @@ export { default as VaultFsSyncPanel } from "./VaultFsSyncPanel";
 export { default as CodeMirrorMdEditor } from "./CodeMirrorMdEditor";
 export { default as NoteFrontmatterPanel } from "./NoteFrontmatterPanel";
 export {
+  default as NoteEmbedAwareMarkdown,
+  MAX_EMBED_DEPTH,
+  splitEmbedSegments,
+} from "./NoteEmbedAwareMarkdown";
+export {
   buildWikilinkCompletionSource,
   wikilinkAutocomplete,
   type WikilinkSuggestion,
