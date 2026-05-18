@@ -84,3 +84,22 @@ export {
   type SemanticEnrichmentRunNoCandidatesEnvelope,
   type SemanticEnrichmentRunKindNotSupportedEnvelope,
 } from "./semantic-enrichment-runner.js";
+
+export {
+  convertSemanticEnrichmentToCorrectionProposal,
+  promoteSemanticEnrichmentProposal,
+  EnrichmentProposalNotFoundError,
+  EnrichmentProposalNotPromotableError,
+  EnrichmentProposalAlreadyPromotedError,
+  SEMANTIC_ENRICHMENT_PROMOTED_STATUS,
+  SEMANTIC_ENRICHMENT_PROMOTED_DECISION,
+  type ConvertSemanticEnrichmentOptions,
+  type CorrectionProposalRowFromEnrichment,
+  type CorrectionProposalWriter,
+  type EnrichmentProposalReader,
+  type EnrichmentProposalStatusWriter,
+  type EnrichmentDecisionWriter,
+  type PromoteSemanticEnrichmentInput,
+  type PromoteSemanticEnrichmentDeps,
+  type PromoteSemanticEnrichmentResult,
+} from "./semantic-enrichment-promotion-bridge.js";
