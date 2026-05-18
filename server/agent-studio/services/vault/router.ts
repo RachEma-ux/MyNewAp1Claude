@@ -452,6 +452,10 @@ export const vaultRouter = router({
           throw e;
         }
       }
+      // Track A — A8 — capture prior state BEFORE the persistence
+      // step so we can detect the disabled → enabled transition and
+      // auto-fire the initial backfill (in the background).
+      const priorPath = await repo.getVaultFsSyncPath(input.vaultId);
       await repo.setVaultFsSyncPath(input.vaultId, input.path);
       if (input.path === null) {
         await defaultWatcherManager.stop(input.vaultId);
@@ -459,7 +463,7 @@ export const vaultRouter = router({
         // Track A — A6 — wire the FS → DB upsert handler. Each
         // watcher event flows through handleWatcherEvent which does
         // hash-based echo prevention + parse + upsert.
-        const { handleWatcherEvent } = await import(
+        const { handleWatcherEvent, runInitialBackfill } = await import(
           "./fs-sync-integration.js"
         );
         await defaultWatcherManager.getOrStart({
@@ -469,8 +473,32 @@ export const vaultRouter = router({
             await handleWatcherEvent(repo, event);
           },
         });
+        // Track A — A8 — auto-fire the initial backfill on the
+        // disabled → enabled transition. Runs in the background so
+        // the operator's mutation response returns immediately.
+        // Failures are logged but don't fail the mutation. Re-
+        // enabling the same path is idempotent — the writer's echo
+        // guard skips notes whose hash already matches what's on
+        // disk.
+        if (priorPath === null) {
+          void (async () => {
+            try {
+              await runInitialBackfill(repo, input.vaultId);
+            } catch (e) {
+              console.warn(
+                `[fs-sync] auto-backfill failed for vaultId=${input.vaultId}:`,
+                e,
+              );
+            }
+          })();
+        }
       }
-      return { vaultId: input.vaultId, fsSyncPath: input.path };
+      return {
+        vaultId: input.vaultId,
+        fsSyncPath: input.path,
+        priorPath,
+        autoBackfillFired: priorPath === null && input.path !== null,
+      };
     }),
 
   /**
@@ -504,14 +532,15 @@ export const vaultRouter = router({
   triggerInitialBackfill: protectedProcedure
     .input(z.object({ vaultId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
-      const {
-        materializeNotes,
-        resolveNoteFilePath,
-        renderNoteAsMarkdownForFsSync,
-      } = await import("./fs-sync-backfill.js");
+      // Track A — A8 — delegates to the shared runInitialBackfill
+      // helper so the manual-trigger path and the auto-fire path in
+      // setFsSyncPath go through the same code.
+      const { runInitialBackfill } = await import(
+        "./fs-sync-integration.js"
+      );
       const repo = getRepo();
-      const vaultRoot = await repo.getVaultFsSyncPath(input.vaultId);
-      if (vaultRoot === null) {
+      const result = await runInitialBackfill(repo, input.vaultId);
+      if (result === null) {
         throwTrpcAndCapture(
           new TRPCError({
             code: "BAD_REQUEST",
@@ -519,54 +548,6 @@ export const vaultRouter = router({
           }),
         );
       }
-      // Pull every note in the vault, render via the FS-sync helper,
-      // hand the spec set to the reconciler. Per-note hash persistence
-      // happens in the onWritten callback so a crash mid-backfill
-      // doesn't leave the DB out of sync with disk.
-      const notes = await repo.listNotesInVault(input.vaultId, {
-        limit: 10000,
-      });
-      const specs: Array<{
-        absPath: string;
-        contentMd: string;
-        lastHash: string | null;
-        noteId: number;
-      }> = [];
-      for (const note of notes) {
-        const latest = await repo.getLatestNoteVersion(note.id);
-        if (!latest) continue;
-        const rendered = renderNoteAsMarkdownForFsSync({
-          title: note.title,
-          slug: note.slug,
-          contentMd: latest.contentMd,
-          frontmatter: (latest.frontmatter ?? {}) as Record<string, unknown>,
-          version: latest.version,
-        });
-        const lookup = await repo.findNoteBySlugInVault(
-          input.vaultId,
-          note.slug,
-        );
-        specs.push({
-          absPath: resolveNoteFilePath(vaultRoot, [], note.slug),
-          contentMd: rendered,
-          lastHash: lookup?.fsSyncLastHash ?? null,
-          noteId: note.id,
-        });
-      }
-      const result = await materializeNotes({
-        vaultId: input.vaultId,
-        vaultRoot: vaultRoot!,
-        specs: specs.map(({ noteId: _, ...s }) => s),
-        onWritten: async (spec, r) => {
-          if (r.kind === "written") {
-            const noteId = specs.find((s) => s.absPath === spec.absPath)
-              ?.noteId;
-            if (noteId !== undefined) {
-              await repo.setNoteFsSyncLastHash(noteId, r.hash);
-            }
-          }
-        },
-      });
       return result;
     }),
 

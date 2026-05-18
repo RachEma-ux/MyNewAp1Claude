@@ -29,10 +29,12 @@ import { unlink } from "node:fs/promises";
 
 import type { VaultRepository } from "./repository.js";
 import {
+  materializeNotes,
   parseNotePathFromAbs,
   readMarkdownFile,
   resolveNoteFilePath,
   writeMarkdownAtomic,
+  type FsSyncBackfillResult,
   type FsSyncWatcherEvent,
 } from "./fs-sync/index.js";
 import { renderNoteAsMarkdownForFsSync } from "./fs-sync-backfill.js";
@@ -230,4 +232,65 @@ export async function handleWatcherEvent(
     return;
   }
   await repo.setNoteFsSyncLastHash(lookup.noteId, read.hash);
+}
+
+/**
+ * One-shot backfill of every note in a vault to disk. Used by both
+ * the manual `triggerInitialBackfill` tRPC procedure (A5) and the
+ * auto-fire on transition `null` → `path` in `setFsSyncPath` (A8).
+ *
+ * Idempotent — notes whose current contentMd hash matches the
+ * stored `fs_sync_last_hash` are skipped by the writer's cycle-
+ * prevention guard. Per-write the `onWritten` callback persists
+ * the new hash so a crash mid-backfill doesn't leave DB and disk
+ * out of sync.
+ *
+ * Returns null when the vault has no `fs_sync_path` set (caller
+ * decides whether to surface this as an error or a no-op).
+ */
+export async function runInitialBackfill(
+  repo: VaultRepository,
+  vaultId: number,
+): Promise<FsSyncBackfillResult | null> {
+  const vaultRoot = await repo.getVaultFsSyncPath(vaultId);
+  if (vaultRoot === null) return null;
+  const notes = await repo.listNotesInVault(vaultId, { limit: 10000 });
+  const specs: Array<{
+    absPath: string;
+    contentMd: string;
+    lastHash: string | null;
+    noteId: number;
+  }> = [];
+  for (const note of notes) {
+    const latest = await repo.getLatestNoteVersion(note.id);
+    if (!latest) continue;
+    const rendered = renderNoteAsMarkdownForFsSync({
+      title: note.title,
+      slug: note.slug,
+      contentMd: latest.contentMd,
+      frontmatter: (latest.frontmatter ?? {}) as Record<string, unknown>,
+      version: latest.version,
+      noteId: note.id,
+    });
+    const lookup = await repo.findNoteBySlugInVault(vaultId, note.slug);
+    specs.push({
+      absPath: resolveNoteFilePath(vaultRoot, [], note.slug),
+      contentMd: rendered,
+      lastHash: lookup?.fsSyncLastHash ?? null,
+      noteId: note.id,
+    });
+  }
+  return await materializeNotes({
+    vaultId,
+    vaultRoot,
+    specs: specs.map(({ noteId: _, ...s }) => s),
+    onWritten: async (spec, r) => {
+      if (r.kind === "written") {
+        const noteId = specs.find((s) => s.absPath === spec.absPath)?.noteId;
+        if (noteId !== undefined) {
+          await repo.setNoteFsSyncLastHash(noteId, r.hash);
+        }
+      }
+    },
+  });
 }
