@@ -24,8 +24,11 @@
  *
  * **Deferred — run-trigger mutation.**
  * Manually triggering an enrichment run is a mutation that needs
- * the candidate-selection layer plumbed (T-D.3 §candidates). That's
- * a separate slice (T-D.3.γ).
+ * the candidate-selection layer plumbed (T-D.3 §candidates).
+ * `listCandidatesByKind` (T-D.3.δ-prep) ships that layer for the
+ * `description_enrichment` kind; the trigger mutation itself stays
+ * deferred until model-access binding + the remaining 4 selectors
+ * land.
  *
  * Mounted at `agentStudio.semanticEnrichment.*`. All procedures are
  * `adminProcedure` and read-only.
@@ -50,6 +53,10 @@ import {
 } from "./contracts.js";
 import {
   createSemanticEnrichmentStore,
+  listSemanticEnrichmentCandidates,
+  SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT,
+  SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT,
+  type SemanticEnrichmentCandidatesEnvelope,
   type SemanticEnrichmentProposalDetail,
   type SemanticEnrichmentProposalListRow,
   type SemanticEnrichmentRecentRejectionRow,
@@ -250,6 +257,61 @@ export const semanticEnrichmentRouter = router({
           return { status: "not_found", proposalId: input.proposalId };
         }
         return { status: "ok", proposalId: input.proposalId, proposal };
+      },
+    ),
+
+  /**
+   * Candidate-selection layer for the not-yet-built T-D.3.δ trigger
+   * mutation. Operators (and a future cron) call this to preview
+   * which graph nodes would be considered for enrichment by kind
+   * before kicking off a real run.
+   *
+   * Today only `proposalKind === "description_enrichment"` returns
+   * non-empty data — the SQL: nodes whose `description` property is
+   * missing OR shorter than `weakDescriptionMaxLength` (default 40
+   * chars including JSON quoting). Other kinds return an empty
+   * envelope with `weakDescriptionMaxLengthUsed: null` until their
+   * dedicated scanners ship in follow-up slices.
+   *
+   * Workspace-scoped — required input arg. `typeKey` optional filter
+   * for narrowing to one node type.
+   */
+  listCandidatesByKind: adminProcedure
+    .input(
+      z.object({
+        workspaceId: z.number().int().positive(),
+        proposalKind: z.enum(
+          SEMANTIC_ENRICHMENT_PROPOSAL_KINDS as unknown as readonly [
+            SemanticEnrichmentProposalKind,
+            ...SemanticEnrichmentProposalKind[],
+          ],
+        ),
+        typeKey: z.string().min(1).max(100).optional(),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(SEMANTIC_ENRICHMENT_CANDIDATES_ABSOLUTE_LIMIT)
+          .default(SEMANTIC_ENRICHMENT_CANDIDATES_DEFAULT_LIMIT),
+        weakDescriptionMaxLength: z
+          .number()
+          .int()
+          .min(1)
+          .max(10_000)
+          .optional(),
+      }),
+    )
+    .query(
+      async ({ input }): Promise<SemanticEnrichmentCandidatesEnvelope> => {
+        return await listSemanticEnrichmentCandidates({
+          workspaceId: input.workspaceId,
+          proposalKind: input.proposalKind,
+          limit: input.limit,
+          ...(input.typeKey !== undefined ? { typeKey: input.typeKey } : {}),
+          ...(input.weakDescriptionMaxLength !== undefined
+            ? { weakDescriptionMaxLength: input.weakDescriptionMaxLength }
+            : {}),
+        });
       },
     ),
 
