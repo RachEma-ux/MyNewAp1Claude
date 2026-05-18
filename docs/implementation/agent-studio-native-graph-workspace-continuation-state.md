@@ -121,6 +121,22 @@ Historical "next material work" items (MR caller-migration sub-arc, concrete lan
 
 Per-PR detail in memory entries `project_v1_plus_lens_stack_arc_2026_05_16` / `project_v1_plus_layout_renderer_arc_2026_05_16` / `project_v1_plus_quality_lens_arc_2026_05_16` / `project_v1_plus_url_deeplink_subarc_2026_05_17`. Tracker §7 sweep row for #1272–#1360 added by T-A.43 (this doc-drift PR).
 
+**2026-05-17 → 2026-05-18 continuation — 42-PR vault chain (#1449–#1490):** Three back-to-back autonomous arcs took the vault layer from "explorer + read/edit" to a full Obsidian-style editor whose every mutation projects into the Knowledge Graph and surfaces as DB-backed backlinks. Sub-arc breakdown:
+
+1. **#1449–#1458 (10 PRs)** — Pre-Obsidian intermediate fixes: `createVault` admin-member fix, vault-explorer Create-Vault + Create-Note affordances, `MarkdownEditorPane` error classification, semantic-enrichment selector kind #2 (missing_property_fill), "Open Vault Explorer" home-page CTA, sidebar rename (#1451 — partial).
+2. **#1459–#1475 (17 PRs)** — Obsidian-style vault initiative: Track A FS-sync 9 PRs (`A1` ADR → `A9` boundary scan + CLAUDE.md hard-rules bullet) + Track B editor parity 6 PRs (`B1` debounced auto-save through `B7` Cmd+P quick switcher) + neo4j-driver/yjs deps. Full memory: `project_obsidian_vault_complete.md`.
+3. **#1476–#1488 (13 PRs)** — Vault → Knowledge Graph chain: end-to-end producer (#1477) → drain orchestrator (#1479) → cron + boot wire (#1480) → sync-worker symmetry (#1478) → Neo4j writes; link persistence tables (#1482) + inbound backfill (#1481) + admin drain tRPC (#1483) + retry-with-backoff (#1485) + backlinks query tRPC (#1486) + backfill admin (#1487) + `WikilinksBacklinksPanel` DB migration (#1488). Full memory: `project_vault_kg_chain_complete.md`.
+4. **#1489–#1490 (2 PRs)** — Trailing fixes: `listBacklinks` SELECT DISTINCT + ORDER BY fix (#1489); Vault Explorer label alignment across PageHeader + nav.ts + routes.tsx + tests (#1490 — closes the #1451 partial-rename gap).
+
+Tracker §28 added in this T-A.44 doc-drift PR records the closure receipt.
+
+**Next material work (post-#1490):** Material runtime work — the vault layer is now end-to-end:
+- **T-D.5.ζ** golden-questions evaluation caller (mutation or cron) — needs ADR review for Live Engine Factory wiring.
+- **T-D.3.δ** semantic-enrichment trigger mutation — needs candidate-selection layer plumbed (selector kinds 2/5 shipped via #1455).
+- **T-F.4** Quality Lens UI — read surfaces uniform across T-D.3 + T-D.5 + graph-quality + graph-correction; UI work fully unblocked.
+- **Phase 7 ASDB graph-repo wire-in or delete** — operator-triage decision per #1445 header + memory `project_phase_7_asdb_graph_repo_orphan.md`.
+- **T-C CLAUDE.md Non-Build List reconciliation** — text was already updated for CRDT/offline/multi-region (per the V1+ plan scope block); audit for any residual contradictions remains a one-PR doc sweep.
+
 The historical (pre-strict-audit) recovery context follows.
 
 ---

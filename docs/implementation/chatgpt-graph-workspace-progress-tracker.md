@@ -1731,3 +1731,165 @@ fully closed at the operator-facing tRPC surface level
 (T-G.4 + T-G.5 + T-D.3 + T-D.5), mount-drift class fully guarded
 by 4 complementary layers, detail-vs-list pattern formalized,
 orphan finding documented. Remaining work needs operator direction.
+
+---
+
+## 28. Obsidian-style vault + Vault → Knowledge Graph chain (2026-05-18)
+
+Two autonomous arcs landed back-to-back after §27, plus a small
+trailing-fix sub-arc, totaling **42 PRs (#1449–#1490)**. Together
+they take the vault from "explorer + read/edit" to a full
+Obsidian-style editor whose every mutation projects into the
+Knowledge Graph and surfaces as DB-backed backlinks. Tracker §28
+is the closure receipt; per-PR breakdown lives in the two memory
+files referenced below.
+
+### Ledger (3 sub-arcs)
+
+#### 28.1 — Pre-Obsidian intermediate fixes (#1449–#1458, 10 PRs)
+
+| # | PR | Slice |
+|---|----|-------|
+| 1 | #1449 | `GraphQualityFindingsPanel` — transform stats Record to Bucket[] |
+| 2 | #1450 | Vault-explorer Create-Vault + Create-Note affordances |
+| 3 | #1451 | Surface Graph Workspace under Vaults sidebar (label "Vault Explorer") |
+| 4 | #1452 | Replace misleading editor empty-state with actionable hint |
+| 5 | #1453 | `MarkdownEditorPane` — classify errors (no more blanket `permission_denied`) |
+| 6 | #1454 | `semanticEnrichment.listCandidatesByKind` (T-D.3.δ-prep) |
+| 7 | #1455 | Semantic-enrichment selector — `missing_property_fill` kind (2/5) |
+| 8 | #1456 | Doc — candidate-contract constraint gating selectors 3-5 |
+| 9 | #1457 | `createVault` adds creator as admin member (invisible-vault bug) |
+| 10 | #1458 | Open Vault Explorer button on home page header |
+
+#### 28.2 — Obsidian-style vault initiative (#1459–#1475, 17 PRs) — COMPLETE
+
+Memory: `~/.claude/projects/-root/memory/project_obsidian_vault_complete.md`.
+
+Track A (FS-sync, 9 PRs): `A1` ADR (#1461) · `A2` schema columns
+(#1462) · `A3` writer + reader + reconciler (#1463) · `A4`
+chokidar watcher (#1464) · `A5` tRPC procedures (#1465) · `A6`
+createNote/updateNote/deleteNote ↔ FS hooks (#1466) · `A7`
+`VaultFsSyncPanel` (#1467) · `A8` auto-fire initial backfill
+(#1468) · `A9` closure boundary scan + CLAUDE.md hard-rules
+bullet (#1469).
+
+Track B (editor parity, 6 PRs): `B1` debounced auto-save
+(#1460) · `B2` CodeMirror 6 editor (#1470) · `B3` `[[wikilink]]`
+autocomplete (#1471) · `B4` `#tag` autocomplete (#1472) · `B5`
+frontmatter Properties panel (#1473) · `B6` `![[embed]]`
+read-mode preview (#1474) · `B7` Cmd+P quick switcher (#1475).
+
+Plus chore deps PR #1459 (neo4j-driver + yjs pnpm-lock).
+
+#### 28.3 — Vault → Knowledge Graph chain (#1476–#1488, 13 PRs) — COMPLETE
+
+Memory: `~/.claude/projects/-root/memory/project_vault_kg_chain_complete.md`.
+
+End-to-end producer → drain → Neo4j + admin surface +
+DB-backed backlinks: URL deeplink (#1476) · producer enqueue
+(#1477) · sync-worker symmetry for `note.updated` + `note.deleted`
+(#1478) · drain orchestrator (#1479) · drain cron + boot wire
+(#1480) · inbound-resolution backfill (#1481) · link persistence
+(`ags_vault_wikilinks` + `ags_vault_embeds`) (#1482) · admin
+drain tRPC (#1483) · note-shape embed classification (#1484) ·
+retry-with-backoff for failed drain rows (#1485) · `vault.listBacklinks`
++ `listOutgoingWikilinks` tRPC (#1486) · `vault.backfillLinks`
+admin (#1487) · `WikilinksBacklinksPanel` DB migration (#1488).
+
+#### 28.4 — Trailing fixes (#1489–#1490, 2 PRs)
+
+| # | PR | Slice |
+|---|----|-------|
+| 1 | #1489 | `listBacklinks` — `SELECT DISTINCT` + `ORDER BY` violation fix |
+| 2 | #1490 | Align Vault Explorer labels across PageHeader + `nav.ts` + `routes.tsx` + tests (closes the PR #1451 partial-rename gap) |
+
+### End-to-end shape after §28
+
+```
+createNote/updateNote/deleteNote   (router)
+   ├── fireFsFlush / fireFsDelete         (Track A, §28.2)
+   ├── fireGraphProjection                (#1477 producer)
+   │     → ags_graph_projection_sync_jobs
+   │     → drain cron (*/5 min)           (#1479 + #1480)
+   │     → ProjectionSyncWorker.handle    (#1478 cases)
+   │     → Neo4j writes
+   ├── fireGraphProjectionDeletion        (#1478 delete arm)
+   └── fireLinkPersistence                (#1482 persist)
+         → ags_vault_wikilinks REPLACE
+         → ags_vault_embeds REPLACE
+```
+
+`/agent-studio/graph-workspace` (URL slug preserved; PageHeader +
+sidebar entry now read **"Vault Explorer"** per the §28.1 #1451
+rename + §28.4 #1490 alignment).
+
+### Hard-rule compliance (CLAUDE.md)
+
+- ✓ Postgres = source of truth; Neo4j writes are derived
+  projections via the drain orchestrator + sync-worker. Reverse
+  direction never occurs.
+- ✓ `fs.write*` / `fs.rename*` / `fs.unlink*` / `fs.mkdir*` inside
+  `server/agent-studio/services/vault/**` restricted to `fs-sync/`
+  + the two sibling `fs-sync-{backfill,integration}.ts` modules
+  (source-scan tested per A9 #1469).
+- ✓ No `neo4j-driver` imports outside
+  `server/agent-studio/services/graph/repository/**` (boundary
+  preserved by drain orchestrator going through
+  `getGraphRepository()`).
+- ✓ All graph mutations stay route-able through the existing
+  Phase 11.5 proposal/approval surface (the drain handles
+  *projection*, not source-of-truth mutation).
+
+### Carry-forward (all OPTIONAL; arc is at natural close)
+
+- **B7 server-side switcher aggregation** — current MVP caps
+  cross-vault search at 5 vaults due to React rules-of-hooks. A
+  `vault.searchAllNotes` tRPC procedure would lift the cap.
+- **B6 embed slug resolution** — resolves against the first vault
+  the user has access to. Cross-vault embeds need
+  `<NoteEmbedAwareMarkdown>` to carry the current vault context.
+- **Cron-based auto-backfill** — `vault.backfillLinks` is
+  admin-only manual today; a scheduled cron could detect sparse
+  link-coverage vaults and backfill automatically.
+- **Inbound-resolution scan optimization** — current
+  `enqueueVaultNoteProjection` does O(N) per createNote; replace
+  with a single `content_md ILIKE` JOIN once link tables have
+  full coverage.
+
+### Sub-arc carry-forward lessons (5)
+
+1. **End-to-end producer/consumer requires BOTH halves.** §28.3
+   #1477 wired the producer but the queue had no consumer until
+   the drain orchestrator (#1479). "Enqueue works" ≠ "the work
+   happens." The keystone PR is the one that closes the
+   producer→consumer loop, not the one that opens the producer.
+2. **Type-union declarations need a real producer/consumer
+   touchpoint to stay honest.** `ProjectionEvent.note.updated`
+   was declared `{noteId, previousVersionId, versionId}` but no
+   producer ever emitted that shape; the union compiled fine
+   because `triggerPayload: unknown` flowed through. Closing
+   the asymmetry surfaced the declared-shape drift.
+3. **Stack-and-rebase under squash merge is the cherry-pick
+   recipe.** Every stacked PR in §28.2 got cherry-picked onto
+   fresh `main` after the parent squash-merged. The recipe:
+   `git cherry-pick <descendant-sha>` onto a fresh branch from
+   `main`, then `git push -f origin <new-branch>:<original-name>`.
+4. **One `autocompletion()` extension per CodeMirror state.**
+   B3 + B4 wanted two autocomplete sources; CM6 silently shadowed
+   the second. Fix: factor each module to export a bare
+   `CompletionSource`, then the composing parent uses ONE
+   `autocompletion({ override: [src1, src2] })`.
+5. **Partial renames are worse than no rename.** §28.1 #1451
+   renamed the sidebar entry to "Vault Explorer" but left the
+   PageHeader + `nav.ts` + `routes.tsx` labels as "Graph
+   Workspace". Operators saw three names for one feature until
+   §28.4 #1490 closed the gap. When renaming an operator-visible
+   surface, sweep ALL label sites in the same PR — or explicitly
+   document the partial rename + file a follow-up before merge.
+
+Autonomous burst is at a natural completion point — vault layer
+is now Obsidian-grade (editor + FS-sync + DB-canonical) with
+end-to-end Knowledge Graph projection + DB-backed backlinks +
+labels aligned. Remaining material work flips back to runtime
+slices (T-D Quality Agent / T-F Quality Lens UI) or operator-
+direction sub-arcs.
