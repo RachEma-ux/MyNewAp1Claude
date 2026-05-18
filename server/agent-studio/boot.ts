@@ -574,6 +574,24 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.25.b — Graph Projection Queue Drain cron. Drains pending
+  // rows in ags_graph_projection_sync_jobs every 5 minutes by passing
+  // each through the ProjectionSyncWorker. Without this, the queue
+  // grew unboundedly — #1477/#1478 wired producers but nothing
+  // consumed the rows. Env-flag-gated via
+  // AGS_PROJECTION_DRAIN_CRON_DISABLED.
+  try {
+    const { ensureProjectionDrainCronStarted } = await import(
+      "./services/graph/projection/queue-drain-cron"
+    );
+    ensureProjectionDrainCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-projection-drain-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3.26 — V1+ Phase 19-β (2026-05-13): register default publish
   // pushers for the three target types defined in PR-V1-2 (#749):
   // staging_env, remote_vault, external_kb. PR-V1-2 shipped the
