@@ -613,7 +613,7 @@ export const semanticEnrichmentRouter = router({
    * Wraps `promote` over an array of proposal ids and aggregates per-
    * row outcomes (same bucketing as the auto-promote cron). Useful
    * for operator-triggered batch promotions that don't want to wait
-   * on the cron's */15 cadence.
+   * on the cron's 15-minute cadence.
    *
    * Input validation:
    *   - 1 ≤ `proposalIds.length` ≤ ABSOLUTE_BULK_PROMOTE_LIMIT (500)
