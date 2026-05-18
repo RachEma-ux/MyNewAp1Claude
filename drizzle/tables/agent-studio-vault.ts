@@ -40,6 +40,11 @@ export const agsVaults = pgTable(
     createdByUserId: integer("created_by_user_id"),
     settings: json("settings").$type<Record<string, unknown>>(),
     archivedAt: timestamp("archived_at"),
+    // Track A — Obsidian-style FS sync (ADR
+    // docs/architecture/agent-studio-vault-fs-sync.md). Operator-supplied
+    // absolute path under VAULT_FS_SYNC_ALLOWED_ROOTS; null = disabled.
+    // Validated server-side by setFsSyncPath (admin-gated).
+    fsSyncPath: text("fs_sync_path"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -97,6 +102,12 @@ export const agsVaultNotes = pgTable(
     governanceStatus: varchar("governance_status", { length: 50 }).notNull().default("active"),
     createdByUserId: integer("created_by_user_id"),
     deletedAt: timestamp("deleted_at"),
+    // Track A — FS-sync echo prevention (ADR
+    // docs/architecture/agent-studio-vault-fs-sync.md). SHA-256 hex of
+    // the contentMd most recently round-tripped through disk. Cycle
+    // prevention: DB→FS and FS→DB both skip when the about-to-be-written
+    // hash matches this column. Durable across restarts.
+    fsSyncLastHash: varchar("fs_sync_last_hash", { length: 64 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
