@@ -48,7 +48,15 @@ export type ProjectionEvent =
   // (source-side); this event drives the projection side via
   // buildCanvasReferenceProjection().
   | { kind: "canvas.note_reference_changed"; payload: { canvasId: number; canvasNodeId: number; referencedNoteId: number } }
-  | { kind: "canvas.note_reference_removed"; payload: { canvasNodeId: number } };
+  | { kind: "canvas.note_reference_removed"; payload: { canvasNodeId: number } }
+  // Phase 24 — Bases MVP (T-F.2). Bases become first-class graph
+  // nodes; rows hang off via OF_BASE; optional ROW_OF_NOTE edge
+  // when the row links back to a vault note (`noteId`).
+  | { kind: "base.created"; payload: { baseId: number; workspaceId: number | null; vaultId: number | null; slug: string; name: string } }
+  | { kind: "base.updated"; payload: { baseId: number; workspaceId: number | null; vaultId: number | null; slug: string; name: string } }
+  | { kind: "base.deleted"; payload: { baseId: number } }
+  | { kind: "base.row_changed"; payload: { rowId: number; baseId: number; noteId: number | null } }
+  | { kind: "base.row_removed"; payload: { rowId: number } };
 
 export interface ProjectionJobResult {
   readonly eventKind: ProjectionEvent["kind"];
@@ -245,6 +253,85 @@ export class ProjectionSyncWorker {
       case "canvas.note_reference_removed": {
         const { canvasNodeId } = event.payload;
         return buildCanvasReferenceRemoval({ canvasNodeId });
+      }
+      // ── Phase 24 — Bases MVP (T-F.2) ─────────────────────────────
+      case "base.created":
+      case "base.updated": {
+        const { baseId, slug, name } = event.payload;
+        return [{
+          kind: "upsert_node",
+          node: {
+            typeKey: "Base",
+            id: `base:${baseId}`,
+            sourceId: String(baseId),
+            properties: { slug, name },
+            provenance: provenance("ags_base", String(baseId), "asserted"),
+          },
+        }];
+      }
+      case "base.deleted": {
+        const { baseId } = event.payload;
+        return [{
+          kind: "delete_node",
+          node: {
+            typeKey: "Base",
+            id: `base:${baseId}`,
+            sourceId: String(baseId),
+            properties: {},
+            provenance: provenance("ags_base", String(baseId), "asserted"),
+          },
+        }];
+      }
+      case "base.row_changed": {
+        const { rowId, baseId, noteId } = event.payload;
+        const rowNode: NodeIdentity & { properties: Record<string, unknown>; provenance: ProvenanceFields } = {
+          typeKey: "BaseRow",
+          id: `base_row:${rowId}`,
+          sourceId: String(rowId),
+          properties: { baseId },
+          provenance: provenance("ags_base_row", String(rowId), "asserted"),
+        };
+        const ofBase: EdgeIdentity & { properties: Record<string, unknown>; provenance: ProvenanceFields } = {
+          typeKey: "OF_BASE",
+          id: `of_base:${rowId}`,
+          sourceNode: { typeKey: "BaseRow", id: rowNode.id },
+          targetNode: { typeKey: "Base", id: `base:${baseId}` },
+          properties: {},
+          provenance: provenance("ags_base_row", String(rowId), "derived"),
+        };
+        const writes: ProjectionWrite[] = [
+          { kind: "upsert_node", node: rowNode },
+          { kind: "upsert_edge", edge: ofBase },
+        ];
+        // Optional row-to-note edge. When noteId is null, the row is
+        // a free-standing record without note ancestry; no edge.
+        if (noteId != null) {
+          writes.push({
+            kind: "upsert_edge",
+            edge: {
+              typeKey: "ROW_OF_NOTE",
+              id: `row_of_note:${rowId}`,
+              sourceNode: { typeKey: "BaseRow", id: rowNode.id },
+              targetNode: { typeKey: "Note", id: `note:${noteId}` },
+              properties: {},
+              provenance: provenance("ags_base_row", String(rowId), "derived"),
+            },
+          });
+        }
+        return writes;
+      }
+      case "base.row_removed": {
+        const { rowId } = event.payload;
+        return [{
+          kind: "delete_node",
+          node: {
+            typeKey: "BaseRow",
+            id: `base_row:${rowId}`,
+            sourceId: String(rowId),
+            properties: {},
+            provenance: provenance("ags_base_row", String(rowId), "asserted"),
+          },
+        }];
       }
       case "promotion.approved": {
         const { noteId, noteVersionId, targetAssetId, promotionKind } = event.payload;

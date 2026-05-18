@@ -45,6 +45,58 @@ import {
   type UpdateBaseInput,
   type UpdateBaseRowInput,
 } from "./types.js";
+import {
+  enqueueBaseProjection,
+  enqueueBaseRowProjection,
+  enqueueBaseRowRemoval,
+} from "./graph-projection.js";
+
+/**
+ * Fire-and-forget base-side projection enqueue. Failures here NEVER
+ * roll back the Postgres mutation — Postgres is canonical, the graph
+ * is a writeable projection. The drain cron will retry transiently
+ * failed rows; permanent failures get capped at MAX_DRAIN_RETRY_ATTEMPTS.
+ */
+function fireBaseProjection(
+  base: AgsBase,
+  eventKind: "base.created" | "base.updated",
+): void {
+  void enqueueBaseProjection({
+    baseId: base.id,
+    workspaceId: base.workspaceId,
+    vaultId: base.vaultId,
+    slug: base.slug,
+    name: base.name,
+    eventKind,
+  }).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[bases-service] enqueueBaseProjection failed for base ${base.id} (${eventKind}): ${message}`,
+    );
+  });
+}
+
+function fireBaseRowProjection(row: AgsBaseRow): void {
+  void enqueueBaseRowProjection({
+    rowId: row.id,
+    baseId: row.baseId,
+    noteId: row.noteId,
+  }).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[bases-service] enqueueBaseRowProjection failed for row ${row.id}: ${message}`,
+    );
+  });
+}
+
+function fireBaseRowRemoval(rowId: number): void {
+  void enqueueBaseRowRemoval({ rowId }).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[bases-service] enqueueBaseRowRemoval failed for row ${rowId}: ${message}`,
+    );
+  });
+}
 
 // ----- Bases ----------------------------------------------------------
 
@@ -69,6 +121,7 @@ export async function createBase(input: CreateBaseInput): Promise<AgsBase> {
   if (!inserted) {
     throw new Error("Failed to insert base row");
   }
+  fireBaseProjection(inserted, "base.created");
   return inserted;
 }
 
@@ -161,6 +214,7 @@ export async function updateBase(
     .returning();
   const updated = rows[0];
   if (!updated) throw new BaseNotFoundError(baseId);
+  fireBaseProjection(updated, "base.updated");
   return updated;
 }
 
@@ -268,6 +322,7 @@ export async function createBaseRow(
     .returning();
   const inserted = rows[0];
   if (!inserted) throw new Error("Failed to insert base row");
+  fireBaseRowProjection(inserted);
   return inserted;
 }
 
@@ -301,7 +356,25 @@ export async function updateBaseRow(
     .returning();
   const updated = updatedRows[0];
   if (!updated) throw new BaseRowNotFoundError(rowId);
+  fireBaseRowProjection(updated);
   return updated;
+}
+
+/**
+ * Hard-delete a row + enqueue a `base.row_removed` projection event
+ * so Neo4j prunes the BaseRow node + OF_BASE / ROW_OF_NOTE edges.
+ */
+export async function deleteBaseRow(rowId: number): Promise<void> {
+  const db = getAsDb();
+  if (!db) throw new AsdbUnavailableError();
+  const existing = await db
+    .select({ id: agsBaseRows.id })
+    .from(agsBaseRows)
+    .where(eq(agsBaseRows.id, rowId))
+    .limit(1);
+  if (existing.length === 0) throw new BaseRowNotFoundError(rowId);
+  await db.delete(agsBaseRows).where(eq(agsBaseRows.id, rowId));
+  fireBaseRowRemoval(rowId);
 }
 
 export async function listBaseRows(

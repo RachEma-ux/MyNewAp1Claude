@@ -35,6 +35,7 @@ import {
   createBase,
   createBaseColumn,
   createBaseRow,
+  deleteBaseRow,
   getBaseSnapshot,
   listBaseColumns,
   listBaseRows,
@@ -226,6 +227,20 @@ export const basesRouter = router({
     .input(z.object({ baseId: z.number().int().positive() }))
     .query(async ({ input }) => {
       return await listBaseRows(input.baseId);
+    }),
+
+  deleteRow: protectedProcedure
+    .input(z.object({ rowId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        await deleteBaseRow(input.rowId);
+        return { rowId: input.rowId, deleted: true as const };
+      } catch (e) {
+        if (e instanceof BaseRowNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
+      }
     }),
 });
 

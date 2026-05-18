@@ -154,6 +154,43 @@ export function translatePendingRowToEvent(
         },
       };
     }
+    // Phase 24 — Bases MVP (T-F.2) -------------------------------------
+    case "base.created":
+    case "base.updated": {
+      const baseId = num("baseId");
+      const slug = str("slug");
+      const name = str("name");
+      if (baseId == null || slug == null || name == null) return null;
+      return {
+        kind: row.triggerEvent,
+        payload: {
+          baseId,
+          workspaceId: num("workspaceId"),
+          vaultId: num("vaultId"),
+          slug,
+          name,
+        },
+      };
+    }
+    case "base.deleted": {
+      const baseId = num("baseId");
+      if (baseId == null) return null;
+      return { kind: "base.deleted", payload: { baseId } };
+    }
+    case "base.row_changed": {
+      const rowId = num("rowId");
+      const baseId = num("baseId");
+      if (rowId == null || baseId == null) return null;
+      return {
+        kind: "base.row_changed",
+        payload: { rowId, baseId, noteId: num("noteId") },
+      };
+    }
+    case "base.row_removed": {
+      const rowId = num("rowId");
+      if (rowId == null) return null;
+      return { kind: "base.row_removed", payload: { rowId } };
+    }
     default:
       return null;
   }
