@@ -528,7 +528,10 @@ export const semanticEnrichmentRouter = router({
           status: "ok" as const,
           enrichmentProposalId: result.promote.enrichmentProposalId,
           correctionProposalId: result.promote.correctionProposalId,
-          applied: result.approveAndApply.apply.applied,
+          applied: result.approveAndApply.apply.result.applied,
+          ...(result.approveAndApply.apply.result.reason !== undefined
+            ? { applyReason: result.approveAndApply.apply.result.reason }
+            : {}),
         };
       } catch (e) {
         if (e instanceof EnrichmentProposalNotFoundError) {

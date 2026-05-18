@@ -79,7 +79,11 @@ describe("promoteAndApproveProposal — composition", () => {
       calls.push("approveAndApply");
       return {
         approval: { id: 500, status: "approved" } as never,
-        apply: { applied: true, auditEventId: 9 } as never,
+        apply: {
+          proposalId: 500,
+          payloadKind: "stub_kind" as never,
+          result: { applied: true },
+        } as never,
       };
     });
 
@@ -110,7 +114,7 @@ describe("promoteAndApproveProposal — composition", () => {
     );
 
     expect(result.promote.correctionProposalId).toBe(500);
-    expect(result.approveAndApply.apply.applied).toBe(true);
+    expect(result.approveAndApply.apply.result.applied).toBe(true);
   });
 
   it("threads notifyUserId to approveAndApply only (not to promote)", async () => {
@@ -121,7 +125,11 @@ describe("promoteAndApproveProposal — composition", () => {
     });
     approveAndApplyMock.mockResolvedValue({
       approval: {} as never,
-      apply: { applied: true } as never,
+      apply: {
+        proposalId: 500,
+        payloadKind: "stub_kind" as never,
+        result: { applied: true },
+      } as never,
     });
 
     await promoteAndApproveProposal({
@@ -146,7 +154,11 @@ describe("promoteAndApproveProposal — composition", () => {
     });
     approveAndApplyMock.mockResolvedValue({
       approval: {} as never,
-      apply: { applied: true } as never,
+      apply: {
+        proposalId: 500,
+        payloadKind: "stub_kind" as never,
+        result: { applied: true },
+      } as never,
     });
 
     await promoteAndApproveProposal({
@@ -171,7 +183,11 @@ describe("promoteAndApproveProposal — composition", () => {
     });
     approveAndApplyMock.mockResolvedValue({
       approval: {} as never,
-      apply: { applied: true } as never,
+      apply: {
+        proposalId: 500,
+        payloadKind: "stub_kind" as never,
+        result: { applied: true },
+      } as never,
     });
 
     const fakeDb = { __marker: "db" } as never;
