@@ -78,6 +78,33 @@ export interface EnqueueVaultNoteProjectionResult {
   readonly noteJobId: number;
   readonly wikilinkJobIds: number[];
   readonly unresolvedSlugs: string[];
+  /**
+   * Number of wikilink.changed jobs enqueued by the inbound-resolution
+   * backfill — peers that referenced this note via `[[<slug>]]` BEFORE
+   * the note was created. Always 0 for `eventKind === "note.updated"`
+   * (no slug change on update; old peer wikilinks already resolve).
+   */
+  readonly inboundBackfilledCount: number;
+}
+
+const WIKILINK_RE = /\[\[([^\]\n]+?)\]\]/g;
+
+/**
+ * Returns true iff `contentMd` contains `[[<slug>]]` (with optional
+ * heading anchor or alias). Mirrors `extractLinksFromMarkdown`'s
+ * parser shape — the inbound backfill must agree with the outbound
+ * extractor on what counts as a wikilink to `slug`.
+ */
+function contentReferencesSlug(contentMd: string, slug: string): boolean {
+  WIKILINK_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = WIKILINK_RE.exec(contentMd)) !== null) {
+    const inner = m[1]!.trim();
+    const [targetPart] = inner.split("|", 1);
+    const [targetSlug] = targetPart!.split("#", 1);
+    if (targetSlug!.trim() === slug) return true;
+  }
+  return false;
 }
 
 /**
@@ -112,24 +139,16 @@ export async function enqueueVaultNoteProjection(
   });
 
   const extraction = extractLinksFromMarkdown(input.contentMd);
-  if (extraction.wikilinks.length === 0) {
-    return {
-      noteJobId: noteJob.jobId,
-      wikilinkJobIds: [],
-      unresolvedSlugs: [],
-    };
-  }
 
-  // Resolve targetSlug → noteId against the vault's slug map. Drops
-  // self-links and unresolved targets; the sync-worker also guards
-  // against null targetNoteId (sync-worker.ts:153), but skipping here
-  // keeps the queue clean of no-op rows.
+  // Load peers once. The slug→noteId map services BOTH the outbound
+  // wikilink resolution AND the inbound-resolution backfill.
   const peers = await repo.listNotesInVault(input.vaultId, { limit: 10_000 });
   const slugToNoteId = new Map<string, number>();
   for (const p of peers) {
     slugToNoteId.set(p.slug, p.id);
   }
 
+  // ---- Outbound wikilink jobs (extraction → resolved targets) ----
   const wikilinkJobIds: number[] = [];
   const unresolvedSlugs: string[] = [];
   const seenSlugs = new Set<string>();
@@ -145,6 +164,7 @@ export async function enqueueVaultNoteProjection(
       projectionKey: `vault_wikilink:${input.versionId}:${wl.targetSlug}`,
       triggerEvent: "wikilink.changed",
       triggerPayload: {
+        sourceNoteId: input.noteId,
         sourceVersionId: input.versionId,
         targetSlug: wl.targetSlug,
         targetNoteId,
@@ -153,9 +173,45 @@ export async function enqueueVaultNoteProjection(
     wikilinkJobIds.push(job.jobId);
   }
 
+  // ---- Inbound-resolution backfill (note.created only) ----
+  // When a note is FIRST created, peers that previously wrote
+  // `[[<slug>]]` against it would have enqueued wikilink.changed
+  // events with targetNoteId=null — the sync-worker's
+  // wikilink.changed case returns [] for null targets, so those
+  // edges never materialized in Neo4j. Now that the target exists,
+  // re-enqueue wikilink.changed for each peer that referenced it.
+  //
+  // Cost: O(N) latest-version fetches per createNote. Acceptable
+  // at MVP scale (<1000 notes); a follow-on can replace with a
+  // single JOIN on note_versions WHERE content_md ILIKE '%[[slug]]%'.
+  //
+  // Skipped on note.updated: slug doesn't change on update; peer
+  // wikilinks already resolved on the peer's own enqueue pass.
+  let inboundBackfilledCount = 0;
+  if (input.eventKind === "note.created") {
+    for (const peer of peers) {
+      if (peer.id === input.noteId) continue;
+      const peerVersion = await repo.getLatestNoteVersion(peer.id);
+      if (!peerVersion) continue;
+      if (!contentReferencesSlug(peerVersion.contentMd, input.slug)) continue;
+      await graphRepo.enqueueProjectionJob({
+        projectionKey: `vault_wikilink:${peerVersion.id}:${input.slug}`,
+        triggerEvent: "wikilink.changed",
+        triggerPayload: {
+          sourceNoteId: peer.id,
+          sourceVersionId: peerVersion.id,
+          targetSlug: input.slug,
+          targetNoteId: input.noteId,
+        },
+      });
+      inboundBackfilledCount++;
+    }
+  }
+
   return {
     noteJobId: noteJob.jobId,
     wikilinkJobIds,
     unresolvedSlugs,
+    inboundBackfilledCount,
   };
 }

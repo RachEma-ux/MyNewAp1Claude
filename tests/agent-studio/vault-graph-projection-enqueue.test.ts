@@ -63,7 +63,7 @@ function buildStubGraphRepo(): {
 }
 
 function buildStubVaultRepo(
-  notes: Array<{ id: number; slug: string }>,
+  notes: Array<{ id: number; slug: string; latestContentMd?: string }>,
 ): VaultRepository {
   const listNotesInVault = async () =>
     notes.map((n) => ({
@@ -71,16 +71,31 @@ function buildStubVaultRepo(
       vaultId: 1,
       slug: n.slug,
       title: n.slug,
-      currentVersionId: 1,
+      currentVersionId: n.id * 10,
       governanceStatus: "active",
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
+  const getLatestNoteVersion = async (noteId: number) => {
+    const n = notes.find((x) => x.id === noteId);
+    if (!n) return null;
+    return {
+      id: n.id * 10,
+      noteId: n.id,
+      version: 1,
+      contentMd: n.latestContentMd ?? "",
+      contentHash: "",
+      frontmatter: null,
+      authorUserId: 1,
+      createdAt: new Date(),
+    };
+  };
   return new Proxy(
-    { listNotesInVault },
+    { listNotesInVault, getLatestNoteVersion },
     {
       get(target, prop, receiver) {
         if (prop === "listNotesInVault") return listNotesInVault;
+        if (prop === "getLatestNoteVersion") return getLatestNoteVersion;
         throw new Error(
           `[stub-vault-repo] unexpected method access: ${String(prop)}`,
         );
@@ -157,6 +172,7 @@ describe("enqueueVaultNoteProjection", () => {
     expect(wikilinkJobs).toHaveLength(2);
     expect(wikilinkJobs[0]!.projectionKey).toBe("vault_wikilink:50:beta");
     expect(wikilinkJobs[0]!.triggerPayload).toEqual({
+      sourceNoteId: 10,
       sourceVersionId: 50,
       targetSlug: "beta",
       targetNoteId: 11,
@@ -244,6 +260,174 @@ describe("enqueueVaultNoteProjection", () => {
       (j) => j.triggerEvent === "wikilink.changed",
     );
     expect(wikilinkJobs).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inbound-resolution backfill (note.created only)
+// ---------------------------------------------------------------------------
+
+describe("enqueueVaultNoteProjection — inbound-resolution backfill", () => {
+  it("re-enqueues wikilink.changed for peers that already referenced the new slug", async () => {
+    const { graphRepo, jobs } = buildStubGraphRepo();
+    const repo = buildStubVaultRepo([
+      // Existing peer B (id=11) wrote `[[alpha]]` BEFORE alpha existed.
+      // Existing peer C (id=12) wrote `[[other]]` — no inbound to alpha.
+      { id: 11, slug: "beta", latestContentMd: "look at [[alpha]] for details" },
+      { id: 12, slug: "gamma", latestContentMd: "see [[other]] please" },
+      // New note A (id=10, slug=alpha) — being created right now.
+      { id: 10, slug: "alpha", latestContentMd: "i am the new note" },
+    ]);
+
+    const result = await enqueueVaultNoteProjection(
+      {
+        vaultId: 1,
+        noteId: 10,
+        versionId: 50,
+        slug: "alpha",
+        title: "Alpha",
+        contentMd: "i am the new note",
+        eventKind: "note.created",
+      },
+      { graphRepo, repo },
+    );
+
+    expect(result.inboundBackfilledCount).toBe(1);
+    const backfillJobs = jobs.filter(
+      (j) =>
+        j.triggerEvent === "wikilink.changed" &&
+        (j.triggerPayload as Record<string, unknown>).sourceNoteId === 11,
+    );
+    expect(backfillJobs).toHaveLength(1);
+    expect(backfillJobs[0]!.triggerPayload).toEqual({
+      sourceNoteId: 11,
+      sourceVersionId: 110, // peer B's id × 10 (stub convention)
+      targetSlug: "alpha",
+      targetNoteId: 10,
+    });
+  });
+
+  it("skips the new note itself during backfill scan (self-link guard)", async () => {
+    const { graphRepo, jobs } = buildStubGraphRepo();
+    const repo = buildStubVaultRepo([
+      // The new note's own latest contentMd happens to contain `[[alpha]]`
+      // (a self-link). The backfill must skip it; the outbound pass
+      // separately drops self-links.
+      { id: 10, slug: "alpha", latestContentMd: "self-ref [[alpha]]" },
+    ]);
+
+    const result = await enqueueVaultNoteProjection(
+      {
+        vaultId: 1,
+        noteId: 10,
+        versionId: 50,
+        slug: "alpha",
+        title: "Alpha",
+        contentMd: "self-ref [[alpha]]",
+        eventKind: "note.created",
+      },
+      { graphRepo, repo },
+    );
+
+    expect(result.inboundBackfilledCount).toBe(0);
+    const backfillJobs = jobs.filter(
+      (j) =>
+        j.triggerEvent === "wikilink.changed" &&
+        (j.triggerPayload as Record<string, unknown>).targetSlug === "alpha",
+    );
+    expect(backfillJobs).toHaveLength(0);
+  });
+
+  it("does NOT run backfill on note.updated (slugs don't change on update)", async () => {
+    const { graphRepo, jobs } = buildStubGraphRepo();
+    const repo = buildStubVaultRepo([
+      { id: 11, slug: "beta", latestContentMd: "old peer [[alpha]] link" },
+      { id: 10, slug: "alpha", latestContentMd: "i exist" },
+    ]);
+
+    const result = await enqueueVaultNoteProjection(
+      {
+        vaultId: 1,
+        noteId: 10,
+        versionId: 99,
+        slug: "alpha",
+        title: "Alpha v2",
+        contentMd: "i exist v2",
+        eventKind: "note.updated",
+      },
+      { graphRepo, repo },
+    );
+
+    expect(result.inboundBackfilledCount).toBe(0);
+    const backfillJobs = jobs.filter(
+      (j) =>
+        j.triggerEvent === "wikilink.changed" &&
+        (j.triggerPayload as Record<string, unknown>).targetSlug === "alpha",
+    );
+    expect(backfillJobs).toHaveLength(0);
+  });
+
+  it("matches `[[slug]]`, `[[slug|alias]]`, and `[[slug#anchor]]` shapes", async () => {
+    const { graphRepo, jobs } = buildStubGraphRepo();
+    const repo = buildStubVaultRepo([
+      { id: 11, slug: "beta", latestContentMd: "bare [[alpha]]" },
+      { id: 12, slug: "gamma", latestContentMd: "aliased [[alpha|the new]]" },
+      { id: 13, slug: "delta", latestContentMd: "anchored [[alpha#intro]]" },
+      { id: 14, slug: "epsilon", latestContentMd: "different [[alpha-prime]]" },
+      { id: 10, slug: "alpha", latestContentMd: "new" },
+    ]);
+
+    const result = await enqueueVaultNoteProjection(
+      {
+        vaultId: 1,
+        noteId: 10,
+        versionId: 50,
+        slug: "alpha",
+        title: "Alpha",
+        contentMd: "new",
+        eventKind: "note.created",
+      },
+      { graphRepo, repo },
+    );
+
+    // 3 backfills (beta, gamma, delta); epsilon's `[[alpha-prime]]`
+    // matches a different slug.
+    expect(result.inboundBackfilledCount).toBe(3);
+    const backfillSourceNoteIds = jobs
+      .filter(
+        (j) =>
+          j.triggerEvent === "wikilink.changed" &&
+          (j.triggerPayload as Record<string, unknown>).targetSlug === "alpha",
+      )
+      .map((j) => (j.triggerPayload as Record<string, unknown>).sourceNoteId)
+      .sort();
+    expect(backfillSourceNoteIds).toEqual([11, 12, 13]);
+  });
+
+  it("inboundBackfilledCount=0 when no peers reference the new slug", async () => {
+    const { graphRepo, jobs } = buildStubGraphRepo();
+    const repo = buildStubVaultRepo([
+      { id: 11, slug: "beta", latestContentMd: "no wikilinks here" },
+      { id: 10, slug: "alpha", latestContentMd: "i am new" },
+    ]);
+
+    const result = await enqueueVaultNoteProjection(
+      {
+        vaultId: 1,
+        noteId: 10,
+        versionId: 50,
+        slug: "alpha",
+        title: "Alpha",
+        contentMd: "i am new",
+        eventKind: "note.created",
+      },
+      { graphRepo, repo },
+    );
+
+    expect(result.inboundBackfilledCount).toBe(0);
+    expect(jobs.filter((j) => j.triggerEvent === "wikilink.changed")).toHaveLength(
+      0,
+    );
   });
 });
 
