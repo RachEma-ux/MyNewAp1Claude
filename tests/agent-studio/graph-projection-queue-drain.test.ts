@@ -23,9 +23,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readFileSync } from "fs";
+import { resolve } from "path";
+
 import {
   drainPendingProjectionJobs,
   translatePendingRowToEvent,
+  MAX_DRAIN_RETRY_ATTEMPTS,
 } from "../../server/agent-studio/services/graph/projection/queue-drain.js";
 import type {
   PendingProjectionJobRow,
@@ -413,5 +417,51 @@ describe("drainPendingProjectionJobs", () => {
       worker: buildStubWorker(new Map()),
     });
     expect(seenLimits).toEqual([17]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retry-with-backoff (default loaders only — source-scan)
+// ---------------------------------------------------------------------------
+
+const DRAIN_SRC_PATH = resolve(
+  __dirname,
+  "../../server/agent-studio/services/graph/projection/queue-drain.ts",
+);
+const drainSrc = readFileSync(DRAIN_SRC_PATH, "utf8");
+
+describe("default loaders — retry-with-backoff", () => {
+  it("exports MAX_DRAIN_RETRY_ATTEMPTS = 3", () => {
+    expect(MAX_DRAIN_RETRY_ATTEMPTS).toBe(3);
+  });
+
+  it("default fetcher includes failed rows under the retry cap (OR clause)", () => {
+    // SQL shape: status='pending' OR (status='failed' AND retry_count < MAX)
+    expect(drainSrc).toMatch(
+      /or\(\s*eq\(agsGraphProjectionSyncJobs\.status,\s*["']pending["']\)/,
+    );
+    expect(drainSrc).toMatch(
+      /eq\(agsGraphProjectionSyncJobs\.status,\s*["']failed["']\)/,
+    );
+    expect(drainSrc).toMatch(
+      /lt\(\s*agsGraphProjectionSyncJobs\.retryCount,\s*MAX_DRAIN_RETRY_ATTEMPTS\s*,?\s*\)/,
+    );
+  });
+
+  it("default updater increments retry_count on 'failed' (Postgres-side sql template)", () => {
+    expect(drainSrc).toMatch(
+      /status\s*===\s*["']failed["'][\s\S]*?retryCount:\s*sql`\$\{agsGraphProjectionSyncJobs\.retryCount\}\s*\+\s*1`/,
+    );
+  });
+
+  it("default updater does NOT touch retry_count on 'completed' or 'unknown_event_kind'", () => {
+    // The non-failed branch sets only status/lastError/completedAt/updatedAt.
+    // Snapshot the shape via a literal match — when this regression-
+    // proofs the implementation, the next refactor surfaces the
+    // intent in code review.
+    const elseBranch = drainSrc.match(
+      /:\s*\{\s*status,\s*lastError,\s*completedAt:\s*new Date\(\),\s*updatedAt:\s*new Date\(\),\s*\}/,
+    );
+    expect(elseBranch).not.toBeNull();
   });
 });
