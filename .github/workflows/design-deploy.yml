@@ -1,0 +1,223 @@
+name: Design App Deploy
+
+# Adapted from .github/workflows/builder-deploy.yml.
+# The Design app is a single static index.html with inline CSS/JS — no build,
+# no database, no LLMs. We serve the repo root with python3's stdlib HTTP
+# server and expose it over a Cloudflare quick tunnel (same trycloudflare.com
+# mechanism as Builder Deploy), then hold the tunnel open for `duration`
+# minutes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'How long to keep the tunnel up (minutes)'
+        required: true
+        default: '30'
+        type: choice
+        options:
+          - '5'
+          - '15'
+          - '30'
+          - '60'
+      entry:
+        description: 'Entry file to serve (path relative to repo root)'
+        required: false
+        default: 'index.html'
+
+permissions:
+  contents: read
+
+jobs:
+  serve-and-tunnel:
+    runs-on: ubuntu-latest
+    # Generous ceiling: 60 min max duration + ~10 min for setup/teardown.
+    timeout-minutes: 75
+
+    steps:
+      - name: Reset Gist status to pending
+        run: |
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts, deploy_type: "design"}')
+
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist reset to pending" || echo "⚠️ Gist reset failed"
+          else
+            echo "ℹ️ GIST_TOKEN/TUNNEL_GIST_ID not configured — skipping Gist update"
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify entry file exists
+        run: |
+          ENTRY="${{ github.event.inputs.entry }}"
+          if [ ! -f "$ENTRY" ]; then
+            echo "::error::Entry file '$ENTRY' not found at repo root"
+            echo "Files at root:"
+            ls -la
+            exit 1
+          fi
+          echo "✅ Will serve: $ENTRY ($(wc -c < "$ENTRY") bytes)"
+
+      - name: Install cloudflared
+        run: |
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          ./cloudflared --version
+
+      - name: Serve Design app and open tunnel
+        env:
+          ENTRY: ${{ github.event.inputs.entry }}
+          DURATION_MIN: ${{ github.event.inputs.duration }}
+        run: |
+          set -euo pipefail
+
+          echo "🐍 Starting static server on :3000..."
+          python3 -m http.server 3000 --bind 127.0.0.1 > server.log 2>&1 &
+          SERVER_PID=$!
+
+          # Wait for static server health (root must respond 200/301/200).
+          HEALTH_OK="false"
+          for attempt in $(seq 1 10); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "❌ Static server exited"
+              cat server.log || true
+              exit 1
+            fi
+            if curl -fsS -o /dev/null "http://localhost:3000/${ENTRY}"; then
+              HEALTH_OK="true"
+              echo "✅ Static server healthy on :3000/${ENTRY} (attempt $attempt)"
+              break
+            fi
+            sleep 1
+          done
+          if [ "$HEALTH_OK" != "true" ]; then
+            echo "❌ Static server didn't serve ${ENTRY}"
+            cat server.log || true
+            exit 1
+          fi
+
+          # Start tunnel — same retry pattern as builder-deploy.yml because
+          # the free trycloudflare.com API occasionally 500s and crashes
+          # cloudflared before publishing a URL.
+          TUNNEL_URL=""
+          TUNNEL_PID=""
+          for outer in $(seq 1 3); do
+            echo "🌐 Starting Cloudflare tunnel (attempt ${outer}/3)..."
+            : > tunnel.log
+            ./cloudflared tunnel --url http://localhost:3000 >> tunnel.log 2>&1 &
+            TUNNEL_PID=$!
+
+            for attempt in $(seq 1 12); do
+              if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+                echo "⚠️ cloudflared exited before publishing a URL (outer ${outer})"
+                cat tunnel.log || true
+                break
+              fi
+              TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' tunnel.log | head -1 || true)
+              if [ -n "$TUNNEL_URL" ]; then
+                echo "✅ Tunnel URL published on outer ${outer}, inner ${attempt}"
+                break
+              fi
+              echo "⌛ Waiting for tunnel URL (outer ${outer}, inner ${attempt}/12)..."
+              sleep 5
+            done
+
+            [ -n "$TUNNEL_URL" ] && break
+
+            if [ -n "$TUNNEL_PID" ] && kill -0 "$TUNNEL_PID" 2>/dev/null; then
+              kill "$TUNNEL_PID" 2>/dev/null || true
+              wait "$TUNNEL_PID" 2>/dev/null || true
+            fi
+            if [ "$outer" -lt 3 ]; then
+              echo "🔁 Retrying cloudflared in 10s..."
+              sleep 10
+            fi
+          done
+
+          if [ -z "$TUNNEL_URL" ]; then
+            echo "::error::Tunnel URL was not published after 3 attempts"
+            cat tunnel.log || true
+            exit 1
+          fi
+
+          DESIGN_URL="${TUNNEL_URL}/${ENTRY}"
+
+          echo ""
+          echo "============================================"
+          echo "🎨 DESIGN APP LIVE"
+          echo "============================================"
+          echo "🌐 Root  : $TUNNEL_URL"
+          echo "📄 Design: $DESIGN_URL"
+          echo "⏱️  Up for: ${DURATION_MIN} minutes"
+          echo "============================================"
+          echo ""
+
+          echo "$DESIGN_URL" > app_url.txt
+
+          # Workflow summary so the URL is one click from the run page.
+          {
+            echo "## 🎨 Design App Live"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| 🌐 **Design URL** | [\`${DESIGN_URL}\`](${DESIGN_URL}) |"
+            echo "| 🌐 Tunnel root | [\`${TUNNEL_URL}\`](${TUNNEL_URL}) |"
+            echo "| 📄 Entry | \`${ENTRY}\` |"
+            echo "| ⏱️ Duration | ${DURATION_MIN} minutes |"
+            echo "| 🔁 Run ID | \`${{ github.run_id }}\` |"
+            echo ""
+            echo "> Quick tunnels via trycloudflare.com are free and ephemeral — URL changes on every run."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Publish to Gist (same shape as builder-deploy.yml so the Builder
+          # app can pick it up the same way).
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg url "$DESIGN_URL" \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg dur "$DURATION_MIN" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: $url, version: "design", run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts, auth_mode: "none", deploy_type: "design"}')
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist updated with tunnel URL" || echo "⚠️ Gist update failed"
+          fi
+
+          # Hold open for the requested duration, then tear down cleanly.
+          sleep $(( DURATION_MIN * 60 ))
+
+          kill "$SERVER_PID" 2>/dev/null || true
+          kill "$TUNNEL_PID" 2>/dev/null || true
+          echo "👋 Tunnel closed after ${DURATION_MIN} min"
+
+      - name: Upload deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-deploy-${{ github.run_id }}
+          path: |
+            app_url.txt
+            server.log
+            tunnel.log
+          retention-days: 3
+          if-no-files-found: warn
