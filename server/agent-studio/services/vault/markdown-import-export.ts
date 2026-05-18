@@ -154,7 +154,14 @@ export interface ExportNoteAsMarkdownOptions {
   readonly repository?: VaultRepository;
 }
 
-function sanitizeFilenameSegment(s: string): string {
+/**
+ * Sanitizes a string into a safe filename segment: ASCII alnum + `-_`,
+ * trimmed of leading/trailing dashes, with `"note"` as a fallback for
+ * fully-stripped inputs. The Track A FS-sync writer reuses this for
+ * disk filenames; keeping it exported preserves the single-source-of-
+ * truth contract for the disk-naming policy.
+ */
+export function sanitizeFilenameSegment(s: string): string {
   return s.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "note";
 }
 
