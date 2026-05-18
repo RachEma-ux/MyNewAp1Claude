@@ -465,4 +465,72 @@ export class AsdbVaultRepository implements VaultRepository {
 
     return { deleted: true };
   }
+
+  // Track A — FS-sync surface (ADR
+  // docs/architecture/agent-studio-vault-fs-sync.md). Thin DB helpers
+  // for the upcoming A5 tRPC + A6 post-commit hooks. Path validation
+  // is the caller's responsibility (see assertVaultRootIsConfigurable
+  // in fs-sync/path-validator.ts).
+
+  async getVaultFsSyncPath(vaultId: number): Promise<string | null> {
+    const db = getAsDb();
+    const [row] = await db
+      .select({ fsSyncPath: agsVaults.fsSyncPath })
+      .from(agsVaults)
+      .where(eq(agsVaults.id, vaultId));
+    return row?.fsSyncPath ?? null;
+  }
+
+  async setVaultFsSyncPath(
+    vaultId: number,
+    path: string | null,
+  ): Promise<void> {
+    const db = getAsDb();
+    await db
+      .update(agsVaults)
+      .set({ fsSyncPath: path, updatedAt: new Date() })
+      .where(eq(agsVaults.id, vaultId));
+  }
+
+  async findNoteBySlugInVault(
+    vaultId: number,
+    slug: string,
+  ): Promise<{
+    noteId: number;
+    folderId: number | null;
+    fsSyncLastHash: string | null;
+  } | null> {
+    const db = getAsDb();
+    const [row] = await db
+      .select({
+        id: agsVaultNotes.id,
+        folderId: agsVaultNotes.folderId,
+        fsSyncLastHash: agsVaultNotes.fsSyncLastHash,
+      })
+      .from(agsVaultNotes)
+      .where(
+        and(
+          eq(agsVaultNotes.vaultId, vaultId),
+          eq(agsVaultNotes.slug, slug),
+          sql`${agsVaultNotes.deletedAt} IS NULL`,
+        ),
+      );
+    if (!row) return null;
+    return {
+      noteId: row.id,
+      folderId: row.folderId,
+      fsSyncLastHash: row.fsSyncLastHash,
+    };
+  }
+
+  async setNoteFsSyncLastHash(
+    noteId: number,
+    hash: string | null,
+  ): Promise<void> {
+    const db = getAsDb();
+    await db
+      .update(agsVaultNotes)
+      .set({ fsSyncLastHash: hash, updatedAt: new Date() })
+      .where(eq(agsVaultNotes.id, noteId));
+  }
 }
