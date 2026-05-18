@@ -103,6 +103,57 @@ export function _setVaultRepositoryForTests(repo: VaultRepository | null): void 
   cachedRepo = repo;
 }
 
+/**
+ * Track A — A6 — fire-and-forget FS-sync flush helpers. Mutations
+ * (createNote / updateNote / deleteNote) call these without awaiting
+ * so the operator's tRPC response returns immediately; failures are
+ * logged but do not roll back the DB mutation. FS-sync no-ops when
+ * the vault has no `fs_sync_path` set.
+ *
+ * Importing lazily (inside the helpers) keeps the router cold-import
+ * cost low and avoids a circular dep between router ↔ fs-sync-
+ * integration ↔ markdown-import-export.
+ */
+function fireFsFlush(vaultId: number, noteId: number): void {
+  void (async () => {
+    try {
+      const { flushNoteToDisk } = await import("./fs-sync-integration.js");
+      const result = await flushNoteToDisk(getRepo(), vaultId, noteId);
+      if (result.kind === "error") {
+        console.warn(
+          `[fs-sync] flushNoteToDisk noteId=${noteId} error: ${result.error}`,
+        );
+      }
+    } catch (e) {
+      console.warn(
+        `[fs-sync] unexpected error during FS flush noteId=${noteId}:`,
+        e,
+      );
+    }
+  })();
+}
+
+function fireFsDelete(vaultId: number, noteSlug: string): void {
+  void (async () => {
+    try {
+      const { deleteNoteFromDisk } = await import(
+        "./fs-sync-integration.js"
+      );
+      const result = await deleteNoteFromDisk(getRepo(), vaultId, noteSlug);
+      if (result.kind === "error") {
+        console.warn(
+          `[fs-sync] deleteNoteFromDisk slug=${noteSlug} error: ${result.error}`,
+        );
+      }
+    } catch (e) {
+      console.warn(
+        `[fs-sync] unexpected error during FS delete slug=${noteSlug}:`,
+        e,
+      );
+    }
+  })();
+}
+
 export const vaultRouter = router({
   createVault: protectedProcedure
     .input(VaultCreateInput)
@@ -136,6 +187,10 @@ export const vaultRouter = router({
       // Side-effect: extract links and stage projection event payload.
       // The projection sync worker (when wired) picks this up.
       const extraction = extractLinksFromMarkdown(input.contentMd);
+      // Track A — A6 — DB → FS flush (fire-and-forget). The flush
+      // is non-blocking (the operator's response returns before disk
+      // I/O completes). FS sync no-ops when fs_sync_path is null.
+      void fireFsFlush(input.vaultId, note.id);
       return {
         ...note,
         wikilinkCount: extraction.wikilinks.length,
@@ -151,6 +206,10 @@ export const vaultRouter = router({
       if (result.conflict) {
         return { conflict: true, latestVersion: result.latestVersion };
       }
+      // Track A — A6 — DB → FS flush. Look up the note's vaultId
+      // (the update input only carries noteId) before firing.
+      const note = await getRepo().getNoteById(input.noteId);
+      if (note) void fireFsFlush(note.vaultId, input.noteId);
       return { conflict: false, versionId: result.versionId };
     }),
 
@@ -158,8 +217,15 @@ export const vaultRouter = router({
     .input(NoteDeleteInput)
     .mutation(async ({ input, ctx }) => {
       const userId = (ctx as unknown as { user?: { id?: number } }).user?.id ?? 1;
+      // Look up the note BEFORE delete so we can resolve the slug
+      // for the FS-side unlink.
+      const beforeDelete = await getRepo().getNoteById(input.noteId);
       const result = await getRepo().deleteNote(input, userId);
       if (result.deleted) {
+        // Track A — A6 — DB → FS delete.
+        if (beforeDelete) {
+          void fireFsDelete(beforeDelete.vaultId, beforeDelete.slug);
+        }
         return { deleted: true as const };
       }
       if ("notFound" in result) {
@@ -390,14 +456,17 @@ export const vaultRouter = router({
       if (input.path === null) {
         await defaultWatcherManager.stop(input.vaultId);
       } else {
-        // The handler is wired in A6 (post-commit hooks); for now we
-        // just start the watcher with a no-op so the lifecycle works
-        // end-to-end and operators can verify the watcher is running.
+        // Track A — A6 — wire the FS → DB upsert handler. Each
+        // watcher event flows through handleWatcherEvent which does
+        // hash-based echo prevention + parse + upsert.
+        const { handleWatcherEvent } = await import(
+          "./fs-sync-integration.js"
+        );
         await defaultWatcherManager.getOrStart({
           vaultId: input.vaultId,
           vaultRoot: input.path,
-          onEvent: () => {
-            /* A6 — DB upsert handler */
+          onEvent: async (event) => {
+            await handleWatcherEvent(repo, event);
           },
         });
       }
