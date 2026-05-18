@@ -19,5 +19,5 @@ export const agentStudioNav: AgentStudioNavEntry[] = [
   { label: "Skill Catalog", href: "/agent-studio/catalog/skills", group: "build", order: 3 },
   { label: "Tool Catalog", href: "/agent-studio/catalog/tools", group: "build", order: 4 },
   { label: "Marketplace", href: "/agent-studio/marketplace", group: "build", order: 5 },
-  { label: "Graph Workspace", href: "/agent-studio/graph-workspace", group: "build", order: 6 },
+  { label: "Vault Explorer", href: "/agent-studio/graph-workspace", group: "build", order: 6 },
 ];

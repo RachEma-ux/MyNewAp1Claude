@@ -44,7 +44,7 @@ vi.mock("@/lib/trpc", () => ({
 describe("GraphWorkspacePage — Phase 13 §7", () => {
   it("renders the page header", () => {
     render(<GraphWorkspacePage />);
-    expect(screen.getByText("Graph Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Vault Explorer")).toBeInTheDocument();
   });
 
   it("mounts the GraphSkillUsagePanel (Phase 12.5 §9)", () => {
