@@ -42,8 +42,18 @@ import { adminProcedure, router } from "../../../../_core/trpc.js";
 import {
   createGoldenQuestionsReadStore,
   type GoldenQuestionListRow,
+  type GoldenQuestionResultListRow,
+  type GoldenQuestionRunListRow,
+  type GoldenQuestionRunStats,
   type GoldenQuestionSuiteListRow,
 } from "./golden-questions-read-store.js";
+
+// ============================================================================
+// Limit constants
+// ============================================================================
+
+export const GOLDEN_QUESTIONS_LIST_RUNS_DEFAULT_LIMIT = 50;
+export const GOLDEN_QUESTIONS_LIST_RUNS_ABSOLUTE_LIMIT = 200;
 
 // ============================================================================
 // Output envelopes
@@ -63,6 +73,35 @@ export interface ListGoldenQuestionsInSuiteEnvelope {
   readonly status: "ok" | "not_found";
   readonly suiteKey: string;
   readonly questions?: ReadonlyArray<GoldenQuestionListRow>;
+}
+
+/**
+ * `listRecentRuns` envelope (T-D.5.γ). Plain wrapper; no
+ * discriminated outcome since an empty-list result is the natural
+ * "no runs yet" state.
+ */
+export interface ListGoldenQuestionRecentRunsEnvelope {
+  readonly runs: ReadonlyArray<GoldenQuestionRunListRow>;
+}
+
+/**
+ * `getRunStats` envelope (T-D.5.γ). Discriminated `not_found` for
+ * stale-link safety; mirrors codeGraph.getIngestionStats /
+ * semanticEnrichment.getRunStats.
+ */
+export interface GetGoldenQuestionRunStatsEnvelope {
+  readonly status: "ok" | "not_found";
+  readonly stats?: GoldenQuestionRunStats;
+}
+
+/**
+ * `listRunResults` envelope (T-D.5.γ). Discriminated `not_found`
+ * for stale-link safety.
+ */
+export interface ListGoldenQuestionRunResultsEnvelope {
+  readonly status: "ok" | "not_found";
+  readonly runId: number;
+  readonly results?: ReadonlyArray<GoldenQuestionResultListRow>;
 }
 
 // ============================================================================
@@ -100,6 +139,72 @@ export const goldenQuestionsRouter = router({
           return { status: "not_found", suiteKey: input.suiteKey };
         }
         return { status: "ok", suiteKey: input.suiteKey, questions };
+      },
+    ),
+
+  /**
+   * Recent golden-question evaluation runs (T-D.5.γ), newest-first
+   * by createdAt. Optional `suiteKey` filter for per-suite drill-in.
+   * Empty list = no runs persisted yet (T-D.5.β write-store +
+   * T-D.5.δ caller wiring required before this returns anything).
+   */
+  listRecentRuns: adminProcedure
+    .input(
+      z.object({
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(GOLDEN_QUESTIONS_LIST_RUNS_ABSOLUTE_LIMIT)
+          .default(GOLDEN_QUESTIONS_LIST_RUNS_DEFAULT_LIMIT),
+        suiteKey: z.string().min(1).max(100).optional(),
+      }),
+    )
+    .query(
+      async ({ input }): Promise<ListGoldenQuestionRecentRunsEnvelope> => {
+        const store = createGoldenQuestionsReadStore();
+        const runs = await store.listRecentRuns({
+          limit: input.limit,
+          ...(input.suiteKey !== undefined ? { suiteKey: input.suiteKey } : {}),
+        });
+        return { runs };
+      },
+    ),
+
+  /**
+   * Per-run aggregate stats (T-D.5.γ) — pass/fail counts + total
+   * + status + timestamps. Discriminated `not_found` envelope so
+   * stale dashboard links don't throw.
+   */
+  getRunStats: adminProcedure
+    .input(z.object({ runId: z.number().int().positive() }))
+    .query(
+      async ({ input }): Promise<GetGoldenQuestionRunStatsEnvelope> => {
+        const store = createGoldenQuestionsReadStore();
+        const stats = await store.getRunStats(input.runId);
+        if (stats === null) return { status: "not_found" };
+        return { status: "ok", stats };
+      },
+    ),
+
+  /**
+   * Per-question results for one run (T-D.5.γ). Joined with
+   * `agsGoldenQuestions` for questionKey + question text — drives
+   * the per-run drill-in panel showing each question's result +
+   * failure reason. Discriminated `not_found` for stale-link safety.
+   */
+  listRunResults: adminProcedure
+    .input(z.object({ runId: z.number().int().positive() }))
+    .query(
+      async ({
+        input,
+      }): Promise<ListGoldenQuestionRunResultsEnvelope> => {
+        const store = createGoldenQuestionsReadStore();
+        const results = await store.listRunResults(input.runId);
+        if (results === null) {
+          return { status: "not_found", runId: input.runId };
+        }
+        return { status: "ok", runId: input.runId, results };
       },
     ),
 });

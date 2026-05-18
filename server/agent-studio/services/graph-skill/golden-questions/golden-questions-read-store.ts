@@ -22,12 +22,14 @@
  *     error so callers can short-circuit.
  */
 
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 
 import { getAsDb } from "../../../db/connection.js";
 import {
   agsGoldenQuestionSuites,
   agsGoldenQuestions,
+  agsGoldenQuestionRuns,
+  agsGoldenQuestionResults,
 } from "../../../../../drizzle/tables/agent-studio-graph-quality.js";
 
 /**
@@ -59,6 +61,60 @@ export interface GoldenQuestionListRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Operator-facing list row for `ags_golden_question_runs` (T-D.5.γ).
+ * Joins suiteKey so the operator dashboard can render
+ * "knowledge_graph_core — passed 6/7 (1 failed) — 2026-05-18" without
+ * a second fetch.
+ */
+export interface GoldenQuestionRunListRow {
+  readonly id: number;
+  readonly suiteId: number;
+  readonly suiteKey: string;
+  readonly status: string;
+  readonly passedCount: number;
+  readonly failedCount: number;
+  readonly startedAt: Date | null;
+  readonly completedAt: Date | null;
+  readonly createdAt: Date;
+}
+
+/**
+ * One per-question result row for `ags_golden_question_results`
+ * (T-D.5.γ). `actualAnswer` is included since operators need it
+ * for failure triage; the list view caps at `runId` scope so the
+ * payload size is bounded by the suite size.
+ */
+export interface GoldenQuestionResultListRow {
+  readonly id: number;
+  readonly runId: number;
+  readonly questionId: number;
+  readonly questionKey: string;
+  readonly question: string;
+  readonly actualAnswer: string | null;
+  readonly citationCount: number | null;
+  readonly passed: boolean;
+  readonly failureReason: string | null;
+  readonly durationMs: number | null;
+  readonly createdAt: Date;
+}
+
+/**
+ * Aggregate per-run stats (T-D.5.γ). Same shape as
+ * `SemanticEnrichmentRunStats` but for golden-question runs.
+ */
+export interface GoldenQuestionRunStats {
+  readonly runId: number;
+  readonly suiteId: number;
+  readonly suiteKey: string;
+  readonly status: string;
+  readonly passedCount: number;
+  readonly failedCount: number;
+  readonly totalCount: number;
+  readonly startedAt: Date | null;
+  readonly completedAt: Date | null;
+}
+
 export interface GoldenQuestionsReadStore {
   /**
    * Recent seeded suites, ordered by `suiteKey` ascending for
@@ -76,6 +132,30 @@ export interface GoldenQuestionsReadStore {
   listQuestionsInSuite(
     suiteKey: string,
   ): Promise<ReadonlyArray<GoldenQuestionListRow> | null>;
+
+  /**
+   * T-D.5.γ — Recent run rows, newest-first by createdAt. Optional
+   * suiteKey filter. Joins suiteKey for display without N+1 fetches.
+   */
+  listRecentRuns(input: {
+    readonly limit: number;
+    readonly suiteKey?: string;
+  }): Promise<ReadonlyArray<GoldenQuestionRunListRow>>;
+
+  /**
+   * T-D.5.γ — Per-run stats. Returns null when the runId isn't
+   * found (stale-link safety per the §22 lesson).
+   */
+  getRunStats(runId: number): Promise<GoldenQuestionRunStats | null>;
+
+  /**
+   * T-D.5.γ — Per-question results for one run, ordered by
+   * questionKey ascending. Returns null when the runId isn't
+   * found.
+   */
+  listRunResults(
+    runId: number,
+  ): Promise<ReadonlyArray<GoldenQuestionResultListRow> | null>;
 }
 
 export interface CreateGoldenQuestionsReadStoreOptions {
@@ -128,6 +208,162 @@ export function createGoldenQuestionsReadStore(
           active: s.active,
           questionCount: counts.get(s.id) ?? 0,
           createdAt: s.createdAt,
+        }),
+      );
+    },
+
+    async listRecentRuns(input) {
+      const db = requireDb(options.db);
+      const baseQuery = db
+        .select({
+          id: agsGoldenQuestionRuns.id,
+          suiteId: agsGoldenQuestionRuns.suiteId,
+          suiteKey: agsGoldenQuestionSuites.suiteKey,
+          status: agsGoldenQuestionRuns.status,
+          passedCount: agsGoldenQuestionRuns.passedCount,
+          failedCount: agsGoldenQuestionRuns.failedCount,
+          startedAt: agsGoldenQuestionRuns.startedAt,
+          completedAt: agsGoldenQuestionRuns.completedAt,
+          createdAt: agsGoldenQuestionRuns.createdAt,
+        })
+        .from(agsGoldenQuestionRuns)
+        .innerJoin(
+          agsGoldenQuestionSuites,
+          eq(agsGoldenQuestionRuns.suiteId, agsGoldenQuestionSuites.id),
+        );
+      const rows = await (input.suiteKey !== undefined
+        ? baseQuery.where(
+            eq(agsGoldenQuestionSuites.suiteKey, input.suiteKey),
+          )
+        : baseQuery
+      )
+        .orderBy(desc(agsGoldenQuestionRuns.createdAt))
+        .limit(input.limit);
+      return rows.map(
+        (r: {
+          id: number;
+          suiteId: number;
+          suiteKey: string;
+          status: string;
+          passedCount: number | null;
+          failedCount: number | null;
+          startedAt: Date | null;
+          completedAt: Date | null;
+          createdAt: Date;
+        }) => ({
+          id: r.id,
+          suiteId: r.suiteId,
+          suiteKey: r.suiteKey,
+          status: r.status,
+          passedCount: r.passedCount ?? 0,
+          failedCount: r.failedCount ?? 0,
+          startedAt: r.startedAt,
+          completedAt: r.completedAt,
+          createdAt: r.createdAt,
+        }),
+      );
+    },
+
+    async getRunStats(runId) {
+      const db = requireDb(options.db);
+      const rows = await db
+        .select({
+          id: agsGoldenQuestionRuns.id,
+          suiteId: agsGoldenQuestionRuns.suiteId,
+          suiteKey: agsGoldenQuestionSuites.suiteKey,
+          status: agsGoldenQuestionRuns.status,
+          passedCount: agsGoldenQuestionRuns.passedCount,
+          failedCount: agsGoldenQuestionRuns.failedCount,
+          startedAt: agsGoldenQuestionRuns.startedAt,
+          completedAt: agsGoldenQuestionRuns.completedAt,
+        })
+        .from(agsGoldenQuestionRuns)
+        .innerJoin(
+          agsGoldenQuestionSuites,
+          eq(agsGoldenQuestionRuns.suiteId, agsGoldenQuestionSuites.id),
+        )
+        .where(eq(agsGoldenQuestionRuns.id, runId))
+        .limit(1);
+      if (rows.length === 0) return null;
+      const r = rows[0] as {
+        id: number;
+        suiteId: number;
+        suiteKey: string;
+        status: string;
+        passedCount: number | null;
+        failedCount: number | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+      };
+      const passedCount = r.passedCount ?? 0;
+      const failedCount = r.failedCount ?? 0;
+      return {
+        runId: r.id,
+        suiteId: r.suiteId,
+        suiteKey: r.suiteKey,
+        status: r.status,
+        passedCount,
+        failedCount,
+        totalCount: passedCount + failedCount,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+      };
+    },
+
+    async listRunResults(runId) {
+      const db = requireDb(options.db);
+      const runExists = await db
+        .select({ id: agsGoldenQuestionRuns.id })
+        .from(agsGoldenQuestionRuns)
+        .where(eq(agsGoldenQuestionRuns.id, runId))
+        .limit(1);
+      if (runExists.length === 0) return null;
+      const rows = await db
+        .select({
+          id: agsGoldenQuestionResults.id,
+          runId: agsGoldenQuestionResults.runId,
+          questionId: agsGoldenQuestionResults.questionId,
+          questionKey: agsGoldenQuestions.questionKey,
+          question: agsGoldenQuestions.question,
+          actualAnswer: agsGoldenQuestionResults.actualAnswer,
+          citationCount: agsGoldenQuestionResults.citationCount,
+          passed: agsGoldenQuestionResults.passed,
+          failureReason: agsGoldenQuestionResults.failureReason,
+          durationMs: agsGoldenQuestionResults.durationMs,
+          createdAt: agsGoldenQuestionResults.createdAt,
+        })
+        .from(agsGoldenQuestionResults)
+        .innerJoin(
+          agsGoldenQuestions,
+          eq(agsGoldenQuestionResults.questionId, agsGoldenQuestions.id),
+        )
+        .where(eq(agsGoldenQuestionResults.runId, runId))
+        .orderBy(asc(agsGoldenQuestions.questionKey));
+      return rows.map(
+        (r: {
+          id: number;
+          runId: number;
+          questionId: number;
+          questionKey: string;
+          question: string;
+          actualAnswer: string | null;
+          citationCount: number | null;
+          passed: boolean;
+          failureReason: string | null;
+          durationMs: number | null;
+          createdAt: Date;
+        }) => ({
+          id: r.id,
+          runId: r.runId,
+          questionId: r.questionId,
+          questionKey: r.questionKey,
+          question: r.question,
+          actualAnswer: r.actualAnswer,
+          citationCount: r.citationCount,
+          passed: r.passed,
+          failureReason: r.failureReason,
+          durationMs: r.durationMs,
+          createdAt: r.createdAt,
         }),
       );
     },
