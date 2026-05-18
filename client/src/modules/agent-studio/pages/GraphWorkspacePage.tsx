@@ -19,7 +19,7 @@
  * are preserved under the Observability tab.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Network } from "lucide-react";
 
 import GraphSkillUsagePanel from "../components/GraphSkillUsagePanel";
@@ -50,15 +50,76 @@ type WorkspaceTab =
   | "trace"
   | "observability";
 
+/**
+ * Track B follow-on — read `?vault=N&note=M` from the page URL on mount.
+ *
+ * Mechanical replication of the T-F.135 / T-F.136 URL-deeplink primitive,
+ * extended to a TWO-axis pair (vaultId + noteId). Operators bookmark a
+ * specific note (or share its URL with a teammate) by appending
+ * `?vault=1&note=42` to `/agent-studio/graph-workspace`. The deeplink
+ * pre-seeds the explorer + opens the editor without forcing the operator
+ * to re-traverse the vault tree.
+ *
+ * SSR-safe via `typeof window` guard. NaN/non-positive ids are dropped to
+ * null so a bogus `?note=abc` query never seeds an out-of-range fetch.
+ */
+function readWorkspaceIdsFromUrl(): {
+  vaultId: number | null;
+  noteId: number | null;
+} {
+  if (typeof window === "undefined") return { vaultId: null, noteId: null };
+  const params = new URLSearchParams(window.location.search);
+  const parsePositive = (raw: string | null): number | null => {
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  };
+  return {
+    vaultId: parsePositive(params.get("vault")),
+    noteId: parsePositive(params.get("note")),
+  };
+}
+
 export default function GraphWorkspacePage(): React.ReactElement {
-  const [selectedVaultId, setSelectedVaultId] = useState<number | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
+  const [selectedVaultId, setSelectedVaultId] = useState<number | null>(
+    () => readWorkspaceIdsFromUrl().vaultId,
+  );
+  const [selectedNoteId, setSelectedNoteId] = useState<number | null>(
+    () => readWorkspaceIdsFromUrl().noteId,
+  );
   const [tab, setTab] = useState<WorkspaceTab>("editor");
   const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget>({
     kind: "none",
   });
   // Track B — B7 — Cmd+P / Ctrl+P quick switcher.
   const { open: quickSwitcherOpen, closeSwitcher } = useQuickSwitcherKeybinding();
+
+  // Track B follow-on — write-back the (vault, note) pair to the page URL
+  // via `history.replaceState` so the browser address bar always reflects
+  // the current selection. `replaceState` (not `pushState`) avoids
+  // polluting the back-button history with every click in the explorer;
+  // the back button still lands on the previous app route rather than
+  // the previous note selection. wouter ignores the search portion of
+  // the URL, so this never re-triggers its router.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (selectedVaultId !== null) {
+      params.set("vault", String(selectedVaultId));
+    } else {
+      params.delete("vault");
+    }
+    if (selectedNoteId !== null) {
+      params.set("note", String(selectedNoteId));
+    } else {
+      params.delete("note");
+    }
+    const search = params.toString();
+    const next = `${window.location.pathname}${search.length > 0 ? `?${search}` : ""}${window.location.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, "", next);
+    }
+  }, [selectedVaultId, selectedNoteId]);
 
   const noteQuery = trpc.agentStudio.vault.getNote.useQuery(
     { noteId: selectedNoteId ?? 0 },
@@ -67,12 +128,32 @@ export default function GraphWorkspacePage(): React.ReactElement {
 
   return (
     <div className="flex flex-col h-full" data-testid="graph-workspace-page">
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 flex items-start justify-between gap-3">
         <PageHeader
           title="Graph Workspace"
           subtitle="Vault notes, graph exploration, impact analysis, and runtime traces — backed by the native graph workspace runtime."
           icon={<Network className="h-5 w-5" />}
         />
+        {/* Track B follow-on — copy a shareable link with `?vault=N&note=M`
+            pre-filled. Gated on having BOTH a vault AND a note selected
+            because the deeplink's value is opening the editor on a
+            specific note; before that, the URL would just preselect the
+            vault and the receiving operator would still need to pick a
+            note. */}
+        {selectedVaultId !== null && selectedNoteId !== null ? (
+          <button
+            type="button"
+            className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-muted shrink-0 mt-1"
+            data-testid="graph-workspace-copy-link-button"
+            title={`Copy a shareable link with ?vault=${selectedVaultId}&note=${selectedNoteId}`}
+            onClick={() => {
+              const url = `${window.location.origin}${window.location.pathname}?vault=${selectedVaultId}&note=${selectedNoteId}`;
+              void navigator.clipboard?.writeText(url);
+            }}
+          >
+            Copy link
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-1 min-h-0 mt-3">
