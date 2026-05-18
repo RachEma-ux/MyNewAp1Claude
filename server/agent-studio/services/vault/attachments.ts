@@ -34,6 +34,10 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsVaultAttachments } from "../../../../drizzle/tables/agent-studio-vault.js";
+import {
+  assertWithinQuota,
+  resolveDefaultAttachmentBytesLimit,
+} from "./attachment-quota-guard.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -124,11 +128,43 @@ function rowToAttachment(r: Record<string, unknown>): AttachmentRow {
 export async function createAttachment(
   input: CreateAttachmentInput,
   createdByUserId: number,
-  options: AttachmentServiceOptions = {},
+  options: AttachmentServiceOptions & {
+    /**
+     * T-B.2 — quota guard defense. When provided (number), enforces
+     * `assertWithinQuota` against the vault's current usage before
+     * insert. When omitted, falls back to
+     * `resolveDefaultAttachmentBytesLimit()` (env-resolved). Pass
+     * `null` explicitly to bypass — useful for seed/import paths
+     * that are quota-exempt by policy. Surfaces
+     * `AttachmentQuotaExceededError` on rejection (callers can
+     * unwrap via instanceof).
+     */
+    readonly bytesLimit?: number | null;
+  } = {},
 ): Promise<AttachmentRow> {
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
   if (!db) throw new AsdbUnavailableError();
+
+  // T-B.2 — push quota enforcement INTO the service so internal
+  // callers (future ingestion paths / seeds / scripts) can never
+  // bypass the budget. Explicit `null` opt-out kept for the
+  // limited cases where quota does not apply (e.g. bulk-restore
+  // from a verified-trusted source).
+  const bytesLimit =
+    options.bytesLimit === undefined
+      ? resolveDefaultAttachmentBytesLimit()
+      : options.bytesLimit;
+  if (bytesLimit !== null) {
+    await assertWithinQuota(
+      {
+        vaultId: input.vaultId,
+        sizeBytesAdded: input.sizeBytes,
+        bytesLimit,
+      },
+      { getDb },
+    );
+  }
 
   const inserted = await db
     .insert(agsVaultAttachments)

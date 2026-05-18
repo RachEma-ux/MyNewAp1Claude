@@ -39,7 +39,6 @@ import {
 } from "./markdown-import-export.js";
 import {
   AttachmentQuotaExceededError,
-  assertWithinQuota,
   resolveDefaultAttachmentBytesLimit,
 } from "./attachment-quota-guard.js";
 import {
@@ -795,16 +794,17 @@ export const vaultRouter = router({
     .mutation(async ({ input, ctx }) => {
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const userId = ctxAny.user?.id ?? 1;
-      // V1+ Phase 15-γ wire-up (#770): enforce attachment quota
-      // BEFORE the insert. The default bytes limit is resolved from
-      // `AGS_VAULT_ATTACHMENT_BYTES_LIMIT`; unset → null → guard is
-      // a no-op (unlimited storage, pre-15-γ default).
+      // T-B.2 — the quota guard now lives INSIDE `createAttachment`
+      // so every caller (router, future ingestion / seed paths, etc.)
+      // gets the same defense. The router only translates the
+      // service-thrown `AttachmentQuotaExceededError` to TRPCError
+      // FORBIDDEN; bytesLimit resolution stays the env default.
       try {
-        await assertWithinQuota({
-          vaultId: input.vaultId,
-          sizeBytesAdded: input.sizeBytes,
-          bytesLimit: resolveDefaultAttachmentBytesLimit(),
-        });
+        const attachment = await createAttachment(input, userId);
+        return {
+          ...attachment,
+          embedSnippet: buildAttachmentEmbedSnippet(attachment),
+        };
       } catch (e) {
         if (e instanceof AttachmentQuotaExceededError) {
           throwTrpcAndCapture(new TRPCError({
@@ -813,18 +813,6 @@ export const vaultRouter = router({
             cause: e,
           }));
         }
-        throwTrpcAndCapture(new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: e instanceof Error ? e.message : String(e),
-        }));
-      }
-      try {
-        const attachment = await createAttachment(input, userId);
-        return {
-          ...attachment,
-          embedSnippet: buildAttachmentEmbedSnippet(attachment),
-        };
-      } catch (e) {
         throwTrpcAndCapture(new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: e instanceof Error ? e.message : String(e),
