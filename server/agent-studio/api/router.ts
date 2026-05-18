@@ -89,6 +89,8 @@ import { approvalBusAdminRouter } from "../services/runtime/approval-bus-admin-r
 import { publishTargetsAdminRouter } from "../services/publish-targets/admin-router";
 import { canvasRouter } from "../services/canvas/canvas-router";
 import { canvasProjectionEventsDrainRouter } from "../services/canvas/projection-events-drain-router";
+// Phase 24 — Bases MVP (T-F.1).
+import { basesRouter } from "../services/bases/bases-router";
 import { graphQualityRouter } from "../services/graph-quality/router";
 import { codeGraphRouter } from "../services/code-graph/code-graph-router";
 import { securityGraphRouter } from "../services/security-graph/security-graph-router";
@@ -2966,6 +2968,12 @@ export const agentStudioRouter = router({
   // handles the canvas→vault→workspace split-handle + 17-γ projection
   // event emission.
   canvas: canvasRouter,
+  // Phase 24 — Bases MVP (T-F.1). New `ags_bases` / `ags_base_columns`
+  // / `ags_base_rows` tables + CRUD service + tRPC. Lightweight
+  // database-like surface (column schema + tabular rows) for
+  // capturing structured records alongside a vault; row may
+  // optionally link a note (`noteId`).
+  bases: basesRouter,
   // V1+ 17-γ follow-up (2026-05-14): canvas projection events
   // drain scheduler observability — `getDrainStatus` reads the
   // module-singleton tick state (#810) so operators can verify
