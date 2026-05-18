@@ -36,6 +36,29 @@ import type { GraphRepository } from "../graph/repository/types.js";
 
 export type VaultNoteEventKind = "note.created" | "note.updated";
 
+/**
+ * Enqueues a `note.deleted` projection job. No content / wikilink
+ * extraction — the sync-worker's `note.deleted` case purges the Note
+ * (and DETACH-cascades the NoteVersion + LINKS_TO + VERSION_OF
+ * edges) from Neo4j. Mirrors `enqueueVaultNoteProjection`'s
+ * fire-and-forget contract.
+ */
+export interface EnqueueVaultNoteDeletionInput {
+  readonly noteId: number;
+}
+
+export async function enqueueVaultNoteDeletion(
+  input: EnqueueVaultNoteDeletionInput,
+  options: { graphRepo?: GraphRepository } = {},
+): Promise<{ jobId: number }> {
+  const graphRepo = options.graphRepo ?? getGraphRepository();
+  return graphRepo.enqueueProjectionJob({
+    projectionKey: `vault_note:${input.noteId}`,
+    triggerEvent: "note.deleted",
+    triggerPayload: { noteId: input.noteId },
+  });
+}
+
 export interface EnqueueVaultNoteProjectionInput {
   readonly vaultId: number;
   readonly noteId: number;

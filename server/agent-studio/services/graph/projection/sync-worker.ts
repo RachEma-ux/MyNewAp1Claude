@@ -23,7 +23,11 @@ import { recordFailureStateEvent } from "../../failure-states/observability-brid
 
 export type ProjectionEvent =
   | { kind: "note.created"; payload: { noteId: number; vaultId: number; slug: string; title: string; versionId: number } }
-  | { kind: "note.updated"; payload: { noteId: number; previousVersionId: number; versionId: number } }
+  // `note.updated` shares the `note.created` payload shape — the
+  // sync-worker upserts the new NoteVersion node + VERSION_OF edge
+  // against the (already-existing) Note node. previousVersionId is
+  // not needed: Neo4j upsert is idempotent.
+  | { kind: "note.updated"; payload: { noteId: number; vaultId: number; slug: string; title: string; versionId: number } }
   | { kind: "note.version_created"; payload: { noteId: number; versionId: number; version: number } }
   | { kind: "note.deleted"; payload: { noteId: number } }
   | { kind: "wikilink.changed"; payload: { sourceNoteId: number; sourceVersionId: number; targetSlug: string; targetNoteId: number | null } }
@@ -148,6 +152,61 @@ export class ProjectionSyncWorker {
           { kind: "upsert_node", node: versionNode },
           { kind: "upsert_edge", edge: versionOf },
         ];
+      }
+      case "note.updated": {
+        // Upsert the new NoteVersion + VERSION_OF edge against the
+        // existing Note node. Old NoteVersion rows persist for audit;
+        // a future GC pass can prune them. The Note node properties
+        // (slug + title) re-upsert too — title rename should
+        // propagate to the graph.
+        const { noteId, slug, title, versionId } = event.payload;
+        const noteNode: NodeIdentity & { properties: Record<string, unknown>; provenance: ProvenanceFields } = {
+          typeKey: "Note",
+          id: `note:${noteId}`,
+          sourceId: String(noteId),
+          properties: { slug, title },
+          provenance: provenance("vault_note", String(noteId), "asserted"),
+        };
+        const versionNode: NodeIdentity & { properties: Record<string, unknown>; provenance: ProvenanceFields } = {
+          typeKey: "NoteVersion",
+          id: `note_version:${versionId}`,
+          sourceId: String(versionId),
+          sourceVersionId: String(versionId),
+          properties: {},
+          provenance: provenance("vault_note_version", String(versionId), "asserted"),
+        };
+        const versionOf: EdgeIdentity & { properties: Record<string, unknown>; provenance: ProvenanceFields } = {
+          typeKey: "VERSION_OF",
+          id: `version_of:${versionId}`,
+          sourceNode: { typeKey: "NoteVersion", id: versionNode.id },
+          targetNode: { typeKey: "Note", id: noteNode.id },
+          properties: {},
+          provenance: provenance("vault_note_version", String(versionId), "derived"),
+        };
+        return [
+          { kind: "upsert_node", node: noteNode },
+          { kind: "upsert_node", node: versionNode },
+          { kind: "upsert_edge", edge: versionOf },
+        ];
+      }
+      case "note.deleted": {
+        // Delete the Note node. Neo4j `DETACH DELETE` cascades to
+        // attached NoteVersion nodes + LINKS_TO / VERSION_OF edges,
+        // keeping the graph free of orphans. Postgres remains the
+        // authoritative record of the soft-delete; the graph mirror
+        // is purged hard because graph-time semantics are "is this
+        // edge live?", not "was it ever asserted?".
+        const { noteId } = event.payload;
+        return [{
+          kind: "delete_node",
+          node: {
+            typeKey: "Note",
+            id: `note:${noteId}`,
+            sourceId: String(noteId),
+            properties: {},
+            provenance: provenance("vault_note", String(noteId), "asserted"),
+          },
+        }];
       }
       case "wikilink.changed": {
         const { sourceVersionId, targetSlug, targetNoteId } = event.payload;

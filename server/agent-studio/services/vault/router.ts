@@ -168,6 +168,22 @@ function fireGraphProjection(
   })();
 }
 
+function fireGraphProjectionDeletion(noteId: number): void {
+  void (async () => {
+    try {
+      const { enqueueVaultNoteDeletion } = await import(
+        "./graph-projection.js"
+      );
+      await enqueueVaultNoteDeletion({ noteId });
+    } catch (e) {
+      console.warn(
+        `[graph-projection] deletion enqueue failed noteId=${noteId}:`,
+        e,
+      );
+    }
+  })();
+}
+
 function fireFsDelete(vaultId: number, noteSlug: string): void {
   void (async () => {
     try {
@@ -288,6 +304,10 @@ export const vaultRouter = router({
         if (beforeDelete) {
           void fireFsDelete(beforeDelete.vaultId, beforeDelete.slug);
         }
+        // Knowledge Graph projection — emit `note.deleted` so the
+        // sync-worker purges the Note (and DETACH-cascades the
+        // NoteVersion + LINKS_TO + VERSION_OF edges) from Neo4j.
+        void fireGraphProjectionDeletion(input.noteId);
         return { deleted: true as const };
       }
       if ("notFound" in result) {
