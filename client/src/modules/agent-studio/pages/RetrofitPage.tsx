@@ -41,6 +41,7 @@ import { SimulationRunsRetentionPanel } from "../components/SimulationRunsRetent
 import { TestRunsRetentionPanel } from "../components/TestRunsRetentionPanel";
 import { GraphQualityScansRetentionPanel } from "../components/GraphQualityScansRetentionPanel";
 import { GraphCorrectionProposalsRetentionPanel } from "../components/GraphCorrectionProposalsRetentionPanel";
+import { SemanticEnrichmentProposalDetailPanel } from "../components/SemanticEnrichmentProposalDetailPanel";
 import { GraphQualityAgentRunsRetentionPanel } from "../components/GraphQualityAgentRunsRetentionPanel";
 import { IngestionJobsRetentionPanel } from "../components/IngestionJobsRetentionPanel";
 import { GraphChangeProposalsRetentionPanel } from "../components/GraphChangeProposalsRetentionPanel";
@@ -160,6 +161,7 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <TabsTrigger value="note-promotions-retention">Note Promotions Retention</TabsTrigger>
           <TabsTrigger value="release-audit-refs-archival">Release Audit Refs Archival</TabsTrigger>
           <TabsTrigger value="lifecycle-holds-management">Lifecycle Holds</TabsTrigger>
+          <TabsTrigger value="semantic-enrichment-promote">Semantic Enrichment Promote</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingestion">
@@ -253,6 +255,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         </TabsContent>
         <TabsContent value="lifecycle-holds-management">
           <LifecycleHoldsManagementPanel />
+        </TabsContent>
+        <TabsContent value="semantic-enrichment-promote">
+          <SemanticEnrichmentProposalDetailPanel />
         </TabsContent>
       </Tabs>
     </div>
