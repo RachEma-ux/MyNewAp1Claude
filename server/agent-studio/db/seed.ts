@@ -38,6 +38,8 @@ import * as agsGraphQualitySchema from "../../../drizzle/tables/agent-studio-gra
 // 17-γ Projection-Events table added in PR-V1-53). The seed loop introspects
 // every export starting with `ags*` and provisions it.
 import * as agsCanvasSchema from "../../../drizzle/tables/agent-studio-canvas";
+// Phase 24 — Bases MVP (T-F.1).
+import * as agsBasesSchema from "../../../drizzle/tables/agent-studio-bases";
 
 interface SeedResult {
   created: number;
@@ -202,6 +204,7 @@ export async function seedAsDb(): Promise<SeedResult> {
     ...agsGraphRagSchema,
     ...agsGraphQualitySchema,
     ...agsCanvasSchema,
+    ...agsBasesSchema,
   };
 
   try {
