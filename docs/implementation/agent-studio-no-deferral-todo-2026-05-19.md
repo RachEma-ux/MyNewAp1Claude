@@ -163,7 +163,7 @@ Generated 2026-05-19. Updated as slices land (per-slice receipt rows appended at
 | 23 RegionAdminPanel doc truth-audit | #1541 | `0f644bd1` | Forms had shipped; doc-block was stale |
 | 24 Neo4j CE bench dispatcher | #1542 | `8857d96c` | One-command operator wrapper around GHA workflow_dispatch |
 | 25 plugin framework first slice | #1543 | `8a9d9af2` | Closed-taxonomy contracts + manifest validator |
-| 26 doc-debt sweep | this PR | TBD | Strips closed-by-successor markers across 6 files |
+| 26 doc-debt sweep | #1544 | `e1043217` | Strips closed-by-successor markers across 6 files |
 
 ## Closure receipt (2026-05-19)
 
@@ -176,3 +176,62 @@ documentation + a handful of within-slice closure references
 multi-region account) remain as operator scaffolding (slices 24 +
 25 ship the code paths; the operator's residual is one CLI
 invocation, not a multi-PR rebuild).
+
+---
+
+## Continuation mission (2026-05-19, post-slice-26)
+
+**Trigger:** post-slice-26 re-scan over `server/agent-studio/` + `client/src/modules/agent-studio/` for `TODO|FIXME|deferred|skeleton|stub` produced 172 markers. After triage:
+
+| Triage class | Count | Action |
+|---|---|---|
+| **Real implementation gaps shippable from this session** | 5 | Ship — covered by slices 27–31 below |
+| Closed-by-successor (marker text refers to work already shipped) | 8 | Strip the markers in slice 30 (doc-debt cleanup) |
+| Test-seam / DI stub references (`Test seam — supply a stub …`) | ~95 | Leave — intentional dependency-injection signal |
+| Genuine MVP-boundary documentation / spike intent | ~50 | Leave — these are intent, not deferrals |
+| Cycle-8 + architectural sub-arcs (model registry + AI Types catalog + tool-call streaming + RAC orchestration error registry + RAC derivation + binding fixture drain) | 6 | Split — separate continuation arc (catalogue tabled, see "Tabled for next arc" below) |
+| Workspace-default-bindings LR-02/03/04/08 follow-ons (Phase 29 caller migrations) | 4 | Tabled for next arc — historical Phase 29 follow-on |
+
+### Continuation slices
+
+| # | Slice | File:line | Action |
+|---|---|---|---|
+| 27 | **Vault search procedure** | `services/vault/router.ts:508` + `services/vault/search.ts` | Replace skeleton `[]` return with tsvector-backed `AsdbVaultSearchService.search()`. Permission filter against `ags_vault_members`. |
+| 28 | **Background-jobs metadata table** | `services/workspace-observability/background-jobs.ts:62` + new `drizzle/tables/agent-studio-background-job-status-metadata.ts` | Add `ags_background_job_status_metadata` (status PK, terminal:bool, retryable:bool, label, severity) + reseed the `TERMINAL_BACKGROUND_JOB_STATUSES` set from the table on boot. |
+| 29 | **Impact-analysis Cypher templates** | `services/graph-lens/impact-analysis-executor.ts` + new `services/graph-lens/impact-analysis-templates.ts` + `ags_query_templates` seed | Register ≥1 parameterized template for `knowledge_impact`; route `runImpactAnalysis` to `GraphRepository.executeTemplate(...)` for kinds with templates; `classifyImpactAnalysisExecutorMode` returns `"template"` for those. |
+| 30 | **Doc-debt sweep (continuation)** | 6 files | Rewrite "MVP 1 skeleton" / "Phase 7.5 fills" / "deferred kinds" markers in `vault/repository.ts:4,104`, `vault/search.ts:2,7`, `semantic-enrichment-router.ts:386`, `graph-quality/mutation-worker.ts:88` where the referenced work has shipped. |
+| 31 | **BasesPanel β kind picker** | `client/src/modules/agent-studio/components/BasesPanel.tsx:287,1420` | Kind picker for column-kind on row create/edit + adaptive value editor per kind. |
+
+### Tabled for next arc (architectural sub-arcs, not deferrable from this session)
+
+These are real gaps but require multi-PR architectural scaffolding outside the scope of a doc-block sweep. Each gets a follow-on catalogue arc when work resumes:
+
+- **Tool-call streaming on Model Access** — `chat-stream.ts:180,362,563` + `services/chat.ts:1108`. Requires extending the `ModelAccess.stream()` contract with a `tool_call_delta` event class + adapter wiring across OpenRouter / direct-provider paths. Multi-PR sub-arc.
+- **Model-registry-driven context budget** — `services/runtime/context-window.ts:37`. Requires a model-context-window registry (per model: window size, training cutoff, modality). Cycle-8 sub-arc.
+- **AI Types catalog availability** — `bindings.ts:501`. Phase 12.b — requires AI Types catalog table + tRPC + UI.
+- **Drain legacy fixtures into binding rows** — `services/chat.ts:1358`. Phase 27.5b migration arc.
+- **RAC orchestration error registry** — `services/runtime/rac-orchestrator.ts:86`. M7-c8 — requires registry pattern for error classes.
+- **Per-source RAC planner derivation** — `services/rac/planner-mode.ts:26,167`. Requires per-source `RetrievalPlanItem` derivation logic.
+- **Workspace-default-bindings caller migrations** — `workspace-default-bindings.ts:7`. LR-02/03/04/08 — Phase 29 follow-on; each LR has its own catalogue entry.
+
+These are real but architecturally separable; opening them mid-mission would violate "no silent re-scoping" — each gets its own contract document when next worked.
+
+### Continuation execution order
+
+1. **Slice 27** (vault search) — smallest, single procedure, isolated.
+2. **Slice 28** (background-jobs metadata) — adds a table, mechanical.
+3. **Slice 29** (impact-analysis templates) — single template + executor branch.
+4. **Slice 30** (doc-debt sweep) — bulk text rewrite once 27–29 land.
+5. **Slice 31** (BasesPanel kind picker) — UI-only, no server changes.
+6. **Slice 32** — continuation closure receipt with merge SHAs.
+
+### Continuation receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 27 vault search | TBD | TBD | tsvector-backed `AsdbVaultSearchService` + router wiring |
+| 28 background-jobs metadata | TBD | TBD | `ags_background_job_status_metadata` + boot-reseed |
+| 29 impact-analysis templates | TBD | TBD | `knowledge_impact` template registered |
+| 30 doc-debt sweep continuation | TBD | TBD | 6-file marker sweep |
+| 31 BasesPanel kind picker | TBD | TBD | β kind picker + adaptive editor |
+| 32 continuation closure | TBD | TBD | Closure receipt |
