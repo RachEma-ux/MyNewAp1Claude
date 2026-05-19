@@ -29,6 +29,8 @@ import type {
   BackendKey,
   EdgeIdentity,
   EdgeProperties,
+  GraphAlgorithmInput,
+  GraphAlgorithmResult,
   GraphRepository,
   NodeIdentity,
   NodeProperties,
@@ -603,8 +605,238 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
 
   // ----- Algorithms -----
 
-  async runAlgorithm() {
-    return { rows: [], durationMs: 0 };
+  async runAlgorithm(
+    input: GraphAlgorithmInput,
+  ): Promise<GraphAlgorithmResult> {
+    // Slice 7 of the no-deferral catalogue. The full GraphAlgorithmKey
+    // taxonomy is `shortest_path | centrality | similarity |
+    // community_detection | blast_radius`. The postgres backend
+    // implements:
+    //  - shortest_path → delegates to `this.shortestPath(...)`
+    //  - centrality → degree centrality (in + out edges per node)
+    //  - community_detection → weakly-connected components via
+    //    recursive CTE
+    //  - blast_radius → BFS depth-N from seed, counting reachable nodes
+    //  - similarity → Jaccard over neighbor sets of two seeds
+    //
+    // Algorithms requiring full graph-data-science / Neo4j GDS land
+    // operator-actionable errors so the caller can branch on
+    // capability instead of silently consuming empty rows.
+    const startedAt = Date.now();
+    const conn = getAsDb();
+    const govFilter = input.runtime.governanceStatusFilter ?? ["active"];
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
+
+    switch (input.algorithmKey) {
+      case "shortest_path": {
+        const from = String(input.parameters.from ?? "");
+        const to = String(input.parameters.to ?? "");
+        const path = await this.shortestPath(from, to, input.runtime);
+        return {
+          rows: path
+            ? [
+                {
+                  length: path.length,
+                  nodeIds: path.nodes.map((n) => n.id),
+                  edgeTypeKeys: path.edges.map((e) => e.typeKey),
+                },
+              ]
+            : [],
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      case "centrality": {
+        // Degree centrality: edges incident on each node.
+        const limit = Number(input.parameters.limit ?? 100);
+        const rows = await conn.execute(sql`
+          WITH degree AS (
+            SELECT n.id, n.type_key, n.node_key,
+                   COUNT(e.id) AS degree
+            FROM ${agsGraphNodes} n
+            LEFT JOIN ${agsGraphEdges} e
+              ON (e.source_node_id = n.id OR e.target_node_id = n.id)
+              AND e.governance_status IN (${govList})
+            WHERE n.governance_status IN (${govList})
+            GROUP BY n.id, n.type_key, n.node_key
+          )
+          SELECT type_key, node_key, degree
+          FROM degree
+          ORDER BY degree DESC, node_key ASC
+          LIMIT ${limit};
+        `);
+        const records =
+          (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+          (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+        return {
+          rows: records.map((r) => ({
+            typeKey: String(r.type_key),
+            nodeId: String(r.node_key),
+            degree: Number(r.degree ?? 0),
+          })),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      case "community_detection": {
+        // Weakly-connected components via recursive CTE. Each
+        // component's "root" is the minimum node id reachable
+        // through undirected edges.
+        const limit = Number(input.parameters.limit ?? 1000);
+        const rows = await conn.execute(sql`
+          WITH RECURSIVE adj AS (
+            SELECT source_node_id AS a, target_node_id AS b
+            FROM ${agsGraphEdges}
+            WHERE governance_status IN (${govList})
+            UNION
+            SELECT target_node_id AS a, source_node_id AS b
+            FROM ${agsGraphEdges}
+            WHERE governance_status IN (${govList})
+          ),
+          components AS (
+            SELECT n.id AS node_id, n.id AS component_root, 0::int AS depth
+            FROM ${agsGraphNodes} n
+            WHERE n.governance_status IN (${govList})
+            UNION
+            SELECT adj.b AS node_id,
+                   LEAST(c.component_root, adj.b) AS component_root,
+                   c.depth + 1 AS depth
+            FROM adj
+            JOIN components c ON adj.a = c.node_id
+            WHERE c.depth < 12
+          )
+          SELECT n.type_key, n.node_key, MIN(c.component_root) AS component_root
+          FROM components c
+          JOIN ${agsGraphNodes} n ON n.id = c.node_id
+          GROUP BY n.id, n.type_key, n.node_key
+          ORDER BY component_root ASC, n.node_key ASC
+          LIMIT ${limit};
+        `);
+        const records =
+          (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+          (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+        return {
+          rows: records.map((r) => ({
+            typeKey: String(r.type_key),
+            nodeId: String(r.node_key),
+            componentRoot: Number(r.component_root ?? 0),
+          })),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      case "blast_radius": {
+        // BFS depth-N from seed, counting reachable distinct nodes.
+        const seed = String(input.parameters.seed ?? "");
+        const depthCap = Math.min(Number(input.parameters.maxDepth ?? 3), 6);
+        if (!seed) {
+          throw new Error("runAlgorithm/blast_radius: missing 'seed' parameter (node_key)");
+        }
+        const rows = await conn.execute(sql`
+          WITH RECURSIVE walk AS (
+            SELECT n.id, 0::int AS depth
+            FROM ${agsGraphNodes} n
+            WHERE n.node_key = ${seed}
+              AND n.governance_status IN (${govList})
+            UNION
+            SELECT n.id, w.depth + 1
+            FROM ${agsGraphEdges} e
+            JOIN walk w
+              ON (e.source_node_id = w.id OR e.target_node_id = w.id)
+            JOIN ${agsGraphNodes} n
+              ON n.id = CASE WHEN e.source_node_id = w.id THEN e.target_node_id ELSE e.source_node_id END
+            WHERE w.depth < ${depthCap}
+              AND n.governance_status IN (${govList})
+              AND e.governance_status IN (${govList})
+          )
+          SELECT depth, COUNT(DISTINCT id) AS reachable
+          FROM walk
+          GROUP BY depth
+          ORDER BY depth ASC;
+        `);
+        const records =
+          (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+          (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+        return {
+          rows: records.map((r) => ({
+            depth: Number(r.depth ?? 0),
+            reachable: Number(r.reachable ?? 0),
+          })),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      case "similarity": {
+        // Jaccard similarity of neighbor sets for two seeds.
+        const a = String(input.parameters.a ?? "");
+        const b = String(input.parameters.b ?? "");
+        if (!a || !b) {
+          throw new Error("runAlgorithm/similarity: missing 'a' or 'b' seed parameter");
+        }
+        const rows = await conn.execute(sql`
+          WITH neighbors AS (
+            SELECT
+              CASE WHEN sn.node_key = ${a} THEN tn.id ELSE sn.id END AS neighbor_id,
+              ${a} AS seed
+            FROM ${agsGraphEdges} e
+            JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+            JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+            WHERE (sn.node_key = ${a} OR tn.node_key = ${a})
+              AND e.governance_status IN (${govList})
+            UNION
+            SELECT
+              CASE WHEN sn.node_key = ${b} THEN tn.id ELSE sn.id END AS neighbor_id,
+              ${b} AS seed
+            FROM ${agsGraphEdges} e
+            JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+            JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+            WHERE (sn.node_key = ${b} OR tn.node_key = ${b})
+              AND e.governance_status IN (${govList})
+          )
+          SELECT
+            COUNT(*) FILTER (WHERE seed = ${a}) AS a_count,
+            COUNT(*) FILTER (WHERE seed = ${b}) AS b_count,
+            (
+              SELECT COUNT(*) FROM (
+                SELECT neighbor_id FROM neighbors WHERE seed = ${a}
+                INTERSECT
+                SELECT neighbor_id FROM neighbors WHERE seed = ${b}
+              ) i
+            ) AS intersection,
+            (
+              SELECT COUNT(*) FROM (
+                SELECT neighbor_id FROM neighbors WHERE seed = ${a}
+                UNION
+                SELECT neighbor_id FROM neighbors WHERE seed = ${b}
+              ) u
+            ) AS union_count;
+        `);
+        const records =
+          (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+          (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+        const row = records[0] ?? { a_count: 0, b_count: 0, intersection: 0, union_count: 0 };
+        const union = Number(row.union_count ?? 0);
+        const jaccard = union === 0 ? 0 : Number(row.intersection ?? 0) / union;
+        return {
+          rows: [
+            {
+              a,
+              b,
+              aDegree: Number(row.a_count ?? 0),
+              bDegree: Number(row.b_count ?? 0),
+              intersection: Number(row.intersection ?? 0),
+              union,
+              jaccard,
+            },
+          ],
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      default: {
+        // Discriminated union exhaustiveness — surface unknown keys
+        // explicitly rather than returning empty rows.
+        throw new Error(`runAlgorithm: unsupported algorithmKey "${String(input.algorithmKey)}"`);
+      }
+    }
   }
 
   // ----- Permissions -----
