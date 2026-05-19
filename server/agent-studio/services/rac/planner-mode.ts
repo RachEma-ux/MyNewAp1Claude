@@ -20,15 +20,15 @@
  *   - hybrid_cag_tool_knowledge          — CAG + tool_knowledge.
  *   - hybrid_cag_rag_tool_knowledge      — CAG + KB/RAG + tool_knowledge.
  *
- * Phase 12 (Native Graph Workspace) reserves seven additional modes per
+ * Phase 12 (Native Graph Workspace) ships seven additional modes per
  * `docs/architecture/agent-studio-graphrag-retrieval-router.md` §1.3 so
  * the GraphRAG retrieval router can label traces distinctly from the
- * generic `knowledge_retrieval` bucket. Derivation extension is deferred
- * until per-source retrieval-method metadata lands — `derivePlannerMode`
- * continues to emit `knowledge_retrieval` for `graph_index` sources
- * today, with the seven new strings reserved at the type level so
- * downstream callers (UI, trace columns, tRPC contracts) can already
- * reference them:
+ * generic `knowledge_retrieval` bucket. `derivePlannerMode` emits the
+ * `graphrag_*` modes by reading the per-source
+ * `metadataJson.retrievalMethod` field via
+ * `readGraphragRetrievalMethod` (see Phase 12 §5 below); legacy
+ * `graph_index` sources without that metadata still route through the
+ * generic bucket. The seven new modes are:
  *
  *   - graphrag_local                     — local-context GraphRAG.
  *   - graphrag_global                    — global-context GraphRAG.
@@ -163,9 +163,10 @@ export const RAC_PLANNER_MODES = [
   "hybrid_cag_rag",
   "hybrid_cag_tool_knowledge",
   "hybrid_cag_rag_tool_knowledge",
-  // ── Phase 12 — Native Graph Workspace GraphRAG modes (reserved) ──
-  // Type-level only today; derivation extension deferred until per-source
-  // retrieval-method metadata lands. See file header.
+  // ── Phase 12 — Native Graph Workspace GraphRAG modes ──
+  // Emitted by `derivePlannerMode` when a runnable source carries
+  // `metadataJson.retrievalMethod` (read via `readGraphragRetrievalMethod`).
+  // See file header + `methodToReservedMode` below.
   "graphrag_local",
   "graphrag_global",
   "graphrag_traversal",
@@ -176,10 +177,18 @@ export const RAC_PLANNER_MODES = [
 ] as const;
 
 /**
- * Reserved Phase 12 modes that the current `derivePlannerMode`
- * implementation never emits. Exported so the lockstep test and
- * downstream callers can distinguish reservation from active modes
- * without re-enumerating the literals.
+ * Phase 12 GraphRAG modes. `derivePlannerMode` emits these only when
+ * a runnable source carries the `metadataJson.retrievalMethod`
+ * discriminator (read via `readGraphragRetrievalMethod`); sources
+ * without the discriminator continue to route through the generic
+ * `knowledge_retrieval` / `hybrid_cag_rag` buckets — the lockstep
+ * test asserts that absence.
+ *
+ * Exported so the lockstep test + downstream callers (router lookup,
+ * trace columns) can iterate the GraphRAG-flavored modes without
+ * re-enumerating the literals. The constant name retains the
+ * `RESERVED_` prefix for backwards compatibility with importers; the
+ * doc-block here is the source of truth.
  */
 export const PHASE_12_RESERVED_MODES = [
   "graphrag_local",
