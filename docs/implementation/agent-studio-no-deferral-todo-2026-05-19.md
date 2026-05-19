@@ -454,7 +454,66 @@ genuinely shippable as a single PR: the contract surface
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 38 catalogue | TBD | TBD | Opens continuation-3 |
-| 39 streamEvents producer | TBD | TBD | OpenAI SSE tool-call accumulation + Anthropic fallback |
-| 40 doc-debt sweep | TBD | TBD | Tool-call streaming + LR-XX markers closed |
-| 41 continuation-3 closure | TBD | TBD | Closure receipt |
+| 38 catalogue | #1557 | `ec6955d5` | Opens continuation-3; re-audits 4-of-5 already-shipped sub-arcs |
+| 39 streamEvents producer | #1558 | `1ef64157` | OpenAI SSE tool-call accumulation + Anthropic fallback + 16-test source-scan+behavioral |
+| 40 doc-debt sweep | #1559 | `76a10c88` | chat-stream tool-call streaming marker rewritten; closure paragraph re-audit |
+| 41 continuation-3 closure | this PR | TBD | Closure receipt |
+
+## Continuation-3 closure receipt (2026-05-19)
+
+The third continuation arc shipped 1 implementation slice + 1 doc-block
+sweep + this closure across PRs #1557–#1560. The re-audit found that
+4 of the 5 originally-tabled sub-arcs from slice-37's closure had
+already shipped — only legacy-fixture helper deletion remains, and
+that one is operator-gated (waits for no-env-depends signal).
+
+### Continuation-3 carry-forward lessons
+
+1. **Tabled-item lists rot fast.** Continuation-2's closure named
+   LR-02/03/04/08 as "remaining sub-arcs per `PHASE_28_EXECUTION_PLAN.md`".
+   The plan doc predates Phase 29.4-29.6 migrations that already
+   landed; continuation-2 inherited the stale wording without checking
+   the live code. Pattern: re-audit each named tabled item before
+   propagating it to the next mission's closure paragraph — at least
+   one grep of the named file:line for the legacy pattern.
+2. **Producer-side migrations don't auto-flip callers.** Slice 39's
+   `streamEvents()` ships the full `ModelAccessStreamEvent` union, but
+   chat-stream's tool-loop intentionally stays on non-streaming
+   `execute()`. Per-turn dispatch needs the full `toolCalls` set
+   before the next turn is built; switching to `streamEvents()` would
+   defer dispatch to stream-end (no latency win) or break the
+   ordering guarantee the MCP dispatcher relies on. Lesson: ship the
+   producer + a "why caller stays" doc-block in the same arc so the
+   architectural decision survives the cycle that opened the
+   contract.
+3. **`as const` discriminated unions decode SSE cleanly.** The
+   `ModelAccessStreamEvent` union (4 variants discriminated by `type`)
+   mapped onto OpenAI's SSE deltas without a normalizing intermediate:
+   `delta.content` → `text_delta`, `delta.tool_calls[]` → per-index
+   accumulators yielding `tool_call_delta` / `tool_call_complete`,
+   `[DONE]` → `done`. Anthropic falls back to a single non-streaming
+   execute + same envelope. Pattern: when a stream surface has
+   multiple event kinds, ship the union as data + put the per-kind
+   parser in a single producer rather than branching everywhere.
+4. **The accumulator-flush double emit guard is structural.**
+   `streamEvents()` flushes accumulated tool calls on BOTH the
+   `[DONE]` branch AND the post-loop fallthrough so a stream that
+   ends without a terminal sentinel (server-side close, network drop
+   mid-stream-of-text-only-content) still surfaces accumulated tool
+   calls. Catching the implicit-end case via "always flush on
+   generator exit" would mean a finally block; the explicit dual emit
+   sites keep the control flow grep-able.
+5. **Operator-gated tabled items can stay tabled honestly.** The
+   legacy-fixture helper (`scripts/agent-studio/create-provider-bindings-for-legacy-agents.ts`)
+   stays around because deleting it requires knowing no production
+   environment depends on it. That's a real operator-action gate, not
+   a deferral — the closure paragraph names it as such rather than
+   tabling it as "follow-on architectural work."
+
+After this slice, the no-deferral mission has shipped 41 slices
+across 3 continuation arcs (1-26 original mission, 27-32 continuation-1,
+33-41 continuation-2+3). All identified gaps in
+`server/agent-studio/` + `client/src/modules/agent-studio/` +
+`server/openrouter/model-access/` are either closed, genuine MVP-
+boundary documentation, intentional DI stubs, or operator-gated
+external-infrastructure residuals.
