@@ -12,20 +12,14 @@
  * Mounted at `agentStudio.goldenQuestions.*`. Both procedures are
  * `adminProcedure` (operator-only) and read-only.
  *
- * **Deferred — run lifecycle persistence + caller.**
- * `runLiveEvaluation(suites, runner, options)` exists at
- * `services/graph-skill/golden-questions/live-evaluator.ts` but:
- *
- *   - Has NO caller in production (cron / operator-trigger
- *     mutation not built)
- *   - Has NO persistence write to `ags_golden_question_runs` /
- *     `ags_golden_question_results` (returns the summary
- *     in-memory only)
- *
- * The run-lifecycle persistence + the caller form a 2-3 slice
- * follow-up arc (T-D.5.β / T-D.5.γ). This slice ships the read
- * surface so the operator dashboard can render the "browse
- * golden-question suites" picker today.
+ * Slice 44 of the no-deferral continuation-4 catalogue (2026-05-19)
+ * closed the T-D.5.γ runner caller. The `triggerLiveEvaluation`
+ * admin mutation composes `buildLiveEngine` + `runLiveEvaluation` +
+ * `createGoldenQuestionsWriteStore.recordSuiteRun` to persist each
+ * suite's results into `ags_golden_question_runs` /
+ * `ags_golden_question_results`. The composer itself lives in
+ * `trigger-live-evaluation.ts` so the router stays narrow and
+ * future callers (cron, CLI) can reuse it.
  *
  * Hard-rule compliance (CLAUDE.md):
  *   - No `neo4j-driver` / `dispatchMcpToolCall` / `openrouter` /
@@ -38,6 +32,8 @@
 
 import { z } from "zod";
 
+import { TRPCError } from "@trpc/server";
+
 import { adminProcedure, router } from "../../../../_core/trpc.js";
 import {
   createGoldenQuestionsReadStore,
@@ -48,6 +44,10 @@ import {
   type GoldenQuestionRunStats,
   type GoldenQuestionSuiteListRow,
 } from "./golden-questions-read-store.js";
+import {
+  GoldenQuestionsSuiteNotFoundError,
+  triggerLiveEvaluation,
+} from "./trigger-live-evaluation.js";
 
 // ============================================================================
 // Limit constants
@@ -240,6 +240,68 @@ export const goldenQuestionsRouter = router({
         return { status: "ok", questionId: input.questionId, question };
       },
     ),
+
+  /**
+   * T-D.5.γ — trigger a live golden-questions evaluation run. The
+   * composer in `trigger-live-evaluation.ts` loads the suites from
+   * `DEFAULT_GOLDEN_QUESTION_SUITES`, builds the engine via
+   * `buildLiveEngine`, runs the pure evaluator, and persists each
+   * suite's result via `createGoldenQuestionsWriteStore.recordSuiteRun`.
+   *
+   * Optional `suiteKey` narrows the run to a single seeded suite. A
+   * `suiteKey` not present in the seed maps to `BAD_REQUEST`.
+   *
+   * The `intent` field on Model Access defaults to `agent-run` inside
+   * `buildLiveEngine`; per-call governance receipts ride that path.
+   */
+  triggerLiveEvaluation: adminProcedure
+    .input(
+      z.object({
+        providerConnectionId: z.number().int().positive(),
+        modelRef: z.string().min(1).max(200),
+        workspaceId: z.number().int().positive(),
+        actorId: z.number().int().positive(),
+        suiteKey: z.string().min(1).max(100).optional(),
+        perQuestionTimeoutMs: z
+          .number()
+          .int()
+          .min(1_000)
+          .max(600_000)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const result = await triggerLiveEvaluation({
+          providerConnectionId: input.providerConnectionId,
+          modelRef: input.modelRef,
+          workspaceId: input.workspaceId,
+          actorId: input.actorId,
+          ...(input.suiteKey != null ? { suiteKey: input.suiteKey } : {}),
+          ...(input.perQuestionTimeoutMs != null
+            ? { perQuestionTimeoutMs: input.perQuestionTimeoutMs }
+            : {}),
+        });
+        return {
+          status: "ok" as const,
+          summary: result.summary,
+          persistence: result.persistence,
+          suitesRun: result.suitesRun,
+        };
+      } catch (err) {
+        if (err instanceof GoldenQuestionsSuiteNotFoundError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err.message,
+          });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : String(err),
+        });
+      }
+    }),
 });
 
 export type GoldenQuestionsRouter = typeof goldenQuestionsRouter;

@@ -3069,15 +3069,17 @@ export const agentStudioRouter = router({
   // performed the assignment until now. Source-scan integrity test
   // guards future drift.
   vault: vaultRouter,
-  // Native Graph Workspace T-D.5.α: Golden Questions read surface —
-  // listSuites + listQuestionsInSuite. Seed file
+  // Native Graph Workspace T-D.5.α/β/γ: Golden Questions surface —
+  // read methods (listSuites / listQuestionsInSuite / listRecentRuns /
+  // getRunStats / listRunResults / getQuestionDetail) + the T-D.5.γ
+  // triggerLiveEvaluation admin mutation. Seed file
   // (server/agent-studio/services/graph-skill/seed-golden-questions.ts)
   // populates ags_golden_question_suites + ags_golden_questions at
-  // boot via seedAsDb(); this mount lets the operator dashboard
-  // enumerate them without re-implementing the closed-taxonomy
-  // lookup client-side. Run-lifecycle persistence + caller deferred
-  // to T-D.5.β/.γ (runLiveEvaluation exists but has no caller AND no
-  // persistence write today).
+  // boot via seedAsDb(); the triggerLiveEvaluation composer
+  // (`trigger-live-evaluation.ts`) wires buildLiveEngine +
+  // runLiveEvaluation + createGoldenQuestionsWriteStore so each
+  // operator-triggered run persists into ags_golden_question_runs +
+  // ags_golden_question_results.
   goldenQuestions: goldenQuestionsRouter,
   // Phase 22 follow-up #635: catalog-sync-log retention admin surface
   // (prune + getCronStatus). Sister of runs.pruneRetention (#623),
