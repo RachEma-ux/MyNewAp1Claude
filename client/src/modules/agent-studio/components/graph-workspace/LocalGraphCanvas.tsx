@@ -247,10 +247,11 @@ export default function LocalGraphCanvas({
     const nodes: ReadonlyArray<NodeRow> = query.data?.nodes ?? [];
     const edges: ReadonlyArray<EdgeRow> = query.data?.edges ?? [];
 
-    // Dedup identical (id, typeKey) — `ags_graph_edges` currently
-    // allows duplicate rows because `upsertEdge` does not use
-    // `onConflictDoUpdate`. The canvas would render overlapping
-    // edges otherwise.
+    // Defensive dedup pass on (id, typeKey) and (source, typeKey,
+    // target). The DB-side partial unique index on
+    // `(type_key, edge_key)` (slice 4 of the no-deferral catalogue)
+    // is the source-of-truth dedup; this pass survives null-keyed
+    // legacy edges that the partial index intentionally ignores.
     const seenNodes = new Set<string>();
     const dedupedNodes = nodes.filter((n) => {
       const key = `${n.typeKey}:${n.id}`;

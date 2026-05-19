@@ -16,6 +16,7 @@
  *   - agent-studio-graph-layout-registry.md
  */
 
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -176,6 +177,14 @@ export const agsGraphEdges = pgTable(
     sourceNodeIdx: index("idx_ags_graph_edges_source_node").on(t.sourceNodeId),
     targetNodeIdx: index("idx_ags_graph_edges_target_node").on(t.targetNodeId),
     governanceIdx: index("idx_ags_graph_edges_governance").on(t.governanceStatus),
+    // Partial unique on (typeKey, edgeKey) where edgeKey IS NOT NULL.
+    // Projection sync always sets edgeKey from EdgeIdentity.id; null
+    // rows can exist only for legacy/derived computed edges and stay
+    // un-deduped. The constraint lets `upsertEdge` use
+    // `onConflictDoUpdate` instead of blind insert.
+    typeEdgeKeyIdx: uniqueIndex("idx_ags_graph_edges_type_edge_key")
+      .on(t.typeKey, t.edgeKey)
+      .where(sql`${t.edgeKey} IS NOT NULL`),
   }),
 );
 
