@@ -30,8 +30,13 @@
  *   2. governance pre-invoke (may hit policy engine)
  *
  * "ask" rules → treated as deny (decision #3a). The async pending-
- * request flow only exists in the simulation engine; the dispatcher
- * is sync. TODO: revisit if/when async dispatch is needed.
+ * request flow lives in the simulation engine; the dispatcher is
+ * sync **by design** — every approval transition happens BEFORE
+ * dispatch via `gateRuntimeDispatch` (cycle-4 / cycle-5 audit). Slice
+ * 17 of the no-deferral catalogue (2026-05-19) confirmed this is a
+ * load-bearing architectural decision, not a deferred feature.
+ * Re-opening would require revisiting C2-c4 boundary + the
+ * dispatcher-layering source-scan; not done as part of this slice.
  *
  * L5-c5 (cycle-5 audit `/sdcard/Download/MCP_DISPATCHER_AUDIT_2026-05-09.md`
  * §L5-c5) — INTENTIONAL ABSENCES at this layer (lockstep-tested by
