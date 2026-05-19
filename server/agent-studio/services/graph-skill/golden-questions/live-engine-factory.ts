@@ -150,7 +150,7 @@ export function buildModelAccessAdapter(config: LiveEngineConfig): ModelAccessAd
         providerConnectionId: config.providerConnectionId,
         modelRef: input.modelHint ?? config.modelRef,
         messages,
-        intent: "agent",
+        intent: "evaluation",
         workspaceId: config.workspaceId,
         actorId: config.actorId,
       });
@@ -179,12 +179,13 @@ export function buildMcpDispatchAdapter(config: LiveEngineConfig): McpDispatchAd
   return {
     async dispatch(input) {
       return await dispatchMcpToolCall({
+        agentDraftId: -1,
         toolName: input.toolName,
         args: input.args,
-        workspaceId: config.workspaceId,
-        actorId: config.actorId,
+        source: "live_runtime",
         runtimeRunId: input.runtimeRunId,
-      } as Parameters<typeof dispatchMcpToolCall>[0]);
+        caller: { userId: config.actorId },
+      });
     },
   };
 }
