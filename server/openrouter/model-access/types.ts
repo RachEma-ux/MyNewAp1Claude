@@ -139,21 +139,18 @@ export interface ModelAccessStreamChunk {
 }
 
 /**
- * Phase 7.5 (Roadmap V3) — discriminated stream-event union. Forward-
- * looking shape that lets the streaming layer carry tool-call deltas
- * + completed-tool-call markers alongside text deltas. The Phase 7
- * pre-flight audit confirmed that `ModelAccessStreamChunk` is text-
- * only today (per `execute.ts:314-319` doc-block: tool-call streaming
- * deferred to Phase 17/18).
+ * Phase 7.5 (Roadmap V3) — discriminated stream-event union. The
+ * streaming layer carries tool-call deltas + completed-tool-call
+ * markers alongside text deltas. Slice 39 of the no-deferral
+ * continuation-3 catalogue (2026-05-19) shipped the producer at
+ * `execute.ts:streamEvents`; `ModelAccessStreamChunk` (text-only) is
+ * preserved for backward compatibility with `stream()` callers that
+ * only consume text.
  *
  * **Backward compatibility.** This union is ADDITIVE — no caller is
  * forced to migrate. The existing `stream()` generator continues to
  * yield `ModelAccessStreamChunk`. Consumers that opt into tool-call
- * streaming will use `streamEvents()` (a future producer) which
- * yields this union instead. When Phase 17/18 lands the upstream
- * tool-call SSE parsers, the producer is wired up; today this type
- * is purely the contract surface so chat-stream's eventual switch
- * is a one-line type swap rather than a shape redesign.
+ * streaming use `streamEvents()` which yields this union instead.
  *
  * **Variant choice — discriminated by `type` field.** OpenAI and
  * Anthropic SSE both surface tool calls as separate events from text
