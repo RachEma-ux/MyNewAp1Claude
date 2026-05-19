@@ -382,11 +382,15 @@ export const semanticEnrichmentRouter = router({
    * Discriminated envelope (`RunSemanticEnrichmentOutput`):
    *   - `"ok"` — agent ran; full counts attached
    *   - `"no_candidates"` — selector returned zero rows
-   *   - `"kind_not_yet_supported"` — proposalKind is one of the 3
-   *     deferred kinds (stale_fact_refresh / entity_disambiguation /
-   *     relationship_label_repair) — each needs the
-   *     `SemanticEnrichmentCandidate` contract extension; the message
-   *     names the constraint explicitly.
+   *   - `"kind_not_yet_supported"` — surfaced only when a proposalKind
+   *     value lands in `SEMANTIC_ENRICHMENT_PROPOSAL_KINDS` but is
+   *     not yet listed in the runner's
+   *     `SUPPORTED_TRIGGER_PROPOSAL_KINDS`. The currently-supported
+   *     kinds (description_enrichment / missing_property_fill /
+   *     entity_disambiguation / relationship_label_repair /
+   *     stale_fact_refresh) all surface real proposals; this branch
+   *     stays as a defensive contract so a future kind addition
+   *     doesn't silently break the envelope.
    *
    * Hard-rule compliance (CLAUDE.md):
    *   - LLM access lives behind the runner's resolved openrouter

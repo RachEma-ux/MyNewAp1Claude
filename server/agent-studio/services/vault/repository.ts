@@ -1,7 +1,14 @@
 /**
- * Vault service — repository (Drizzle-backed).
+ * Vault service — repository contract.
  *
- * MVP 1 skeleton. Wire to ASDB Drizzle client in Phase 2.
+ * Defines the `VaultRepository` interface + the in-memory
+ * `VaultRepositoryStub`. Production code wires
+ * `AsdbVaultRepository` (in `repository-asdb.ts`) against the ASDB
+ * Drizzle client; tests + `AGS_VAULT_REPO=stub` dev mode use the stub.
+ *
+ * The stub is intentionally kept lightweight (Maps + arrays) so unit
+ * tests don't have to boot ASDB; production callers go through the
+ * Drizzle-backed implementation per `router.ts:getRepo`.
  */
 
 import { createHash } from "crypto";
@@ -101,10 +108,10 @@ export function computeContentHash(contentMd: string): string {
 }
 
 /**
- * MVP 1 skeleton repository. Returns deterministic empty results until
- * Phase 2 wires the real Drizzle client and ASDB queries.
- *
- * Tests stub this via VaultRepositoryStub.
+ * In-memory `VaultRepository` implementation used by unit tests +
+ * `AGS_VAULT_REPO=stub` dev mode. Production code routes through
+ * `AsdbVaultRepository` (`repository-asdb.ts`); the stub is the
+ * deterministic in-process equivalent.
  */
 export class VaultRepositoryStub implements VaultRepository {
   private nextId = 1;
