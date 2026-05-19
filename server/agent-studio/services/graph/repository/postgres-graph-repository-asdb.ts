@@ -22,6 +22,7 @@ import {
   agsGraphNodes,
   agsGraphEdges,
 } from "../../../../../drizzle/tables/agent-studio-graph.js";
+import { agsQueryTemplates } from "../../../../../drizzle/tables/agent-studio-graph-skill.js";
 import type {
   BackendCapabilities,
   BackendHealth,
@@ -478,8 +479,71 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
 
   // ----- Query templates -----
 
-  async executeTemplate(_input: QueryTemplateExecutionInput): Promise<QueryTemplateExecutionResult> {
-    return { rows: [], truncated: false, durationMs: 0, templateVersion: "1.0" };
+  async executeTemplate(
+    input: QueryTemplateExecutionInput,
+  ): Promise<QueryTemplateExecutionResult> {
+    // Slice 6 of the no-deferral catalogue. Look up the template row
+    // from `ags_query_templates`, require a postgres-backend variant,
+    // execute its body as parameterized SQL via the underlying pool.
+    const startedAt = Date.now();
+    const conn = getAsDb();
+
+    // Prefer a postgres-tagged template; fall back to any row with
+    // the matching key so legacy single-backend templates still run.
+    const candidates = await conn
+      .select()
+      .from(agsQueryTemplates)
+      .where(eq(agsQueryTemplates.templateKey, input.templateKey))
+      .limit(5);
+    const template =
+      candidates.find((t) => t.graphBackend === "postgres") ?? candidates[0];
+    if (!template) {
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" not found in ags_query_templates`,
+      );
+    }
+    if (template.graphBackend !== "postgres") {
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" is bound to backend "${template.graphBackend}", not postgres. Register a row with graph_backend='postgres' for AsdbPostgresGraphRepository.`,
+      );
+    }
+    if (!template.readOnly) {
+      // Defense-in-depth: the dispatcher layer also gates this, but
+      // the repository must refuse mutating templates so a misconfigured
+      // row can't sneak through.
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" is not marked read-only; mutating templates are forbidden via this path.`,
+      );
+    }
+
+    // Resolve bind args. `parameter_schema.ordered = ["a","b"]`
+    // gives a deterministic order; otherwise fall back to sorted keys.
+    const schema = (template.parameterSchema ?? {}) as {
+      ordered?: unknown;
+    };
+    const orderedNames: string[] = Array.isArray(schema.ordered)
+      ? (schema.ordered as unknown[]).map((s) => String(s))
+      : Object.keys(input.parameters ?? {}).sort();
+    const values = orderedNames.map((name) => input.parameters?.[name]);
+    const maxResults = template.maxResults ?? 1000;
+
+    // Drop down to the underlying pg pool for positional bind support.
+    // Drizzle's `sql.raw(text)` doesn't bind, so the only way to safely
+    // pass external values is the pool's `query(text, values)` API.
+    const client = (conn as unknown as { $client?: { query: (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> } }).$client;
+    if (!client || typeof client.query !== "function") {
+      throw new Error(
+        "executeTemplate: underlying postgres client unavailable (drizzle.$client not exposed). Upgrade drizzle-orm or set DATABASE_URL_ASDB to a node-postgres-compatible URL.",
+      );
+    }
+    const result = await client.query(template.cypherBody, values);
+    const rows = (result.rows ?? []) as Record<string, unknown>[];
+    return {
+      rows: rows.slice(0, maxResults),
+      truncated: rows.length > maxResults,
+      durationMs: Date.now() - startedAt,
+      templateVersion: String(template.id ?? "1.0"),
+    };
   }
 
   // ----- Algorithms -----
