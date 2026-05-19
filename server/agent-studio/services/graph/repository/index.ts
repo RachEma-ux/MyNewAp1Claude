@@ -71,7 +71,10 @@ export {
 } from "./capabilities.js";
 
 export { TestGraphRepository } from "./test-graph-repository.js";
-export { PostgresGraphRepository } from "./postgres-graph-repository.js";
+// `AsdbPostgresGraphRepository` is the postgres backend. The
+// 176-LoC `PostgresGraphRepository` skeleton was deleted on
+// 2026-05-19 (no-deferral slice 14) — it was unreferenced by
+// the factory since #1524 and had no external callers.
 export { AsdbPostgresGraphRepository } from "./postgres-graph-repository-asdb.js";
 export { Neo4jCommunityGraphRepository } from "./neo4j-community-graph-repository.js";
 export { MemgraphGraphRepository } from "./memgraph-graph-repository.js";

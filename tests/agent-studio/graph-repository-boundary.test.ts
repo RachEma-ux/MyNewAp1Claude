@@ -110,15 +110,21 @@ describe("Phase 1.2 — GraphRepository surface", () => {
     expect(content).toMatch(/getGraphRepository/);
   });
 
-  it("declares all five backend implementations", () => {
+  it("declares all four backend implementations (PostgresGraphRepository skeleton deleted in slice 14)", () => {
     const indexPath = join(
       REPO_ROOT,
       "server/agent-studio/services/graph/repository/index.ts",
     );
     const content = readFileSync(indexPath, "utf8");
     expect(content).toMatch(/TestGraphRepository/);
-    expect(content).toMatch(/PostgresGraphRepository/);
+    expect(content).toMatch(/AsdbPostgresGraphRepository/);
     expect(content).toMatch(/Neo4jCommunityGraphRepository/);
+    expect(content).toMatch(/MemgraphGraphRepository/);
+    // The skeleton was deleted — assert non-existence so a revert
+    // re-introducing it is caught.
+    expect(content).not.toMatch(
+      /export\s*\{\s*PostgresGraphRepository\s*\}\s*from/,
+    );
   });
 
   it("capability registry exists", () => {
