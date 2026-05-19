@@ -22,6 +22,7 @@ import {
   agsGraphNodes,
   agsGraphEdges,
 } from "../../../../../drizzle/tables/agent-studio-graph.js";
+import { agsQueryTemplates } from "../../../../../drizzle/tables/agent-studio-graph-skill.js";
 import type {
   BackendCapabilities,
   BackendHealth,
@@ -368,8 +369,152 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
     return { nodes: r.nodes, edges: r.edges };
   }
 
-  async shortestPath(_from: string, _to: string, _runtime: RuntimeContext): Promise<TraversalPath | null> {
-    return null;
+  async shortestPath(
+    from: string,
+    to: string,
+    runtime: RuntimeContext,
+  ): Promise<TraversalPath | null> {
+    if (from === to) {
+      // Trivial path — return the seed alone with length 0.
+      const conn = getAsDb();
+      const [seed] = await conn
+        .select({ typeKey: agsGraphNodes.typeKey, nodeKey: agsGraphNodes.nodeKey })
+        .from(agsGraphNodes)
+        .where(eq(agsGraphNodes.nodeKey, from))
+        .limit(1);
+      if (!seed) return null;
+      return {
+        nodes: [{ typeKey: seed.typeKey, id: seed.nodeKey }],
+        edges: [],
+        length: 0,
+      };
+    }
+    const conn = getAsDb();
+    const govFilter = runtime.governanceStatusFilter ?? ["active"];
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
+    const maxDepth = 6;
+    // Recursive BFS over the undirected adjacency view. Each walk
+    // row keeps a JSON array of node ids on the path so we can
+    // rebuild the full hop sequence once the destination is hit.
+    // The `cycle_guard` text column repurposes Postgres' standard
+    // cycle-detection pattern without requiring `WITH RECURSIVE ...
+    // CYCLE` (PG14+) so the query stays portable.
+    const rows = await conn.execute(sql`
+      WITH RECURSIVE walk AS (
+        SELECT
+          n.id AS node_id,
+          n.type_key,
+          n.node_key,
+          0::int AS depth,
+          ARRAY[n.id]::int[] AS path_ids,
+          ARRAY[]::int[] AS edge_ids
+        FROM ${agsGraphNodes} n
+        WHERE n.node_key = ${from}
+          AND n.governance_status IN (${govList})
+        UNION ALL
+        SELECT
+          n.id,
+          n.type_key,
+          n.node_key,
+          w.depth + 1,
+          w.path_ids || n.id,
+          w.edge_ids || e.id
+        FROM ${agsGraphEdges} e
+        JOIN walk w
+          ON (e.source_node_id = w.node_id OR e.target_node_id = w.node_id)
+        JOIN ${agsGraphNodes} n
+          ON n.id = CASE
+            WHEN e.source_node_id = w.node_id THEN e.target_node_id
+            ELSE e.source_node_id
+          END
+        WHERE w.depth < ${maxDepth}
+          AND NOT (n.id = ANY(w.path_ids))
+          AND n.governance_status IN (${govList})
+          AND e.governance_status IN (${govList})
+      )
+      SELECT path_ids, edge_ids, depth
+      FROM walk
+      WHERE node_key = ${to}
+      ORDER BY depth ASC
+      LIMIT 1;
+    `);
+    const records =
+      (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+    const row = records[0];
+    if (!row) return null;
+    const pathIds = Array.isArray(row.path_ids) ? (row.path_ids as number[]) : [];
+    const edgeIds = Array.isArray(row.edge_ids) ? (row.edge_ids as number[]) : [];
+    if (pathIds.length === 0) return null;
+
+    // Hydrate node + edge identities in a single pair of round-trips.
+    const nodeRows = await conn.execute(sql`
+      SELECT id, type_key, node_key
+      FROM ${agsGraphNodes}
+      WHERE id IN (${sql.join(
+        pathIds.map((id) => sql`${id}`),
+        sql`, `,
+      )});
+    `);
+    const nodeRecords =
+      (nodeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(nodeRows) ? (nodeRows as Array<Record<string, unknown>>) : []);
+    const nodeById = new Map<number, NodeIdentity>(
+      nodeRecords.map((r) => [
+        Number(r.id),
+        { typeKey: String(r.type_key), id: String(r.node_key) },
+      ]),
+    );
+    const nodes: NodeIdentity[] = pathIds
+      .map((id) => nodeById.get(id))
+      .filter((n): n is NodeIdentity => n != null);
+
+    let edges: EdgeIdentity[] = [];
+    if (edgeIds.length > 0) {
+      const edgeRows = await conn.execute(sql`
+        SELECT
+          e.type_key AS edge_type_key,
+          e.edge_key,
+          e.id,
+          sn.type_key AS src_type,
+          sn.node_key AS src_key,
+          tn.type_key AS tgt_type,
+          tn.node_key AS tgt_key
+        FROM ${agsGraphEdges} e
+        JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+        JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+        WHERE e.id IN (${sql.join(
+          edgeIds.map((id) => sql`${id}`),
+          sql`, `,
+        )});
+      `);
+      const edgeRecords =
+        (edgeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+        (Array.isArray(edgeRows) ? (edgeRows as Array<Record<string, unknown>>) : []);
+      const edgeByRowId = new Map<number, EdgeIdentity>(
+        edgeRecords.map((r) => [
+          Number(r.id),
+          {
+            typeKey: String(r.edge_type_key),
+            id: String(r.edge_key ?? ""),
+            sourceNode: { typeKey: String(r.src_type), id: String(r.src_key) },
+            targetNode: { typeKey: String(r.tgt_type), id: String(r.tgt_key) },
+          },
+        ]),
+      );
+      edges = edgeIds
+        .map((id) => edgeByRowId.get(id))
+        .filter((e): e is EdgeIdentity => e != null);
+    }
+
+    return {
+      nodes,
+      edges,
+      length: Number(row.depth ?? edges.length),
+    };
   }
 
   // ----- Projection sync -----
@@ -389,8 +534,71 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
 
   // ----- Query templates -----
 
-  async executeTemplate(_input: QueryTemplateExecutionInput): Promise<QueryTemplateExecutionResult> {
-    return { rows: [], truncated: false, durationMs: 0, templateVersion: "1.0" };
+  async executeTemplate(
+    input: QueryTemplateExecutionInput,
+  ): Promise<QueryTemplateExecutionResult> {
+    // Slice 6 of the no-deferral catalogue. Look up the template row
+    // from `ags_query_templates`, require a postgres-backend variant,
+    // execute its body as parameterized SQL via the underlying pool.
+    const startedAt = Date.now();
+    const conn = getAsDb();
+
+    // Prefer a postgres-tagged template; fall back to any row with
+    // the matching key so legacy single-backend templates still run.
+    const candidates = await conn
+      .select()
+      .from(agsQueryTemplates)
+      .where(eq(agsQueryTemplates.templateKey, input.templateKey))
+      .limit(5);
+    const template =
+      candidates.find((t) => t.graphBackend === "postgres") ?? candidates[0];
+    if (!template) {
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" not found in ags_query_templates`,
+      );
+    }
+    if (template.graphBackend !== "postgres") {
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" is bound to backend "${template.graphBackend}", not postgres. Register a row with graph_backend='postgres' for AsdbPostgresGraphRepository.`,
+      );
+    }
+    if (!template.readOnly) {
+      // Defense-in-depth: the dispatcher layer also gates this, but
+      // the repository must refuse mutating templates so a misconfigured
+      // row can't sneak through.
+      throw new Error(
+        `executeTemplate: template "${input.templateKey}" is not marked read-only; mutating templates are forbidden via this path.`,
+      );
+    }
+
+    // Resolve bind args. `parameter_schema.ordered = ["a","b"]`
+    // gives a deterministic order; otherwise fall back to sorted keys.
+    const schema = (template.parameterSchema ?? {}) as {
+      ordered?: unknown;
+    };
+    const orderedNames: string[] = Array.isArray(schema.ordered)
+      ? (schema.ordered as unknown[]).map((s) => String(s))
+      : Object.keys(input.parameters ?? {}).sort();
+    const values = orderedNames.map((name) => input.parameters?.[name]);
+    const maxResults = template.maxResults ?? 1000;
+
+    // Drop down to the underlying pg pool for positional bind support.
+    // Drizzle's `sql.raw(text)` doesn't bind, so the only way to safely
+    // pass external values is the pool's `query(text, values)` API.
+    const client = (conn as unknown as { $client?: { query: (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> } }).$client;
+    if (!client || typeof client.query !== "function") {
+      throw new Error(
+        "executeTemplate: underlying postgres client unavailable (drizzle.$client not exposed). Upgrade drizzle-orm or set DATABASE_URL_ASDB to a node-postgres-compatible URL.",
+      );
+    }
+    const result = await client.query(template.cypherBody, values);
+    const rows = (result.rows ?? []) as Record<string, unknown>[];
+    return {
+      rows: rows.slice(0, maxResults),
+      truncated: rows.length > maxResults,
+      durationMs: Date.now() - startedAt,
+      templateVersion: String(template.id ?? "1.0"),
+    };
   }
 
   // ----- Algorithms -----
