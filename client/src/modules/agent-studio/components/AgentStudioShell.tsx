@@ -69,6 +69,11 @@ const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
 const VaultAttachmentsPage = lazy(() => import("../pages/VaultAttachmentsPage"));
 // V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin page.
 const VaultSavedViewsPage = lazy(() => import("../pages/VaultSavedViewsPage"));
+// No-deferral continuation-7 slice 53: Vault Templates admin page —
+// the third vault admin surface (sibling of attachments + saved views),
+// promoting `VaultTemplatesPanel` from `RetrofitPage`-embedded to a
+// first-class page with its own route + sidebar entry.
+const VaultTemplatesPage = lazy(() => import("../pages/VaultTemplatesPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -208,6 +213,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-saved-views")) {
     return { ...empty, view: "vault-saved-views" as any, homeMode: null };
+  }
+  // ── No-deferral continuation-7 slice 53: Vault Templates admin (no agent context) ──
+  if (path.startsWith("/agent-studio/vault-templates")) {
+    return { ...empty, view: "vault-templates" as any, homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -437,6 +446,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/vault-saved-views");
       return;
     }
+    // No-deferral continuation-7 slice 53: vault-templates is a global view.
+    if ((key as string) === "vault-templates") {
+      navigate("/agent-studio/vault-templates");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -560,6 +574,9 @@ export default function AgentStudioShell() {
         // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
         case "vault-saved-views" as any:
           return <VaultSavedViewsPage />;
+        // ── No-deferral continuation-7 slice 53: Vault Templates admin ──
+        case "vault-templates" as any:
+          return <VaultTemplatesPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
