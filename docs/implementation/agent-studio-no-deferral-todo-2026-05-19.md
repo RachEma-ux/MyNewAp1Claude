@@ -143,4 +143,36 @@ Generated 2026-05-19. Updated as slices land (per-slice receipt rows appended at
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 1 (this doc) | TBD | TBD | Opens the contract |
+| 1 (this doc) | #1527 | `943351c2` | Opens the contract |
+| 2 d3-force simulation | #1528 | `860bf26a` | Local + Global canvas; 31-test source-scan |
+| 3 boundary-node fetch | #1529 | `8f789606` | globalGraphSample includes neighbors-of-sample |
+| 4 upsertEdge dedup | #1530 | `44fd9c50` | Partial unique index + onConflictDoUpdate + manual migration |
+| 5 shortestPath CTE | #1531 (bundled) | `56b1d9fa` | Recursive CTE BFS |
+| 6 executeTemplate | #1531 (bundled) | `56b1d9fa` | Against ags_query_templates via $client.query |
+| 7 runAlgorithm | #1532 | `157f97a3` | 5-algorithm closed-taxonomy coverage |
+| 8-13 projection methods | #1533 | `7a341cd9` | enqueueProjectionJob/takeSnapshot/detectDrift/rebuildProjection/explainPath/applyProjectionJob counters |
+| 14 skeleton deletion | #1534 | `f7f5e954` | 176-LoC postgres-graph-repository.ts removed |
+| 15 memgraph close-out | #1535 | `3376a4c1` | All "Still skeleton" methods closed |
+| 16 promotion target-asset binding | #1536 | `338f7d9e` | createDraft no longer returns sentinel 0 |
+| 17 MCP dispatcher decision | #1537 (bundled) | `f59e63d4` | TODO → load-bearing architectural decision |
+| 18 OAuth encryption-at-rest | #1537 (bundled) | `f59e63d4` | clientSecret + codeVerifier + nonce + state encrypted at rest |
+| 19 health-alert retention | #1538 | `fded7a87` | 90-day envelope on resolvedAt-only |
+| 20 failure-state bridge + audit | #1539 | `e2780da7` | retention-cron catch wires background_job_failed |
+| 21 marketplace publish dialog | #1540 (bundled) | `b3fff80b` | Full publish-form Dialog on AgentMarketplacePage |
+| 22 RetrofitPage lane drill | #1540 (bundled) | `b3fff80b` | onClickLane + lane-filter banner |
+| 23 RegionAdminPanel doc truth-audit | #1541 | `0f644bd1` | Forms had shipped; doc-block was stale |
+| 24 Neo4j CE bench dispatcher | #1542 | `8857d96c` | One-command operator wrapper around GHA workflow_dispatch |
+| 25 plugin framework first slice | #1543 | `8a9d9af2` | Closed-taxonomy contracts + manifest validator |
+| 26 doc-debt sweep | this PR | TBD | Strips closed-by-successor markers across 6 files |
+
+## Closure receipt (2026-05-19)
+
+All 26 slices have merged into main. Pre-mission grep tally was 76
+deferral / out-of-scope markers across the agent-studio module;
+post-slice-26 the count is reduced to genuine MVP-boundary
+documentation + a handful of within-slice closure references
+(e.g. "slice 19 of the no-deferral catalogue (2026-05-19) closed
+…"). External-infrastructure residuals (Aura subscription,
+multi-region account) remain as operator scaffolding (slices 24 +
+25 ship the code paths; the operator's residual is one CLI
+invocation, not a multi-PR rebuild).

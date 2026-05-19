@@ -21,9 +21,11 @@
  * `docs/architecture/agent-studio-postgres-neo4j-responsibility-split.md`
  * locks the invariant.
  *
- * Until Phase 7.5 wires the Neo4j worker, the rows accumulate as pending.
- * This service is the "writer side" of the bridge; the worker is the
- * "reader side" and is out of scope for this PR.
+ * Phase 7.5 wired the Neo4j worker (`ProjectionSyncWorker`) — this
+ * service writes the "writer side" rows; the worker drains them via
+ * the `*/5 * * * *` projection-drain cron (env-gated via
+ * `AGS_PROJECTION_DRAIN_CRON_DISABLED`). End-to-end shipped 2026-05-18
+ * across PRs #1476-#1488.
  *
  * Failure mode: ASDB unavailable → typed `AsdbUnavailableError`. Callers
  * upstream (Graph Agent runtime + decision-trace writer) catch this and

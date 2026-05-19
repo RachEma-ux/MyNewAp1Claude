@@ -16,9 +16,10 @@
  *
  * The service is a "policy" only in the sense that it accepts a
  * caller-supplied horizon in milliseconds and deletes rows whose
- * `createdAt` is older than `now - olderThanMs`. A scheduled job
- * (out of scope for this PR) would call it nightly with the
- * configured horizon.
+ * `createdAt` is older than `now - olderThanMs`. The shared retention-
+ * cron factory (`services/retention/make-retention-cron.ts`) is the
+ * scheduling path; see `graph-agent-runtime-traces-retention-cron.ts`
+ * for the nightly composition.
  *
  * Failure mode: ASDB unavailable → returns an empty summary
  * (degrade-silently). Operator UIs can show "ASDB not connected"

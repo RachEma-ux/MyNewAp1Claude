@@ -13,10 +13,11 @@
  * "explain why this answer happened" purpose of the ledger.
  *
  * Pattern set is intentionally small and conservative to avoid
- * false positives. A production-grade redactor would use a
- * configurable pattern registry (out of scope for this PR — the
- * intent here is "redaction exists" per the Phase 14 acceptance
- * criterion).
+ * false positives. A configurable pattern registry would be an
+ * additive extension on top of the constant `PATTERNS` array; today
+ * the Phase 14 acceptance criterion ("redaction exists") is met by
+ * this static set and there's no operator demand for runtime
+ * configurability.
  *
  * ADR: docs/architecture/agent-studio-graph-agent-runtime.md §1.7
  */
