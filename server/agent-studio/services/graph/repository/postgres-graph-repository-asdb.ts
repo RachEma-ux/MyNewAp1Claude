@@ -313,8 +313,152 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
     return { nodes: r.nodes, edges: r.edges };
   }
 
-  async shortestPath(_from: string, _to: string, _runtime: RuntimeContext): Promise<TraversalPath | null> {
-    return null;
+  async shortestPath(
+    from: string,
+    to: string,
+    runtime: RuntimeContext,
+  ): Promise<TraversalPath | null> {
+    if (from === to) {
+      // Trivial path — return the seed alone with length 0.
+      const conn = getAsDb();
+      const [seed] = await conn
+        .select({ typeKey: agsGraphNodes.typeKey, nodeKey: agsGraphNodes.nodeKey })
+        .from(agsGraphNodes)
+        .where(eq(agsGraphNodes.nodeKey, from))
+        .limit(1);
+      if (!seed) return null;
+      return {
+        nodes: [{ typeKey: seed.typeKey, id: seed.nodeKey }],
+        edges: [],
+        length: 0,
+      };
+    }
+    const conn = getAsDb();
+    const govFilter = runtime.governanceStatusFilter ?? ["active"];
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
+    const maxDepth = 6;
+    // Recursive BFS over the undirected adjacency view. Each walk
+    // row keeps a JSON array of node ids on the path so we can
+    // rebuild the full hop sequence once the destination is hit.
+    // The `cycle_guard` text column repurposes Postgres' standard
+    // cycle-detection pattern without requiring `WITH RECURSIVE ...
+    // CYCLE` (PG14+) so the query stays portable.
+    const rows = await conn.execute(sql`
+      WITH RECURSIVE walk AS (
+        SELECT
+          n.id AS node_id,
+          n.type_key,
+          n.node_key,
+          0::int AS depth,
+          ARRAY[n.id]::int[] AS path_ids,
+          ARRAY[]::int[] AS edge_ids
+        FROM ${agsGraphNodes} n
+        WHERE n.node_key = ${from}
+          AND n.governance_status IN (${govList})
+        UNION ALL
+        SELECT
+          n.id,
+          n.type_key,
+          n.node_key,
+          w.depth + 1,
+          w.path_ids || n.id,
+          w.edge_ids || e.id
+        FROM ${agsGraphEdges} e
+        JOIN walk w
+          ON (e.source_node_id = w.node_id OR e.target_node_id = w.node_id)
+        JOIN ${agsGraphNodes} n
+          ON n.id = CASE
+            WHEN e.source_node_id = w.node_id THEN e.target_node_id
+            ELSE e.source_node_id
+          END
+        WHERE w.depth < ${maxDepth}
+          AND NOT (n.id = ANY(w.path_ids))
+          AND n.governance_status IN (${govList})
+          AND e.governance_status IN (${govList})
+      )
+      SELECT path_ids, edge_ids, depth
+      FROM walk
+      WHERE node_key = ${to}
+      ORDER BY depth ASC
+      LIMIT 1;
+    `);
+    const records =
+      (rows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []);
+    const row = records[0];
+    if (!row) return null;
+    const pathIds = Array.isArray(row.path_ids) ? (row.path_ids as number[]) : [];
+    const edgeIds = Array.isArray(row.edge_ids) ? (row.edge_ids as number[]) : [];
+    if (pathIds.length === 0) return null;
+
+    // Hydrate node + edge identities in a single pair of round-trips.
+    const nodeRows = await conn.execute(sql`
+      SELECT id, type_key, node_key
+      FROM ${agsGraphNodes}
+      WHERE id IN (${sql.join(
+        pathIds.map((id) => sql`${id}`),
+        sql`, `,
+      )});
+    `);
+    const nodeRecords =
+      (nodeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(nodeRows) ? (nodeRows as Array<Record<string, unknown>>) : []);
+    const nodeById = new Map<number, NodeIdentity>(
+      nodeRecords.map((r) => [
+        Number(r.id),
+        { typeKey: String(r.type_key), id: String(r.node_key) },
+      ]),
+    );
+    const nodes: NodeIdentity[] = pathIds
+      .map((id) => nodeById.get(id))
+      .filter((n): n is NodeIdentity => n != null);
+
+    let edges: EdgeIdentity[] = [];
+    if (edgeIds.length > 0) {
+      const edgeRows = await conn.execute(sql`
+        SELECT
+          e.type_key AS edge_type_key,
+          e.edge_key,
+          e.id,
+          sn.type_key AS src_type,
+          sn.node_key AS src_key,
+          tn.type_key AS tgt_type,
+          tn.node_key AS tgt_key
+        FROM ${agsGraphEdges} e
+        JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+        JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+        WHERE e.id IN (${sql.join(
+          edgeIds.map((id) => sql`${id}`),
+          sql`, `,
+        )});
+      `);
+      const edgeRecords =
+        (edgeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+        (Array.isArray(edgeRows) ? (edgeRows as Array<Record<string, unknown>>) : []);
+      const edgeByRowId = new Map<number, EdgeIdentity>(
+        edgeRecords.map((r) => [
+          Number(r.id),
+          {
+            typeKey: String(r.edge_type_key),
+            id: String(r.edge_key ?? ""),
+            sourceNode: { typeKey: String(r.src_type), id: String(r.src_key) },
+            targetNode: { typeKey: String(r.tgt_type), id: String(r.tgt_key) },
+          },
+        ]),
+      );
+      edges = edgeIds
+        .map((id) => edgeByRowId.get(id))
+        .filter((e): e is EdgeIdentity => e != null);
+    }
+
+    return {
+      nodes,
+      edges,
+      length: Number(row.depth ?? edges.length),
+    };
   }
 
   // ----- Projection sync -----
