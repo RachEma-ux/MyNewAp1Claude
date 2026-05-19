@@ -49,7 +49,9 @@ import {
 import {
   classifyImpactAnalysisExecutorMode,
   runImpactAnalysisStub,
+  runImpactAnalysisViaTemplate,
 } from "./impact-analysis-executor.js";
+import { getGraphRepository } from "../graph/repository/index.js";
 
 // ============================================================================
 // Input schemas
@@ -184,7 +186,7 @@ export const impactAnalysisRouter = router({
   runImpactAnalysis: adminProcedure
     .input(RunImpactAnalysisInput)
     .query(
-      ({ input }): RunImpactAnalysisEnvelope => {
+      async ({ input, ctx }): Promise<RunImpactAnalysisEnvelope> => {
         const request: ImpactAnalysisRequest = {
           kind: input.kind,
           startingNode: input.startingNode,
@@ -193,9 +195,21 @@ export const impactAnalysisRouter = router({
             ? { nodeTypeKeyFilter: input.nodeTypeKeyFilter }
             : {}),
         };
+        const mode = classifyImpactAnalysisExecutorMode(input.kind);
+        if (mode === "template") {
+          const runtime = {
+            ...(ctx.user?.id != null ? { userId: ctx.user.id } : {}),
+            workspaceId: 0,
+          };
+          const result = await runImpactAnalysisViaTemplate(request, {
+            repository: getGraphRepository(),
+            runtime,
+          });
+          return { result, mode };
+        }
         return {
           result: runImpactAnalysisStub(request),
-          mode: classifyImpactAnalysisExecutorMode(input.kind),
+          mode,
         };
       },
     ),

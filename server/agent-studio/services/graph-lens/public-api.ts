@@ -74,6 +74,21 @@ export {
 } from "./impact-analysis-contracts.js";
 
 export {
+  IMPACT_ANALYSIS_TEMPLATES,
+  findImpactAnalysisTemplate,
+  hasImpactAnalysisTemplate,
+  buildImpactAnalysisTemplateSeedRows,
+  type ImpactAnalysisTemplateEntry,
+  type ImpactAnalysisTemplateSeedRow,
+} from "./impact-analysis-templates.js";
+
+export {
+  runImpactAnalysisStub,
+  runImpactAnalysisViaTemplate,
+  classifyImpactAnalysisExecutorMode,
+} from "./impact-analysis-executor.js";
+
+export {
   registerLensRunner,
   getLensRunner,
   runLens,

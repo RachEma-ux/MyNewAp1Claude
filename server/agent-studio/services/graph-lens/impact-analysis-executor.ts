@@ -1,37 +1,26 @@
 /**
- * Impact Analysis executor — stub implementation (T-G.5.β).
+ * Impact Analysis executor.
  *
- * Plumbs the executor surface so the operator dashboard can wire up
- * to `runImpactAnalysis(kind, startingNode)` today. **This stub does
- * not traverse the graph** — it returns an anchor-only result for
- * every kind.
+ * Two-mode executor:
+ *   - **Stub mode** (`runImpactAnalysisStub`) — returns an anchor-only
+ *     result. Used as the fallback for kinds without a registered
+ *     Cypher template + by unit tests that don't need a graph.
+ *   - **Template mode** (`runImpactAnalysisViaTemplate`) — slice 29
+ *     of the no-deferral continuation catalogue (2026-05-19) wires
+ *     this for kinds present in `IMPACT_ANALYSIS_TEMPLATES`. Calls
+ *     `GraphRepository.executeTemplate(...)` with the kind's
+ *     parameterized Cypher template and maps the result rows.
  *
- * Why ship a stub before the real templates:
- *   1. The dashboard wiring (component → tRPC procedure → response
- *      shape) can land in parallel with the Cypher-template
- *      authoring. Without the stub, the dashboard work blocks on
- *      every kind getting a template.
- *   2. The response shape is already locked by T-F.3's
- *      `ImpactAnalysisResult` contract. The stub honors that
- *      contract exactly; future template-backed executors slot in
- *      without dashboard-side changes.
- *   3. The permission-filter pattern (T-F.3's `visible:false`
- *      preservation) is exercised by the stub even though there's
- *      nothing to filter — the contract path is tested.
- *
- * Future template-backed executor:
- *   - For each `ImpactAnalysisKind`, register a parameterized Cypher
- *     template in `ags_query_templates` (T-F.4 work).
- *   - Replace the stub's "return anchor only" branch with
- *     `GraphRepository.executeTemplate({ templateKey, params })`.
- *   - Apply the permission filter (T-F.3's `visible:false` shape)
- *     to the result.
+ * `classifyImpactAnalysisExecutorMode(kind)` returns `"template"` when
+ * a template is registered for the kind, otherwise `"stub"`.
  *
  * Hard-rule compliance (CLAUDE.md):
- *   - No `neo4j-driver` import. The future template-backed executor
- *     reaches Neo4j via `GraphRepository.executeTemplate(...)`.
+ *   - No `neo4j-driver` import. The template-mode executor reaches
+ *     Neo4j via `GraphRepository.executeTemplate(...)`.
  *   - No `dispatchMcpToolCall` / `openrouter` / `credential-resolver`.
  *   - No `process.env.*_API_KEY` reads.
+ *   - Templates are read-only by hard rule (the `ags_query_templates`
+ *     `read_only` column is `true` for every registered template).
  */
 
 import {
@@ -40,6 +29,11 @@ import {
   type ImpactAnalysisRequest,
   type ImpactAnalysisResult,
 } from "./impact-analysis-contracts.js";
+import {
+  findImpactAnalysisTemplate,
+  hasImpactAnalysisTemplate,
+} from "./impact-analysis-templates.js";
+import type { GraphRepository, RuntimeContext } from "../graph/repository/types.js";
 
 // ============================================================================
 // Stub executor
@@ -92,12 +86,12 @@ export function runImpactAnalysisStub(
 }
 
 /**
- * Per-kind stub mode classifier. Returns one of:
- *   - `stub` — the executor has no template registered for this
- *     kind; result is anchor-only.
+ * Per-kind mode classifier. Returns one of:
+ *   - `stub` — no template registered for this kind; result is
+ *     anchor-only.
  *   - `template` — a parameterized Cypher template is registered
- *     and the executor would run it (future state — always `stub`
- *     today since no templates are seeded).
+ *     in `IMPACT_ANALYSIS_TEMPLATES`. The executor routes through
+ *     `GraphRepository.executeTemplate(...)`.
  *
  * Exposed so the operator dashboard can render a "Stub mode — no
  * template registered" badge per kind in the impact-analysis
@@ -106,10 +100,56 @@ export function runImpactAnalysisStub(
  * haven't authored a Cypher template for this kind yet."
  */
 export function classifyImpactAnalysisExecutorMode(
-  _kind: ImpactAnalysisKind,
+  kind: ImpactAnalysisKind,
 ): "stub" | "template" {
-  // Today: always stub. When templates land in T-F.4, this returns
-  // "template" for kinds with seeded entries in
-  // `ags_query_templates`.
-  return "stub";
+  return hasImpactAnalysisTemplate(kind) ? "template" : "stub";
+}
+
+/**
+ * Template-mode executor. Calls `GraphRepository.executeTemplate(...)`
+ * with the kind's parameterized Cypher template and maps the result
+ * rows back into the `ImpactAnalysisResult` shape.
+ *
+ * Falls back to the anchor-only stub on:
+ *   - No template registered for the kind (defense-in-depth — the
+ *     router should call this only when `classifyImpactAnalysisExecutorMode`
+ *     returns `"template"`).
+ *   - Template-execution throws (the failure surfaces to the operator
+ *     UI as an empty-impact result; the underlying error is logged).
+ */
+export async function runImpactAnalysisViaTemplate(
+  request: ImpactAnalysisRequest,
+  deps: {
+    readonly repository: GraphRepository;
+    readonly runtime: RuntimeContext;
+  },
+): Promise<ImpactAnalysisResult> {
+  // Normalize maxDepth — throws on invalid input per the contract.
+  void normalizeImpactMaxDepth(request.maxDepth);
+
+  const template = findImpactAnalysisTemplate(request.kind);
+  if (!template) return runImpactAnalysisStub(request);
+
+  try {
+    const params = template.buildParameters(request);
+    const result = await deps.repository.executeTemplate({
+      templateKey: template.templateKey,
+      parameters: params,
+      runtime: deps.runtime,
+    });
+    const { nodes, edges } = template.mapRows(result.rows, request);
+    return {
+      kind: request.kind,
+      startingNodeId: request.startingNode.id,
+      nodes,
+      edges,
+      truncated: result.truncated,
+      hiddenNodeCount: 0,
+    };
+  } catch (err) {
+    console.warn(
+      `[impact-analysis] template execution failed for kind=${request.kind}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return runImpactAnalysisStub(request);
+  }
 }
