@@ -5,13 +5,19 @@
  *
  *   1. Cache + re-warm cron status (top — quick "is multi-region
  *      actually wired" answer).
- *   2. Active regions table (read-only).
- *   3. Workspace pins table (read-only).
+ *   2. Active regions table with per-row "Edit pin" prefill action +
+ *      collapsible settings JSON drill-down.
+ *   3. Workspace pins table with per-row "Edit" prefill + "Remove"
+ *      delete buttons.
+ *   4. Pin form — Add OR Edit (the same form services both flows;
+ *      Edit prefills the form via setPinForm). Saves through
+ *      `agentStudio.region.setPin`.
  *
- * Pin add/edit/remove forms are intentionally out of scope for this
- * slice — operator pin onboarding is rare + sensitive and warrants
- * its own UI iteration after the data shape settles. CLI / direct
- * tRPC continue to be the supported pin-write path.
+ * Slice 23 of the no-deferral catalogue (2026-05-19) closed the
+ * earlier "Pin add/edit/remove forms are intentionally out of scope"
+ * doc-block claim — the forms had in fact shipped in this same file
+ * (lines 575-686 set/edit/remove tRPC mutations + form inputs); only
+ * the header description was stale.
  *
  * Pattern follows #813 / #814 (CanvasProjectionEventsDrainStatusPanel)
  * — small focused panel with its own data fetches, mounted by a
