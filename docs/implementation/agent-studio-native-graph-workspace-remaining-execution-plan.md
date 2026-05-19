@@ -154,18 +154,18 @@ The remaining work splits cleanly into seven tracks. They are deliberately order
 - When the Phase 12 GraphRAG router answers wrong on a golden question, emit a correction proposal targeted at the implicated graph fact(s).
 - Closes the "self-correcting" loop in the roadmap §0 product vision.
 
-**Acceptance criteria for T-D as a whole:**
-- [ ] Graph quality scan runs (cron + manual)
-- [ ] Duplicate entities detected
-- [ ] Stale graph facts detected
-- [ ] Projection drift detected (already done — PR-AT-3 — extended to propose corrections)
-- [ ] Missing required properties detected
-- [ ] Semantic enrichment proposals created
-- [ ] Both agents create proposals only (no direct graph mutation — source-scan tested)
-- [ ] Human/governance approval required before SoT mutation
-- [ ] Approved correction reprojects to Neo4j CE
-- [ ] Approved + rejected paths both auditable
-- [ ] Golden-question failure creates correction proposal
+**Acceptance criteria for T-D as a whole** (all closed; see `[[project-td4-promotion-chain-complete]]` + Phase 23 13/13 in `[[project-native-graph-workspace-sprint-complete]]`):
+- [x] Graph quality scan runs (cron + manual)
+- [x] Duplicate entities detected
+- [x] Stale graph facts detected
+- [x] Projection drift detected (already done — PR-AT-3 — extended to propose corrections)
+- [x] Missing required properties detected
+- [x] Semantic enrichment proposals created (T-D.3 — see `services/graph-quality/semantic-enrichment-runner.ts` + boundary test `tests/agent-studio/td-3-delta-semantic-enrichment-runner-boundary.test.ts`)
+- [x] Both agents create proposals only (no direct graph mutation — boundary tests under `tests/agent-studio/td-3-delta-*` + `services/graph-quality/finding-to-proposal.ts`)
+- [x] Human/governance approval required before SoT mutation (T-D.4 — `services/graph-quality/repository-backed-applier.ts` gates on `graph_correction_proposal_approved`)
+- [x] Approved correction reprojects to Neo4j CE (T-D.4 — `services/graph-quality/mutation-worker.ts`)
+- [x] Approved + rejected paths both auditable (T-D.4 — `ags_graph_correction_audit_event`)
+- [x] Golden-question failure creates correction proposal (T-D.5 — `services/graph-skill/golden-questions/live-evaluator.ts`)
 
 **Dependencies:**
 - Phase 11.5 proposal/approval surface (done)
@@ -184,13 +184,13 @@ The remaining work splits cleanly into seven tracks. They are deliberately order
 
 **Goal:** Determine whether Code Intelligence Graph (T-G prerequisite) is achievable.
 
-**Acceptance criteria:**
-- [ ] `docs/implementation/agent-studio-code-graph-parser-spike-2026.md` — spike report
-- [ ] Sample repo ingestion attempt with tree-sitter (TypeScript + Python at minimum)
-- [ ] Parser strategy documented: single tree-sitter vs per-language AST tools vs LLM-driven
-- [ ] Code node/edge model validated: `Repository` / `File` / `Class` / `Function` / `ApiEndpoint` / `IMPORTS` / `CALLS` / `DECLARES` / `IMPLEMENTS` / `DEPENDS_ON`
-- [ ] Performance measurement: ingest this repo, measure parse time + projection time + Neo4j CE query latency on 5 representative impact-analysis queries
-- [ ] **Decision:** proceed with T-G Code Intelligence Graph, defer, or revise scope
+**Acceptance criteria** (all closed; see PRs #1363–#1367 + `[[project-v1-plus-code-graph-spike-2026-05-17]]`):
+- [x] `docs/implementation/agent-studio-code-graph-parser-spike-2026.md` — spike report
+- [x] Sample repo ingestion attempt with tree-sitter (TypeScript + Python at minimum) — `services/code-graph/spike/run-sample-ingest.ts`
+- [x] Parser strategy documented: single tree-sitter vs per-language AST tools vs LLM-driven
+- [x] Code node/edge model validated: `Repository` / `File` / `Class` / `Function` / `ApiEndpoint` / `IMPORTS` / `CALLS` / `DECLARES` / `IMPLEMENTS` / `DEPENDS_ON` — see `services/code-graph/contracts/code-intelligence-contracts.ts`
+- [x] Performance measurement: ingest this repo, measure parse time + projection time + Neo4j CE query latency on 5 representative impact-analysis queries — `services/code-graph/spike/project-and-measure.ts`
+- [x] **Decision:** proceed with T-G Code Intelligence Graph (proceeded; T-G.2 shipped pre-audit per `[[project-native-graph-workspace-finish-complete]]`)
 
 **First PR (T-E.1):** Doc + tree-sitter dependency add (under spike, not production). Source-scan test ensuring tree-sitter is not imported outside `services/code-graph/spike/`.
 
@@ -208,7 +208,7 @@ The remaining work splits cleanly into seven tracks. They are deliberately order
 
 #### T-F.1 — Lens Registry primitive (3 PRs)
 - `services/graph-lens/registry.ts` — registers named lenses with: id, label, layout, default-filter, governance-scope.
-- 8 lens kinds (closed taxonomy): `RAG` / `RAC` / `CAG` / `GraphSkill` / `MCP` / `Governance` / `Runtime` / `InstitutionalMemory`.
+- 10 lens kinds (closed taxonomy, `GRAPH_LENS_KINDS` in `services/graph-lens/contracts.ts`): `rag` / `rac` / `cag` / `graph_skill` / `mcp` / `governance` / `runtime` / `institutional_memory` / `code_intelligence` / `security_devsecops`. (Plan originally specified 8; final shipped surface added `code_intelligence` + `security_devsecops` to align with T-G.2 / T-G.3.)
 - Source-scan test: no lens may import `neo4j-driver` directly; all queries route through `GraphRepository`.
 
 #### T-F.2 — Bases MVP (4–5 PRs)
@@ -233,14 +233,14 @@ The remaining work splits cleanly into seven tracks. They are deliberately order
 - Reads from `agsRuntimeRuns` + `graphAgentDecisionTrace`.
 - Per-run flame-graph view of decision steps (reuses the slowest-step gauge from #982 + step-kind distribution from #983).
 
-**Acceptance criteria for T-F as a whole:**
-- [ ] Lens registry exists with 8 closed-taxonomy kinds
-- [ ] Bases MVP works (create / share / version)
-- [ ] Impact Analysis works for all 7 impact types using Neo4j CE
-- [ ] Quality Lens triages T-D findings
-- [ ] Runtime Lens / Decision-Trace Lens uses the existing trace tables
-- [ ] All lens queries route through GraphRepository (source-scan)
-- [ ] Permission post-filtering applied everywhere
+**Acceptance criteria for T-F as a whole** (lens stack closed; see `[[project-native-graph-workspace-finish-complete]]` truth-audit row T-F.1–T-F.5):
+- [x] Lens registry exists with closed-taxonomy kinds (10 kinds; see §T-F.1 note above)
+- [x] Bases MVP works (create / share / version) — Phase 24 MVP shipped via #1508 + #1509
+- [x] Impact Analysis works for all 7 impact types using Neo4j CE — `services/graph-lens/impact-analysis-{contracts,executor,router}.ts`
+- [x] Quality Lens triages T-D findings — `client/src/modules/agent-studio/{components/GraphQualityFindingsPanel.tsx,pages/GraphQualityFindingsPage.tsx}`
+- [x] Runtime Lens / Decision-Trace Lens uses the existing trace tables — `services/graph-lens/install-runtime-lens-runner.ts`
+- [x] All lens queries route through GraphRepository (source-scan) — `tests/agent-studio/graph-repository-boundary.test.ts`
+- [ ] Permission post-filtering applied everywhere (per-lens audit pending — leave open until completed)
 
 **Dependencies:**
 - T-A doc-drift (so the new ledger appends honestly)
@@ -281,14 +281,14 @@ The remaining work splits cleanly into seven tracks. They are deliberately order
 - Output: rank + reason + graph path + source citations + confidence + permission status
 - Reuses the GraphRAG router (done)
 
-**Acceptance criteria for T-G as a whole:**
-- [ ] Institutional Memory Lens works
-- [ ] Code Intelligence Graph ingestion (or recorded decision to defer)
-- [ ] Security Graph Lens works
-- [ ] Recommendation service pattern works
-- [ ] Impact analysis can traverse institutional / code / security graphs
-- [ ] Neo4j CE performance acceptable OR upgrade trigger fires (→ Track T-H)
-- [ ] Permission rules enforced
+**Acceptance criteria for T-G as a whole** (services shipped pre-audit; see truth-audit rows T-G.1–T-G.4 in `[[project-native-graph-workspace-finish-complete]]`):
+- [x] Institutional Memory Lens works — `services/institutional-memory/{contracts,project-node,public-api}.ts`
+- [x] Code Intelligence Graph ingestion (or recorded decision to defer) — `services/code-graph/{contracts,parser,persistence,projection}/` (proceed-decision per T-E spike)
+- [x] Security Graph Lens works — `services/graph-lens/install-security-devsecops-lens-runner.ts`
+- [x] Recommendation service pattern works — `services/recommendation/{contracts,assemble-response,recommendation-router,runtime}/`
+- [x] Impact analysis can traverse institutional / code / security graphs — `services/graph-lens/impact-analysis-executor.ts` (CodeImpact / SecurityImpact / GovernanceImpact templates registered in `ags_query_templates`)
+- [ ] Neo4j CE performance acceptable OR upgrade trigger fires (→ Track T-H) — **Formalized** via `docs/runbooks/agent-studio-native-graph-workspace-neo4j-ce-benchmark-runbook.md` (T-B.1 operator-action item, not autonomous)
+- [x] Permission rules enforced — `evaluateGovernance()` chokepoint + per-lens permission post-filter
 
 **Dependencies:** T-D (Quality Agent), T-E (Code spike), T-F (Lens registry).
 
