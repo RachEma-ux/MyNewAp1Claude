@@ -107,15 +107,17 @@ Out of scope for MVP 0–4 (eternal — boundary preserved even after V1+ shipme
 - `kgra/` Python sidecar at repo root
 - `server/kgra-agent/` internal changes
 - `server/data-analysis/` internal changes
-- Full Canvas / full Bases / plugin framework
+- Plugin framework / marketplace — V2.x scope per `agent-studio-native-graph-workspace-roadmap.md` Phase 26 (T-H, gated on operator approval)
 - Neo4j Enterprise / Aura migration (Phase 27 documents the upgrade path)
 
 **V1+ plan scope — first slices shipped 2026-05-13, full hardening in V2.0** (formerly listed as eternal MVP-0-4 deferrals; reclassified 2026-05-15 because the V1+ plan opened these phases and the strict-audit doc names the reclassification trigger):
 - Real-time collaborative editing / CRDT — V1+ plan Phase CRDT (`docs/architecture/agent-studio-realtime-collab-crdt.md`). Phases α/β/γ/γ-2/γ-3-auth/γ-3-upgrade/γ-3-framing/transport landed (#755/#764/#765/#774/#787-#791); full hardening (y-protocols framing, presence persistence, conflict UX) tracked in `agent-studio-native-graph-workspace-remaining-execution-plan.md` track T-B.
 - Offline sync / local-first mode — V1+ plan Phase OL-1 (`docs/architecture/agent-studio-offline-local-first.md`). Phases α through OL-9 landed (#756/#762/#773/#777–#781/#783/#785); operator rollout (App.tsx call site with real tRPC closures) tracked in remaining-plan T-B.
 - Multi-region graph deployment — V1+ plan Phase MR-1 (`docs/architecture/agent-studio-multi-region.md`). Phases α through MR×19 + caller-migration batches landed (#754/#763/#775/#794/#797/#798/…); production rollout (Aurora-style replication, failover runbook execution) tracked in remaining-plan T-H.2.
+- **Canvas** — Phase 17 data model + service shipped (#752 / #761); UI page (`CanvasPage.tsx`) is open Phase 17 work in the punch list. NOT eternal.
+- **Bases** — Phase 24 MVP + KG projection shipped 2026-05-18 (#1508 / #1509). `ags_bases` / `ags_base_columns` / `ags_base_rows` data model + 9-procedure tRPC + `base.*` ProjectionEvent kinds live. Lens registry + Impact Analysis Lens + Quality Lens + Runtime Lens tracked in the punch list as T-F.1 / T-F.3 / T-F.4 / T-F.5. NOT eternal.
 
-The strategic intent of the original MVP-0-4 Non-Build List was to prevent over-scoping the *initial closure* — not to forbid those features in the V1+ successor plan. The V1+ plan and the remaining execution plan are the authoritative scope documents for these three areas going forward.
+The strategic intent of the original MVP-0-4 Non-Build List was to prevent over-scoping the *initial closure* — not to forbid those features in the V1+ successor plan. The V1+ plan, the remaining execution plan, and `agent-studio-native-graph-workspace-remaining-punch-list-2026-05-19.md` are the authoritative scope documents for these areas going forward.
 
 ADR index: `docs/architecture/agent-studio-native-graph-workspace.md` (top-level), `agent-studio-postgres-neo4j-responsibility-split.md`, `agent-studio-graph-agent-integration-boundaries.md`, `agent-studio-graph-repository-and-backend-strategy.md`, `agent-studio-active-graph-backend-decision.md` (Phase 1.5 closure), `agent-studio-realtime-collab-crdt.md`, `agent-studio-offline-local-first.md`, `agent-studio-multi-region.md`.
 
