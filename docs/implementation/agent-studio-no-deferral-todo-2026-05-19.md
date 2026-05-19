@@ -233,7 +233,7 @@ These are real but architecturally separable; opening them mid-mission would vio
 | 28 background-jobs metadata | #1547 | `f7603c4c` | `ags_background_job_status_metadata` table + boot-reseed (`seedBackgroundJobStatusMetadata`) + lockstep guard test |
 | 29 impact-analysis templates | #1548 | `732f4540` | `knowledge_impact` Cypher template registered + `runImpactAnalysisViaTemplate` + operator-callable seed script |
 | 30 doc-debt sweep continuation | #1549 | `d75dfa83` | Stale "MVP 1 skeleton" / "Phase 7.5 fills" / "3 deferred kinds" / "placeholder stubs" markers rewritten across 4 files |
-| 31 BasesPanel + InboxPanel doc-blocks | #1550 | _pending_ | 4 stale β/γ-deferral doc-blocks rewritten to name live successors (T-F.107/109/111/116/120/121) |
+| 31 BasesPanel + InboxPanel doc-blocks | #1550 | `a368a712` | 4 stale β/γ-deferral doc-blocks rewritten to name live successors (T-F.107/109/111/116/120/121) |
 | 32 continuation closure | this PR | TBD | Closure receipt + updated grep tally |
 
 ## Continuation closure receipt (2026-05-19)
