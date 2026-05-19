@@ -911,6 +911,26 @@ Each instance preserves the same two-affordance pattern (URL→state reader + Co
 
 **Standing-pattern menu after T-A.42:** (a)-(l) all as previously stated; (m) JSX-fragment taxonomy ladder — 4 instances across 4 different dispatch shapes; extraction blocked on convergence-not-count; (n) cross-panel URL deeplinks — 4 instances across 3 axis-shape variants; extraction blocked on identical-axis-shape convergence (lesson 92 N≥3 same-shape requirement); (o) — closed by T-F.133; (p) scout for closed-taxonomy plain-text rendering sites (unchanged); (q) NEW: scout panels whose selection state spans 2+ axes (e.g., GraphQualityFindings has `expandedFindingId` AND `severityFilter` AND `statusFilter`) for multi-key deeplink composition — would extend (n) from single-param to multi-param URLs (`?findingId=42&severity=critical`); defer until single-param replication backlog is exhausted. |
 
+### 6.1.ter Phase 23 closure + Phase 24 opener (2026-05-18 → 2026-05-19)
+
+After the T-D.4 promotion chain landed (PRs #1499–#1504 covered in
+`project_td4_promotion_chain_complete.md`), a 5-PR forward sprint closed
+Phase 23 and opened Phase 24:
+
+| PR | Slug | Merge SHA |
+|---|---|---|
+| #1505 | T-A.45 doc-drift + Phase 23 closure receipt | `fcb0b161` |
+| #1507 | T-D.5 post-apply verification | `c55b7166` |
+| #1508 | T-F.1 Bases MVP | `5c7d5cf3` |
+| #1509 | T-F.2 Bases → KG projection | `d3ddac5a` |
+| #1510 | T-B.2 attachment-quota service-layer defense | `45438a07` |
+
+**Phase 23 (Graph Quality Agent + Semantic Self-Correction Loop) — FULLY IMPLEMENTED.** All 13 acceptance criteria ticked. The Self-Correction Flow has a verification verdict written to `ags_graph_correction_audit_events` after every apply.
+
+**Phase 24 (Canvas / Bases / Lenses / Impact) — OPENED.** Bases MVP (`ags_bases` / `ags_base_columns` / `ags_base_rows`) + KG projection (`base.created` / `.updated` / `.deleted` / `.row_changed` / `.row_removed` event kinds) shipped end-to-end.
+
+**Next material work — punch list at** `docs/implementation/agent-studio-native-graph-workspace-remaining-punch-list-2026-05-19.md`. Roughly 50–65 PRs of autonomous-eligible work remain: T-A.46 doc-drift (this PR) + T-C CLAUDE.md reconciliation + T-B.3 MR-1 caller migration tail + T-B.4 extension lane hooks + Phase 15/16/17 UI + T-F.1 Lens Registry + T-F.3/4/5 Lenses + T-E Code Graph Parser spike + T-G.1/2/3/4 graph kinds. T-B.1 G3 benchmark is operator-action; T-H is gated on operator approval.
+
 ---
 
 ## 7. Connection back to MVP 0–4 closure

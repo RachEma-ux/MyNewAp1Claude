@@ -2004,3 +2004,128 @@ criteria with file-pointer + PR list.
    bridge.
 
 T-A.45 closure receipt — Phase 23 doc-drift reconciled.
+
+## 30. Forward sprint #1505–#1510 — Phase 23 closed + Phase 24 opened (2026-05-18)
+
+5 PRs landed end-to-end after the T-D.4 chain finale:
+
+#### 30.1 — T-A.45 doc-drift (#1505)
+
+All 13 Phase 23 acceptance criteria in
+`agent-studio-native-graph-workspace-roadmap.md` flipped `[ ]` → `[x]`.
+Phase 23 closure block added under acceptance criteria with the full
+T-D.3.δ + T-D.4 PR list. Continuation-state §29 added.
+
+#### 30.2 — T-D.5 post-apply verification (#1507)
+
+The Quality Agent feedback circuit: after `applyApprovedProposal`
+writes `event_kind="applied"` to `ags_graph_correction_audit_events`,
+the new `verifyPostApply` re-runs the originating scanner via
+`runQualityScan` and records a 3-outcome verdict:
+
+- `verification_pass` — re-run scan finds no match for the original
+  `(class, sourceTypeKey, sourceId)` triple
+- `verification_fail` — re-run scan still emits the same finding
+- `verification_skipped` with 3 skip reasons:
+  `no_originating_finding` / `scanner_not_registered` / `asdb_unavailable`
+
+Env-flag-gated auto-hook on `approveAndApplyProposal`
+(`AGS_GRAPH_QUALITY_POST_APPLY_VERIFICATION_ENABLED`, default OFF) +
+always-available operator-triggered `verifyProposalApply`
+adminProcedure. Fire-and-forget pattern: verification runs detached
+from the apply promise chain inside a try/catch so a verification
+throw can never break apply.
+
+20 tests across env-flag reader, 3 skip paths, 2 pass/fail paths,
+fallback proxy without source identity, source-scan + router wiring.
+
+#### 30.3 — T-F.1 Bases MVP (#1508)
+
+Phase 24 opener. Lightweight Obsidian-Bases-style database surface:
+
+- `ags_bases` — top-level entity (workspaceId / vaultId / name /
+  slug / icon / color / sortKey / archivedAt)
+- `ags_base_columns` — schema columns (baseId / key / name /
+  dataType / config / sortKey); unique (baseId, key)
+- `ags_base_rows` — row instances (baseId / slug / noteId / cells
+  JSON / sortKey)
+
+Closed 7-value `AGS_BASE_COLUMN_DATA_TYPES` taxonomy:
+text / number / date / checkbox / select / multiselect / note_link.
+z-enum-gated at the router.
+
+9-procedure tRPC surface at `agentStudio.bases.*`:
+create / list / getSnapshot / update / createColumn / listColumns /
+createRow / updateRow / listRows. `assertCellsMatchSchema` rejects
+unknown column keys with `BaseRowUnknownColumnsError`.
+
+28 tests across taxonomy + table integrity + reconciler registration
++ service hard-rule scan + router source-scan + barrel completeness.
+
+#### 30.4 — T-F.2 Bases → Knowledge Graph projection (#1509)
+
+5 new ProjectionEvent kinds added to the canonical taxonomy:
+
+- `base.created` / `base.updated` — upsert Base node
+- `base.deleted` — delete Base node (Neo4j DETACH cascades rows)
+- `base.row_changed` — upsert BaseRow + OF_BASE edge to Base, plus
+  optional ROW_OF_NOTE edge when noteId is set
+- `base.row_removed` — delete BaseRow
+
+New `services/bases/graph-projection.ts` bridge module (4 enqueue
+helpers); bases-service wires createBase / updateBase / createBaseRow
+/ updateBaseRow / new `deleteBaseRow` to fire-and-forget enqueue.
+Postgres remains canonical; projection failures log a warning but
+never roll back. 35 tests.
+
+#### 30.5 — T-B.2 attachment-quota service-layer defense (#1510)
+
+Pushes `assertWithinQuota` from the router INTO `createAttachment`
+so every caller (router, future ingestion paths, seeds, scripts)
+gets the same defense. Service signature gains optional
+`bytesLimit?: number | null`:
+
+- `undefined` → env-resolved via `resolveDefaultAttachmentBytesLimit()`
+- `null` → explicit bypass (kept for verified-trusted bulk-restore
+  paths that are quota-exempt by policy)
+- `number` → caller-supplied cap
+
+Router drops the duplicate in-router call site + dead import; keeps
+the `AttachmentQuotaExceededError → FORBIDDEN` mapping (the error
+now bubbles up from the service). 18 tests + 22 vault-attachments
+regression-clean.
+
+### Carry-forward lessons (5)
+
+1. **Audit suggestions may need re-interpretation.** The audit's
+   T-B.2 suggested "wire `uploadFile` to assertWithinQuota", but
+   there's no `uploadFile` procedure — the actual gap was that the
+   service-layer `createAttachment` didn't enforce the quota, only
+   the router did. Treating audit findings as hypotheses-to-validate
+   rather than instructions-to-execute is the right shape.
+2. **Service-layer guards beat router-layer guards.** T-B.2's
+   defense moves `assertWithinQuota` into `createAttachment` so
+   future ingestion paths, scripts, seeds — anyone calling the
+   service directly — gets the same defense as the router. Pattern:
+   enforce policy at the service-internal layer; have routers
+   translate the service-thrown error to TRPCError shape.
+3. **Env-gate first, default-on later.** T-D.5's verification hook
+   ships default-OFF behind
+   `AGS_GRAPH_QUALITY_POST_APPLY_VERIFICATION_ENABLED` because
+   verification re-runs an existing scanner — same DB load as any
+   other scan. Ops flips the flag after observing baseline; the
+   operator-triggered procedure is always available regardless.
+4. **Fire-and-forget the verification gate with a 4-part
+   predicate.** T-D.5's auto-hook only fires when ALL of
+   `apply.result.applied + scannerRegistry + repository + env flag`
+   are present. Detached from the apply promise chain (no `await`)
+   so a verification throw can never break apply.
+5. **Cherry-pick-onto-fresh-main recipe confirmed again.** T-F.2
+   was stacked on T-F.1; when #1508 squash-merged, cherry-picking
+   the T-F.2 commit onto fresh main + force-push to the original
+   branch name worked cleanly (same pattern as the Obsidian vault
+   arc lesson).
+
+T-A.46 closure receipt — Phase 23 finale + Phase 24 opener
+reconciled. Next: the ~50–65-PR finish run per the punch list at
+`docs/implementation/agent-studio-native-graph-workspace-remaining-punch-list-2026-05-19.md`.
