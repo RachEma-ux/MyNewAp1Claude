@@ -23,7 +23,7 @@
 
 import { and, asc, eq, isNull } from "drizzle-orm";
 
-import { getAsDb } from "../../db/connection.js";
+import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import {
   agsBases,
   agsBaseColumns,
@@ -101,7 +101,12 @@ function fireBaseRowRemoval(rowId: number): void {
 // ----- Bases ----------------------------------------------------------
 
 export async function createBase(input: CreateBaseInput): Promise<AgsBase> {
-  const db = getAsDb();
+  // T-B.3 — when input scopes the Base to a workspace, route the
+  // INSERT through the workspace's region. Catalog-wide Bases
+  // (workspaceId=null) fall back to bootstrap.
+  const ws = input.workspaceId;
+  const db =
+    ws != null ? (getAsDbForWorkspace(ws) ?? getAsDb()) : getAsDb();
   if (!db) throw new AsdbUnavailableError();
   const rows = await db
     .insert(agsBases)
@@ -138,7 +143,12 @@ export interface ListBasesFilter {
 export async function listBases(
   filter: ListBasesFilter = {},
 ): Promise<readonly AgsBase[]> {
-  const db = getAsDb();
+  // T-B.3 — when the caller scopes the listing by workspaceId, route
+  // through the workspace's region. Catalog-wide listings stay on
+  // the bootstrap handle.
+  const ws = filter.workspaceId;
+  const db =
+    ws != null ? (getAsDbForWorkspace(ws) ?? getAsDb()) : getAsDb();
   if (!db) return [];
   const conds = [] as ReturnType<typeof eq>[];
   if (filter.workspaceId !== undefined) {
