@@ -89,7 +89,7 @@ export function makeStaticFactRetrieveHook(
   const extract = options.extractFactKey ?? defaultExtractFactKey;
 
   return async ({ input }) => {
-    const key = extract(input.arguments);
+    const key = extract(input.payload);
     if (key === null) {
       const out: ContractedRetrieveOutcome = { succeeded: true };
       return out;
