@@ -449,7 +449,7 @@ genuinely shippable as a single PR: the contract surface
 |---|---|---|---|
 | 38 catalogue | #1557 | `ec6955d5` | Opens continuation-3; re-audits 4-of-5 already-shipped sub-arcs |
 | 39 streamEvents producer | #1558 | `1ef64157` | OpenAI SSE tool-call accumulation + Anthropic fallback + 16-test source-scan+behavioral |
-| 40 doc-debt sweep | #1559 | _pending_ | chat-stream tool-call streaming marker rewritten; closure paragraph re-audit |
+| 40 doc-debt sweep | #1559 | `76a10c88` | chat-stream tool-call streaming marker rewritten; closure paragraph re-audit |
 | 41 continuation-3 closure | this PR | TBD | Closure receipt |
 
 ## Continuation-3 closure receipt (2026-05-19)
