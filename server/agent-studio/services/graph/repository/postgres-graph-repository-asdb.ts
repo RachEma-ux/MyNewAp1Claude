@@ -259,10 +259,52 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
       .from(agsGraphNodes)
       .where(sql`${agsGraphNodes.governanceStatus} IN (${govList})`)
       .limit(options.maxResults);
+    const nodes: NodeIdentity[] = rows.map((r) => ({ typeKey: r.typeKey, id: r.nodeKey }));
+
+    if (nodes.length === 0) {
+      return { nodes, edges: [], truncated: false };
+    }
+
+    // Edge sample — return edges where both endpoints are in the
+    // sampled node set. Conservative interpretation (no dangling
+    // edges to outside-sample nodes) keeps the global viz coherent
+    // without a second round-trip to fetch boundary nodes.
+    const sampledKeyList = sql.join(
+      nodes.map((n) => sql`${n.id}`),
+      sql`, `,
+    );
+    const edgeRows = await conn.execute(sql`
+      SELECT
+        e.type_key AS edge_type_key,
+        e.edge_key,
+        sn.type_key AS src_type,
+        sn.node_key AS src_key,
+        tn.type_key AS tgt_type,
+        tn.node_key AS tgt_key
+      FROM ${agsGraphEdges} e
+      JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+      JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+      WHERE sn.node_key IN (${sampledKeyList})
+        AND tn.node_key IN (${sampledKeyList})
+        AND e.governance_status IN (${govList})
+      LIMIT ${options.maxResults};
+    `);
+    const edgeRecords =
+      (edgeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(edgeRows) ? (edgeRows as Array<Record<string, unknown>>) : []);
+    const edges: EdgeIdentity[] = edgeRecords.map((r) => ({
+      typeKey: String(r.edge_type_key),
+      id: String(r.edge_key ?? ""),
+      sourceNode: { typeKey: String(r.src_type), id: String(r.src_key) },
+      targetNode: { typeKey: String(r.tgt_type), id: String(r.tgt_key) },
+    }));
+
     return {
-      nodes: rows.map((r) => ({ typeKey: r.typeKey, id: r.nodeKey })),
-      edges: [],
-      truncated: rows.length >= options.maxResults,
+      nodes,
+      edges,
+      truncated:
+        rows.length >= options.maxResults ||
+        edges.length >= options.maxResults,
     };
   }
 
