@@ -16,10 +16,12 @@
  * the workspace has been writing — the closed list is whatever has
  * actually been emitted, no schema decision needed.
  *
- * α-shell ships read-only — markRead / dismiss mutations land in
- * β/γ slices. Honest banner names the deferred capabilities inline
- * (lesson 68 pattern) so operators know which actions exist on the
- * server but aren't yet wired into the UI.
+ * α-shell shipped read-only; β/γ then wired per-row markRead +
+ * dismiss mutations (T-F.107 / T-F.109) and the ε kind-filter +
+ * bulk-by-kind affordances (T-F.111+). The remaining unwired
+ * capability is the workspace-wide dismiss-all button — kept
+ * intentionally narrow because the by-kind bulk path already
+ * covers the common operator need (see the inline banner below).
  */
 
 import { useMemo, useState } from "react";

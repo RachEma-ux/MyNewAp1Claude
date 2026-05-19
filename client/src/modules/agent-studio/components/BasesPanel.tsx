@@ -281,12 +281,10 @@ export function BasesPanel() {
   // T-F.105 (T-F.2-a.3-narrow): typed-JSON editors for Sort +
   // Columns sections of the β detail view. Mirrors the γ
   // filter-edit pattern; per-stage Save validation
-  // (JSON.parse → shape check → updateSavedView). At N=5
-  // row-mutation slices, the cross-clear lists in each open*
-  // helper grew long enough that a `closeAllRowEdits()` helper
-  // would be a natural extraction (lesson 65) — deferred to a
-  // separate refactor PR to keep this slice's diff focused on
-  // the new editors.
+  // (JSON.parse → shape check → updateSavedView). The
+  // `closeAllRowEdits()` helper (T-F.116 / lesson 65) is the
+  // single seam every opener calls to clear sibling row-edit slices
+  // before activating a new one — see the helper definition above.
   const [sortEditBaseId, setSortEditBaseId] = useState<number | null>(null);
   const [sortEditDraft, setSortEditDraft] = useState<string>("");
   const [sortEditError, setSortEditError] = useState<string | null>(null);
@@ -1417,8 +1415,10 @@ function BaseRowDetail({
                 the draft JSON. Operator sees structured view of what's
                 enforced without parsing JSON mentally. Read-only display
                 + Remove only — full add/edit per-condition form is
-                deferred to β/γ follow-ups (kind picker + adaptive value
-                inputs by field type). */}
+                shipped in T-F.120 (kind picker + adaptive value
+                inputs by field type) + T-F.121 (edit-existing-
+                condition mode with shared form state). The
+                inline-add form follows this read-only summary. */}
             <FilterConditionsSummary
               baseId={base.id}
               draft={filterEdit.draft}
@@ -1666,9 +1666,10 @@ function BaseRowDetail({
  *
  * Unparseable / non-V1 drafts fall back to a "structured view
  * unavailable — edit the JSON directly" hint so the operator
- * always has an editing path. The textarea remains the primary
- * (and currently only) ADD surface; add/edit-per-condition forms
- * are deferred to β/γ follow-ups.
+ * always has an editing path. The β/γ follow-ups (add/edit-per-
+ * condition form with kind picker + adaptive value editors) shipped
+ * in T-F.120 / T-F.121 — see the `addField` / `addOp` / `addValue`
+ * + `editingIdx` slices below.
  */
 function FilterConditionsSummary({
   baseId,
