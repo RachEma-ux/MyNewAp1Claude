@@ -9,10 +9,14 @@
  * unreferenced by the factory.
  *
  * This source-scan locks the wiring at the file level so an accidental
- * revert (someone re-imports the skeleton class + flips `new …()`)
- * is caught even when DB-backed tests are skipped on the device. Pairs
- * with the runtime-side assertion in `item-45-active-backend-selection.test.ts`
- * which pins `repo.constructor.name === "AsdbPostgresGraphRepository"`.
+ * revert is caught even when DB-backed tests are skipped on the device.
+ * Pairs with the runtime-side assertion in
+ * `item-45-active-backend-selection.test.ts` which pins
+ * `repo.constructor.name === "AsdbPostgresGraphRepository"`.
+ *
+ * The earlier `PostgresGraphRepository` skeleton was deleted on
+ * 2026-05-19 (no-deferral slice 14). The "does NOT instantiate" check
+ * below now defends against accidental re-introduction.
  *
  * Source-scan pattern: read the file, regex-match the invariants, no
  * boot, no DB. Same shape as
@@ -48,10 +52,13 @@ describe("Wired AsdbPostgresGraphRepository (source-scan)", () => {
     expect(src).toMatch(/new\s+AsdbPostgresGraphRepository\s*\(\s*\)/);
   });
 
-  it("does NOT instantiate the skeleton PostgresGraphRepository", () => {
-    // The skeleton class is still exported for back-compat consumers
-    // (none today). The factory should never construct it.
+  it("does NOT instantiate the deleted PostgresGraphRepository skeleton", () => {
+    // The skeleton was deleted 2026-05-19 (no-deferral slice 14).
+    // Assert it can never come back: neither construction nor export.
     expect(src).not.toMatch(/new\s+PostgresGraphRepository\s*\(\s*\)/);
+    expect(src).not.toMatch(
+      /export\s*\{\s*PostgresGraphRepository\s*\}\s*from/,
+    );
   });
 
   it("postgres remains the default backend (no auto-promotion to neo4j-ce)", () => {

@@ -10,10 +10,9 @@
  * (`agent-studio-active-graph-backend-decision.md`). Production deployments
  * promote `Neo4jCommunityGraphRepository` per Phase 1.5.
  *
- * The 176-LoC skeleton at `./postgres-graph-repository.ts` is kept
- * as the re-export named `PostgresGraphRepository` for back-compat —
- * not constructed by the factory, not used by any caller. Deletable in
- * a follow-up once nothing imports the name directly.
+ * The earlier 176-LoC `PostgresGraphRepository` skeleton was deleted
+ * 2026-05-19 (no-deferral slice 14). This class is the only postgres
+ * backend implementation.
  */
 
 import { and, eq, sql } from "drizzle-orm";
