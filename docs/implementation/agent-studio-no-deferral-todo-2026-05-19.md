@@ -229,9 +229,72 @@ These are real but architecturally separable; opening them mid-mission would vio
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 27 vault search | TBD | TBD | tsvector-backed `AsdbVaultSearchService` + router wiring |
-| 28 background-jobs metadata | TBD | TBD | `ags_background_job_status_metadata` + boot-reseed |
-| 29 impact-analysis templates | TBD | TBD | `knowledge_impact` template registered |
-| 30 doc-debt sweep continuation | TBD | TBD | 6-file marker sweep |
-| 31 BasesPanel kind picker | TBD | TBD | β kind picker + adaptive editor |
-| 32 continuation closure | TBD | TBD | Closure receipt |
+| 27 vault search | #1546 | `c1ba1be3` | tsvector-backed `AsdbVaultSearchService` + router wiring + manual migration for GIN tsvector index |
+| 28 background-jobs metadata | #1547 | `f7603c4c` | `ags_background_job_status_metadata` table + boot-reseed (`seedBackgroundJobStatusMetadata`) + lockstep guard test |
+| 29 impact-analysis templates | #1548 | `732f4540` | `knowledge_impact` Cypher template registered + `runImpactAnalysisViaTemplate` + operator-callable seed script |
+| 30 doc-debt sweep continuation | #1549 | `d75dfa83` | Stale "MVP 1 skeleton" / "Phase 7.5 fills" / "3 deferred kinds" / "placeholder stubs" markers rewritten across 4 files |
+| 31 BasesPanel + InboxPanel doc-blocks | #1550 | _pending_ | 4 stale β/γ-deferral doc-blocks rewritten to name live successors (T-F.107/109/111/116/120/121) |
+| 32 continuation closure | this PR | TBD | Closure receipt + updated grep tally |
+
+## Continuation closure receipt (2026-05-19)
+
+The continuation mission shipped 5 implementation slices + 2 doc-block
+sweeps + this closure receipt across PRs #1546–#1551, on top of the
+catalogue extension at PR #1545. Post-continuation, the grep over
+`server/agent-studio/` + `client/src/modules/agent-studio/` for
+`TODO|FIXME|deferred|skeleton|stub|out of scope|operator-action`
+returns:
+
+- **Test-seam / DI stub references** (`Test seam — supply a stub …`,
+  `Tests inject a stub`, etc.) — ~95 hits, all intentional
+  dependency-injection signals.
+- **Genuine MVP-boundary documentation** — defines the architecture,
+  not a deferral (the original 13 markers + a few new ones added by
+  the continuation slices that name their own narrow boundaries
+  honestly, e.g. impact-analysis templates ship for `knowledge_impact`
+  only; the other 6 kinds remain anchor-only stub until their
+  templates are authored).
+- **Spike intent** — `code-graph/spike/README.md` and `agentic-loop.ts`
+  PR #1 contract-only language are by-design markers, not deferrals.
+- **Tabled architectural sub-arcs** — tool-call streaming on Model
+  Access, model-registry-driven context budget, AI Types catalog
+  availability (Phase 12.b), drain legacy fixtures (Phase 27.5b), RAC
+  orchestration error registry (M7-c8), per-source RAC planner
+  derivation, workspace-default-bindings LR-02/03/04/08. Each named in
+  the "Tabled for next arc" section above; each will get a follow-on
+  catalogue when next worked.
+
+External-infrastructure residuals (Aura subscription, Neo4j CE
+benchmark, multi-region account) remain operator-callable via the
+one-command scripts shipped in slices 24 + 25 of the original mission
++ the seed script in slice 29 of this mission.
+
+### Carry-forward lessons (continuation)
+
+1. **Source-of-truth tables decouple operator UX from code releases.**
+   Slice 28's `ags_background_job_status_metadata` table lets an
+   operator retune per-status behavior (severity, retryable, label)
+   without a code change. The frozen `TERMINAL_BACKGROUND_JOB_STATUSES`
+   set stays as a baseline for synchronous importers + a lockstep
+   guard test prevents the two from drifting.
+2. **Template registries enable per-kind incremental coverage.**
+   Slice 29's `IMPACT_ANALYSIS_TEMPLATES` registry uses the same shape
+   as graph-lens runners — kinds without an entry fall through to the
+   stub, kinds with one route through `executeTemplate`. Future slices
+   can add the remaining 6 templates without touching the executor.
+3. **Mode classifiers are operator-visible signals worth keeping.**
+   `classifyImpactAnalysisExecutorMode` returns `"stub" | "template"`
+   per kind so the operator UI can render a "Stub mode — no template
+   registered" badge per kind. Without this, an anchor-only result
+   looks like "no impact"; the badge makes the cause visible.
+4. **Doc-debt sweeps need successor anchors in source-scan tests.**
+   Slice 30's test pairs each rewritten doc-block with the *successor*
+   file/symbol so a regex-removal regression trips on the missing
+   successor anchor, not on the absence of the deferral phrase alone.
+   Otherwise a future refactor that re-introduces stub language would
+   slip past CI.
+5. **"Deferred to β/γ" doc-blocks rot fast.** Slice 31 found 4 sites
+   where the doc-block was 1-2 releases stale; the implementation had
+   shipped within the same arc but the doc-block was forgotten. Worth
+   sweeping at the close of every arc, not just at the close of a
+   mission.
