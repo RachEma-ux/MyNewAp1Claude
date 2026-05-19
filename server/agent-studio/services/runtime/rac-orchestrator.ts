@@ -82,9 +82,16 @@ import { OrchestrationError } from "./orchestration-error";
  * helper, it MUST type the input as a discriminated union with the
  * namespace as the discriminator (e.g. `OrchestrationCode | DispatchCode`).
  *
- * Mirrors cycle-7 H3-c7 (sandbox vs. dispatch error code namespaces)
- * and M7-c8 (registry pattern for orchestration errors, deferred to
- * a follow-up).
+ * Mirrors cycle-7 H3-c7 (sandbox vs. dispatch error code namespaces).
+ * The M7-c8 registry pattern (typed `OrchestrationErrorCode` union +
+ * abstract `OrchestrationError` base) shipped in
+ * `services/runtime/orchestration-error.ts`. Both
+ * `RetrievalRequiredError` (this file) and `CagRequiredError`
+ * (`services/runtime/system-prompt-composer.ts`) extend that base;
+ * chat-stream + chat.ts route them through a single
+ * `instanceof OrchestrationError` check with an exhaustive
+ * `switch (err.code)` so adding a new code fails TypeScript compile
+ * at both flows until they add a matching branch.
  *
  * Lockstep: pinned by tests/agent-studio/l1-l4-c8-doc-bundle.test.ts.
  */
