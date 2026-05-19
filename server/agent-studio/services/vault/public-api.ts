@@ -168,10 +168,12 @@ export {
   listVisibleSavedViewsForUser,
   listSavedViewVersions,
   getSavedViewVersionById,
+  restoreSavedViewVersion,
   updateSavedView,
   deleteSavedView,
   AsdbUnavailableError as VaultSavedViewsAsdbUnavailableError,
   SavedViewNotFoundError,
+  SavedViewVersionNotFoundError,
 } from "./saved-views.js";
 export type {
   CreateSavedViewInput,

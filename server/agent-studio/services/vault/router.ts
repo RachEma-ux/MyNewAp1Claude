@@ -62,10 +62,12 @@ import {
   listVisibleSavedViewsForUser,
   listSavedViewVersions,
   getSavedViewVersionById,
+  restoreSavedViewVersion,
   updateSavedView,
   deleteSavedView,
   deleteSavedViews,
   SavedViewNotFoundError,
+  SavedViewVersionNotFoundError,
 } from "./saved-views.js";
 import {
   getViewKindBlueprint,
@@ -1133,6 +1135,40 @@ export const vaultRouter = router({
       try {
         return await updateSavedView(input);
       } catch (e) {
+        if (e instanceof SavedViewNotFoundError) {
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
+        }
+        throwTrpcAndCapture(new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }),
+
+  // V1+ Phase 16-γ — restore from a version snapshot (no-deferral
+  // slice 50, closes remaining-punch-list rank-7 drill). Delegates to
+  // `restoreSavedViewVersion` which itself calls `updateSavedView`,
+  // preserving the snapshot-before-update audit-trail invariant —
+  // the restore creates a NEW version row for the pre-restore state,
+  // so operators can roll back a restore by restoring that row.
+  // SavedViewVersionNotFoundError → NOT_FOUND (stale dashboard link).
+  // SavedViewNotFoundError → NOT_FOUND (parent row deleted since the
+  // version was captured — version rows outlive their parent).
+  restoreSavedViewVersion: protectedProcedure
+    .input(z.object({ versionId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const capturedByUserId =
+          typeof (ctx as { user?: { id?: number } })?.user?.id === "number"
+            ? (ctx as { user: { id: number } }).user.id
+            : undefined;
+        return await restoreSavedViewVersion(input.versionId, {
+          ...(capturedByUserId !== undefined ? { capturedByUserId } : {}),
+        });
+      } catch (e) {
+        if (e instanceof SavedViewVersionNotFoundError) {
+          throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
+        }
         if (e instanceof SavedViewNotFoundError) {
           throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: e.message }));
         }
