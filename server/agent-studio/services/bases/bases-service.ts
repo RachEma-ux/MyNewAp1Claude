@@ -98,6 +98,45 @@ function fireBaseRowRemoval(rowId: number): void {
   });
 }
 
+// ----- Workspace resolution helpers (T-B.3 caller-migration tail) ----
+//
+// No-deferral continuation-7 slice 54. The remaining `getAsDb()` call
+// sites in this file were Path-A "bootstrap lookup, then route" pattern
+// candidates: the function receives a `baseId` (or `rowId`), the base
+// row's `workspaceId` column is non-null for workspace-scoped bases,
+// and the route-on-write contract is the same as `createBase`. Both
+// helpers return `null` when the row is missing OR when the base is
+// catalog-wide (workspaceId IS NULL) — callers then fall back to the
+// bootstrap handle so the FK constraint surfaces the missing-row error
+// naturally rather than tangling the routing path with NotFound logic.
+
+type AsDbHandle = NonNullable<ReturnType<typeof getAsDb>>;
+
+async function resolveWorkspaceIdForBase(
+  lookupDb: AsDbHandle,
+  baseId: number,
+): Promise<number | null> {
+  const rows = await lookupDb
+    .select({ workspaceId: agsBases.workspaceId })
+    .from(agsBases)
+    .where(eq(agsBases.id, baseId))
+    .limit(1);
+  return rows[0]?.workspaceId ?? null;
+}
+
+async function resolveWorkspaceIdForBaseRow(
+  lookupDb: AsDbHandle,
+  rowId: number,
+): Promise<number | null> {
+  const rows = await lookupDb
+    .select({ workspaceId: agsBases.workspaceId })
+    .from(agsBaseRows)
+    .innerJoin(agsBases, eq(agsBaseRows.baseId, agsBases.id))
+    .where(eq(agsBaseRows.id, rowId))
+    .limit(1);
+  return rows[0]?.workspaceId ?? null;
+}
+
 // ----- Bases ----------------------------------------------------------
 
 export async function createBase(input: CreateBaseInput): Promise<AgsBase> {
@@ -179,8 +218,13 @@ export async function listBases(
 export async function getBaseSnapshot(
   baseId: number,
 ): Promise<BaseSnapshot> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const baseRows = await db
     .select()
     .from(agsBases)
@@ -208,8 +252,13 @@ export async function updateBase(
   baseId: number,
   patch: UpdateBaseInput,
 ): Promise<AgsBase> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.name !== undefined) updates.name = patch.name;
   if (patch.description !== undefined) updates.description = patch.description;
@@ -233,11 +282,16 @@ export async function updateBase(
 export async function createBaseColumn(
   input: CreateBaseColumnInput,
 ): Promise<AgsBaseColumn> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
   if (!isAgsBaseColumnDataType(input.dataType)) {
     throw new BaseColumnDataTypeError(String(input.dataType));
   }
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, input.baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   // Validate base exists — error is more user-friendly than the
   // foreign-key constraint error.
   const baseRows = await db
@@ -266,8 +320,13 @@ export async function createBaseColumn(
 export async function listBaseColumns(
   baseId: number,
 ): Promise<readonly AgsBaseColumn[]> {
-  const db = getAsDb();
-  if (!db) return [];
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   return await db
     .select()
     .from(agsBaseColumns)
@@ -309,8 +368,13 @@ async function assertCellsMatchSchema(
 export async function createBaseRow(
   input: CreateBaseRowInput,
 ): Promise<AgsBaseRow> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, input.baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const baseRows = await db
     .select({ id: agsBases.id })
     .from(agsBases)
@@ -340,8 +404,13 @@ export async function updateBaseRow(
   rowId: number,
   patch: UpdateBaseRowInput,
 ): Promise<AgsBaseRow> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBaseRow(lookupDb, rowId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const existing = await db
     .select({ id: agsBaseRows.id, baseId: agsBaseRows.baseId })
     .from(agsBaseRows)
@@ -375,8 +444,13 @@ export async function updateBaseRow(
  * so Neo4j prunes the BaseRow node + OF_BASE / ROW_OF_NOTE edges.
  */
 export async function deleteBaseRow(rowId: number): Promise<void> {
-  const db = getAsDb();
-  if (!db) throw new AsdbUnavailableError();
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBaseRow(lookupDb, rowId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const existing = await db
     .select({ id: agsBaseRows.id })
     .from(agsBaseRows)
@@ -390,8 +464,13 @@ export async function deleteBaseRow(rowId: number): Promise<void> {
 export async function listBaseRows(
   baseId: number,
 ): Promise<readonly AgsBaseRow[]> {
-  const db = getAsDb();
-  if (!db) return [];
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   return await db
     .select()
     .from(agsBaseRows)
