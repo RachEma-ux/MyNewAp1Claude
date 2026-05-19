@@ -223,6 +223,31 @@ export function makeRetentionCron<TSweepInput, TResult>(
       const msg = err instanceof Error ? err.message : String(err);
       state.lastError = msg;
       warn(`[${config.logPrefix}] sweep failed: ${msg}`);
+      // Slice 20 of the no-deferral catalogue (2026-05-19): bridge
+      // every cron failure to the Phase 22 closed-taxonomy emission
+      // surface via `background_job_failed`. Operators querying
+      // failure-state events by kind now see the cron failures
+      // alongside the alert system. Fire-and-forget; observability
+      // writes never propagate back to the cron return path.
+      void (async () => {
+        try {
+          const { recordFailureStateEvent } = await import(
+            "../failure-states/observability-bridge.js"
+          );
+          await recordFailureStateEvent({
+            failureState: "background_job_failed",
+            sourceKind: `cron.${config.logPrefix}`,
+            sourceId: config.logPrefix,
+            errorMessage: msg,
+            metadata: {
+              cron: config.defaultCronExpr,
+              envPrefix: config.envPrefix,
+            },
+          });
+        } catch {
+          /* fail-soft */
+        }
+      })();
       return { fired: false, skippedReason: "swept_error" };
     }
   }
