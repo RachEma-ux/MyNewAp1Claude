@@ -23,9 +23,10 @@
  *   - Cache is cold: guard is a no-op (no information to compare;
  *     other code paths fall back to bootstrap, which is local).
  *
- * Wiring options (out of scope for this PR — separate slices):
- *   - tRPC middleware that extracts `workspaceId` from `ctx` or
- *     `input` and calls this guard before the handler runs.
+ * Wiring options (both shipped as additive surfaces):
+ *   - tRPC middleware factory (`services/region/cross-region-middleware.ts`)
+ *     extracts `workspaceId` from `ctx` or `input` and calls this
+ *     guard before the handler runs.
  *   - Per-procedure manual call: `guardCrossRegionAccess(
  *     input.workspaceId)` at the top of any procedure that touches
  *     workspace-scoped data.

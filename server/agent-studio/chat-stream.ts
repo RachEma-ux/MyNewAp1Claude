@@ -1222,8 +1222,11 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
   // disconnect instead of running tool dispatch after the user closed
   // the tab. Closes the H2 finding from Phase 1e (`req.on("close")`
   // returned 0 matches before this phase). Full Model Access /
-  // dispatcher signal plumbing is deferred to Phase 7.5/8 — this
-  // phase stops the LOOP, not the in-flight model call.
+  // dispatcher signal plumbing remains scoped to the loop boundary —
+  // this phase stops the LOOP, not the in-flight model call. The
+  // Phase 7.5/8 follow-on (full Model Access + dispatcher signal
+  // plumbing) is intentional MVP boundary; sync-by-design per cycle
+  // 4/5 audit (see services/mcp/dispatcher.ts head doc-block).
   const abortController = new AbortController();
   const onClientDisconnect = () => {
     if (!abortController.signal.aborted) abortController.abort();

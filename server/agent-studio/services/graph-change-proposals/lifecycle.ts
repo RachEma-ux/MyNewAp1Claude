@@ -13,8 +13,9 @@
  * Boundary contract:
  *   - Agents cannot directly mutate Neo4j graph facts. All mutations
  *     route through a proposal + decision pair.
- *   - Approved proposals write Postgres source-of-truth, then projection
- *     sync updates Neo4j (deferred to Phase 7.5+).
+ *   - Approved proposals write Postgres source-of-truth, then the
+ *     projection-sync worker (Phase 7.5+, shipped via PRs #1476-#1488)
+ *     drains the enqueued rows and updates Neo4j.
  *   - Rejected proposals remain auditable (audit event row stays).
  *
  * ADR:
