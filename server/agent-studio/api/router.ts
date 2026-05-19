@@ -3033,8 +3033,12 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 25 T-G.5.α: Impact Analysis Lens
   // operator-facing read-only surface — listKnownKinds + summarizeResult
   // (pure aggregator wrapper around T-F.10 summarizeImpactAnalysisResult).
-  // Contracts shipped at T-F.3. The actual traversal executor is
-  // deferred to a future T-G.5.β slice (needs Cypher-template review).
+  // Contracts shipped at T-F.3. T-G.5.β traversal executor shipped via
+  // `services/graph-lens/impact-analysis-templates.ts` (no-deferral
+  // catalogue slice 29) — registered kinds run the Cypher template via
+  // `GraphRepository.executeTemplate`; unregistered kinds fall back to
+  // the anchor-only stub. Mode discriminant: `"stub" | "template"` from
+  // `classifyImpactAnalysisExecutorMode`.
   impactAnalysis: impactAnalysisRouter,
   // Native Graph Workspace Phase 23 T-D.3.α: Semantic Enrichment Agent
   // operator-facing read surface — listKnownProposalKinds (closed

@@ -12,7 +12,7 @@
  *   2. mission
  *   3. agent-policy
  *   4. capability-pack   (CAG, optional)
- *   5. retrieval-evidence (RAC P5, placeholder until P5)
+ *   5. retrieval-evidence (RAC P5 — shipped; retrofit closed at P14 per CLAUDE.md)
  *   6. runtime-policy
  *
  * Modes (D-PRM-6):
@@ -169,7 +169,9 @@ export interface SystemPromptInput {
   };
   /** Pre-rendered by the CAG resolver (P1C). Null when unavailable. */
   capabilityPack: SystemPromptSection | null;
-  /** Pre-rendered by the RAC assembler (P5). Always null until P5 lands. */
+  /** Pre-rendered by the RAC assembler (P5 — shipped; retrofit closed
+   *  at P14 per CLAUDE.md). Null when the caller does not run retrieval
+   *  (e.g. `RacRetrievalMode === "no_retrieval"`). */
   retrievalEvidence: SystemPromptSection | null;
 }
 
@@ -293,7 +295,7 @@ export function composeSystemPrompt(input: SystemPromptInput): ComposedSystemPro
     warnings.push("cag: no capability pack available; proceeding without it");
   }
 
-  // ── 5. retrieval-evidence (RAC P5, placeholder until P5) ────────────
+  // ── 5. retrieval-evidence (RAC P5 — shipped) ────────────────────────
   if (input.retrievalEvidence) {
     sections.push({
       id: "retrieval-evidence",
