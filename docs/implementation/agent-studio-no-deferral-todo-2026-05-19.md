@@ -389,14 +389,21 @@ follow-on work.
    touch a lockstep-pinned doc-block, mirror the lockstep's
    assertions in your own slice's test.
 
-The next continuation arc opens when an operator wants to take on the
-5 remaining sub-arcs:
-- **Tool-call streaming on Model Access** — multi-PR contract
-  extension of `ModelAccess.stream()` with `tool_call_delta` event.
-- **Drain legacy fixtures helper deletion** — operator-callable; ship
-  when no environment still depends on the migration helper.
-- **LR-02 / LR-03 / LR-04 / LR-08 caller migrations** — each is its
-  own multi-file caller migration arc per `PHASE_28_EXECUTION_PLAN.md`.
+**Post-continuation-3 update (slice 40 sweep):** of the 5 sub-arcs
+named here at slice-37 close, only **1 remains** after the
+continuation-3 re-audit:
+- **Drain legacy fixtures helper deletion** — operator-callable; ships
+  when no environment still depends on `scripts/agent-studio/create-provider-bindings-for-legacy-agents.ts`.
+
+The other 4 closed during this mission or before:
+- **Tool-call streaming on Model Access** — shipped in continuation-3
+  slice 39 (`execute.ts:streamEvents`); chat-stream's caller stays on
+  `execute()` per the slice 40 doc-block above (tool-loop dispatch
+  ordering requires the full call set per turn).
+- **LR-02 / LR-03 / LR-04 / LR-08 caller migrations** — already
+  shipped in Phase 29.4-29.6 (verified by continuation-3's re-audit;
+  the references came from `PHASE_28_EXECUTION_PLAN.md`, which is
+  itself stale).
 
 ---
 
