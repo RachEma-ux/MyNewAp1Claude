@@ -794,6 +794,36 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // T-B.4 closure (Phase 18-γ): default static-data lane hooks
+  // installer. Pairs with the observability installer above —
+  // observability hooks log + ledger; static hooks contribute
+  // operator-supplied data.
+  //
+  //   AGS_EXTENSIONS_LANE_HOOKS_STATIC=on → register empty static
+  //     hooks for all 3 contracted lanes. Caller supplies real data
+  //     tables via the public-api factories when production data
+  //     is wired in.
+  //
+  //   Anything else / unset → no-op (default OFF).
+  try {
+    const { maybeInstallDefaultStaticLaneHooks } = await import(
+      "./services/extensions/install-default-static-lane-hooks"
+    );
+    const result = maybeInstallDefaultStaticLaneHooks();
+    if (result.installed) {
+      console.log(
+        `[ags-extensions-lane-static] installed — lanes=${result.installedLanes.join(",")}`,
+      );
+    } else {
+      console.log(
+        `[ags-extensions-lane-static] not installed — env flag unset`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-extensions-lane-static] install skipped — ${message}`);
+  }
+
   // Step 3.32 — V1+ Phase MR-1 Phase-2 (2026-05-15): region routing
   // boot wiring. PR-V1-151. Env-flag-gated opt-in via AGS_REGION_ROUTING=on.
   // Single-region operators leave the flag unset; the bootstrap getAsDb()
