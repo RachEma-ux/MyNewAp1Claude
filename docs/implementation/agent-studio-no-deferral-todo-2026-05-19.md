@@ -840,10 +840,100 @@ implies a restore action that doesn't yet exist.
 | 50 | **`restoreSavedViewVersion` mutation** | Service function + tRPC mutation. Composes `getSavedViewVersionById` + `updateSavedView` so the audit-trail invariant is preserved by reuse (the restore itself creates a NEW version snapshot of the pre-restore row). |
 | 51 | **Continuation-6 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Closes the remaining-punch-list's last autonomously-shippable open item. |
 
+## Continuation-6 closure receipt (2026-05-19)
+
+The sixth continuation arc shipped 1 implementation slice + 1
+catalogue + this closure across PRs #1568–#1570. The mixed sweep
+(spot-check + surface-driven over adjacent docs) surfaced the
+remaining-punch-list rank-7 drill — Phase 16-γ version-history
+**restore** mutation. The 3 preserved conditional deferrals + 1
+operator-gated residual remain unchanged.
+
 ### Continuation-6 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 49 catalogue | this PR | TBD | Opens continuation-6; spot-check + surface-driven re-audit; finds rank-7 Phase 16-γ restore gap |
-| 50 restore mutation | TBD | TBD | `restoreSavedViewVersion` service + tRPC mutation + tests; closes Phase 16 rank-7 drill |
-| 51 continuation-6 closure | TBD | TBD | Closure receipt + remaining-punch-list rank-7 close-out |
+| 49 catalogue | #1568 | `d62768c8` | Opens continuation-6; mixed sweep (spot-check + surface-driven); finds Phase 16-γ restore gap |
+| 50 restore mutation | #1569 | `a6dd9a60` | `restoreSavedViewVersion` service + tRPC mutation; composes existing primitives so audit-trail is preserved by reuse; 15 unit tests |
+| 51 continuation-6 closure | this PR | TBD | Closure receipt + remaining-punch-list rank-7 close-out |
+
+### Continuation-6 carry-forward lessons
+
+1. **Spot-check + adjacent-doc sweep beats wide-surface grep at this
+   stage.** Continuation-5 predicted "0–1 actionable items" for the
+   next arc. Continuation-6 spot-checked the 3 preserved deferrals
+   (all unchanged) then turned to `docs/implementation/agent-studio-
+   native-graph-workspace-remaining-punch-list-2026-05-19.md`'s
+   §"Post-audit closure addendum" — found 1 still-open
+   autonomously-shippable item (rank-7 Phase 16-γ restore). Wide-
+   surface grep across `server/` would have produced the same
+   ~170-line haystack as continuation-5 and missed this gap
+   entirely (it lives in the implementation doc, not in code).
+   Lesson: as the in-code surface saturates, **the audit primitive
+   shifts from "grep the code" to "spot-check the audit-trail
+   docs"**.
+2. **Read surfaces imply write surfaces.** The version-history
+   surface (`listSavedViewVersions` + `getSavedViewVersionById` +
+   tRPC reads) had been wired since Phase 16-γ but never had a
+   matching restore mutation. Operators reaching for "restore this
+   version" hit a wall. The read surface IS an implicit promise
+   of the write surface — when a read endpoint returns historical
+   snapshots, operators reasonably expect a way to act on them.
+   Lesson: when shipping a read-only history endpoint, **either
+   ship the mutate-from-history sibling at the same time or
+   explicitly document why it's intentionally absent**.
+3. **Compose primitives instead of re-implementing invariants.**
+   `restoreSavedViewVersion` is ~10 LoC of composition: load the
+   snapshot, call `updateSavedView` with its fields. The
+   audit-trail invariant (snapshot-before-update) is preserved by
+   reuse — `updateSavedView` already does the snapshot — rather
+   than by re-implementing it in the restore path. A naive
+   "restore = direct UPDATE with the snapshot's values" would have
+   bypassed the audit trail and made the restore irreversible.
+   Lesson: when an existing primitive enforces an invariant you
+   care about, **route through it** rather than parallel-paths.
+4. **Identity attributes don't restore.** `viewKind` is the saved
+   view's `kind` discriminator — operators don't expect a restore
+   to change the view's type (a `note_list` view stays a
+   `note_list` view across restores). The composer omits
+   `viewKind` from the restored fields, and `UpdateSavedViewInput`
+   correctly has no `viewKind` key. Lesson: when designing
+   version-history → restore, **separate identity attributes from
+   content attributes explicitly**, and only restore content.
+5. **Mission convergence is real, but punctuated.** Continuation-5
+   yielded 0 actionable + 2 doc-debt; continuation-6 yielded 1
+   actionable + 0 doc-debt. The trend isn't monotonic — each
+   arc's audit method surfaces different gaps. Mixed sweeps
+   (spot-check + ADR/punch-list scan + adjacent code) will keep
+   surfacing 0–2 items per arc until all read endpoints have
+   complementary write endpoints OR all preserved deferrals
+   have their trigger conditions met. Lesson: **don't declare
+   "mission complete forever" after a converging arc** —
+   declare "mission complete for THIS audit method" and shift
+   methods on the next arc.
+
+After this slice, the no-deferral mission has shipped **51 slices
+across 6 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51 cont-6).
+
+The remaining-punch-list rank-7 drill (Phase 16-γ restore UI) is
+**closed at the service + tRPC layer**. UI panel work (a
+`SavedViewVersionRestoreButton` calling
+`vault.restoreSavedViewVersion`) is a downstream UI slice tracked
+under remaining-plan T-B not the no-deferral mission.
+
+Surface remaining:
+- **Operator-gated residual** (1 item): legacy bindings script
+  deletion — trigger unchanged.
+- **Conditional deferrals** (2 items): `chat.ts:1117` result-
+  introspection (gated on dashboard observability gap),
+  `runtime-lens-asdb-reader.ts:24` workspaceId JOIN (gated on
+  shared-cluster deployment).
+- **MVP-boundary intent** (7 categories): unchanged.
+
+User directive remains honored: every gap actionable from this
+device through this audit method has shipped. Next re-audit
+should try yet another method — e.g., diff `docs/implementation/
+*.md` against actual feature surfaces, or trace operator-facing
+tRPC endpoints back to their UI consumers to find the next
+"endpoint exists, UI doesn't" gap.
