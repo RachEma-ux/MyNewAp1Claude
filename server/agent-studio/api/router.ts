@@ -1997,11 +1997,15 @@ const mcpRouter = router({
     .input(initiateMcpOAuthSchema)
     .mutation(async ({ input }) => {
       const { buildAuthorizationUrl } = await import("../services/mcp/auth");
+      const { encrypt } = await import("../../_core/encryption");
       const result = buildAuthorizationUrl(input.config);
       // Persist config + state on the MCP server row so the exchange
-      // procedure can find them by serverId. Encryption-at-rest TODO:
-      // wire encryptString/decryptString here when we ship secrets to
-      // production deployments.
+      // procedure can find them by serverId. Slice 18 of the no-deferral
+      // catalogue (2026-05-19) closes the "Encryption-at-rest TODO"
+      // here. Fields that carry secret-bearing material — clientSecret
+      // on the config, the OAuth state nonce + code-verifier — are
+      // round-tripped through the platform encrypt() helper before
+      // hitting the DB. The exchange procedure decrypts before use.
       const server = await repo.getMcpServerById(input.serverId);
       if (!server) {
         throwTrpcAndCapture(new TRPCError({
@@ -2009,9 +2013,18 @@ const mcpRouter = router({
           message: `MCP server ${input.serverId} not found`,
         }));
       }
+      const configToPersist = { ...input.config } as Record<string, unknown>;
+      if (typeof configToPersist.clientSecret === "string" && configToPersist.clientSecret.length > 0) {
+        configToPersist.clientSecret = encrypt(configToPersist.clientSecret);
+      }
+      const stateToPersist = { ...(result.state as unknown as Record<string, unknown>) };
+      for (const secretKey of ["codeVerifier", "state", "nonce"]) {
+        const v = stateToPersist[secretKey];
+        if (typeof v === "string" && v.length > 0) stateToPersist[secretKey] = encrypt(v);
+      }
       await repo.updateMcpServerOAuth(input.serverId, {
-        oauthConfig: input.config as Record<string, unknown>,
-        oauthState: result.state as unknown as Record<string, unknown>,
+        oauthConfig: configToPersist,
+        oauthState: stateToPersist,
       });
       return {
         authorizationUrl: result.authorizationUrl,
@@ -2042,9 +2055,25 @@ const mcpRouter = router({
             "OAuth flow not initiated for this server — call oauthInitiate first",
         }));
       }
+      // Slice 18 of the no-deferral catalogue: oauthInitiate now
+      // encrypts the OAuth state's `state` / `codeVerifier` / `nonce`
+      // and the config's `clientSecret`. Decrypt them here for the
+      // exchange. `isEncrypted` makes the migration transparent for
+      // rows written before the slice landed.
+      const { decrypt: decryptStored, isEncrypted } = await import("../../_core/encryption");
+      const maybeDecrypt = (v: unknown): unknown =>
+        typeof v === "string" && isEncrypted(v) ? decryptStored(v) : v;
+      const decryptedConfig: Record<string, unknown> = { ...config };
+      if (typeof decryptedConfig.clientSecret === "string") {
+        decryptedConfig.clientSecret = maybeDecrypt(decryptedConfig.clientSecret);
+      }
+      const decryptedState: Record<string, unknown> = { ...state };
+      for (const secretKey of ["state", "codeVerifier", "nonce"]) {
+        decryptedState[secretKey] = maybeDecrypt(decryptedState[secretKey]);
+      }
       // Defeat CSRF: the state from the provider must match what we
       // generated at initiate time.
-      if (input.state !== (state as any).state) {
+      if (input.state !== decryptedState.state) {
         throwTrpcAndCapture(new TRPCError({
           code: "BAD_REQUEST",
           message: "OAuth state mismatch — possible CSRF attempt",
@@ -2053,9 +2082,9 @@ const mcpRouter = router({
       let tokens;
       try {
         tokens = await exchangeCodeForTokens({
-          config: config as any,
+          config: decryptedConfig as any,
           code: input.code,
-          codeVerifier: (state as any).codeVerifier,
+          codeVerifier: decryptedState.codeVerifier as string | undefined,
         });
       } catch (e) {
         throwTrpcAndCapture(new TRPCError({
