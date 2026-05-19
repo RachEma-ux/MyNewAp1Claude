@@ -146,7 +146,7 @@ export class AsdbPromotionAdapter implements PromotionAdapter {
     };
   }
 
-  async createDraft(request: PromotionRequest): Promise<{ promotionId: number; targetAssetId: number }> {
+  async createDraft(request: PromotionRequest): Promise<{ promotionId: number }> {
     const inserted = await this.db
       .insert(agsNotePromotions)
       .values({
@@ -165,14 +165,16 @@ export class AsdbPromotionAdapter implements PromotionAdapter {
       metadata: { rationale: request.rationale ?? null, kind: request.promotionKind },
     });
 
-    // Phase 11 MVP: target asset binding deferred to activate; stub returns 0.
-    return { promotionId, targetAssetId: 0 };
+    // Target asset doesn't bind until `activateVersion`; this method
+    // intentionally returns only the promotion id. See lifecycle.ts
+    // `PromotionAdapter` doc for the contract.
+    return { promotionId };
   }
 
   async activateVersion(
     promotionId: number,
     decidedByUserId: number,
-  ): Promise<{ versionId: number }> {
+  ): Promise<{ versionId: number; targetAssetId: number }> {
     // Find the next monotonic version (count of existing versions + 1).
     const existing = await this.db
       .select({ id: agsNotePromotionVersions.id })
@@ -223,7 +225,11 @@ export class AsdbPromotionAdapter implements PromotionAdapter {
       })
       .where(eq(agsNotePromotions.id, promotionId));
 
-    return { versionId };
+    // The activated version row IS the bound target asset for the
+    // projection chain (see sync-worker.ts `promotion.approved` event
+    // handler). Returning it here lets the lifecycle layer feed the
+    // projection event without a second lookup.
+    return { versionId, targetAssetId: versionId };
   }
 
   async rollback(

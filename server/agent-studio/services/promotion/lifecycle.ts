@@ -135,8 +135,22 @@ export interface PromotionGovernanceResult {
 export interface PromotionAdapter {
   validate(request: PromotionRequest): Promise<PromotionValidationOutcome>;
   evaluateGovernance(request: PromotionRequest, validation: PromotionValidationOutcome): Promise<PromotionGovernanceResult>;
-  createDraft(request: PromotionRequest): Promise<{ promotionId: number; targetAssetId: number }>;
-  activateVersion(promotionId: number, decidedByUserId: number): Promise<{ versionId: number }>;
+  /**
+   * Creates the pending promotion row. The TARGET asset doesn't exist
+   * yet — that binding lands at activate time. Slice 16 of the
+   * no-deferral catalogue removed the placeholder `targetAssetId: 0`
+   * that this used to return; callers that need the bound asset id
+   * receive it from `activateVersion`.
+   */
+  createDraft(request: PromotionRequest): Promise<{ promotionId: number }>;
+  /**
+   * `versionId` is the source-of-truth target-asset id — the row in
+   * `ags_note_promotion_versions` that represents the now-active
+   * binding. Slice 16 exposes it through this return shape so the
+   * projection-event chain can populate the `promoted_to` edge
+   * without a separate lookup.
+   */
+  activateVersion(promotionId: number, decidedByUserId: number): Promise<{ versionId: number; targetAssetId: number }>;
   rollback(promotionId: number, decidedByUserId: number): Promise<{ activatedVersionId: number }>;
   emitProjectionEvent(promotionId: number, status: PromotionStatus): Promise<void>;
 }
