@@ -10,20 +10,27 @@ import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
+import GlobalGraphCanvas from "./GlobalGraphCanvas";
 
 const SAMPLE_OPTIONS = [50, 100, 250] as const;
+const VIEW_MODES = ["canvas", "list"] as const;
+type ViewMode = (typeof VIEW_MODES)[number];
 
 export interface GlobalGraphViewProps {
   readonly onSelectNode?: (nodeId: string) => void;
+  readonly defaultViewMode?: ViewMode;
 }
 
 export default function GlobalGraphView({
   onSelectNode,
+  defaultViewMode = "canvas",
 }: GlobalGraphViewProps): React.ReactElement {
   const [sampleSize, setSampleSize] = useState<number>(100);
-  const query = trpc.agentStudio.graphWorkspace.globalGraphSample.useQuery({
-    options: { maxDepth: 1, maxResults: sampleSize },
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  const query = trpc.agentStudio.graphWorkspace.globalGraphSample.useQuery(
+    { options: { maxDepth: 1, maxResults: sampleSize } },
+    { enabled: viewMode === "list" },
+  );
 
   const state = useMemo(() => {
     if (query.isLoading) return "loading" as const;
@@ -44,31 +51,56 @@ export default function GlobalGraphView({
       className="border rounded"
       data-testid="global-graph-view"
       data-sample-size={sampleSize}
+      data-view-mode={viewMode}
     >
-      <header className="flex items-center justify-between border-b px-3 py-1.5 text-xs">
+      <header className="flex items-center justify-between border-b px-3 py-1.5 text-xs gap-2">
         <span className="font-semibold uppercase text-gray-500">
           Global graph sample
         </span>
-        <div className="flex items-center gap-1">
-          <span className="text-gray-500">sample:</span>
-          {SAMPLE_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              data-testid={`global-graph-sample-${s}`}
-              data-active={s === sampleSize ? "true" : "false"}
-              onClick={() => setSampleSize(s)}
-              className={`px-2 py-0.5 rounded border ${
-                s === sampleSize ? "bg-blue-50 border-blue-300" : ""
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">view:</span>
+            {VIEW_MODES.map((m) => (
+              <button
+                key={m}
+                type="button"
+                data-testid={`global-graph-view-mode-${m}`}
+                data-active={m === viewMode ? "true" : "false"}
+                onClick={() => setViewMode(m)}
+                className={`px-2 py-0.5 rounded border ${
+                  m === viewMode ? "bg-blue-50 border-blue-300" : ""
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">sample:</span>
+            {SAMPLE_OPTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                data-testid={`global-graph-sample-${s}`}
+                data-active={s === sampleSize ? "true" : "false"}
+                onClick={() => setSampleSize(s)}
+                className={`px-2 py-0.5 rounded border ${
+                  s === sampleSize ? "bg-blue-50 border-blue-300" : ""
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
       <div className="p-3 min-h-32">
-        {state !== null ? (
+        {viewMode === "canvas" ? (
+          <GlobalGraphCanvas
+            sampleSize={sampleSize}
+            onSelectNode={onSelectNode}
+          />
+        ) : state !== null ? (
           <WorkspaceStateLayer
             state={state}
             rawErrorForDevtools={query.error?.message}
