@@ -79,16 +79,20 @@ describe("Item 45 — GRAPH_BACKEND=neo4j-ce repository selection", () => {
   });
 
   it("unset GRAPH_BACKEND → defaults to postgres (does NOT auto-select neo4j-ce)", async () => {
-    // The default is intentionally postgres per the index header
-    // ("change default to neo4j-ce once Phase 1.5 backend decision
-    // closes positively"). Auto-selecting neo4j-ce on an unset env
-    // var would break dev boxes; this test pins the default.
+    // The default is intentionally postgres — always-available
+    // fallback, no driver install required. The wired class is
+    // `AsdbPostgresGraphRepository` (the real Phase 7 Drizzle-backed
+    // implementation, wired 2026-05-19; replaced the 176-LoC skeleton
+    // that returned empty reads). Auto-selecting neo4j-ce on an
+    // unset env var would break dev boxes; this test pins both the
+    // default backendKey AND the concrete class.
     const mod = await import(
       "../../server/agent-studio/services/graph/repository/index"
     );
     mod._resetGraphRepository();
     const repo = mod.getGraphRepository();
-    expect(repo.constructor.name).toBe("PostgresGraphRepository");
+    expect(repo.backendKey).toBe("postgres");
+    expect(repo.constructor.name).toBe("AsdbPostgresGraphRepository");
   });
 
   it("Neo4jCommunityGraphRepository selection does NOT trigger eager neo4j-driver load", async () => {
