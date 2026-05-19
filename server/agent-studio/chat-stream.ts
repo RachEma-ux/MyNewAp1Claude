@@ -574,9 +574,20 @@ async function runStreamingToolLoop(args: {
     }
 
     // Phase 27.3 — non-streaming Model Access execute per turn.
-    // Tool-call streaming on Model Access is deferred to a future
-    // phase; we honestly degrade by emitting the turn's assistant
-    // content as one SSE `token` event after the call returns.
+    //
+    // The upstream Model Access surface now ships a tool-call-aware
+    // `streamEvents()` generator (no-deferral slice 39, 2026-05-19);
+    // the chat-stream loop continues to call non-streaming `execute()`
+    // because the tool-loop's per-turn dispatch decision needs the
+    // FULL set of `toolCalls` before the next turn is built. Switching
+    // to `streamEvents()` would require either (a) deferring tool
+    // dispatch until the end of the upstream stream (no latency win
+    // since the dispatch still blocks the next turn) or (b) per-tool
+    // dispatch with eager mid-stream commits, which breaks the
+    // ordering guarantees the MCP dispatcher relies on. The current
+    // shape honestly emits the turn's assistant content as a single
+    // SSE `token` event after execute() returns; chat-stream's own
+    // SSE plumbing is the streaming boundary.
     const turnStartMs = Date.now();
     const executeInput: ModelAccessExecuteInput = {
       providerConnectionId,
