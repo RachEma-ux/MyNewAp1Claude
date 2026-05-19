@@ -2,20 +2,17 @@
  * LocalGraphCanvas — Native Graph Workspace visual node-link view.
  *
  * Renders the same `localGraph` tRPC payload as `LocalGraphView`, but
- * as a force-directed-ish layout with react-flow instead of a text
- * list. The text-list view is preserved as a toggle so screen readers
- * + low-pixel-density operator views stay first-class.
+ * as a force-directed layout via d3-force instead of a text list.
+ * The text-list view is preserved as a toggle so screen readers +
+ * low-pixel-density operator views stay first-class.
  *
- * No mock data. Re-uses the same `classifyWorkspaceState` helper as
- * the sibling text view so error/empty states render identically.
- *
- * The seed node is centered; peers fan out in radial rings keyed by
- * a simple depth-vs-incident-edge heuristic computed client-side
- * (the localGraph response does not currently expose per-row depth;
- * we infer it by BFS over the returned edges). For 27-node Movies
- * Demo neighborhoods this lands cheap and stable. Larger graphs
- * benefit from a true force simulation — d3-force can be slotted
- * in later without changing this file's caller contract.
+ * Layout: d3-force simulation runs for a fixed tick budget at mount
+ * (off-DOM — no animation loop, no per-tick re-render). The seed
+ * node is pinned at the origin via `fx`/`fy`; peers settle around
+ * it under link + many-body (charge) + radial-anchor forces. The
+ * BFS-derived depth (seed=0, neighbors=1, …) feeds the radial anchor
+ * so the layout retains the legibility of the original radial rings
+ * while honoring real edge geometry.
  */
 
 import React, { useMemo } from "react";
@@ -28,6 +25,13 @@ import ReactFlow, {
   type Node as RFNode,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import {
+  forceCenter,
+  forceLink,
+  forceManyBody,
+  forceRadial,
+  forceSimulation,
+} from "d3-force";
 import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
@@ -86,49 +90,110 @@ function computeDepths(
 }
 
 /**
- * Radial layout: seed at origin, ring N at radius N * STEP. Within a
- * ring, nodes evenly distributed by angle. Orphans (depth = ∞) land
- * on the outermost ring.
+ * d3-force layout: seed pinned at origin, peers settle under
+ *   - link force (target distance ~ depth-step length)
+ *   - many-body (charge) force for repulsion
+ *   - radial anchor keyed by BFS depth so rings stay visible
+ *   - center force to keep the whole graph framed
+ *
+ * The simulation runs for a fixed tick budget at mount, off the DOM
+ * (no animation loop, no React re-render per tick). React-flow then
+ * renders the settled positions as static node coordinates.
  */
 const RING_RADIUS = 180;
 const NODE_W = 140;
 const NODE_H = 36;
+const SIM_TICKS = 300;
+const LINK_DISTANCE = RING_RADIUS;
+const CHARGE_STRENGTH = -400;
+const RADIAL_STRENGTH = 0.5;
 
-function layoutRadial(
+interface ForceNode {
+  id: string;
+  ring: number;
+  fx?: number;
+  fy?: number;
+  x?: number;
+  y?: number;
+}
+interface ForceLink {
+  source: string;
+  target: string;
+}
+
+function layoutForce(
   seedId: string,
   nodes: ReadonlyArray<NodeRow>,
+  edges: ReadonlyArray<EdgeRow>,
   depths: Map<string, number>,
 ): Map<string, { x: number; y: number }> {
-  const byRing = new Map<number, NodeRow[]>();
   let maxRing = 0;
-  for (const n of nodes) {
-    const d = depths.get(n.id) ?? Number.POSITIVE_INFINITY;
-    const ring = Number.isFinite(d) ? d : -1;
-    if (!byRing.has(ring)) byRing.set(ring, []);
-    byRing.get(ring)!.push(n);
-    if (Number.isFinite(d)) maxRing = Math.max(maxRing, d);
+  for (const d of depths.values()) {
+    if (Number.isFinite(d) && d > maxRing) maxRing = d;
   }
-  // Orphan ring sits one step beyond the deepest reachable ring.
   const orphanRing = maxRing + 1;
 
-  const positions = new Map<string, { x: number; y: number }>();
-  for (const [ring, members] of byRing.entries()) {
-    const effectiveRing = ring === -1 ? orphanRing : ring;
-    if (effectiveRing === 0) {
-      // Seed at origin.
-      positions.set(seedId, { x: 0, y: 0 });
-      continue;
+  const forceNodes: ForceNode[] = nodes.map((n) => {
+    const d = depths.get(n.id) ?? Number.POSITIVE_INFINITY;
+    const ring = Number.isFinite(d) ? (d as number) : orphanRing;
+    const angle = (2 * Math.PI * hashStringToUnit(n.id));
+    const base: ForceNode = {
+      id: n.id,
+      ring,
+      x: Math.cos(angle) * ring * RING_RADIUS,
+      y: Math.sin(angle) * ring * RING_RADIUS,
+    };
+    if (n.id === seedId) {
+      base.fx = 0;
+      base.fy = 0;
     }
-    const radius = effectiveRing * RING_RADIUS;
-    members.forEach((m, idx) => {
-      const angle = (2 * Math.PI * idx) / members.length;
-      positions.set(m.id, {
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-      });
-    });
+    return base;
+  });
+  const forceLinks: ForceLink[] = edges.map((e) => ({
+    source: e.sourceNode.id,
+    target: e.targetNode.id,
+  }));
+
+  const sim = forceSimulation(forceNodes as never)
+    .force(
+      "link",
+      forceLink(forceLinks as never)
+        .id((d: never) => (d as ForceNode).id)
+        .distance(LINK_DISTANCE),
+    )
+    .force("charge", forceManyBody().strength(CHARGE_STRENGTH))
+    .force(
+      "radial",
+      forceRadial<ForceNode>(
+        (d) => d.ring * RING_RADIUS,
+        0,
+        0,
+      ).strength(RADIAL_STRENGTH),
+    )
+    .force("center", forceCenter(0, 0))
+    .stop();
+
+  for (let i = 0; i < SIM_TICKS; i++) sim.tick();
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const n of forceNodes) {
+    positions.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
   }
   return positions;
+}
+
+/**
+ * Deterministic [0, 1) hash so initial seeding for sibling nodes
+ * spreads around the ring rather than collapsing on top of each
+ * other, which would stall the force simulation.
+ */
+function hashStringToUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return (h >>> 0) / 0x100000000;
 }
 
 function nodeStyle(typeKey: string, isSeed: boolean): React.CSSProperties {
@@ -202,7 +267,7 @@ export default function LocalGraphCanvas({
     });
 
     const depths = computeDepths(seedNodeId, dedupedNodes, dedupedEdges);
-    const positions = layoutRadial(seedNodeId, dedupedNodes, depths);
+    const positions = layoutForce(seedNodeId, dedupedNodes, dedupedEdges, depths);
 
     const rfNodes: RFNode[] = dedupedNodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: 0, y: 0 };

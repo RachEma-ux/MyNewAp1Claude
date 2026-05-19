@@ -1,12 +1,12 @@
 /**
  * GlobalGraphCanvas — visual companion to GlobalGraphView.
  *
- * Force-directed-ish render of `globalGraphSample`. Since the postgres
- * backend currently returns `edges: []` for the sample (Cypher-side
- * sampling on Neo4j would include edges; the recursive-CTE fallback
- * does not), the canvas degrades gracefully to a grid of orphan nodes
- * grouped by `typeKey`. The companion text view exposes the same
- * data without the layout overhead.
+ * Force-directed render of `globalGraphSample` via d3-force. The
+ * postgres backend now returns edges between sampled nodes (PR #1526)
+ * and boundary-node edges where the next slice extends the sample,
+ * so the canvas renders a real node-link diagram instead of a grid.
+ * The companion text view exposes the same data without the layout
+ * overhead.
  */
 
 import React, { useMemo } from "react";
@@ -19,6 +19,14 @@ import ReactFlow, {
   type Node as RFNode,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import {
+  forceCenter,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+} from "d3-force";
 import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
@@ -31,8 +39,34 @@ export interface GlobalGraphCanvasProps {
 
 const NODE_W = 150;
 const NODE_H = 36;
-const CELL_W = NODE_W + 30;
-const CELL_H = NODE_H + 24;
+const SIM_TICKS = 300;
+const LINK_DISTANCE = 160;
+const CHARGE_STRENGTH = -300;
+const TYPE_BUCKET_RADIUS = 320;
+
+interface ForceNode {
+  id: string;
+  typeKey: string;
+  x?: number;
+  y?: number;
+}
+interface ForceLink {
+  source: string;
+  target: string;
+}
+
+/**
+ * Deterministic [0, 1) hash so seeded positions spread by typeKey
+ * rather than collapsing on top of each other.
+ */
+function hashStringToUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return (h >>> 0) / 0x100000000;
+}
 
 function nodeStyle(typeKey: string): React.CSSProperties {
   const palette: Record<string, { bg: string; border: string }> = {
@@ -69,37 +103,99 @@ export default function GlobalGraphCanvas({
     const nodes = query.data?.nodes ?? [];
     const edges = query.data?.edges ?? [];
 
-    // Group by typeKey, then column-row layout per group.
-    const byType = new Map<string, Array<{ typeKey: string; id: string }>>();
-    for (const n of nodes) {
-      if (!byType.has(n.typeKey)) byType.set(n.typeKey, []);
-      byType.get(n.typeKey)!.push(n);
-    }
+    // Dedup node + edge keys before feeding the simulation.
+    const seenNodes = new Set<string>();
+    const dedupedNodes = nodes.filter((n) => {
+      const k = `${n.typeKey}:${n.id}`;
+      if (seenNodes.has(k)) return false;
+      seenNodes.add(k);
+      return true;
+    });
+    const seenEdges = new Set<string>();
+    const dedupedEdges = edges.filter((e) => {
+      const k = `${e.sourceNode.id}|${e.typeKey}|${e.targetNode.id}`;
+      if (seenEdges.has(k)) return false;
+      seenEdges.add(k);
+      return true;
+    });
 
-    const rfNodes: RFNode[] = [];
-    let columnX = 0;
-    for (const [, group] of byType.entries()) {
-      const cols = Math.ceil(Math.sqrt(group.length));
-      group.forEach((g, idx) => {
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
-        rfNodes.push({
-          id: g.id,
-          position: { x: columnX + col * CELL_W, y: row * CELL_H },
-          data: { label: `${g.typeKey}\n${g.id}` },
-          style: nodeStyle(g.typeKey),
-          type: "default",
-        });
-      });
-      columnX += cols * CELL_W + 60;
-    }
+    // Stable typeKey bucket index — keeps the typeKey clustering
+    // legible by anchoring each typeKey's centroid around a circle
+    // of radius TYPE_BUCKET_RADIUS while letting the rest of the
+    // simulation move freely.
+    const typeKeys = Array.from(new Set(dedupedNodes.map((n) => n.typeKey)));
+    typeKeys.sort();
+    const typeAngle = new Map<string, number>();
+    typeKeys.forEach((tk, i) => {
+      typeAngle.set(tk, (2 * Math.PI * i) / Math.max(1, typeKeys.length));
+    });
 
-    const rfEdges: RFEdge[] = edges.map((e, idx) => ({
+    // Constrain layout to the set of nodes that actually appear in
+    // the edge set so disconnected sub-components don't drift apart
+    // arbitrarily — d3 already handles this, but seeding helps the
+    // simulation settle within SIM_TICKS.
+    const forceNodes: ForceNode[] = dedupedNodes.map((n) => {
+      const a = typeAngle.get(n.typeKey) ?? 0;
+      const jitter = hashStringToUnit(n.id) * 0.8;
+      return {
+        id: n.id,
+        typeKey: n.typeKey,
+        x: Math.cos(a + jitter) * TYPE_BUCKET_RADIUS,
+        y: Math.sin(a + jitter) * TYPE_BUCKET_RADIUS,
+      };
+    });
+    const forceLinks: ForceLink[] = dedupedEdges.map((e) => ({
+      source: e.sourceNode.id,
+      target: e.targetNode.id,
+    }));
+
+    const sim = forceSimulation(forceNodes as never)
+      .force(
+        "link",
+        forceLink(forceLinks as never)
+          .id((d: never) => (d as ForceNode).id)
+          .distance(LINK_DISTANCE),
+      )
+      .force("charge", forceManyBody().strength(CHARGE_STRENGTH))
+      .force("center", forceCenter(0, 0))
+      .force(
+        "typeX",
+        forceX<ForceNode>(
+          (d) =>
+            Math.cos(typeAngle.get(d.typeKey) ?? 0) * TYPE_BUCKET_RADIUS,
+        ).strength(0.05),
+      )
+      .force(
+        "typeY",
+        forceY<ForceNode>(
+          (d) =>
+            Math.sin(typeAngle.get(d.typeKey) ?? 0) * TYPE_BUCKET_RADIUS,
+        ).strength(0.05),
+      )
+      .stop();
+    for (let i = 0; i < SIM_TICKS; i++) sim.tick();
+
+    const rfNodes: RFNode[] = forceNodes.map((fn) => ({
+      id: fn.id,
+      position: { x: fn.x ?? 0, y: fn.y ?? 0 },
+      data: { label: `${fn.typeKey}\n${fn.id}` },
+      style: nodeStyle(fn.typeKey),
+      type: "default",
+    }));
+
+    const rfEdges: RFEdge[] = dedupedEdges.map((e, idx) => ({
       id: `${e.sourceNode.id}__${e.typeKey}__${e.targetNode.id}__${idx}`,
       source: e.sourceNode.id,
       target: e.targetNode.id,
       label: e.typeKey,
       style: { stroke: "#6b7280", strokeWidth: 1 },
+      labelStyle: {
+        fontSize: 9,
+        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+        fill: "#374151",
+      },
+      labelBgStyle: { fill: "#fff", fillOpacity: 0.85 },
+      labelBgPadding: [2, 4] as [number, number],
     }));
 
     return { rfNodes, rfEdges };
