@@ -1,10 +1,12 @@
 /**
- * Vault — search service skeleton.
+ * Vault — search service contract.
  *
- * Phase 6 MVP. Backed by Postgres tsvector for full-text;
- * tag / property filters via Drizzle joins.
- *
- * MVP skeleton uses VaultRepositoryStub for in-memory dev mode.
+ * The production implementation (`AsdbVaultSearchService` in
+ * `search-asdb.ts`) is backed by a parameterized Postgres tsvector
+ * query against `ags_vault_note_versions.content_md` (current version
+ * per note) with a permission join on `ags_vault_members`. The stub
+ * here is used by `process.env.AGS_VAULT_REPO === "stub"` callers
+ * (unit tests + dev modes that don't boot ASDB).
  */
 
 import type { SearchInput } from "./contracts.js";
@@ -23,21 +25,9 @@ export interface VaultSearchService {
 }
 
 /**
- * Phase 6 production implementation uses tsvector:
- *
- *   SELECT n.id, n.vault_id, n.title, n.slug,
- *          ts_headline('english', v.content_md, query) AS snippet,
- *          ts_rank(to_tsvector('english', v.content_md), query) AS score
- *   FROM ags_vault_notes n
- *   JOIN ags_vault_note_versions v ON n.current_version_id = v.id
- *   , websearch_to_tsquery('english', $query) query
- *   WHERE to_tsvector('english', v.content_md) @@ query
- *     AND ($vaultId IS NULL OR n.vault_id = $vaultId)
- *     AND n.governance_status = 'active'
- *   ORDER BY score DESC
- *   LIMIT $limit;
- *
- * Plus permission filter at app boundary against ags_vault_members.
+ * Stub for unit tests + `AGS_VAULT_REPO=stub` dev mode. Returns no
+ * hits regardless of input. Production code routes through
+ * `AsdbVaultSearchService`.
  */
 export class VaultSearchServiceStub implements VaultSearchService {
   async search(_input: SearchInput, _runtime: { userId?: number }): Promise<SearchHit[]> {

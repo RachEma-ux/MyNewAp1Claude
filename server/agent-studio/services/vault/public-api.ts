@@ -37,6 +37,7 @@ export {
 
 export type { SearchHit, VaultSearchService } from "./search.js";
 export { VaultSearchServiceStub } from "./search.js";
+export { AsdbVaultSearchService } from "./search-asdb.js";
 
 export {
   createTemplate,

@@ -19,6 +19,9 @@ import { NoteCreateInput, NoteDeleteInput, NoteUpdateInput, VaultCreateInput, Va
 import { VaultRepositoryStub } from "./repository.js";
 import { AsdbVaultRepository } from "./repository-asdb.js";
 import type { VaultRepository } from "./repository.js";
+import { VaultSearchServiceStub } from "./search.js";
+import { AsdbVaultSearchService } from "./search-asdb.js";
+import type { VaultSearchService } from "./search.js";
 import { extractLinksFromMarkdown } from "./links.js";
 import {
   createTemplate,
@@ -94,12 +97,36 @@ function getRepo(): VaultRepository {
   return cachedRepo;
 }
 
+let cachedSearchService: VaultSearchService | null = null;
+function getSearchService(): VaultSearchService {
+  if (cachedSearchService) return cachedSearchService;
+  // Search rides the same stub flag as the repository: in unit tests +
+  // dev modes that don't boot ASDB, the stub returns []. Production
+  // uses the ASDB-backed tsvector implementation.
+  if (process.env.AGS_VAULT_REPO === "stub") {
+    cachedSearchService = new VaultSearchServiceStub();
+  } else {
+    cachedSearchService = new AsdbVaultSearchService();
+  }
+  return cachedSearchService;
+}
+
 /**
  * Test helper. Allows tests to inject a custom repository implementation
  * and reset between cases.
  */
 export function _setVaultRepositoryForTests(repo: VaultRepository | null): void {
   cachedRepo = repo;
+}
+
+/**
+ * Test helper. Allows tests to inject a custom search service
+ * implementation and reset between cases.
+ */
+export function _setVaultSearchServiceForTests(
+  svc: VaultSearchService | null,
+): void {
+  cachedSearchService = svc;
 }
 
 /**
@@ -507,10 +534,17 @@ export const vaultRouter = router({
 
   search: protectedProcedure
     .input(SearchInput)
-    .query(async ({ input: _input }) => {
-      // Phase 6 wires the tsvector search via AsdbVaultRepository.
-      // MVP returns empty until then.
-      return [] as Array<{ noteId: number; title: string; snippet: string; score: number }>;
+    .query(async ({ input, ctx }) => {
+      const service = getSearchService();
+      const hits = await service.search(input, { userId: ctx.user?.id });
+      return hits.map((h) => ({
+        noteId: h.noteId,
+        vaultId: h.vaultId,
+        title: h.title,
+        slug: h.slug,
+        snippet: h.snippet,
+        score: h.score,
+      }));
     }),
 
   // ============================================================
