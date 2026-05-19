@@ -6,9 +6,12 @@
  * `getGraphRepository()` returns the active singleton based on
  * `GRAPH_BACKEND` env var:
  *   - `test`        → TestGraphRepository (in-memory)
- *   - `postgres`    → PostgresGraphRepository (recursive CTE fallback)
+ *   - `postgres`    → AsdbPostgresGraphRepository (Phase 7 Drizzle-backed
+ *                     real impl; wired 2026-05-19, replacing the 176-LoC
+ *                     skeleton that returned `{nodes:[], edges:[]}`)
  *   - `neo4j-ce`    → Neo4jCommunityGraphRepository (active backend post Phase 7.5)
- *   - default       → `postgres` for tests, `neo4j-ce` once Phase 1.5 closes
+ *   - `memgraph`    → MemgraphGraphRepository (read-only Bolt path)
+ *   - default       → `postgres` (always available; no driver install required)
  *
  * Boundary tests (tests/agent-studio/graph-repository-boundary.test.ts):
  *   - No `import` from `neo4j-driver` outside this directory.
@@ -69,11 +72,12 @@ export {
 
 export { TestGraphRepository } from "./test-graph-repository.js";
 export { PostgresGraphRepository } from "./postgres-graph-repository.js";
+export { AsdbPostgresGraphRepository } from "./postgres-graph-repository-asdb.js";
 export { Neo4jCommunityGraphRepository } from "./neo4j-community-graph-repository.js";
 export { MemgraphGraphRepository } from "./memgraph-graph-repository.js";
 
 import { TestGraphRepository } from "./test-graph-repository.js";
-import { PostgresGraphRepository } from "./postgres-graph-repository.js";
+import { AsdbPostgresGraphRepository } from "./postgres-graph-repository-asdb.js";
 import { Neo4jCommunityGraphRepository } from "./neo4j-community-graph-repository.js";
 import { MemgraphGraphRepository } from "./memgraph-graph-repository.js";
 import type { GraphRepository, BackendKey } from "./types.js";
@@ -84,11 +88,14 @@ let cachedRepository: GraphRepository | null = null;
  * Returns the active GraphRepository singleton.
  *
  * Selection order:
- *   1. `GRAPH_BACKEND` env var (`test` | `postgres` | `neo4j-ce`).
- *   2. Default: `postgres` (always available).
+ *   1. `GRAPH_BACKEND` env var (`test` | `postgres` | `neo4j-ce` | `memgraph`).
+ *   2. Default: `postgres` (always available; no driver install required).
  *
- * Phase 7.5: change default to `neo4j-ce` once Phase 1.5 backend
- * decision closes positively.
+ * The postgres path uses `AsdbPostgresGraphRepository` (the real
+ * Drizzle-backed implementation over `ags_graph_nodes` /
+ * `ags_graph_edges`). Wired 2026-05-19 — prior to that the
+ * 176-LoC skeleton was the wired class and returned empty results
+ * on every read.
  */
 export function getGraphRepository(): GraphRepository {
   if (cachedRepository) return cachedRepository;
@@ -123,7 +130,7 @@ export function getGraphRepository(): GraphRepository {
       break;
     case "postgres":
     default:
-      cachedRepository = new PostgresGraphRepository();
+      cachedRepository = new AsdbPostgresGraphRepository();
       break;
   }
 

@@ -1,26 +1,19 @@
 /**
- * PostgresGraphRepository — ASDB-backed implementation (Phase 7).
+ * AsdbPostgresGraphRepository — ASDB-backed implementation (Phase 7).
  *
- * Real Drizzle-backed graph node + edge upsert / read. Use this when
- * `GRAPH_BACKEND=postgres` is selected at boot.
+ * Real Drizzle-backed graph node + edge upsert / read. The wired
+ * `postgres` backend in `getGraphRepository()` since 2026-05-19 —
+ * `case "postgres"` instantiates this class.
  *
  * Recursive-CTE traversal is intentionally kept simple — depth-3 is the
  * documented performance ceiling for Postgres in the backend decision ADR
  * (`agent-studio-active-graph-backend-decision.md`). Production deployments
  * promote `Neo4jCommunityGraphRepository` per Phase 1.5.
  *
- * ⚠️ **STATUS — ORPHAN as of 2026-05-18.** This implementation is
- * NOT wired into `getGraphRepository()` in `./index.ts`. The Postgres
- * path there instantiates the 176-LoC SKELETON
- * `PostgresGraphRepository` from `./postgres-graph-repository.ts`,
- * not this 319-LoC Phase 7 implementation. Operator triage required
- * — three decision paths:
- *   1. Wire it in (swap `case "postgres"` in `getGraphRepository()`
- *      to use this class + add source-scan + integration tests)
- *   2. Delete it (if Phase 7 ASDB-backed path is closed)
- *   3. Document + leave in place pending ADR
- * Discovery context recorded in
- * `~/.claude/projects/-root/memory/project_phase_7_asdb_graph_repo_orphan.md`.
+ * The 176-LoC skeleton at `./postgres-graph-repository.ts` is kept
+ * as the re-export named `PostgresGraphRepository` for back-compat —
+ * not constructed by the factory, not used by any caller. Deletable in
+ * a follow-up once nothing imports the name directly.
  */
 
 import { and, eq, sql } from "drizzle-orm";
@@ -169,37 +162,102 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
   ): Promise<{ nodes: NodeIdentity[]; edges: EdgeIdentity[]; truncated: boolean }> {
     const conn = getAsDb();
     const govFilter = runtime.governanceStatusFilter ?? ["active"];
-    // Depth-N recursive CTE — Postgres only.
-    const rows = await conn.execute(sql`
+    // Drizzle's `sql\`...${arr}...\`` template spreads array params
+    // into individual placeholders, so `ANY($n)` sees scalars and
+    // throws `malformed array literal`. Build a comma-separated list
+    // with `sql.join` and use `IN (…)` instead.
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
+    // Depth-N recursive CTE — Postgres only. Walks both outbound and
+    // inbound edges so the local view around a seed node shows the
+    // neighborhood, not just descendants.
+    const nodeRows = await conn.execute(sql`
       WITH RECURSIVE walk AS (
         SELECT n.id, n.type_key, n.node_key, 0::int AS depth
         FROM ${agsGraphNodes} n
         WHERE n.node_key = ${seedNodeId}
+          AND n.governance_status IN (${govList})
         UNION
         SELECT n.id, n.type_key, n.node_key, w.depth + 1
         FROM ${agsGraphEdges} e
-        JOIN walk w ON e.source_node_id = w.id
-        JOIN ${agsGraphNodes} n ON e.target_node_id = n.id
+        JOIN walk w ON e.source_node_id = w.id OR e.target_node_id = w.id
+        JOIN ${agsGraphNodes} n
+          ON n.id = CASE WHEN e.source_node_id = w.id THEN e.target_node_id ELSE e.source_node_id END
         WHERE w.depth < ${options.maxDepth}
-          AND n.governance_status = ANY(${govFilter})
+          AND n.governance_status IN (${govList})
+          AND e.governance_status IN (${govList})
       )
       SELECT id, type_key, node_key FROM walk LIMIT ${options.maxResults};
     `);
 
-    const nodes: NodeIdentity[] = (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
+    // node-postgres / drizzle-pg returns `{ rows, rowCount, ... }` for
+    // raw `execute(sql\`\`)` calls.
+    const nodeRecords =
+      (nodeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(nodeRows) ? (nodeRows as Array<Record<string, unknown>>) : []);
+    const nodes: NodeIdentity[] = nodeRecords.map((r) => ({
       typeKey: String(r.type_key),
       id: String(r.node_key),
     }));
-    return { nodes, edges: [], truncated: nodes.length >= options.maxResults };
+
+    if (nodes.length === 0) {
+      return { nodes, edges: [], truncated: false };
+    }
+
+    // Edges between walked nodes — single SELECT joined on the
+    // node_key set so source-of-truth lookups stay one round-trip.
+    const walkedKeyList = sql.join(
+      nodes.map((n) => sql`${n.id}`),
+      sql`, `,
+    );
+    const edgeRows = await conn.execute(sql`
+      SELECT
+        e.type_key AS edge_type_key,
+        e.edge_key,
+        sn.type_key AS src_type,
+        sn.node_key AS src_key,
+        tn.type_key AS tgt_type,
+        tn.node_key AS tgt_key
+      FROM ${agsGraphEdges} e
+      JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
+      JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
+      WHERE sn.node_key IN (${walkedKeyList})
+        AND tn.node_key IN (${walkedKeyList})
+        AND e.governance_status IN (${govList})
+      LIMIT ${options.maxResults};
+    `);
+
+    const edgeRecords =
+      (edgeRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (Array.isArray(edgeRows) ? (edgeRows as Array<Record<string, unknown>>) : []);
+    const edges: EdgeIdentity[] = edgeRecords.map((r) => ({
+      typeKey: String(r.edge_type_key),
+      id: String(r.edge_key ?? ""),
+      sourceNode: { typeKey: String(r.src_type), id: String(r.src_key) },
+      targetNode: { typeKey: String(r.tgt_type), id: String(r.tgt_key) },
+    }));
+
+    return {
+      nodes,
+      edges,
+      truncated: nodes.length >= options.maxResults || edges.length >= options.maxResults,
+    };
   }
 
   async globalGraphSample(options: TraversalOptions, runtime: RuntimeContext) {
     const conn = getAsDb();
     const govFilter = runtime.governanceStatusFilter ?? ["active"];
+    // See `localGraph` for the Drizzle array-spread caveat.
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
     const rows = await conn
       .select({ typeKey: agsGraphNodes.typeKey, nodeKey: agsGraphNodes.nodeKey })
       .from(agsGraphNodes)
-      .where(sql`${agsGraphNodes.governanceStatus} = ANY(${govFilter})`)
+      .where(sql`${agsGraphNodes.governanceStatus} IN (${govList})`)
       .limit(options.maxResults);
     return {
       nodes: rows.map((r) => ({ typeKey: r.typeKey, id: r.nodeKey })),
@@ -250,12 +308,21 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
     if (!nodes.length) return nodes;
     const conn = getAsDb();
     const govFilter = runtime.governanceStatusFilter ?? ["active"];
+    // See `localGraph` for the Drizzle array-spread caveat.
+    const nodeKeyList = sql.join(
+      nodes.map((n) => sql`${n.id}`),
+      sql`, `,
+    );
+    const govList = sql.join(
+      govFilter.map((g) => sql`${g}`),
+      sql`, `,
+    );
     const visible = await conn
       .select({ nodeKey: agsGraphNodes.nodeKey })
       .from(agsGraphNodes)
       .where(
-        sql`${agsGraphNodes.nodeKey} = ANY(${nodes.map((n) => n.id)})
-            AND ${agsGraphNodes.governanceStatus} = ANY(${govFilter})`,
+        sql`${agsGraphNodes.nodeKey} IN (${nodeKeyList})
+            AND ${agsGraphNodes.governanceStatus} IN (${govList})`,
       );
     const visibleSet = new Set(visible.map((v) => v.nodeKey));
     return nodes.filter((n) => visibleSet.has(n.id));
