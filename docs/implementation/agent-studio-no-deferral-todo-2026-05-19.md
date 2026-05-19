@@ -339,8 +339,61 @@ one-command scripts shipped in slices 24 + 25 of the original mission
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 33 catalogue | TBD | TBD | Opens continuation-2 |
-| 34 AI Types catalog cross-check | TBD | TBD | Opt-in catalogAvailable boolean |
-| 35 per-model context-window registry | TBD | TBD | Closed-taxonomy registry + chat-stream wiring |
-| 36 cycle-8 doc-debt sweep | TBD | TBD | 2 stale markers rewritten |
-| 37 continuation-2 closure | TBD | TBD | Closure receipt |
+| 33 catalogue | #1552 | `15ee78eb` | Opens continuation-2 |
+| 34 AI Types catalog cross-check | #1553 | `30f4d20f` | Opt-in `catalogAvailable` boolean via `crossCheckCatalog` option |
+| 35 per-model context-window registry | #1554 | `cd3aafce` | 10-entry closed-taxonomy registry + parallel-flow lockstep wiring across chat-stream + chat.ts |
+| 36 cycle-8 doc-debt sweep | #1555 | _pending_ | M7-c8 + Phase 12 derivation stale markers rewritten |
+| 37 continuation-2 closure | this PR | TBD | Closure receipt |
+
+## Continuation-2 closure receipt (2026-05-19)
+
+The second continuation arc shipped 3 implementation slices + 1 doc-block
+sweep + this closure receipt across PRs #1552–#1556. The re-audit found
+2 of the 7 originally-tabled sub-arcs were closed-by-successor doc-debt;
+the remaining 5 (tool-call streaming on Model Access, drain legacy
+fixtures helper deletion, LR-02 + LR-03 + LR-04 + LR-08 caller
+migrations) stay tabled — each is either a multi-PR architectural
+contract extension or a multi-file caller migration arc that the
+existing `PHASE_28_EXECUTION_PLAN.md` already scopes for separate
+follow-on work.
+
+### Continuation-2 carry-forward lessons
+
+1. **Always re-audit "tabled" items.** Of 7 sub-arcs named in the
+   slice-32 closure, 2 turned out to be doc-debt only — the successor
+   code shipped during cycle-8 (orchestration-error registry M7-c8 +
+   per-source RAC derivation Phase 12) but the deferral comment was
+   never rewritten. A re-audit before the next mission catches these.
+2. **Opt-in options keep latency profiles honest.** Slice 34's
+   `crossCheckCatalog` defaults to `false` — runtime preflight (the
+   hot path) skips the extra round-trip; only the UI status chip + the
+   picker page opt in. The compromise lets the gap close without
+   regressing hot-path latency.
+3. **Closed taxonomies + suffix-match handle routed refs.** Slice 35's
+   registry handles both `anthropic/claude-haiku-4-5` (direct provider
+   ref) and `openrouter/anthropic/claude-haiku-4-5` (routed) via a
+   single map + suffix-match lookup. A new model lands as one row in
+   the table; no caller-side changes.
+4. **Constants whose names rot still serve as type discriminants.**
+   `PHASE_12_RESERVED_MODES` no longer accurately describes "reserved"
+   modes (they are emitted via the retrievalMethod discriminator), but
+   the name is held in place by 3 test imports + the
+   graph-retrieval-router lockstep. The doc-block rewrite captures
+   the live semantic; the constant name stays as a backward-compat
+   anchor.
+5. **Lockstep tests survive the slice that rewrites the doc they
+   pin.** Slice 36's source-scan test re-asserts every L4-c8 lockstep
+   invariant (DispatchErrorCode + namespace-boundary contract) so the
+   rewrite doesn't accidentally weaken the cross-flow guard the
+   existing `l1-l4-c8-doc-bundle.test.ts` enforces. Pattern: when you
+   touch a lockstep-pinned doc-block, mirror the lockstep's
+   assertions in your own slice's test.
+
+The next continuation arc opens when an operator wants to take on the
+5 remaining sub-arcs:
+- **Tool-call streaming on Model Access** — multi-PR contract
+  extension of `ModelAccess.stream()` with `tool_call_delta` event.
+- **Drain legacy fixtures helper deletion** — operator-callable; ship
+  when no environment still depends on the migration helper.
+- **LR-02 / LR-03 / LR-04 / LR-08 caller migrations** — each is its
+  own multi-file caller migration arc per `PHASE_28_EXECUTION_PLAN.md`.
