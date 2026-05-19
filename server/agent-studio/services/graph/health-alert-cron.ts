@@ -16,9 +16,12 @@
  *     measured in minutes, not hours; the runbook's "sustained 7
  *     days" decision is driven by the persisted rows, not by the
  *     cron tick rate.
- *   - Retention envelope: NONE. The cron only emits rows; pruning
- *     `ags_runtime_alerts` is out of scope for the α slice
- *     (operator deletes manually or via future retention sub-arc).
+ *   - Retention envelope: 90 days on RESOLVED alerts only. Slice 19
+ *     of the no-deferral catalogue (2026-05-19) closed the α-slice
+ *     "out of scope" deferral. Open / unresolved alerts are never
+ *     pruned — they are operator-actionable and stay until resolved.
+ *     Pruning targets `resolvedAt`, not `raisedAt`, so a long-running
+ *     unresolved breach can't get pruned mid-flight.
  *   - Scope: "default" — single global scope today. Per-workspace
  *     scopes land in V1.5 when the multi-region router (PR-V2-1)
  *     hooks region pins.
@@ -48,6 +51,7 @@ import {
 } from "../retention/make-retention-cron.js";
 import {
   runHealthAlertScan,
+  pruneOldRuntimeAlerts,
   type HealthAlertScanInput,
   type HealthAlertScanResult,
 } from "./health-alert.js";
@@ -71,15 +75,24 @@ export interface HealthAlertCronResult {
   readonly decisionCount: number;
   readonly raised: number;
   readonly resolved: number;
+  /** Slice 19 retention envelope — count of resolved alerts pruned. */
+  readonly pruned: number;
 }
 
 const cron = makeRetentionCron<HealthAlertCronInput, HealthAlertCronResult>({
   logPrefix: "ags-graph-health-alert-cron",
   envPrefix: "AGS_GRAPH_HEALTH_ALERT",
   defaultCronExpr: "*/5 * * * *",
-  defaultRetentionDays: null,
-  buildSweepInput: ({ sweepInput }) => sweepInput ?? {},
-  runSweep: async (input) => {
+  // Slice 19 of the no-deferral catalogue: 90-day retention on
+  // resolved alerts. The factory computes `olderThan` from this and
+  // hands it to `buildSweepInput`; we forward to `pruneOldRuntimeAlerts`
+  // after the scan.
+  defaultRetentionDays: 90,
+  buildSweepInput: ({ olderThan, sweepInput }) => ({
+    ...(sweepInput ?? {}),
+    olderThan: olderThan as Date | null,
+  }),
+  runSweep: async (input: HealthAlertCronInput & { olderThan?: Date | null }) => {
     const scope = input.scope ?? "default";
     const runScan = input.runScan ?? runHealthAlertScan;
     const scanInput: HealthAlertScanInput = {
@@ -87,6 +100,12 @@ const cron = makeRetentionCron<HealthAlertCronInput, HealthAlertCronResult>({
       scope,
     };
     const report = await runScan(scanInput);
+    // Retention pass — prune resolved alerts older than the cutoff.
+    let pruned = 0;
+    if (input.olderThan) {
+      const r = await pruneOldRuntimeAlerts({ olderThan: input.olderThan });
+      pruned = r.deleted;
+    }
     return {
       scope: report.scope,
       scannedAt: report.scannedAt,
@@ -95,12 +114,13 @@ const cron = makeRetentionCron<HealthAlertCronInput, HealthAlertCronResult>({
       decisionCount: report.decisions.length,
       raised: report.persisted.raised,
       resolved: report.persisted.resolved,
+      pruned,
     };
   },
   formatSweepLogTail: (r) =>
     `scope=${r.scope} status=${r.status}` +
     (typeof r.latencyMs === "number" ? ` latencyMs=${r.latencyMs}` : "") +
-    ` decisions=${r.decisionCount} raised=${r.raised} resolved=${r.resolved}`,
+    ` decisions=${r.decisionCount} raised=${r.raised} resolved=${r.resolved} pruned=${r.pruned}`,
   formatStartupLogTail: () => "scope=default",
 });
 

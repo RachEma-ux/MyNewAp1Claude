@@ -41,7 +41,7 @@
  *   - `graph_health_unavailable`
  */
 
-import { sql, and, eq, isNull } from "drizzle-orm";
+import { sql, and, eq, isNull, lt } from "drizzle-orm";
 
 import { getAsDb } from "../../db/connection.js";
 import { agsRuntimeAlerts } from "../../../../drizzle/tables/agent-studio-runtime-alerts.js";
@@ -254,6 +254,41 @@ export function evaluateHealth({
 export interface PersistResult {
   readonly raised: number;
   readonly resolved: number;
+}
+
+/**
+ * Pruning helper for the retention envelope on `ags_runtime_alerts`.
+ * Slice 19 of the no-deferral catalogue (2026-05-19) closes the
+ * "Retention envelope: NONE … out of scope for the α slice" deferral
+ * in health-alert-cron.ts.
+ *
+ * Only RESOLVED alerts are eligible for pruning — open alerts that
+ * happen to be old are still operator-actionable and stay until
+ * explicitly resolved. The cutoff applies to `resolvedAt`, not
+ * `raisedAt`, so a long-lived open alert can't accidentally get
+ * pruned mid-flight by the retention pass.
+ */
+export async function pruneOldRuntimeAlerts(input: {
+  readonly olderThan: Date;
+}): Promise<{ deleted: number }> {
+  const db = getAsDb();
+  if (!db) return { deleted: 0 };
+  const res = await db
+    .delete(agsRuntimeAlerts)
+    .where(
+      and(
+        // Only resolved rows. `resolvedAt IS NOT NULL` short-circuits
+        // unresolved alerts.
+        lt(agsRuntimeAlerts.resolvedAt, input.olderThan),
+      ),
+    );
+  const cnt =
+    typeof (res as { rowCount?: number }).rowCount === "number"
+      ? (res as { rowCount: number }).rowCount
+      : Array.isArray(res)
+        ? (res as unknown[]).length
+        : 0;
+  return { deleted: cnt };
 }
 
 /**
