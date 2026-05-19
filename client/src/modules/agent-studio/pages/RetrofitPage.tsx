@@ -117,11 +117,22 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
   const [tabValue, setTabValue] = useState<string>("ingestion");
   const [retryJobKind, setRetryJobKind] = useState<string>("");
   const [cancelJobKind, setCancelJobKind] = useState<string>("");
+  // Slice 22 of the no-deferral catalogue (2026-05-19): lane-click
+  // drill state. Lane clicks set a lane-prefix filter on the kind
+  // card so operators see kinds-within-this-lane without scrolling,
+  // then the bulk-ops form is one click away from the kind they pick.
+  const [laneFilter, setLaneFilter] = useState<string>("");
 
   function handleKindClick(kind: string): void {
     setRetryJobKind(kind);
     setCancelJobKind(kind);
     setTabValue("bulk-job-ops");
+  }
+
+  function handleLaneClick(lane: string): void {
+    // Toggle: clicking the same lane twice clears the filter.
+    setLaneFilter((prev) => (prev === lane ? "" : lane));
+    setTabValue("observability-stats");
   }
 
   return (
@@ -185,7 +196,11 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
           <CronStatusPanel />
         </TabsContent>
         <TabsContent value="observability-stats">
-          <ObservabilityStatsPanel onClickKind={handleKindClick} />
+          <ObservabilityStatsPanel
+            onClickKind={handleKindClick}
+            onClickLane={handleLaneClick}
+            laneFilter={laneFilter}
+          />
         </TabsContent>
         <TabsContent value="observability-dashboard">
           <ObservabilityDashboardPanel onClickKind={handleKindClick} />
@@ -823,10 +838,11 @@ function ApprovalRow({
 // counts + system-vs-user error split + the 4-day sparkline trend
 // inputs from `agentStudio.workspaceObservability.getStats`.
 //
-// Intentionally shows the operator-most-relevant subset — failedJobs
-// ByKind / pendingJobsByKind / runningJobsByKind drilldowns and the
-// per-lane rollups stay deferred until operators ask for them (the
-// shape they need varies by jobKind taxonomy and is hard to mock).
+// Surfaces the operator-most-relevant subset: failedJobsByKind /
+// pendingJobsByKind / runningJobsByKind drilldowns AND the per-lane
+// rollups (T-F.112 / T-F.113 / slice 22 of the no-deferral
+// catalogue 2026-05-19 — lane rows now drill into the kind card via
+// onClickLane + filterByLanePrefix).
 
 function StatBlock({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -952,17 +968,36 @@ function SingleAxisBreakdownCard({
 // intentionally NOT surfaced here — those are a separate axis whose
 // own card lands in a later slice if operator demand surfaces.
 //
-// Precedent (j₂) clickable-rollup fusion is deferred to a follow-up
-// because the retry/cancel form state lives in a sibling component
-// (BulkJobOpsPanel); lifting state up is a larger refactor and the
-// operator can read the card AND manually type a kind in the bulk
-// ops form below in the same scroll. The first slice ships the data.
+// Precedent (j₂) clickable-rollup fusion landed across two slices:
+// - Kind-click → onClickKind (T-F.125) lifts retry/cancel form state
+//   to the page so clicking a kind fills both forms + switches tab.
+// - Lane-click → onClickLane (slice 22 of the no-deferral catalogue,
+//   2026-05-19) toggles a lane-prefix filter on the kind card below
+//   so operators drill from lane → kind without scrolling.
+// Slice 22 of the no-deferral catalogue: filter a kind→count map
+// to keys that start with the lane prefix. Lane = first dot-segment
+// of kind (per T-F.113 semantics). Empty filter returns the input
+// unchanged.
+function filterByLanePrefix(
+  data: Record<string, number>,
+  laneFilter: string | undefined,
+): Record<string, number> {
+  if (!laneFilter) return data;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(data)) {
+    const lane = k.split(".")[0];
+    if (lane === laneFilter) out[k] = v;
+  }
+  return out;
+}
+
 function JobsByKindBreakdownCard({
   jobsByKind,
   failedJobsByKind,
   pendingJobsByKind,
   runningJobsByKind,
   onClickKind,
+  laneFilter,
 }: {
   jobsByKind: Record<string, number>;
   failedJobsByKind: Record<string, number>;
@@ -973,6 +1008,11 @@ function JobsByKindBreakdownCard({
   // when unset, the Kind cell stays a plain `<span>` (read-only
   // breakdown for non-RetrofitPage consumers).
   onClickKind?: (kind: string) => void;
+  // Slice 22 close-out: when set, the card renders a "filtered to
+  // lane=X" banner so operators see what the lane-click narrowed
+  // the view to. The actual filtering is applied by the caller via
+  // `filterByLanePrefix`; this prop is informational.
+  laneFilter?: string;
 }) {
   // Union of all kinds seen across the four axes — a kind might be
   // 0 in `jobsByKind` overall (e.g. retention-pruned) but still
@@ -990,6 +1030,15 @@ function JobsByKindBreakdownCard({
     <Card>
       <CardContent className="p-4 space-y-3">
         <SectionLabel>Jobs by kind</SectionLabel>
+        {laneFilter && (
+          <div
+            className="text-xs text-zinc-400 bg-zinc-900/60 rounded px-2 py-1"
+            data-testid="retrofit-jobs-by-kind-lane-filter-banner"
+          >
+            Filtered to lane <span className="font-mono text-zinc-200">{laneFilter}</span>.
+            Click the lane row again to clear.
+          </div>
+        )}
         {allKinds.length === 0 ? (
           <div
             className="text-sm text-zinc-500"
@@ -1077,11 +1126,20 @@ function JobsByLaneBreakdownCard({
   failedJobsByLane,
   pendingJobsByLane,
   runningJobsByLane,
+  onClickLane,
+  activeLane,
 }: {
   jobsByLane: Record<string, number>;
   failedJobsByLane: Record<string, number>;
   pendingJobsByLane: Record<string, number>;
   runningJobsByLane: Record<string, number>;
+  // Slice 22 of the no-deferral catalogue (2026-05-19): clickable
+  // lane rows. When set, Lane cell becomes a button that calls
+  // onClickLane(lane). Optional — read-only consumers omit it.
+  onClickLane?: (lane: string) => void;
+  // Slice 22: highlight the currently-filtered lane so operators
+  // can see at a glance which lane the kind card is narrowed to.
+  activeLane?: string;
 }) {
   const allLanes = Array.from(
     new Set<string>([
@@ -1132,10 +1190,32 @@ function JobsByLaneBreakdownCard({
                 {allLanes.map((lane) => (
                   <tr
                     key={lane}
-                    className="border-t border-zinc-800"
+                    className={`border-t border-zinc-800 ${
+                      lane === activeLane ? "bg-blue-950/30" : ""
+                    }`}
                     data-testid={`retrofit-jobs-by-lane-row-${lane}`}
                   >
-                    <td className="px-2 py-1 font-mono">{lane}</td>
+                    <td className="px-2 py-1 font-mono">
+                      {onClickLane ? (
+                        <button
+                          type="button"
+                          className={`underline text-left hover:text-blue-300 ${
+                            lane === activeLane ? "text-blue-300" : ""
+                          }`}
+                          onClick={() => onClickLane(lane)}
+                          data-testid={`retrofit-jobs-by-lane-row-${lane}-click`}
+                          title={
+                            lane === activeLane
+                              ? "Click to clear the lane filter"
+                              : `Filter the jobs-by-kind card above to lane="${lane}"`
+                          }
+                        >
+                          {lane}
+                        </button>
+                      ) : (
+                        lane
+                      )}
+                    </td>
                     <td className="px-2 py-1 text-right tabular-nums">
                       {jobsByLane[lane] ?? 0}
                     </td>
@@ -1161,6 +1241,8 @@ function JobsByLaneBreakdownCard({
 
 function ObservabilityStatsPanel({
   onClickKind,
+  onClickLane,
+  laneFilter,
 }: {
   // T-F.125 (T-F.7-j₂ fusion): optional click handler for the
   // jobs-by-kind breakdown rows. Wired from RetrofitPage; clicking
@@ -1168,6 +1250,12 @@ function ObservabilityStatsPanel({
   // Optional so the component still works without the handler
   // (e.g. if another consumer wants the read-only breakdown).
   onClickKind?: (kind: string) => void;
+  // Slice 22 of the no-deferral catalogue (2026-05-19): lane-click
+  // companion. Clicking a lane row toggles a lane-prefix filter on
+  // the jobs-by-kind card below so operators can drill from lane →
+  // kind without scrolling. Optional for read-only consumers.
+  onClickLane?: (lane: string) => void;
+  laneFilter?: string;
 }) {
   const q = trpc.agentStudio.workspaceObservability.getStats.useQuery(
     undefined,
@@ -1230,11 +1318,12 @@ function ObservabilityStatsPanel({
           now?" — currently they'd have to read the per-row labels and
           count by hand. */}
       <JobsByKindBreakdownCard
-        jobsByKind={s.jobsByKind}
-        failedJobsByKind={s.failedJobsByKind}
-        pendingJobsByKind={s.pendingJobsByKind}
-        runningJobsByKind={s.runningJobsByKind}
+        jobsByKind={filterByLanePrefix(s.jobsByKind, laneFilter)}
+        failedJobsByKind={filterByLanePrefix(s.failedJobsByKind, laneFilter)}
+        pendingJobsByKind={filterByLanePrefix(s.pendingJobsByKind, laneFilter)}
+        runningJobsByKind={filterByLanePrefix(s.runningJobsByKind, laneFilter)}
         onClickKind={onClickKind}
+        laneFilter={laneFilter}
       />
 
       {/* ── T-F.113 (T-F.7-β): jobs-by-lane companion ──
@@ -1249,6 +1338,8 @@ function ObservabilityStatsPanel({
         failedJobsByLane={s.failedJobsByLane}
         pendingJobsByLane={s.pendingJobsByLane}
         runningJobsByLane={s.runningJobsByLane}
+        onClickLane={onClickLane}
+        activeLane={laneFilter}
       />
 
       {/* ── T-F.114 (T-F.7-γ): error-events-by-source-kind breakdown ──
