@@ -31,12 +31,14 @@ class PromotionAdapterStub implements PromotionAdapter {
   async createDraft(request: PromotionRequest) {
     const promotionId = this.nextId++;
     this.createdPromotions.push({ noteId: request.noteId, kind: request.promotionKind });
-    return { promotionId, targetAssetId: 1000 + promotionId };
+    return { promotionId };
   }
   async activateVersion(promotionId: number) {
     const versionId = 2000 + promotionId;
     this.activatedVersionIds.push(versionId);
-    return { versionId };
+    // Slice 16 no-deferral: activateVersion owns the target-asset
+    // binding. The version id is the target asset id by construction.
+    return { versionId, targetAssetId: versionId };
   }
   async rollback(promotionId: number) {
     this.rollbacks.push(promotionId);
