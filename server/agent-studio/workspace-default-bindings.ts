@@ -3,8 +3,14 @@
  *
  * Phase 29.1b (D-WDB-1..8 in `docs/architecture/provider-model-binding/
  * WORKSPACE_DEFAULT_BINDING_DECISION.md`). Workspace-default Provider
- * Connection lookup keyed by `(workspaceId, role)` — consumed by the 4
- * deferred Phase 29 caller migrations (LR-02 / LR-03 / LR-04 / LR-08).
+ * Connection lookup keyed by `(workspaceId, role)`. The four Phase 29
+ * caller migrations that consume this primitive (LR-02
+ * `server/embeddings/service.ts`, LR-03 `server/documents/processor.ts`,
+ * LR-04 `server/operators/provider-hub.ts`, LR-08 `server/chat/stream.ts`
+ * + `server/automation/block-executors.ts`) shipped in Phase 29.4-29.6;
+ * each now calls `resolveWorkspaceDefaultBinding({ workspaceId, role })`
+ * before routing through `openRouter.modelAccess.*` (boundary pinned by
+ * the no-deferral slice 40 source-scan).
  *
  * Critical contracts (see ADR for full rationale):
  *

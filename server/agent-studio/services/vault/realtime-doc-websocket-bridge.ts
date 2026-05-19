@@ -186,10 +186,14 @@ export interface InstallRealtimeDocUpgradeResult {
 function defaultGetUserIdFromUpgradeRequest(
   _req: IncomingMessage,
 ): number | null {
-  // First slice: unauthenticated by default. Auth-cookie resolver
-  // lands in a follow-up PR (see ADR §"Explicitly out of scope").
-  // Returning null causes the upgrade handler to deny with
-  // `missing_user_id` → close code 4401.
+  // Test-mode fallback only. Production wires the auth-cookie
+  // resolver via `createDefaultGetUserIdFromUpgradeRequest` from
+  // `realtime-doc-default-getuserid.ts` (shipped via PR-V1-38 #789);
+  // the boot wiring passes that closure as the
+  // `getUserIdFromUpgradeRequest` option. Returning null here causes
+  // the upgrade handler to deny with `missing_user_id` (close code
+  // 4401) so an unconfigured bridge fails closed rather than allowing
+  // anonymous connections.
   return null;
 }
 
