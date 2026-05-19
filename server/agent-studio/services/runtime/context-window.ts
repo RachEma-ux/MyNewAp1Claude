@@ -32,14 +32,15 @@
  *     vocab files for marginal accuracy on the windowing decision.
  *     The heuristic over-counts slightly (good for safety — we
  *     truncate sooner rather than later).
- *   - **Single global budget, not model-specific.** Model-aware
- *     windowing (read context_window from ModelAccessExecuteInput
- *     or a model registry) is deferred to cycle-8 — it requires a
- *     central per-model context-window registry that doesn't exist
- *     yet. Today, operators tune the global default via
- *     `MAX_CONTEXT_TOKENS` env var to match their primary model's
- *     window (default 32000 — covers GPT-4 Turbo / Claude 3 with
- *     headroom).
+ *   - **Per-model budget, with a global fallback.** Slice 35 of the
+ *     no-deferral continuation-2 catalogue (2026-05-19) wired the
+ *     central per-model context-window registry at
+ *     `model-context-windows.ts`. Callers resolve the per-model
+ *     `tokenBudget` via `resolveContextTokenBudget(modelRef, fallback)`
+ *     and pass the result as `maxTokens` here. Unknown refs (newly
+ *     added model not yet in the closed taxonomy) fall back to
+ *     `MAX_CONTEXT_TOKENS` env (default 32000 — covers GPT-4 Turbo /
+ *     Claude 3 with headroom).
  *   - **Tool-call/tool-result pairing preserved.** Eviction is
  *     turn-aligned via the message order — we never split a
  *     tool_call from its matching tool result (which would break
