@@ -35,6 +35,7 @@ import {
   getBindingEligibility,
   type BindingEligibilityResult,
 } from "../provider-connections/public-api";
+import { listAvailableProviderModels } from "../ai-types/public-api";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -443,6 +444,22 @@ export interface ValidateBindingPolicyOptions {
    * without blocking the picker.
    */
   staleAsDegraded?: boolean;
+  /**
+   * Slice 34 of the no-deferral continuation-2 catalogue (2026-05-19).
+   * When true, the validator calls `listAvailableProviderModels` and
+   * surfaces `catalogAvailable: true|false` on the result. Default is
+   * `false` — keeps the legacy `null` return + the existing latency
+   * profile for callers that don't surface the field. The UI status
+   * chip + the picker page pass `crossCheckCatalog: true` to render
+   * a "missing from AI Types catalog" warning when relevant.
+   */
+  crossCheckCatalog?: boolean;
+  /**
+   * Test seam for slice 34. Inject a custom catalog lookup so unit
+   * tests can drive the cross-check branch without booting the
+   * AI Types DB.
+   */
+  listAvailableModels?: typeof listAvailableProviderModels;
 }
 
 export interface ResolveForRunInput {
@@ -498,10 +515,15 @@ export interface ResolveForRunResult {
  *   - When the result is otherwise ok and `refreshTimestamp !== false`,
  *     the row's `lastValidatedAt` is updated to `now`.
  *
- * AI Types catalog availability is deferred to a future Phase 12.b
- * tightening — Phase 12 returns `catalogAvailable: null` when the
- * model catalog ref is missing, leaving room for a future opt-in
- * cross-check via `aiTypes.providerModels.listAvailable`.
+ * AI Types catalog availability — when `options.crossCheckCatalog`
+ * is true (slice 34 of the no-deferral continuation-2 catalogue,
+ * 2026-05-19), the validator calls `listAvailableProviderModels` and
+ * surfaces `catalogAvailable: true|false` on the result based on
+ * whether the binding's `modelRef` appears in the catalog projection.
+ * The default remains `null` — opt-in keeps the existing latency
+ * profile for callers (runtime preflight) that don't surface the
+ * field, while the UI status chip + picker page opt in to get the
+ * "missing from catalog" warning.
  */
 export async function validateBindingPolicy(
   draftId: number,
@@ -599,12 +621,29 @@ export async function validateBindingPolicy(
     writtenAt = now;
   }
 
+  // Slice 34 — opt-in AI Types catalog cross-check. Skipped when
+  // the option is false (legacy callers) or when the binding has no
+  // modelRef. On lookup failure, fall through to `null` so the call
+  // does not regress an otherwise-ok validation.
+  let catalogAvailable: boolean | null = null;
+  if (options.crossCheckCatalog && binding.modelRef.length > 0) {
+    const lookup = options.listAvailableModels ?? listAvailableProviderModels;
+    try {
+      const available = await lookup({});
+      catalogAvailable = available.some(
+        (m) => m.modelRef === binding.modelRef,
+      );
+    } catch {
+      catalogAvailable = null;
+    }
+  }
+
   return {
     draftId,
     role,
     ok: true,
     eligibility,
-    catalogAvailable: null,
+    catalogAvailable,
     lastValidatedAt: writtenAt,
     staleAtCallTime,
   };
