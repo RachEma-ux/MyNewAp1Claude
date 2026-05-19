@@ -61,6 +61,18 @@ export type {
   PruneOldBackgroundJobsInput,
   PruneOldBackgroundJobsResult,
 } from "./background-jobs.js";
+export { TERMINAL_BACKGROUND_JOB_STATUSES, BACKGROUND_JOB_STATUSES } from "./background-jobs.js";
+
+export {
+  DEFAULT_BACKGROUND_JOB_STATUS_METADATA,
+  getBackgroundJobStatusMetadata,
+  getTerminalBackgroundJobStatuses,
+  getMetadataForStatus,
+  seedBackgroundJobStatusMetadata,
+  loadBackgroundJobStatusMetadataFromDb,
+  __resetBackgroundJobStatusMetadataCacheForTests,
+} from "./background-job-status-metadata.js";
+export type { BackgroundJobStatusMetadata } from "./background-job-status-metadata.js";
 
 export {
   pushNotification,

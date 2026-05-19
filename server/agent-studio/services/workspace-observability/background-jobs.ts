@@ -57,9 +57,19 @@ export const BACKGROUND_JOB_STATUSES = [
 export type JobStatus = (typeof BACKGROUND_JOB_STATUSES)[number];
 
 /**
- * Terminal statuses (sweep-eligible). Mirrors the metadata `.terminal`
- * field that would live on a per-status metadata table — kept inline
- * because the metadata table itself is deferred.
+ * Terminal statuses (sweep-eligible). Slice 28 of the no-deferral
+ * continuation catalogue (2026-05-19) moved the source of truth into
+ * `ags_background_job_status_metadata` (a row-per-status lookup) so
+ * operators can adjust per-status behavior without code changes. This
+ * `Set` literal is retained as a frozen baseline for callers that
+ * import it synchronously at module load; live consumers should call
+ * `getTerminalBackgroundJobStatuses()` from
+ * `background-job-status-metadata.ts` instead, which reads the cache
+ * populated by the boot-time reseed and falls back to the same
+ * baseline when ASDB is unavailable.
+ *
+ * The two sources are kept in sync by the integration test in
+ * `background-job-status-metadata.test.ts`.
  */
 export const TERMINAL_BACKGROUND_JOB_STATUSES: ReadonlySet<JobStatus> =
   new Set(["completed", "failed", "cancelled"]);
