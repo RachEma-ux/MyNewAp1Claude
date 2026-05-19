@@ -652,3 +652,65 @@ was honored: every gap large enough to ship from this device has
 shipped. The remaining operator-gated item names the trigger
 condition (no-env-depends) so a future operator can act on it
 without re-deriving the deletion decision.
+
+## Continuation-5 — third re-audit (2026-05-19)
+
+The fourth-arc closure declared mission complete. Operator returned
+with a fifth `build the next catalogue then append it to the todo
+list then execute` directive. Per the continuation-4 carry-forward
+lesson #1 ("alternate between list-driven and surface-driven sweeps
+every other arc"), continuation-5 ran a **list-driven** re-audit:
+revisit the carry-forward closure tables of all four prior arcs,
+spot-check the operator-gated residual, then top up with a wide-
+surface grep over `server/agent-studio/` +
+`server/openrouter/model-access/` + `client/src/modules/agent-studio/`.
+
+### Re-audit findings
+
+The wide-surface grep produced 173 raw hits (`TODO|FIXME|deferred|
+stub|placeholder|skeleton` minus test-seam noise). After triage:
+
+- **2 stale doc-debt markers** name follow-up slices that have
+  already shipped (closed-by-successor):
+
+  | File:line | Marker text | Successor | Slice |
+  |---|---|---|---|
+  | `services/runtime/system-prompt-composer.ts:296` | "5. retrieval-evidence (RAC P5, placeholder until P5)" | RAC P14 shipped (see CLAUDE.md "Implementation Status" — retrofit closed at P14 / `55c8b6b`); the `input.retrievalEvidence` branch is fully wired | 47 |
+  | `api/router.ts:3037` | "deferred to a future T-G.5.β slice (needs Cypher-template review)" | T-G.5.β template registry shipped at `services/graph-lens/impact-analysis-templates.ts` (no-deferral catalogue slice 29); the executor mode switches between `"stub"` + `"template"` per `classifyImpactAnalysisExecutorMode` | 47 |
+
+- **2 conditional-on-future-need deferrals** (preserved — not
+  actionable until trigger conditions met):
+
+  | File:line | Marker | Trigger condition |
+  |---|---|---|
+  | `services/chat.ts:1117` | "result-introspection wrapper; deferred to a future PR if a dashboard surfaces a meaningful gap" | Operator dashboard reports a `Result.ok=false` observability gap |
+  | `services/graph-lens/runners/runtime-lens-asdb-reader.ts:24` | "`workspaceId === viewer.workspaceId`; that's deferred to a follow-up slice" | Shared-cluster deployment (today single-region per CLAUDE.md "Deferred Scope") |
+
+- **Operator-gated residual**: re-inspected
+  `scripts/agent-studio/create-provider-bindings-for-legacy-agents.ts`.
+  Doc-block at line 38 still says "Phase 27.5b will delete this
+  script once no environment depends on it." The script reads
+  `DATABASE_URL` (no other env-vars), but the "depends on it"
+  predicate is whether unbound legacy agents still exist in any
+  operator-deployed environment — that's an operator question,
+  not a code question. Preserved as residual.
+
+- **Genuine MVP-boundary intent** (preserved): the 7 categories
+  documented in continuation-4 closure §"Genuine MVP-boundary
+  intent". Nothing has shifted from intent → gap since 2026-05-19.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 46 | **Open continuation-5 catalogue** | This entry. Documents the list-driven re-audit. |
+| 47 | **Doc-debt sweep (continuation-5)** | Rewrite the 2 stale markers naming their live successors. Lockstep source-scan test. |
+| 48 | **Continuation-5 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Smallest arc to date — 3 PRs. |
+
+### Continuation-5 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 46 catalogue | this PR | TBD | Opens continuation-5; list-driven re-audit, 2 stale markers + 2 conditional deferrals + 1 operator-gated residual |
+| 47 doc-debt sweep | TBD | TBD | system-prompt-composer.ts:296 + api/router.ts:3037 rewritten naming live successors |
+| 48 continuation-5 closure | TBD | TBD | Closure receipt + mission re-close |
