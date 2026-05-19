@@ -201,6 +201,31 @@ export const agsWorkspaceBackgroundJobs = pgTable(
   },
 );
 
+/**
+ * Per-status metadata for background jobs. Closes slice 28 of the
+ * no-deferral continuation catalogue (2026-05-19). Replaces the
+ * inline `TERMINAL_BACKGROUND_JOB_STATUSES` set with a row-per-status
+ * lookup that the service reseeds at boot.
+ *
+ * The terminal / retryable / severity fields are referenced by the
+ * sweeper + operator UI rollup; carrying them in the table lets
+ * operators retune behavior (e.g. mark a custom status as
+ * retryable=false) without code changes.
+ */
+export const agsBackgroundJobStatusMetadata = pgTable(
+  "ags_background_job_status_metadata",
+  {
+    status: varchar("status", { length: 50 }).primaryKey(),
+    terminal: boolean("terminal").notNull(),
+    retryable: boolean("retryable").notNull(),
+    label: varchar("label", { length: 100 }).notNull(),
+    severity: varchar("severity", { length: 20 }).notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+);
+
 export const agsWorkspaceUserNotifications = pgTable(
   "ags_workspace_user_notifications",
   {
