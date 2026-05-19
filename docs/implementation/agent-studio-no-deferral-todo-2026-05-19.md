@@ -342,7 +342,7 @@ one-command scripts shipped in slices 24 + 25 of the original mission
 | 33 catalogue | #1552 | `15ee78eb` | Opens continuation-2 |
 | 34 AI Types catalog cross-check | #1553 | `30f4d20f` | Opt-in `catalogAvailable` boolean via `crossCheckCatalog` option |
 | 35 per-model context-window registry | #1554 | `cd3aafce` | 10-entry closed-taxonomy registry + parallel-flow lockstep wiring across chat-stream + chat.ts |
-| 36 cycle-8 doc-debt sweep | #1555 | _pending_ | M7-c8 + Phase 12 derivation stale markers rewritten |
+| 36 cycle-8 doc-debt sweep | #1555 | `6d3d3ab3` | M7-c8 + Phase 12 derivation stale markers rewritten |
 | 37 continuation-2 closure | this PR | TBD | Closure receipt |
 
 ## Continuation-2 closure receipt (2026-05-19)
