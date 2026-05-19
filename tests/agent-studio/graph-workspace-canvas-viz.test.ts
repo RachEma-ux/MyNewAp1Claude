@@ -140,3 +140,87 @@ describe("GlobalGraphView — view-mode toggle", () => {
     expect(src).toMatch(/defaultViewMode\s*=\s*["']canvas["']/);
   });
 });
+
+describe("LocalGraphCanvas — d3-force simulation wiring", () => {
+  const src = read("LocalGraphCanvas.tsx");
+
+  it("imports forceSimulation + forceLink + forceManyBody + forceRadial + forceCenter from d3-force", () => {
+    expect(src).toMatch(/from\s+["']d3-force["']/);
+    expect(src).toMatch(/forceSimulation/);
+    expect(src).toMatch(/forceLink/);
+    expect(src).toMatch(/forceManyBody/);
+    expect(src).toMatch(/forceRadial/);
+    expect(src).toMatch(/forceCenter/);
+  });
+
+  it("runs the simulation off the DOM (no animation loop — explicit .stop() + tick budget)", () => {
+    expect(src).toMatch(/\.stop\(\)/);
+    expect(src).toMatch(/for \(let i = 0; i < SIM_TICKS; i\+\+\) sim\.tick\(\)/);
+  });
+
+  it("pins the seed at the origin via fx/fy", () => {
+    expect(src).toMatch(/base\.fx = 0;\s*\n\s*base\.fy = 0;/);
+  });
+
+  it("uses a deterministic hash for initial angle seeding (no Math.random())", () => {
+    expect(src).toMatch(/function hashStringToUnit\(s: string\): number/);
+    expect(src).not.toMatch(/Math\.random\(/);
+  });
+
+  it("removes the old layoutRadial function (force replaces it)", () => {
+    expect(src).not.toMatch(/function layoutRadial/);
+    expect(src).toMatch(/function layoutForce/);
+  });
+});
+
+describe("GlobalGraphCanvas — d3-force simulation wiring", () => {
+  const src = read("GlobalGraphCanvas.tsx");
+
+  it("imports forceSimulation + forceLink + forceManyBody + forceCenter + forceX + forceY from d3-force", () => {
+    expect(src).toMatch(/from\s+["']d3-force["']/);
+    expect(src).toMatch(/forceSimulation/);
+    expect(src).toMatch(/forceLink/);
+    expect(src).toMatch(/forceManyBody/);
+    expect(src).toMatch(/forceCenter/);
+    expect(src).toMatch(/forceX/);
+    expect(src).toMatch(/forceY/);
+  });
+
+  it("runs the simulation off the DOM with explicit .stop() + tick budget", () => {
+    expect(src).toMatch(/\.stop\(\)/);
+    expect(src).toMatch(/for \(let i = 0; i < SIM_TICKS; i\+\+\) sim\.tick\(\)/);
+  });
+
+  it("anchors nodes around per-typeKey buckets via forceX + forceY (so typeKey clustering stays legible)", () => {
+    expect(src).toMatch(/typeAngle/);
+    expect(src).toMatch(/TYPE_BUCKET_RADIUS/);
+  });
+
+  it("dedups nodes + edges before feeding the simulation", () => {
+    expect(src).toMatch(/seenNodes/);
+    expect(src).toMatch(/seenEdges/);
+  });
+
+  it("no longer ships the grid-by-typeKey fallback layout", () => {
+    // The grid layout used CELL_W / CELL_H constants.
+    expect(src).not.toMatch(/CELL_W/);
+    expect(src).not.toMatch(/CELL_H/);
+  });
+});
+
+describe("d3-force dependency is declared in package.json", () => {
+  const pkg = JSON.parse(
+    readFileSync(resolve(__dirname, "../../package.json"), "utf8"),
+  );
+
+  it("d3-force is a runtime dependency", () => {
+    expect(pkg.dependencies?.["d3-force"]).toBeDefined();
+  });
+
+  it("@types/d3-force is a dev or runtime dependency", () => {
+    const declared =
+      pkg.dependencies?.["@types/d3-force"] ??
+      pkg.devDependencies?.["@types/d3-force"];
+    expect(declared).toBeDefined();
+  });
+});
