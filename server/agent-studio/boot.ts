@@ -893,13 +893,15 @@ export async function bootAgentStudio(): Promise<void> {
 
   // Step 3.35 — V1+ Phase 24 T-F.7 (2026-05-15): default lens-stack
   // installer. Env-flag-gated: AGS_GRAPH_LENS_DEFAULTS_INSTALL=on and
-  // AGS_GRAPH_LENS_STUB_RUNNERS_INSTALL=on. Both default OFF — the
-  // lens-stack ships behind a feature flag because the concrete-per-
-  // kind runners are still placeholder stubs. When both flags flip on,
-  // the operator UI surfaces 8 default lens kinds (rag / rac / cag /
+  // AGS_GRAPH_LENS_STUB_RUNNERS_INSTALL=on. Both default OFF.
+  //
+  // The stub-runner path is a deliberate fallback for operators who
+  // want to surface the 8 default lens kinds (rag / rac / cag /
   // graph_skill / mcp / governance / runtime / institutional_memory)
-  // with empty-state snapshots until concrete runners replace the
-  // stubs (T-F.8+ slices).
+  // in the dashboard before authoring the per-kind ASDB-backed
+  // runners (Step 3.36 wires those when their `_RUNNER_INSTALL` flag
+  // is on). Pick exactly one strategy per kind — Step 3.36's
+  // explanation on the dual-flag collision applies.
   try {
     const { maybeInstallDefaultLensStack } = await import(
       "./services/graph-lens/public-api"
@@ -925,8 +927,8 @@ export async function bootAgentStudio(): Promise<void> {
   // for KIND in RUNTIME / GOVERNANCE / MCP / CAG / RAG / RAC /
   // GRAPH_SKILL / INSTITUTIONAL_MEMORY. Each flag is independent —
   // operators can enable any subset, the rest fall back to whatever
-  // Step 3.35 installed (stubs when stub flag is on; nothing
-  // otherwise).
+  // Step 3.35 installed (the default empty-state runners when the
+  // stub flag is on; nothing otherwise).
   //
   // IMPORTANT: an operator who sets BOTH the stub install flag
   // (Step 3.35) AND a real install flag (this step) for the same kind

@@ -85,7 +85,15 @@ export interface ApplierResult {
 /**
  * Per-payload-kind applier surface. Each function is pure-side-effect
  * over the graph; this orchestrator wraps every call in an audit row.
- * Phase 7.5 fills in real writes; today these are no-op stubs.
+ *
+ * `DEFAULT_APPLIER_REGISTRY` returns `{ applied: true, details: { stub:
+ * true, ... } }` — intentionally no-op so unit tests can drive the
+ * orchestrator without booting a graph backend. Production code wraps
+ * the default with `createRepositoryBackedApplierRegistry`
+ * (`repository-backed-applier.ts`), which routes the writes through
+ * `GraphRepository.enqueueProjectionJob`. Apply-mode is observable on
+ * the result via the `details.stub` discriminant; the operator UI
+ * uses it to surface a "Stub apply mode" warning.
  */
 export interface ApplierRegistry {
   readonly archive_node: (payload: Extract<ProposalPayload, { kind: "archive_node" }>) => Promise<ApplierResult>;
@@ -102,8 +110,11 @@ export interface ApplierRegistry {
 
 /**
  * Default appliers — no-op stubs that log the would-be-write into
- * `details` and return `applied: true` (orchestrator-only). Phase 7.5
- * replaces these with real graph mutations.
+ * `details` and return `applied: true` (orchestrator-only). Production
+ * code overlays these with `createRepositoryBackedApplierRegistry`
+ * (`repository-backed-applier.ts`), which routes the writes through
+ * `GraphRepository.enqueueProjectionJob`. Callers that need to detect
+ * whether a real write occurred can read `details.stub`.
  *
  * `manual_review` is the sole applier that returns `applied: false` —
  * by design, no automation runs for unknown finding kinds.
