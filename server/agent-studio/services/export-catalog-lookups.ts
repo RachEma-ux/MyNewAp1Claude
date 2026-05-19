@@ -14,7 +14,7 @@ import type {
 import type { ToolRiskClass } from "./cag/types";
 
 export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
-  const { getAsDb } = await import("../db/connection");
+  const { getAsDb, getAsDbForWorkspace } = await import("../db/connection");
   const { getDb } = await import("../../db/connection");
   const repo = await import("../repository");
   const { readRiskClass } = await import("./cag/risk-classifier");
@@ -22,9 +22,13 @@ export async function buildLiveLookups(): Promise<ExportCatalogLookups> {
 
   return {
     async listPublishedAgents(filter) {
-      const asDb = getAsDb();
-      if (!asDb) return [];
       const ws = filter.workspaceId;
+      // T-B.3 — when the caller scopes by workspaceId, route the
+      // query through the workspace's region (MR-1 routing). When
+      // ws is null/undefined (catalog-wide listing), fall back to
+      // the bootstrap handle.
+      const asDb = ws != null ? (getAsDbForWorkspace(ws) ?? getAsDb()) : getAsDb();
+      if (!asDb) return [];
       const rows = (await asDb.execute(
         ws == null
           ? sql`SELECT id, workspace_id AS "workspaceId", name, lifecycle_state AS "lifecycleState",
