@@ -502,3 +502,65 @@ export async function listVisibleSavedViewsForUser(
     viewerUserId: input.viewerUserId,
   });
 }
+
+// ============================================================================
+// V1+ Phase 16-γ — restore from a version snapshot (no-deferral slice 50)
+//
+// Closes the remaining-punch-list rank-7 drill: version-history reads
+// (`listSavedViewVersions` / `getSavedViewVersionById`) shipped at Phase
+// 16-γ, but the restore *mutation* operators reach for after browsing
+// history was never wired. This function delegates to `updateSavedView`
+// so the restore itself snapshots the pre-restore row into a NEW
+// `ags_vault_saved_view_versions` entry — audit-trail preserved by
+// reuse, not re-implementation. Operators can roll back a restore by
+// restoring the version it just produced.
+// ============================================================================
+
+export class SavedViewVersionNotFoundError extends Error {
+  constructor(public readonly versionId: number) {
+    super(`Saved view version ${versionId} not found`);
+    this.name = "SavedViewVersionNotFoundError";
+  }
+}
+
+/**
+ * Restore a saved view to the snapshot at `versionId`. Composes
+ * `getSavedViewVersionById` + `updateSavedView` so the existing
+ * snapshot-before-update behavior captures the pre-restore row into a
+ * new version row (audit-trail invariant preserved).
+ *
+ * `viewKind` is not restored — it is an identity attribute of the
+ * saved view, not a versioned content field, and `UpdateSavedViewInput`
+ * intentionally has no `viewKind` field. The restore otherwise
+ * overwrites `name` / `filters` / `sort` / `columns` / `visibility`
+ * from the snapshot.
+ *
+ * Throws `SavedViewVersionNotFoundError` when the version row is
+ * absent (covers stale dashboard links). Throws
+ * `SavedViewNotFoundError` (from the inner `updateSavedView`) when the
+ * parent saved view row has been deleted since the version was
+ * captured — the version row outlives its parent, so this is a real
+ * edge case operators may hit.
+ */
+export async function restoreSavedViewVersion(
+  versionId: number,
+  options: UpdateSavedViewOptions = {},
+): Promise<SavedViewRow> {
+  const version = await getSavedViewVersionById(versionId, options);
+  if (!version) throw new SavedViewVersionNotFoundError(versionId);
+
+  const visibility: SavedViewVisibility =
+    version.visibility === "workspace_shared" ? "workspace_shared" : "personal";
+
+  return updateSavedView(
+    {
+      id: version.savedViewId,
+      name: version.name,
+      filters: version.filters,
+      sort: version.sort,
+      columns: version.columns,
+      visibility,
+    },
+    options,
+  );
+}
