@@ -937,3 +937,43 @@ should try yet another method — e.g., diff `docs/implementation/
 *.md` against actual feature surfaces, or trace operator-facing
 tRPC endpoints back to their UI consumers to find the next
 "endpoint exists, UI doesn't" gap.
+
+## Continuation-7 — punch-list end-to-end (2026-05-19)
+
+User directive: "proceed in full autonomous mode with all
+remaining-punch-list end-to-end nonstop". Continuation-7 expands
+no-deferral scope from "in-code stub markers" to "everything still
+open in `docs/implementation/agent-studio-native-graph-workspace-
+remaining-punch-list-2026-05-19.md`'s post-audit overlay".
+
+### Re-audit findings
+
+Per the punch-list truth audit (`punch-list-truth-audit-2026-05-19
+.md`), 13 of 18 ranked items had shipped pre-audit. After
+continuation-6 closed rank-7 (Phase 16-γ restore), the items still
+genuinely open are:
+
+| Audit item | Autonomous? | Notes |
+|---|---|---|
+| **T-B.1 Neo4j CE G3 benchmark execution** | No | Operator-action only (dispatch GHA workflow + commit evidence) |
+| **Phase 15 Templates UI — agent-studio standalone page** | Yes | `VaultTemplatesPanel` exists and is mounted in `RetrofitPage`, but no dedicated `VaultTemplatesPage` like the sibling `VaultSavedViewsPage` + `VaultAttachmentsPage`. |
+| **T-B.3 caller-migration tail** | Yes (partial) | 56 `services/**` files still using the workspace-unaware `getAsDb()` shim. Many are system-internal paths without a natural workspaceId; the migration is opportunistic per truth audit. |
+| **T-H V2 plugin framework + Aura migration** | No | Multi-quarter; operator-approval gated. |
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 52 | **Open continuation-7 catalogue** | This entry. Names the punch-list residuals + autonomous scoping. |
+| 53 | **`VaultTemplatesPage`** | Standalone `/agent-studio/vault-templates` page wrapping the existing `VaultTemplatesPanel`; mirrors `VaultSavedViewsPage` + `VaultAttachmentsPage` shape; App.tsx route. |
+| 54 | **T-B.3 caller-migration batch** | Audit 56 service files for clear-win migrations (call sites that already receive a workspaceId-bearing input but use the workspace-unaware shim). Migrate the batch with the closest blast radius. |
+| 55 | **Continuation-7 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names operator-gated residuals (T-B.1, T-H) explicitly. |
+
+### Continuation-7 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 52 catalogue | this PR | TBD | Opens continuation-7; punch-list end-to-end |
+| 53 VaultTemplatesPage | TBD | TBD | Standalone Phase 15 templates page |
+| 54 T-B.3 migration batch | TBD | TBD | Clear-win subset of the 56 getAsDb() sites |
+| 55 continuation-7 closure | TBD | TBD | Receipt + operator-gated residual naming |
