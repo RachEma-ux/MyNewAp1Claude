@@ -23,7 +23,7 @@
  *
  * Phase 7.5 wired the Neo4j worker (`ProjectionSyncWorker`) — this
  * service writes the "writer side" rows; the worker drains them via
- * the `*/5 * * * *` projection-drain cron (env-gated via
+ * the every-5-minute projection-drain cron (env-gated via
  * `AGS_PROJECTION_DRAIN_CRON_DISABLED`). End-to-end shipped 2026-05-18
  * across PRs #1476-#1488.
  *
