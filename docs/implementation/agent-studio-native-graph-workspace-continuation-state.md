@@ -141,13 +141,19 @@ Tracker §28 added in this T-A.44 doc-drift PR records the closure receipt.
 
 Per-PR detail in `project_td4_promotion_chain_complete.md`. Tracker §29 added in T-A.45 doc-drift PR records this closure receipt + ticks Phase 23 acceptance criteria.
 
-**Next material work (post-#1504):** With Phase 23 closed, forward roadmap items:
-- **T-D.5 runtime loop** — Graph Quality Agent feedback circuit: wire 5 selectors into `QualityAgentEngine.decideNextAction()`, persist via `applyGraphCorrection()` → `ags_graph_correction_proposals`. Phase 23 finale (~2–3 PRs).
-- **T-F.1 Bases MVP** — `ags_bases` / `ags_base_rows` / `ags_base_columns` tables + CRUD tRPC + vault wire-up. Phase 24 opener.
-- **T-F.2 Bases → KG projection** — mirror note-projection pattern; cron `*/5`. Phase 24 tier 2.
-- **T-B.2 attachment-quota integration** — wire `assertWithinQuota` into `uploadFile` + inline-attachment paths.
-- **Phase 7 ASDB graph-repo wire-in or delete** — operator-triage decision per #1445 header + memory `project_phase_7_asdb_graph_repo_orphan.md`.
-- **T-C CLAUDE.md Non-Build List reconciliation** — text was already updated for CRDT/offline/multi-region (per the V1+ plan scope block); audit for any residual contradictions remains a one-PR doc sweep.
+**2026-05-18 5-PR forward sprint (#1505–#1510) — Phase 23 / Phase 24 advance:**
+
+| # | Slug | PR | Notes |
+|---|------|----|-------|
+| 1 | T-A.45 doc-drift + Phase 23 closure receipt | #1505 | All 13 Phase 23 acceptance criteria ticked; §29 tracker entry |
+| 2 | T-D.5 post-apply verification | #1507 | Quality Agent feedback circuit; 3-outcome verdict (`verification_pass` / `_fail` / `_skipped`) on `ags_graph_correction_audit_events`; env-gated auto-hook + always-on operator tRPC `verifyProposalApply` |
+| 3 | T-F.1 Bases MVP | #1508 | Phase 24 opener: `ags_bases` / `ags_base_columns` / `ags_base_rows` + 9 tRPC procedures + 7-value `AGS_BASE_COLUMN_DATA_TYPES` taxonomy |
+| 4 | T-F.2 Bases → KG projection | #1509 | 5 new `base.*` ProjectionEvent kinds; Base/BaseRow nodes + OF_BASE + optional ROW_OF_NOTE edges; fire-and-forget enqueue from service |
+| 5 | T-B.2 attachment-quota service-layer defense | #1510 | Push `assertWithinQuota` INTO `createAttachment` so all callers (future ingestion / seeds / scripts) get the same guard; router drops the duplicate check |
+
+Per-PR detail in `project_native_graph_workspace_sprint_complete.md`. Tracker §30 added in this T-A.46 doc-drift PR records the closure receipt.
+
+**Next material work (post-#1510):** Punch list at `docs/implementation/agent-studio-native-graph-workspace-remaining-punch-list-2026-05-19.md`. Roughly 50–65 PRs of autonomous-eligible work remain (T-A.46 + T-C + T-B.3 + T-B.4 + Phase 15/16/17 UI + T-F.1/3/4/5 + T-E + T-G.1/2/3/4). T-B.1 G3 benchmark is operator-action-only; T-H is gated on operator approval.
 
 The historical (pre-strict-audit) recovery context follows.
 
