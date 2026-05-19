@@ -3039,10 +3039,12 @@ export const agentStudioRouter = router({
   // Native Graph Workspace Phase 23 T-D.3.α: Semantic Enrichment Agent
   // operator-facing read surface — listKnownProposalKinds (closed
   // taxonomy enumeration). Contracts + agent + store + proposer +
-  // evidence-collector all shipped via T-D.3/.3.1-.3.5; this is the
-  // missing tRPC mount so the operator dashboard can populate the
-  // proposal-kind picker. Recent-runs + per-run drill-in deferred to
-  // T-D.3.β (needs ASDB read methods on the store).
+  // evidence-collector all shipped via T-D.3/.3.1-.3.5; this mount
+  // lets the operator dashboard populate the proposal-kind picker.
+  // T-D.3.β (recent-runs + per-run drill-in) shipped in the
+  // semantic-enrichment-router itself — `listRecentRuns`,
+  // `getRunStats`, and `listProposals` are wired against the store
+  // alongside the read methods.
   semanticEnrichment: semanticEnrichmentRouter,
   // Phase 11.5 — graph change proposals (agent-initiated graph
   // mutations: node create/update/deprecate, edge create/update/remove,

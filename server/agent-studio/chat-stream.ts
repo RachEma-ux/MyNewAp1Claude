@@ -365,9 +365,14 @@ interface LoopStats {
  * emits the assistant content for that turn as a single SSE `token`
  * event. This is honestly degraded vs. token-by-token streaming; the
  * trade-off is that Direction A is exclusive (no raw provider key in
- * Agent Studio runtime). Tool-call streaming on Model Access is
- * deferred to a future phase that adds tool-call streaming to the
- * Model Access stream contract.
+ * Agent Studio runtime). Tool-call streaming on Model Access ships
+ * via the `streamEvents()` producer in
+ * `server/openrouter/model-access/execute.ts` (no-deferral slice 39).
+ * The chat-stream tool-loop intentionally stays on non-streaming
+ * `execute()` because the per-turn dispatch decision needs the FULL
+ * `toolCalls` set before the next turn is built; see the inline
+ * doc-block on the `executeInput` call below for the architectural
+ * decision.
  *
  * Persists the final assistant row via appendChatMessage and returns
  * its id + cumulative stats so the caller can bump session totals
