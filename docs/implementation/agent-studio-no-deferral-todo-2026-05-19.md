@@ -784,3 +784,66 @@ User directive remains honored: every gap actionable from this
 device has shipped. The remaining items name their trigger
 conditions explicitly so a future operator + future autonomous
 session can act on them without re-doing this audit.
+
+## Continuation-6 — fourth re-audit (2026-05-19)
+
+The fifth-arc closure predicted **0–1 actionable items** for the
+next re-audit. Operator returned with a sixth `build the next
+catalogue then append it to the todo list then execute`
+directive. Per continuation-5 lesson #4 ("Next re-audit can
+probably skip wide-surface grep and just spot-check the catalog
+of prior carry-forwards"), continuation-6 ran a **mixed sweep**:
+spot-check + surface-driven over adjacent docs.
+
+### Re-audit findings
+
+**Spot-check** of the 3 preserved items from continuation-5:
+
+| Item | Status |
+|---|---|
+| `chat.ts:1117` result-introspection wrapper | Unchanged. Trigger (dashboard observability gap) not surfaced. |
+| `runtime-lens-asdb-reader.ts:24` workspaceId JOIN | Unchanged. Trigger (shared-cluster deployment) not surfaced. |
+| `scripts/agent-studio/create-provider-bindings-for-legacy-agents.ts` | Unchanged. Doc-block line 38 still names operator-gated trigger ("no environment depends on it"). |
+
+**Surface-driven** sweep across new surfaces (non-`server/agent-
+studio/`, ADRs, implementation docs). Hit:
+
+- `docs/implementation/agent-studio-native-graph-workspace-
+  remaining-punch-list-2026-05-19.md` §"Post-audit closure
+  addendum" rank-7 ("Phase 16 drill — Saved-views version-history
+  + restore UI") still tagged **open** with note "no operator
+  demand surfaced (truth audit deferral)". The 13 truly-open
+  audit items had shipped; only rank-3 (operator-action) +
+  rank-7 (Phase 16 drill) + rank-18 (gated multi-quarter) remained.
+
+**Rank-7 verification.** `server/agent-studio/services/vault/
+saved-views.ts` already ships the immutable version-history shape:
+
+- `ags_vault_saved_view_versions` table populated on every
+  `updateSavedView` (snapshot BEFORE applying patch — see
+  `saved-views.ts:265-281`).
+- `listSavedViewVersions(savedViewId)` returns version-desc rows.
+- `getSavedViewVersionById(versionId)` returns one snapshot.
+- tRPC mounts at `vault.listSavedViewVersions` + `vault.
+  getSavedViewVersion` (router.ts:1090-1114).
+
+The **restore mutation is missing** — operators can read history
+but not roll back. This is the genuine "operator demand
+surfaced" gap that the punch list flagged: the read surface
+implies a restore action that doesn't yet exist.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 49 | **Open continuation-6 catalogue** | This entry. Names the rank-7 Phase 16-γ restore gap. |
+| 50 | **`restoreSavedViewVersion` mutation** | Service function + tRPC mutation. Composes `getSavedViewVersionById` + `updateSavedView` so the audit-trail invariant is preserved by reuse (the restore itself creates a NEW version snapshot of the pre-restore row). |
+| 51 | **Continuation-6 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Closes the remaining-punch-list's last autonomously-shippable open item. |
+
+### Continuation-6 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 49 catalogue | this PR | TBD | Opens continuation-6; spot-check + surface-driven re-audit; finds rank-7 Phase 16-γ restore gap |
+| 50 restore mutation | TBD | TBD | `restoreSavedViewVersion` service + tRPC mutation + tests; closes Phase 16 rank-7 drill |
+| 51 continuation-6 closure | TBD | TBD | Closure receipt + remaining-punch-list rank-7 close-out |
