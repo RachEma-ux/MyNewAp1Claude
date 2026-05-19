@@ -565,7 +565,90 @@ surfaces:
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 42 catalogue | TBD | TBD | Opens continuation-4 |
-| 43 doc-debt sweep | TBD | TBD | 5 closed-by-successor markers rewritten |
-| 44 golden-questions runner | TBD | TBD | T-D.5.γ — triggerRun mutation + persistence wiring |
-| 45 continuation-4 closure | TBD | TBD | Closure receipt + mission close |
+| 42 catalogue | #1561 | `7f74d19c` | Opens continuation-4; re-audit finds 5 closed-by-successor + 1 genuine gap (T-D.5.γ) |
+| 43 doc-debt sweep | #1562 | `7d24e7be` | 4 closed-by-successor markers rewritten (chat-stream, api/router T-D.3.β, workspace-default-bindings, realtime-doc) |
+| 44 golden-questions runner | #1563 | `2348f0b6` | T-D.5.γ — triggerLiveEvaluation mutation + composer + per-suite fail-soft persistence + 13 tests + live-engine-factory type fix |
+| 45 continuation-4 closure | this PR | TBD | Closure receipt + mission close |
+
+## Continuation-4 closure receipt (2026-05-19)
+
+The fourth continuation arc shipped 1 implementation slice + 1 doc-block
+sweep + this closure across PRs #1561–#1564. The re-audit found one
+genuine implementation gap (T-D.5.γ runner caller) and five
+closed-by-successor markers; all six closed in this arc.
+
+### Continuation-4 carry-forward lessons
+
+1. **Wide re-audit catches drift, even after consecutive sweeps.**
+   Continuation-3 swept "tabled" items based on slice-37's closure
+   paragraph. Continuation-4 ran a different query — grep over the
+   *full* surface for `deferred|skeleton|stub|TODO|FIXME` excluding
+   test-seam noise — and surfaced 5 markers continuation-3's narrow
+   list missed (the api/router.ts mount comments, the workspace-
+   default-bindings header, the realtime-doc auth-cookie default).
+   Pattern: alternate between "list-driven" sweeps (re-audit named
+   tabled items) and "surface-driven" sweeps (grep the live code
+   independently) every other arc.
+2. **Three-piece composer pattern keeps wiring slices small.** Slice
+   44's runner mutation didn't need to ship the engine, the
+   evaluator, or the persistence — those three pieces had landed in
+   earlier arcs. The composer (`trigger-live-evaluation.ts`) is a
+   ~190-line module that does nothing but call the three constructors
+   in sequence. Test-seam DI (runner factory + write store + suite
+   catalog + failure emitter) lets unit tests drive the whole flow
+   without booting any boundary. Lesson: when a vertical involves
+   multiple already-shipped primitives, the composer is its own
+   slice — keep the router file narrow to tRPC procedures.
+3. **Per-suite fail-soft persistence beats all-or-nothing.** When one
+   suite's `recordSuiteRun` throws (transient ASDB outage, table
+   constraint), the composer synthesizes a `suite_not_seeded`
+   outcome and continues with the next suite. The operator sees
+   which suite failed without losing the in-memory summary of the
+   others. Pattern: when a per-row write is reasonably independent,
+   wrap each in its own try/catch + surface failures in the
+   discriminated outcome rather than throwing past the first one.
+4. **Lockstep between router + api/router.ts mount comments.** The
+   mount comment in `api/router.ts` carries its own deferred-state
+   annotation independent of the sub-router's own doc-block. Slice
+   44 rewrote both in the same commit — the per-router comment ("read
+   surface + T-D.5.γ runner shipped") and the sub-router doc-block
+   ("Slice 44 closed T-D.5.γ"). Lesson: when you close a tRPC
+   surface's deferral, both files need the rewrite — the mount
+   comment isn't load-bearing for runtime but it IS the operator-
+   visible status indicator.
+5. **Source-of-truth seed > read-store for runner inputs.** The
+   composer loads suites from `DEFAULT_GOLDEN_QUESTION_SUITES`
+   (in-code seed) rather than reading them back from ASDB via the
+   read-store. Reasoning: the seed IS the canonical source — the
+   read-store is for the operator UI's "browse what's persisted"
+   view. Running the evaluator against the persisted shape would
+   couple the runner to a successful seed sync, and worse, would
+   silently run the wrong suites if the seed file changed but
+   `seedAsDb()` hadn't been re-run. Lesson: pick the in-code source
+   when the round-trip would obscure drift.
+
+After this slice, the no-deferral mission has shipped **45 slices
+across 4 continuation arcs** (1-26 original, 27-32 continuation-1,
+33-37 continuation-2, 38-41 continuation-3, 42-45 continuation-4).
+Post-mission audit checkpoint:
+
+- All identified gaps in `server/agent-studio/` +
+  `server/openrouter/model-access/` + `client/src/modules/agent-studio/`
+  are either closed, genuine MVP-boundary intent, intentional DI
+  stubs, or the one operator-gated residual.
+- **Operator-gated residual** (1 item):
+  `scripts/agent-studio/create-provider-bindings-for-legacy-agents.ts`
+  — deletion waits on no-env-depends confirmation.
+- **Genuine MVP-boundary intent** (documented in the original
+  "What I'm leaving alone" section): boot.ts compliance-adjacent
+  paths, ingestion artifact retention exclusion, MCP `out of scope`
+  prompt text, stale-node-scanner unsourced-node exclusion,
+  failure-states / retention vocab fields, BasesPanel markdown-
+  rendering narrow-arc decision, RegionAdminPanel + IngestionJobs
+  panel compliance-adjacent banners. These are intent, not gaps.
+
+The user's directive ("today's out-of-scopes are tomorrow's big bugs")
+was honored: every gap large enough to ship from this device has
+shipped. The remaining operator-gated item names the trigger
+condition (no-env-depends) so a future operator can act on it
+without re-deriving the deletion decision.
