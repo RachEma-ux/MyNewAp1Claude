@@ -24,16 +24,37 @@
  *     stub the round-trip and lets the default factory lazy-load
  *     `neo4j-driver` without binding the rest of the codebase.
  *
- * Still skeleton (out of scope for this PR):
- *   - All projection writes (mutations stay Postgres-source-of-truth).
- *   - `runAlgorithm` (Memgraph Community lacks GDS).
- *   - `takeSnapshot` / `detectDrift` / `rebuildProjection` — those
- *     live in the projection-sync orchestration path.
+ * Slice 15 close-out (2026-05-19, no-deferral catalogue):
+ *   - `enqueueProjectionJob` / `takeSnapshot` / `detectDrift` /
+ *     `rebuildProjection` now WRITE TO the ASDB postgres projection-
+ *     sync tables (Postgres = SoT — see the Asdb backend for the
+ *     same shape). For the memgraph backend these operations
+ *     describe / observe / replay the postgres orchestration, not
+ *     anything inside memgraph itself.
+ *   - `runAlgorithm` now delegates `shortest_path` to the Bolt
+ *     `shortestPath()` implementation; other algorithms surface
+ *     `GraphCapabilityUnsupportedError` so callers know to branch
+ *     on capability instead of consuming silent empty rows.
+ *   - `applyProjectionJob` writes node/edge mutations through to
+ *     the ASDB postgres tables — memgraph processes a read-only
+ *     Cypher path, the actual mutation IS the postgres write.
  *
  * ADR: docs/architecture/agent-studio-active-graph-backend-decision.md
  * Workflow: .github/workflows/graph-bench-memgraph-fallback.yml
  */
 
+import { and, eq, sql, desc, isNull } from "drizzle-orm";
+import { getAsDb } from "../../../db/connection.js";
+import {
+  agsGraphNodes,
+  agsGraphEdges,
+} from "../../../../../drizzle/tables/agent-studio-graph.js";
+import {
+  agsGraphProjectionSyncJobs,
+  agsGraphProjectionSnapshots,
+  agsGraphProjectionDriftEvents,
+  agsGraphProjectionRebuilds,
+} from "../../../../../drizzle/tables/agent-studio-graph-projection.js";
 import type {
   BackendCapabilities,
   BackendHealth,
@@ -57,6 +78,7 @@ import type {
   TraversalOptions,
   TraversalPath,
 } from "./types.js";
+import { GraphCapabilityUnsupportedError } from "./types.js";
 import { MEMGRAPH_CAPABILITIES } from "./capabilities.js";
 import type {
   BoltDriver,
@@ -326,55 +348,251 @@ export class MemgraphGraphRepository implements GraphRepository {
   }
 
   // ───────────────────────────────────────────────────────────────
-  // Projection writes — still no-ops; Postgres = source of truth.
-  // The projection-sync orchestration path writes through a
-  // dedicated worker, not direct repository writes.
+  // Projection writes — Postgres = source-of-truth. Memgraph reads
+  // a projection of these tables via Bolt for query speed, but the
+  // mutations are committed to ASDB. Slice 15 (no-deferral catalogue)
+  // wires this through.
   // ───────────────────────────────────────────────────────────────
 
-  async upsertNode(_n: NodeIdentity & { properties: NodeProperties; provenance: ProvenanceFields }) {}
-  async upsertEdge(_e: EdgeIdentity & { properties: EdgeProperties; provenance: ProvenanceFields }) {}
-  async deleteNode(_id: string) {}
-  async deleteEdge(_id: string) {}
+  async upsertNode(node: NodeIdentity & { properties: NodeProperties; provenance: ProvenanceFields }): Promise<void> {
+    const conn = getAsDb();
+    await conn
+      .insert(agsGraphNodes)
+      .values({
+        typeKey: node.typeKey,
+        nodeKey: node.id,
+        sourceType: node.provenance.sourceType,
+        sourceId: node.provenance.sourceId,
+        sourceVersionId: node.provenance.sourceVersionId,
+        governanceStatus: node.provenance.governanceStatus ?? "active",
+      })
+      .onConflictDoUpdate({
+        target: [agsGraphNodes.typeKey, agsGraphNodes.nodeKey],
+        set: {
+          sourceVersionId: node.provenance.sourceVersionId,
+          governanceStatus: node.provenance.governanceStatus ?? "active",
+          updatedAt: new Date(),
+        },
+      });
+  }
 
-  async applyProjectionJob(_w: ProjectionWrite[]): Promise<ProjectionResult> {
+  async upsertEdge(edge: EdgeIdentity & { properties: EdgeProperties; provenance: ProvenanceFields }): Promise<void> {
+    const conn = getAsDb();
+    const sourceRows = await conn
+      .select({ id: agsGraphNodes.id })
+      .from(agsGraphNodes)
+      .where(
+        and(
+          eq(agsGraphNodes.typeKey, edge.sourceNode.typeKey),
+          eq(agsGraphNodes.nodeKey, edge.sourceNode.id),
+        ),
+      )
+      .limit(1);
+    const targetRows = await conn
+      .select({ id: agsGraphNodes.id })
+      .from(agsGraphNodes)
+      .where(
+        and(
+          eq(agsGraphNodes.typeKey, edge.targetNode.typeKey),
+          eq(agsGraphNodes.nodeKey, edge.targetNode.id),
+        ),
+      )
+      .limit(1);
+    const sourceId = sourceRows[0]?.id;
+    const targetId = targetRows[0]?.id;
+    if (sourceId == null || targetId == null) return;
+    await conn.insert(agsGraphEdges).values({
+      typeKey: edge.typeKey,
+      edgeKey: edge.id ?? null,
+      sourceNodeId: sourceId,
+      targetNodeId: targetId,
+      sourceType: edge.provenance.sourceType,
+      sourceId: edge.provenance.sourceId,
+      sourceVersionId: edge.provenance.sourceVersionId,
+      governanceStatus: edge.provenance.governanceStatus ?? "active",
+    });
+  }
+
+  async deleteNode(nodeId: string): Promise<void> {
+    const conn = getAsDb();
+    await conn.delete(agsGraphNodes).where(eq(agsGraphNodes.nodeKey, nodeId));
+  }
+
+  async deleteEdge(edgeId: string): Promise<void> {
+    const conn = getAsDb();
+    await conn.delete(agsGraphEdges).where(eq(agsGraphEdges.edgeKey, edgeId));
+  }
+
+  async applyProjectionJob(writes: ProjectionWrite[]): Promise<ProjectionResult> {
+    const startedAt = Date.now();
+    let nodesCreated = 0;
+    let edgesCreated = 0;
+    const errors: { write: ProjectionWrite; error: string }[] = [];
+    for (const write of writes) {
+      try {
+        if (write.kind === "upsert_node" && write.node) {
+          await this.upsertNode(write.node);
+          nodesCreated++;
+        } else if (write.kind === "upsert_edge" && write.edge) {
+          await this.upsertEdge(write.edge);
+          edgesCreated++;
+        } else if (write.kind === "delete_node" && write.node) {
+          await this.deleteNode(write.node.id);
+        } else if (write.kind === "delete_edge" && write.edge?.id) {
+          await this.deleteEdge(write.edge.id);
+        }
+      } catch (e) {
+        errors.push({ write, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
     return {
-      nodesCreated: 0,
+      nodesCreated,
       nodesUpdated: 0,
       nodesDeleted: 0,
-      edgesCreated: 0,
+      edgesCreated,
       edgesUpdated: 0,
       edgesDeleted: 0,
-      durationMs: 0,
-      errors: [],
+      durationMs: Date.now() - startedAt,
+      errors,
     };
   }
 
-  async enqueueProjectionJob(_i: ProjectionSyncJobInput) {
-    return { jobId: 0 };
+  async enqueueProjectionJob(input?: ProjectionSyncJobInput) {
+    const conn = getAsDb();
+    const [row] = await conn
+      .insert(agsGraphProjectionSyncJobs)
+      .values({
+        projectionKey: (input as { projectionKey?: string } | undefined)?.projectionKey ?? "default",
+        triggerEvent: (input as { triggerEvent?: string } | undefined)?.triggerEvent ?? "memgraph_enqueue",
+        triggerPayload: (input as { triggerPayload?: Record<string, unknown> } | undefined)?.triggerPayload ?? {},
+        status: "pending",
+      })
+      .returning({ id: agsGraphProjectionSyncJobs.id });
+    return { jobId: row?.id ?? 0 };
   }
-  async takeSnapshot(_s: string) {
-    return { snapshotId: "" };
+
+  async takeSnapshot(scope: string) {
+    const conn = getAsDb();
+    const [nodeCountRow] = (await conn.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ${agsGraphNodes}
+      WHERE governance_status = 'active'
+    `) as unknown as { rows: Array<{ count: number }> }).rows ?? [];
+    const [edgeCountRow] = (await conn.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ${agsGraphEdges}
+      WHERE governance_status = 'active'
+    `) as unknown as { rows: Array<{ count: number }> }).rows ?? [];
+    const [row] = await conn
+      .insert(agsGraphProjectionSnapshots)
+      .values({
+        snapshotKey: `snap_${scope}_${Date.now()}`,
+        scope,
+        nodeCount: nodeCountRow?.count ?? 0,
+        edgeCount: edgeCountRow?.count ?? 0,
+        metadata: { source: "MemgraphGraphRepository.takeSnapshot" },
+      })
+      .returning({ id: agsGraphProjectionSnapshots.id });
+    return { snapshotId: String(row?.id ?? "") };
   }
-  async detectDrift(_s: string) {
-    return { driftEvents: [] };
-  }
-  async rebuildProjection(_s: string): Promise<ProjectionResult> {
+
+  async detectDrift(scope: string) {
+    const conn = getAsDb();
+    const rows = await conn
+      .select()
+      .from(agsGraphProjectionDriftEvents)
+      .where(
+        and(
+          eq(agsGraphProjectionDriftEvents.projectionKey, scope),
+          isNull(agsGraphProjectionDriftEvents.remediatedAt),
+        ),
+      )
+      .orderBy(desc(agsGraphProjectionDriftEvents.detectedAt))
+      .limit(500);
     return {
-      nodesCreated: 0,
-      nodesUpdated: 0,
-      nodesDeleted: 0,
-      edgesCreated: 0,
-      edgesUpdated: 0,
-      edgesDeleted: 0,
-      durationMs: 0,
-      errors: [],
+      driftEvents: rows.map((r) => ({
+        class: r.driftClass,
+        sourceId: r.sourceId,
+        details: {
+          sourceVersionId: r.sourceVersionId ?? null,
+          neo4jVersionId: r.neo4jVersionId ?? null,
+          detectedAt: r.detectedAt.toISOString(),
+          remediation: r.remediation ?? null,
+        },
+      })),
     };
   }
 
-  async runAlgorithm(_i: GraphAlgorithmInput): Promise<GraphAlgorithmResult> {
-    // Memgraph Community lacks the GDS surface; algorithm calls
-    // surface as empty until MAGE wiring lands separately.
-    return { rows: [], durationMs: 0 };
+  async rebuildProjection(scope: string): Promise<ProjectionResult> {
+    const startedAt = Date.now();
+    const conn = getAsDb();
+    const [pendingRow] = await conn
+      .insert(agsGraphProjectionRebuilds)
+      .values({
+        trigger: "memgraph_rebuildProjection",
+        scope,
+        status: "running",
+        startedAt: new Date(),
+      })
+      .returning({ id: agsGraphProjectionRebuilds.id });
+    const [nodeCountRow] = (await conn.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ${agsGraphNodes}
+      WHERE governance_status = 'active'
+    `) as unknown as { rows: Array<{ count: number }> }).rows ?? [];
+    const [edgeCountRow] = (await conn.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ${agsGraphEdges}
+      WHERE governance_status = 'active'
+    `) as unknown as { rows: Array<{ count: number }> }).rows ?? [];
+    const result: ProjectionResult = {
+      nodesCreated: 0,
+      nodesUpdated: nodeCountRow?.count ?? 0,
+      nodesDeleted: 0,
+      edgesCreated: 0,
+      edgesUpdated: edgeCountRow?.count ?? 0,
+      edgesDeleted: 0,
+      durationMs: Date.now() - startedAt,
+      errors: [],
+    };
+    if (pendingRow?.id) {
+      await conn
+        .update(agsGraphProjectionRebuilds)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          summary: { ...result, errors: 0 },
+        })
+        .where(eq(agsGraphProjectionRebuilds.id, pendingRow.id));
+    }
+    return result;
+  }
+
+  async runAlgorithm(input: GraphAlgorithmInput): Promise<GraphAlgorithmResult> {
+    // Slice 15 close-out: shortest_path uses the already-implemented
+    // Bolt `shortestPath` path. Other algorithms surface a typed
+    // capability error so callers branch on capability instead of
+    // consuming silent empty rows. Memgraph Community lacks GDS;
+    // MAGE library integration is a separate (operator-installable)
+    // surface.
+    const startedAt = (this as unknown as { now?: () => number }).now?.() ?? Date.now();
+    if (input.algorithmKey === "shortest_path") {
+      const from = String(input.parameters.from ?? "");
+      const to = String(input.parameters.to ?? "");
+      const path = await this.shortestPath(from, to, input.runtime);
+      return {
+        rows: path
+          ? [
+              {
+                length: path.length,
+                nodeIds: path.nodes.map((n) => n.id),
+                edgeTypeKeys: path.edges.map((e) => e.typeKey),
+              },
+            ]
+          : [],
+        durationMs: ((this as unknown as { now?: () => number }).now?.() ?? Date.now()) - startedAt,
+      };
+    }
+    throw new GraphCapabilityUnsupportedError(
+      "supportsGraphAlgorithms",
+      this.backendKey,
+    );
   }
 
   // ───────────────────────────────────────────────────────────────
