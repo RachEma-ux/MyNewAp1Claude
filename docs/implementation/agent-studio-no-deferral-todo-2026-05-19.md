@@ -298,3 +298,49 @@ one-command scripts shipped in slices 24 + 25 of the original mission
    shipped within the same arc but the doc-block was forgotten. Worth
    sweeping at the close of every arc, not just at the close of a
    mission.
+
+---
+
+## Continuation mission 2 (2026-05-19, post-slice-32)
+
+**Trigger:** the slice-32 closure paragraph named 7 "tabled architectural sub-arcs." Re-audit confirmed that 3 of the 7 are genuinely closed-by-successor (the successor code shipped in earlier arcs but the deferral comment was never rewritten) and 3 are tractable single-PR work today. The remaining are real multi-PR migration arcs awaiting separate catalogues.
+
+### Re-audit of the 7 tabled items
+
+| Item | Status | Action |
+|---|---|---|
+| Tool-call streaming on Model Access | Multi-PR contract extension | Tabled — separate catalogue when Model Access streaming contract is touched |
+| Model-registry-driven context budget | Tractable single PR | Ship in slice 35 |
+| AI Types catalog availability (Phase 12.b) | Tractable single PR | Ship in slice 34 |
+| Drain legacy fixtures helper deletion | Operator-gated (helper is operator-callable; deletion waits on no-env-depends) | Tabled — genuine operator-action residual |
+| RAC orchestration error registry (M7-c8) | **Closed-by-successor** | Doc-debt sweep in slice 36 — `orchestration-error.ts` ships the registry; the doc-block at `rac-orchestrator.ts:86` is stale |
+| Per-source RAC planner derivation | **Closed-by-successor** | Doc-debt sweep in slice 36 — `derivePlannerMode` already emits the 7 GraphRAG modes via `readGraphragRetrievalMethod`; the doc-block at `planner-mode.ts:26,167` is stale |
+| Workspace-default-bindings LR-02/03/04/08 | Multi-file caller migrations | Tabled — each LR is its own migration arc per `PHASE_28_EXECUTION_PLAN.md` |
+
+### Continuation-2 slices
+
+| # | Slice | File:line | Action |
+|---|---|---|---|
+| 33 | **This catalogue** | this doc | Opens continuation-2 |
+| 34 | **AI Types catalog cross-check** | `server/agent-studio/bindings.ts:501` + `validateBindingPolicy` | Add opt-in `crossCheckCatalog` option; when set, `validateBindingPolicy` calls `listAvailableProviderModels` and surfaces `catalogAvailable: true|false` instead of `null`. Default remains `null` for legacy callers — opt-in keeps the existing latency profile. |
+| 35 | **Per-model context-window registry** | `server/agent-studio/services/runtime/context-window.ts:37` + `chat-stream.ts:175` + new `model-context-windows.ts` | Add a closed-taxonomy map `{ modelRef → tokenBudget }` covering the production models the workspace routes to. `chat-stream.ts` resolves `maxTokens` from the registry given the bound model ref, falling back to `MAX_CONTEXT_TOKENS` env when the ref is unknown. |
+| 36 | **Doc-debt sweep continuation-2** | `rac-orchestrator.ts:86` + `planner-mode.ts:26,167` | Rewrite stale "deferred to a follow-up" / "deferred until per-source retrieval-method metadata lands" markers; both successors have shipped. |
+| 37 | **Continuation-2 closure receipt** | this doc | Per-slice merge SHAs + carry-forward lessons |
+
+### Continuation-2 execution order
+
+1. **Slice 33** (this catalogue) — opens the contract.
+2. **Slice 34** (AI Types catalog cross-check) — single function, isolated.
+3. **Slice 35** (per-model context-window registry) — new module + 2 callers.
+4. **Slice 36** (doc-debt sweep) — text-only on 2 files; closes the cycle-8 doc-debt.
+5. **Slice 37** (closure receipt).
+
+### Continuation-2 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 33 catalogue | TBD | TBD | Opens continuation-2 |
+| 34 AI Types catalog cross-check | TBD | TBD | Opt-in catalogAvailable boolean |
+| 35 per-model context-window registry | TBD | TBD | Closed-taxonomy registry + chat-stream wiring |
+| 36 cycle-8 doc-debt sweep | TBD | TBD | 2 stale markers rewritten |
+| 37 continuation-2 closure | TBD | TBD | Closure receipt |
