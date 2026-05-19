@@ -54,6 +54,7 @@ import { awaitApprovalDecision } from "./runtime/approval-resume-loop";
 // H8-c7 (cycle-7 audit closure §H8-c7): conversation-context windowing
 // before each model.execute() call. Mirrors chat-stream.ts wire-up.
 import { windowChatHistory } from "./runtime/context-window";
+import { resolveContextTokenBudget } from "./runtime/model-context-windows";
 // H5-c8 (cycle-8 audit closure §H5-c8): strict tool-row reconstructor.
 // Mirrors chat-stream.ts's import; the helper drops malformed rows +
 // emits a rate-limited breadcrumb so chatty sessions don't flood
@@ -479,13 +480,19 @@ async function runChatWithToolsViaBinding(input: {
       }
     }
 
-    // H8-c7: window the conversation history to fit MAX_CONTEXT_TOKENS
-    // BEFORE the model.execute() call. Mirrors chat-stream.ts's
-    // wire-up exactly so both flows behave identically (parallel-flow
-    // lockstep). On truncation, emit a best-effort context_truncation
-    // audit row for operator visibility.
+    // H8-c7: window the conversation history BEFORE the
+    // model.execute() call. Mirrors chat-stream.ts's wire-up exactly
+    // so both flows behave identically (parallel-flow lockstep).
+    //
+    // Slice 35 (no-deferral continuation-2, 2026-05-19): the per-
+    // model registry resolves a model-specific tokenBudget; unknown
+    // refs fall back to the env-tuned MAX_CONTEXT_TOKENS.
+    //
+    // On truncation, emit a best-effort context_truncation audit
+    // row for operator visibility.
+    const budget = resolveContextTokenBudget(input.modelRef, MAX_CONTEXT_TOKENS);
     const windowed = windowChatHistory(messages, {
-      maxTokens: MAX_CONTEXT_TOKENS,
+      maxTokens: budget.tokens,
     });
     if (windowed.truncated) {
       try {
@@ -495,7 +502,9 @@ async function runChatWithToolsViaBinding(input: {
           decision: "warn",
           reason: "context_window_exceeded",
           payload: {
-            maxTokens: MAX_CONTEXT_TOKENS,
+            maxTokens: budget.tokens,
+            modelRef: input.modelRef,
+            registryEntry: budget.entry?.label ?? null,
             evictedCount: windowed.evictedCount,
             estimatedTokens: windowed.estimatedTokens,
             keptCount: windowed.messages.length,

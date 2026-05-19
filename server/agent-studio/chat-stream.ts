@@ -71,6 +71,10 @@ import { awaitApprovalDecision } from "./services/runtime/approval-resume-loop";
 // before each model.execute() call. Bounded by MAX_CONTEXT_TOKENS env
 // var (default 32000). Pre-cycle-7 long sessions grew unbounded.
 import { windowChatHistory } from "./services/runtime/context-window";
+import {
+  resolveContextTokenBudget,
+  type ModelContextWindowEntry,
+} from "./services/runtime/model-context-windows";
 // H5-c8 (cycle-8 audit closure §H5-c8): strict tool-row reconstructor.
 // Replaces the legacy `tp?.toolCallId ?? ""` fallback that masked
 // drift in the persistence-shape contract. Helper drops malformed
@@ -173,13 +177,16 @@ const MAX_CALLS_PER_TOOL_PER_REQUEST = (() => {
  * call. Default 32000 — covers GPT-4 Turbo / Claude 3 with
  * headroom for the model's response. Operator override via
  * `MAX_CONTEXT_TOKENS` env var to match deployment-specific
- * model windows; out-of-range values warn + fall back.
+ * model windows; out-of-range values warn + fall back. This stays as
+ * the fallback budget for model refs not registered in
+ * `services/runtime/model-context-windows.ts`.
  *
- * Single global budget rather than model-specific; model-aware
- * windowing (read context_window from a per-model registry) is
- * deferred to cycle-8 — requires a registry that doesn't exist
- * yet. The estimate is intentionally a heuristic (chars/4) so
- * tuning the env var is the right knob, not adjusting the math.
+ * Model-aware windowing landed in slice 35 of the no-deferral
+ * continuation-2 catalogue (2026-05-19). When the bound model is in
+ * the registry, the per-model `tokenBudget` overrides this env var;
+ * unknown refs (operator added a new model that isn't in the closed
+ * taxonomy yet) fall back here. The estimate stays a heuristic
+ * (chars/4) so per-model tuning happens in the registry, not the math.
  */
 const MAX_CONTEXT_TOKENS = (() => {
   const raw = process.env.MAX_CONTEXT_TOKENS;
@@ -524,13 +531,18 @@ async function runStreamingToolLoop(args: {
       }
     }
 
-    // H8-c7: window the message history to fit MAX_CONTEXT_TOKENS
-    // BEFORE the model.execute() call. Pre-cycle-7 long sessions
-    // grew unbounded until the provider's context limit was hit
-    // and the chat failed unrecoverably. The helper preserves the
-    // system message + as much recent history as fits.
+    // H8-c7: window the message history to fit BEFORE the
+    // model.execute() call. Pre-cycle-7 long sessions grew unbounded
+    // until the provider's context limit was hit and the chat failed
+    // unrecoverably. The helper preserves the system message + as
+    // much recent history as fits.
+    //
+    // Slice 35 (no-deferral continuation-2, 2026-05-19): the per-
+    // model registry resolves a model-specific tokenBudget; unknown
+    // refs fall back to the env-tuned MAX_CONTEXT_TOKENS.
+    const budget = resolveContextTokenBudget(modelRef, MAX_CONTEXT_TOKENS);
     const windowed = windowChatHistory(messagesForModelAccess, {
-      maxTokens: MAX_CONTEXT_TOKENS,
+      maxTokens: budget.tokens,
     });
     if (windowed.truncated) {
       // Best-effort observability — operators can grep for
@@ -545,7 +557,9 @@ async function runStreamingToolLoop(args: {
           decision: "warn",
           reason: "context_window_exceeded",
           payload: {
-            maxTokens: MAX_CONTEXT_TOKENS,
+            maxTokens: budget.tokens,
+            modelRef,
+            registryEntry: budget.entry?.label ?? null,
             evictedCount: windowed.evictedCount,
             estimatedTokens: windowed.estimatedTokens,
             keptCount: windowed.messages.length,
