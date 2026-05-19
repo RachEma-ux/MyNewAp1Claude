@@ -56,3 +56,34 @@ Smallest-to-ship first → unblocks larger work. T-A.46 + T-C are pure doc work.
 T-B.1 is operator-action only — skip in autonomous mode.
 
 T-H requires operator approval — skip in autonomous mode.
+
+## Post-audit closure addendum (2026-05-19)
+
+After this punch-list was drafted, the 2026-05-19 finish run shipped PRs #1511–#1517 and produced the **truth audit** (`agent-studio-native-graph-workspace-punch-list-truth-audit-2026-05-19.md`) which discovered that **13 of the 18 ranked items had already shipped pre-audit** via concurrent execution. The `open` status column above reflects this document's drafting state and should be cross-checked against the truth audit for actual state.
+
+Status overlay (post-audit):
+
+| Rank | Item | Post-audit state |
+|---|---|---|
+| 1 | T-A.46 doc-drift | **shipped** (#1511 `8abb7c07`) |
+| 2 | T-C CLAUDE.md reclassification | **shipped** (#1512 `80d9b167`) |
+| 3 | T-B.1 G3 benchmark execution | open — operator-action only (not autonomous) |
+| 4 | T-B.3 MR-1 caller migration tail | **shipped (initial closure)** — #1513 (`05b75ca0`) export-catalog + #1516 (`6535df6b`) bases-service; ongoing tail as new caller sites land |
+| 5 | T-B.4 Extension lane hooks | **shipped** (#1514 `4f7550e0` default static-data lane hooks installer) |
+| 6 | Phase 15 UI | **partial** — VaultTemplatesPanel shipped (#1517 `1ef2d6e1`); AttachmentLibrary UI was already on `main` pre-audit (per truth-audit evidence) |
+| 7 | Phase 16 drill | open — no operator demand surfaced (truth audit deferral) |
+| 8 | Phase 17 UI | **already shipped pre-audit** (CanvasOperatorPage + CanvasOperatorPanel) per truth audit |
+| 9 | T-F.1 Lens Registry | **already shipped pre-audit** (T-F.7/T-F.70 — 10-value GRAPH_LENS_KINDS taxonomy) |
+| 10 | T-F.3 Impact Analysis Lens | **already shipped pre-audit** |
+| 11 | T-F.4 Quality Lens UI | **already shipped pre-audit** (GraphQualityFindingsPanel + page) |
+| 12 | T-F.5 Runtime Lens | **already shipped pre-audit** |
+| 13 | T-E Code Graph Parser spike | **already shipped pre-audit** (PRs #1363–#1367) |
+| 14 | T-G.1 Institutional Memory | **already shipped pre-audit** |
+| 15 | T-G.2 Code Intelligence Graph | **already shipped pre-audit** (code-graph services) |
+| 16 | T-G.3 Security / DevSecOps Lens | **already shipped pre-audit** |
+| 17 | T-G.4 Recommendation Service | **already shipped pre-audit** |
+| 18 | T-H V2 plugin framework + Aura migration | gated — operator approval (multi-quarter) |
+
+**Net remaining (genuinely open for autonomous scope): 0.** Only operator-action items (T-B.1) and operator-approval-gated items (T-H) remain.
+
+See the truth audit doc for per-item code evidence.
