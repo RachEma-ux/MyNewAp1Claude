@@ -517,3 +517,55 @@ across 3 continuation arcs (1-26 original mission, 27-32 continuation-1,
 `server/openrouter/model-access/` are either closed, genuine MVP-
 boundary documentation, intentional DI stubs, or operator-gated
 external-infrastructure residuals.
+
+---
+
+## Continuation mission 4 (2026-05-19, post-slice-41)
+
+**Trigger:** post-slice-41 wide re-audit over `server/agent-studio/` +
+`server/openrouter/model-access/` + `client/src/modules/agent-studio/`
+for `deferred|skeleton|stub|out of scope|TODO|FIXME` (excluding
+test-seam DI references, closure records, and MVP-boundary intent)
+surfaces:
+
+| Finding | Count | Action |
+|---|---|---|
+| Closed-by-successor doc-debt | 5 | Slice 43 sweep |
+| Genuine implementation gap (operator-callable now) | 1 | Slice 44 — golden-questions live-eval runner caller |
+| Genuine MVP-boundary intent (leave) | ~10 | Documented in earlier "What I'm leaving alone" section |
+| Operator-gated residual | 1 | Legacy-fixture helper deletion — waits on no-env-depends signal |
+
+### Re-audit findings — closed-by-successor
+
+| Marker | Successor | Slice |
+|---|---|---|
+| `chat-stream.ts:369` — "Tool-call streaming on Model Access is deferred to a future phase" | `streamEvents()` in execute.ts (slice 39 / #1558) | 43 |
+| `api/router.ts:3044` — "Recent-runs + per-run drill-in deferred to T-D.3.β" | `listRecentRuns` / `getRunStats` / `listProposals` in semantic-enrichment-router (T-D.3.β shipped) | 43 |
+| `api/router.ts:3076` — "Run-lifecycle persistence + caller deferred to T-D.5.β/.γ" | Closed by slice 44 below (T-D.5.γ runner mutation) | 43 (after slice 44 merges) |
+| `workspace-default-bindings.ts:7` — "consumed by the 4 deferred Phase 29 caller migrations (LR-02 / LR-03 / LR-04 / LR-08)" | All 4 migrated in Phase 29.4-29.6 (verified by continuation-3 slice 40 source-scan) | 43 |
+| `realtime-doc-websocket-bridge.ts:189` — "Auth-cookie resolver lands in a follow-up PR" | `createDefaultGetUserIdFromUpgradeRequest` in realtime-doc-default-getuserid.ts (shipped via PR-V1-38 #789) | 43 |
+
+### Continuation-4 slices
+
+| # | Slice | File:line | Action |
+|---|---|---|---|
+| 42 | **This catalogue** | this doc | Opens continuation-4 |
+| 43 | **Doc-debt sweep (continuation-4)** | 5 files | Rewrite the 5 markers above to name their live successors. |
+| 44 | **Golden-questions triggerRun mutation (T-D.5.γ)** | `golden-questions-router.ts` + new procedure | Admin mutation that composes `buildLiveEngine` + `runLiveEvaluation` + `createGoldenQuestionsWriteStore.recordSuiteRun` to persist results to `ags_golden_question_runs` / `ags_golden_question_results`. Closes the `golden-questions-router.ts:15-28` "Deferred — run lifecycle persistence + caller" doc-block. |
+| 45 | **Continuation-4 closure receipt** | this doc | Per-slice merge SHAs + carry-forward lessons. Mission close if nothing new surfaces. |
+
+### Continuation-4 execution order
+
+1. **Slice 42** (this catalogue) — opens the contract.
+2. **Slice 43** (doc-debt sweep) — text-only on 5 files; lowest risk; clears the closure trail.
+3. **Slice 44** (golden-questions triggerRun) — admin mutation; composes existing pieces; persistence already exists.
+4. **Slice 45** (closure receipt + mission close).
+
+### Continuation-4 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 42 catalogue | TBD | TBD | Opens continuation-4 |
+| 43 doc-debt sweep | TBD | TBD | 5 closed-by-successor markers rewritten |
+| 44 golden-questions runner | TBD | TBD | T-D.5.γ — triggerRun mutation + persistence wiring |
+| 45 continuation-4 closure | TBD | TBD | Closure receipt + mission close |
