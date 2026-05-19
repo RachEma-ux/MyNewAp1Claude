@@ -397,3 +397,57 @@ The next continuation arc opens when an operator wants to take on the
   when no environment still depends on the migration helper.
 - **LR-02 / LR-03 / LR-04 / LR-08 caller migrations** — each is its
   own multi-file caller migration arc per `PHASE_28_EXECUTION_PLAN.md`.
+
+---
+
+## Continuation mission 3 (2026-05-19, post-slice-37)
+
+**Trigger:** the slice-37 closure named 5 tabled sub-arcs. Re-audit
+confirmed **4 of the 5 are already shipped** — LR-02 / LR-03 / LR-04 /
+LR-08 caller migrations all reference workspace-default-binding
+resolution + `gatewayCall(openRouter.modelAccess.*)` per Phase 29.4-29.6
+on main today. Continuation-2's closure paragraph was wrong to keep them
+tabled; the references came from `PHASE_28_EXECUTION_PLAN.md`, which
+predates the Phase 29 migrations.
+
+The 5th tabled item — **tool-call streaming on Model Access** — is
+genuinely shippable as a single PR: the contract surface
+(`ModelAccessStreamEvent` discriminated union with `text_delta` /
+`tool_call_delta` / `tool_call_complete` / `done`) already exists in
+`types.ts:174`; only the producer is missing.
+
+### Re-audit of the 5 originally-tabled items
+
+| Item | Status | Evidence |
+|---|---|---|
+| Tool-call streaming on Model Access | Tractable single PR | `types.ts:174` ships the contract; `execute.ts:315` is the production gap |
+| Drain legacy fixtures helper deletion | Operator-gated (no-env-depends signal) | Tabled until operator confirms no environment depends on the helper |
+| LR-02 embeddings caller | **Already migrated** | `server/embeddings/service.ts` uses `gatewayCall(openRouter.modelAccess.embed)` via workspace default binding |
+| LR-03 documents/processor caller | **Already migrated** | `documents/processor.ts:340` lazy-imports `getEmbeddingService()` (Phase 29.4b) |
+| LR-04 operators/provider-hub caller | **Already migrated** | `operators/provider-hub.ts:70` throws `OperatorBindingError` + uses `ags_workspace_default_provider_bindings` (role=`classifier`) |
+| LR-08 chat/stream + automation | **Already migrated** | `chat/stream.ts:134` calls `resolveWorkspaceContext` (post-LR-08); `automation/block-executors.ts:230` ships `executeInvokeAgent` with Path B refuse |
+
+### Continuation-3 slices
+
+| # | Slice | File:line | Action |
+|---|---|---|---|
+| 38 | **This catalogue** | this doc | Opens continuation-3 |
+| 39 | **Model Access streamEvents producer** | `server/openrouter/model-access/execute.ts` (+ types.ts) | Implement `streamEvents()` async generator that emits the existing `ModelAccessStreamEvent` union. Parse OpenAI SSE `delta.tool_calls` with per-index accumulation; emit `tool_call_delta` chunks with partial JSON, then `tool_call_complete` with the reconstructed call. Anthropic falls back to non-streaming `execute()` + single emit of the full output as one `text_delta` + zero-or-more `tool_call_complete`. |
+| 40 | **Doc-debt sweep (LR + tool-call streaming markers)** | `execute.ts:315` + `types.ts:146` + `chat-stream.ts:577` + this catalogue's closure paragraph | Rewrite "tool-call streaming is deferred to Phase 17/18" (closed by slice 39) and the closure paragraph's "LR-02/03/04/08 caller migrations" mention (all 4 already shipped). |
+| 41 | **Continuation-3 closure receipt** | this doc | Per-slice merge SHAs + carry-forward lessons |
+
+### Continuation-3 execution order
+
+1. **Slice 38** (this catalogue) — opens the contract.
+2. **Slice 39** (streamEvents producer) — single file in Model Access; the contract surface is already locked.
+3. **Slice 40** (doc-debt sweep) — text-only on 3 files + this doc; closes the closed-by-successor markers.
+4. **Slice 41** (closure receipt).
+
+### Continuation-3 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 38 catalogue | TBD | TBD | Opens continuation-3 |
+| 39 streamEvents producer | TBD | TBD | OpenAI SSE tool-call accumulation + Anthropic fallback |
+| 40 doc-debt sweep | TBD | TBD | Tool-call streaming + LR-XX markers closed |
+| 41 continuation-3 closure | TBD | TBD | Closure receipt |
