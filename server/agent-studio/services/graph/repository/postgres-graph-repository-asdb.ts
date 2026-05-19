@@ -97,9 +97,44 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
       // ordering (nodes before edges).
       return;
     }
+    // Dedup invariant (slice 4 of the no-deferral catalogue):
+    // `idx_ags_graph_edges_type_edge_key` is a partial unique index
+    // on (type_key, edge_key) WHERE edge_key IS NOT NULL. When the
+    // caller supplies a stable EdgeIdentity.id (projection-sync always
+    // does), `onConflictDoUpdate` upgrades the row in place instead
+    // of leaving duplicate (typeKey, edgeKey) pairs that the canvas
+    // viz had to dedup client-side.
+    if (edge.id) {
+      await conn
+        .insert(agsGraphEdges)
+        .values({
+          typeKey: edge.typeKey,
+          edgeKey: edge.id,
+          sourceNodeId: sourceId,
+          targetNodeId: targetId,
+          sourceType: edge.provenance.sourceType,
+          sourceId: edge.provenance.sourceId,
+          sourceVersionId: edge.provenance.sourceVersionId,
+          governanceStatus: edge.provenance.governanceStatus ?? "active",
+        })
+        .onConflictDoUpdate({
+          target: [agsGraphEdges.typeKey, agsGraphEdges.edgeKey],
+          set: {
+            sourceNodeId: sourceId,
+            targetNodeId: targetId,
+            sourceVersionId: edge.provenance.sourceVersionId,
+            governanceStatus: edge.provenance.governanceStatus ?? "active",
+            updatedAt: new Date(),
+          },
+        });
+      return;
+    }
+    // Null edgeKey — legacy/derived computed edges with no stable
+    // key. The partial unique index ignores them; blind insert is
+    // the only available shape.
     await conn.insert(agsGraphEdges).values({
       typeKey: edge.typeKey,
-      edgeKey: edge.id,
+      edgeKey: null,
       sourceNodeId: sourceId,
       targetNodeId: targetId,
       sourceType: edge.provenance.sourceType,
