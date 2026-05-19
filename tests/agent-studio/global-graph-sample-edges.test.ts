@@ -47,13 +47,26 @@ describe("AsdbPostgresGraphRepository.globalGraphSample — edge sample (source-
     );
   });
 
-  it("filters edges to those whose endpoints are both in the sampled node set", () => {
-    expect(method).toMatch(/sn\.node_key IN \(\$\{sampledKeyList\}\)/);
-    expect(method).toMatch(/tn\.node_key IN \(\$\{sampledKeyList\}\)/);
+  it("filters edges to those with AT LEAST ONE endpoint in the sampled node set (boundary inclusion)", () => {
+    // Boundary-node fetch slice (2026-05-19): an OR between the two
+    // endpoint filters lets edges from sample to outside-sample
+    // through; their outside endpoints are added as boundary nodes.
+    expect(method).toMatch(
+      /\(sn\.node_key IN \(\$\{sampledKeyList\}\)\s*OR\s*tn\.node_key IN \(\$\{sampledKeyList\}\)\)/,
+    );
   });
 
-  it("applies the governance filter to edges", () => {
+  it("applies the governance filter to edges AND both endpoint nodes (so boundary fetch can't bypass it)", () => {
     expect(method).toMatch(/e\.governance_status IN \(\$\{govList\}\)/);
+    expect(method).toMatch(/sn\.governance_status IN \(\$\{govList\}\)/);
+    expect(method).toMatch(/tn\.governance_status IN \(\$\{govList\}\)/);
+  });
+
+  it("collects boundary nodes (outside-sample endpoints) into the returned node set", () => {
+    expect(method).toMatch(/const sampledIds = new Set\(nodes\.map/);
+    expect(method).toMatch(/const boundary = new Map<string, NodeIdentity>\(\)/);
+    expect(method).toMatch(/const allNodes: NodeIdentity\[\] = \[\.\.\.nodes, \.\.\.boundary\.values\(\)\]/);
+    expect(method).toMatch(/nodes: allNodes/);
   });
 
   it("returns edges with both endpoints in the EdgeIdentity shape", () => {

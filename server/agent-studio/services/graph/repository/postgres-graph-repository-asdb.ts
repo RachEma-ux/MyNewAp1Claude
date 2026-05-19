@@ -265,10 +265,11 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
       return { nodes, edges: [], truncated: false };
     }
 
-    // Edge sample — return edges where both endpoints are in the
-    // sampled node set. Conservative interpretation (no dangling
-    // edges to outside-sample nodes) keeps the global viz coherent
-    // without a second round-trip to fetch boundary nodes.
+    // Edge sample — return edges where AT LEAST one endpoint is in
+    // the sampled node set. Boundary nodes (the outside-sample
+    // endpoints) are added to the result's `nodes` array so the
+    // viz can draw the edge without a dangling reference. This
+    // closes PR #1526's "boundary-node fetch" out-of-scope note.
     const sampledKeyList = sql.join(
       nodes.map((n) => sql`${n.id}`),
       sql`, `,
@@ -284,9 +285,11 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
       FROM ${agsGraphEdges} e
       JOIN ${agsGraphNodes} sn ON sn.id = e.source_node_id
       JOIN ${agsGraphNodes} tn ON tn.id = e.target_node_id
-      WHERE sn.node_key IN (${sampledKeyList})
-        AND tn.node_key IN (${sampledKeyList})
+      WHERE (sn.node_key IN (${sampledKeyList})
+             OR tn.node_key IN (${sampledKeyList}))
         AND e.governance_status IN (${govList})
+        AND sn.governance_status IN (${govList})
+        AND tn.governance_status IN (${govList})
       LIMIT ${options.maxResults};
     `);
     const edgeRecords =
@@ -299,8 +302,25 @@ export class AsdbPostgresGraphRepository implements GraphRepository {
       targetNode: { typeKey: String(r.tgt_type), id: String(r.tgt_key) },
     }));
 
+    // Boundary nodes — any edge endpoint we discovered that wasn't
+    // already in the original sample. Add them so the viz can
+    // render the connection without a dangling reference. These
+    // are clearly labeled "boundary" so the operator UI can shade
+    // them differently from the primary sample.
+    const sampledIds = new Set(nodes.map((n) => n.id));
+    const boundary = new Map<string, NodeIdentity>();
+    for (const e of edges) {
+      if (!sampledIds.has(e.sourceNode.id) && !boundary.has(e.sourceNode.id)) {
+        boundary.set(e.sourceNode.id, e.sourceNode);
+      }
+      if (!sampledIds.has(e.targetNode.id) && !boundary.has(e.targetNode.id)) {
+        boundary.set(e.targetNode.id, e.targetNode);
+      }
+    }
+    const allNodes: NodeIdentity[] = [...nodes, ...boundary.values()];
+
     return {
-      nodes,
+      nodes: allNodes,
       edges,
       truncated:
         rows.length >= options.maxResults ||
