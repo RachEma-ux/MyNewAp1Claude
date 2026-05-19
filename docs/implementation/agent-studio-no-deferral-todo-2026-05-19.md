@@ -707,10 +707,80 @@ stub|placeholder|skeleton` minus test-seam noise). After triage:
 | 47 | **Doc-debt sweep (continuation-5)** | Rewrite the 2 stale markers naming their live successors. Lockstep source-scan test. |
 | 48 | **Continuation-5 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Smallest arc to date — 3 PRs. |
 
+## Continuation-5 closure receipt (2026-05-19)
+
+The fifth continuation arc shipped 1 doc-debt sweep across the
+smallest 3-PR arc to date (#1565–#1567). The list-driven re-audit
+found 2 stale "deferred to a future X" markers where the named
+follow-up had shipped (RAC P5 in the retrofit closure + T-G.5.β in
+no-deferral slice 29). Both rewrites named the live successor; a
+9-test source-scan lockstep prevents drift.
+
 ### Continuation-5 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 46 catalogue | this PR | TBD | Opens continuation-5; list-driven re-audit, 2 stale markers + 2 conditional deferrals + 1 operator-gated residual |
-| 47 doc-debt sweep | TBD | TBD | system-prompt-composer.ts:296 + api/router.ts:3037 rewritten naming live successors |
-| 48 continuation-5 closure | TBD | TBD | Closure receipt + mission re-close |
+| 46 catalogue | #1565 | `82c1da09` | Opens continuation-5; list-driven re-audit, 2 stale markers + 2 conditional deferrals + 1 operator-gated residual |
+| 47 doc-debt sweep | #1566 | `dff1e87e` | system-prompt-composer.ts:15+172 + api/router.ts:3037 rewritten naming live successors; 9-test source-scan lockstep |
+| 48 continuation-5 closure | this PR | TBD | Closure receipt + mission re-close |
+
+### Continuation-5 carry-forward lessons
+
+1. **Two stale-marker variants on the same surface.** Slice 47 first
+   rewrote the section-order comment at `system-prompt-composer.ts:15`
+   ("RAC P5, placeholder until P5"); only after switching to slice 48's
+   branch did the file's interface-field doc at `:172` ("Always null
+   until P5 lands") surface as a sibling marker carrying the same
+   pre-shipment framing. Both markers reference the same shipped
+   work and were rewritten together. Lesson: when sweeping a stale
+   marker, **grep the same source file for any sibling marker
+   referencing the same successor work** before committing — they
+   tend to travel in pairs (doc-block + interface-field, type-def +
+   call-site, etc.).
+2. **Source-scan lockstep is cheaper than the doc-debt itself.** The
+   9-test lockstep took ~30 LoC + 30ms runtime. Without it, the
+   continuation-6 audit would have to re-grep the surface to verify
+   the markers haven't regressed. The lockstep is the audit
+   primitive — future arcs can scan for `no-deferral-slice-*-
+   continuation-*-docdebt.test.ts` files to enumerate every prior
+   rewrite without re-deriving them.
+3. **The smallest arc still merits its own catalogue + closure.** A
+   2-marker sweep could have shipped as a single PR. The 3-PR shape
+   (catalogue + sweep + closure) preserves the audit trail —
+   anyone inheriting the codebase can read the continuation-5
+   catalogue (#1565) and know exactly what re-audit was run, which
+   findings were preserved as conditional deferrals, and which were
+   actioned. Lesson: cataloging the *re-audit method* is cheap and
+   compounds across arcs.
+4. **Re-audit cost decreases as the surface shrinks.** Continuation-
+   1 found 7 actionable items; -2 found 4; -3 found 4; -4 found 1;
+   -5 found 0 actionable + 2 doc-debt. The mission is converging
+   on a small fixed set of conditional-on-future-need deferrals
+   (chat.ts result-introspection, runtime-lens workspaceId JOIN)
+   plus the operator-gated residual. Next re-audit can probably
+   skip wide-surface grep and just spot-check the catalog of
+   prior carry-forwards.
+5. **List-driven sweeps make conditional deferrals visible.** Wide-
+   surface grep treats `services/chat.ts:1117`'s "deferred to a
+   future PR if a dashboard surfaces a meaningful gap" the same as
+   any other "deferred" marker. List-driven sweeps surface the
+   *condition* (dashboard observability gap) — and let the auditor
+   decide that the condition is genuinely future-gated, not a
+   typeable today-gap. Lesson: when triaging "deferred" markers,
+   pull the surrounding sentence — many of them carry their own
+   "deferred *if X*" trigger condition that the grep doesn't show.
+
+After this slice, the no-deferral mission has shipped **48 slices
+across 5 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5).
+
+The surface is **converging**: the next re-audit's expected yield
+is 0–1 actionable items. The conditional deferrals + operator-
+gated residual + MVP-boundary intent categories are stable and
+don't need re-cataloguing each arc; future arcs can spot-check
+them rather than re-deriving them.
+
+User directive remains honored: every gap actionable from this
+device has shipped. The remaining items name their trigger
+conditions explicitly so a future operator + future autonomous
+session can act on them without re-doing this audit.
