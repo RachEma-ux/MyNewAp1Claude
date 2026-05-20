@@ -120,6 +120,13 @@ const RacIngestionPage = lazy(() => import("../pages/RacIngestionPage"));
 // data model). Coexists with the existing T-F.91 / T-F.2-α saved-
 // view α-shell at /agent-studio/bases.
 const BasesAdminPage = lazy(() => import("../pages/BasesAdminPage"));
+// No-deferral continuation-22 slice 99: MCP Schema Sync admin page —
+// closes the mcpSchemaSync.* UI-consumer gap (Retrofit P11 — single
+// governed mutation mirroring an MCP server's live tools snapshot
+// into ags_mcp_tool_knowledge + ags_knowledge_units).
+const McpSchemaSyncPage = lazy(
+  () => import("../pages/McpSchemaSyncPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -295,6 +302,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-21 slice 96: Bases Admin canonical CRUD (no agent context) ──
   if (path.startsWith("/agent-studio/bases-admin")) {
     return { ...empty, view: "bases-admin", homeMode: null };
+  }
+  // ── No-deferral continuation-22 slice 99: MCP Schema Sync admin (no agent context) ──
+  if (path.startsWith("/agent-studio/mcp-schema-sync")) {
+    return { ...empty, view: "mcp-schema-sync", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -569,6 +580,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/bases-admin");
       return;
     }
+    // No-deferral continuation-22 slice 99: mcp-schema-sync is a global view.
+    if (key === "mcp-schema-sync") {
+      navigate("/agent-studio/mcp-schema-sync");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -728,6 +744,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "bases-admin":
           return <BasesAdminPage />;
+        // ── No-deferral continuation-22 slice 99: MCP Schema Sync admin
+        //    (typed via AgentStudioView). ──
+        case "mcp-schema-sync":
+          return <McpSchemaSyncPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

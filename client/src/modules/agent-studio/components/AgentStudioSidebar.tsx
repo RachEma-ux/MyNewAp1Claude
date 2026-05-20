@@ -157,6 +157,12 @@ export type AgentStudioView =
   //    ags_base_rows data model). Coexists with the existing T-F.91
   //    / T-F.2-α saved-view α-shell at /agent-studio/bases. ──
   | "bases-admin"
+  // ── No-deferral continuation-22 slice 99: MCP Schema Sync page.
+  //    Closes the mcpSchemaSync.* UI-consumer gap (Retrofit P11 —
+  //    single governed mutation mirroring an MCP server's live
+  //    tools snapshot into ags_mcp_tool_knowledge +
+  //    ags_knowledge_units). ──
+  | "mcp-schema-sync"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -292,6 +298,16 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Bases (canonical)",
     items: [
       { key: "bases-admin", label: "Bases Admin", icon: Table2 },
+    ],
+  },
+  // ── No-deferral continuation-22 slice 99: mcp-schema-sync page.
+  //    Operator surface for the Retrofit P11 tool-knowledge mirroring
+  //    governed mutation. Single-mutation arc — see continuation-22
+  //    catalogue. ──
+  {
+    label: "MCP Schema",
+    items: [
+      { key: "mcp-schema-sync", label: "Schema Sync", icon: Webhook },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
