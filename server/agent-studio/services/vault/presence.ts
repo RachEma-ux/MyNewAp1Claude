@@ -206,12 +206,19 @@ export async function leavePresence(input: {
  * List currently-active peers for a note. Side effect: evicts
  * rows whose `lastActiveAt` is older than the TTL. Eviction
  * happens BEFORE the select so the returned set is fresh.
+ *
+ * No-deferral slice 60: routed via the file's `resolveNoteRoutedConn`
+ * Path-A helper so the eviction DELETE + the SELECT both ride the
+ * workspace-scoped handle. Closes the last raw `getAsDb()` call site
+ * in this file — the sibling presence functions (heartbeat /
+ * removePresence / updatePresence) already use the same helper.
  */
 export async function listPresence(noteId: number): Promise<
   ReadonlyArray<PresenceRow>
 > {
-  const db = getAsDb();
-  if (!db) return [];
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const db = await resolveNoteRoutedConn(lookupDb, noteId);
   const cutoff = new Date(Date.now() - PRESENCE_IDLE_TTL_MS);
   await db
     .delete(agsVaultNotePresence)
