@@ -86,6 +86,62 @@ import type {
   BoltRecord,
 } from "./bolt-driver-port.js";
 
+/**
+ * PR #1398 item 16 — Memgraph MAGE algorithm specs.
+ *
+ * MAGE is Memgraph's algorithm library, installed as an
+ * operator-controlled plugin. When loaded, each procedure below is
+ * callable from Cypher; when absent, Memgraph raises a
+ * "procedure not registered" error which `runAlgorithm` catches
+ * and re-throws as `GraphCapabilityUnsupportedError`.
+ *
+ * Why this shape (call + yield + return clauses):
+ *   - The CALL is the entry point; YIELD names the binding the
+ *     procedure exposes; RETURN projects to a stable shape that
+ *     consumers can rely on without knowing MAGE internals.
+ *   - The yielded `node` is destructured to `node.id` so the
+ *     consumer doesn't need to parse Neo4j node objects.
+ */
+export interface MageAlgorithmSpec {
+  readonly callClause: string;
+  readonly yieldClause: string;
+  readonly returnClause: string;
+}
+
+export const MAGE_ALGORITHMS: Record<string, MageAlgorithmSpec> = {
+  pagerank: {
+    callClause: "CALL pagerank.get()",
+    yieldClause: "node, rank",
+    returnClause: "node.id AS nodeId, rank AS score",
+  },
+  betweenness_centrality: {
+    callClause: "CALL betweenness_centrality.get()",
+    yieldClause: "node, betweenness_centrality",
+    returnClause:
+      "node.id AS nodeId, betweenness_centrality AS score",
+  },
+  community_detection: {
+    callClause: "CALL community_detection.get()",
+    yieldClause: "node, community_id",
+    returnClause: "node.id AS nodeId, community_id AS communityId",
+  },
+  weakly_connected_components: {
+    callClause: "CALL weakly_connected_components.get()",
+    yieldClause: "node, component_id",
+    returnClause: "node.id AS nodeId, component_id AS componentId",
+  },
+};
+
+/**
+ * Algorithm keys this backend can handle. `shortest_path` routes
+ * through the existing Bolt path; everything else flows through
+ * MAGE_ALGORITHMS.
+ */
+export const MEMGRAPH_SUPPORTED_ALGORITHM_KEYS = [
+  "shortest_path",
+  ...Object.keys(MAGE_ALGORITHMS),
+] as const;
+
 export interface MemgraphGraphRepositoryOptions {
   readonly endpoint: string;
   readonly username: string;
@@ -565,13 +621,24 @@ export class MemgraphGraphRepository implements GraphRepository {
   }
 
   async runAlgorithm(input: GraphAlgorithmInput): Promise<GraphAlgorithmResult> {
-    // Slice 15 close-out: shortest_path uses the already-implemented
-    // Bolt `shortestPath` path. Other algorithms surface a typed
-    // capability error so callers branch on capability instead of
-    // consuming silent empty rows. Memgraph Community lacks GDS;
-    // MAGE library integration is a separate (operator-installable)
-    // surface.
+    // PR #1398 item 16 closure: MAGE pass-through for the four most
+    // operator-useful graph algorithms. Memgraph CE ships MAGE as an
+    // operator-installable plugin (`mage` apt package / Docker image
+    // variant). When MAGE is loaded:
+    //   - `pagerank.get()` — node ranking by PageRank
+    //   - `betweenness_centrality.get()` — node centrality
+    //   - `community_detection.get()` — Louvain communities
+    //   - `weakly_connected_components.get()` — WCC labels
+    // When MAGE is NOT installed, Memgraph raises a "procedure not
+    // registered" error; we catch + re-throw as
+    // `GraphCapabilityUnsupportedError` so callers still get the
+    // typed capability signal rather than a raw Bolt failure.
+    //
+    // `shortest_path` continues to route through the already-shipped
+    // Bolt `shortestPath` path (no MAGE dependency).
     const startedAt = (this as unknown as { now?: () => number }).now?.() ?? Date.now();
+    const now = () => (this as unknown as { now?: () => number }).now?.() ?? Date.now();
+
     if (input.algorithmKey === "shortest_path") {
       const from = String(input.parameters.from ?? "");
       const to = String(input.parameters.to ?? "");
@@ -586,9 +653,52 @@ export class MemgraphGraphRepository implements GraphRepository {
               },
             ]
           : [],
-        durationMs: ((this as unknown as { now?: () => number }).now?.() ?? Date.now()) - startedAt,
+        durationMs: now() - startedAt,
       };
     }
+
+    const mageSpec = MAGE_ALGORITHMS[input.algorithmKey];
+    if (mageSpec) {
+      const maxResults = Math.min(
+        typeof input.parameters.maxResults === "number"
+          ? input.parameters.maxResults
+          : 200,
+        2000,
+      );
+      const cypher = `${mageSpec.callClause} YIELD ${mageSpec.yieldClause} RETURN ${mageSpec.returnClause} LIMIT $maxResults`;
+      let records: Array<Record<string, unknown>>;
+      try {
+        const result = await this.withSession(async (session) =>
+          session.run(cypher, { maxResults }),
+        );
+        records = result.records.map((rec) => {
+          const out: Record<string, unknown> = {};
+          for (const k of rec.keys) out[k] = rec.get(k);
+          return out;
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // Memgraph signals an absent MAGE plugin via "procedure X not
+        // registered" / "Procedure not registered" wording. Surface
+        // that as the typed capability error so callers can branch
+        // on capability rather than parsing Bolt error strings.
+        if (
+          /not registered/i.test(message) ||
+          /procedure.+(not exist|unknown|unavailable)/i.test(message)
+        ) {
+          throw new GraphCapabilityUnsupportedError(
+            "supportsGraphAlgorithms",
+            this.backendKey,
+          );
+        }
+        throw err;
+      }
+      return {
+        rows: records,
+        durationMs: now() - startedAt,
+      };
+    }
+
     throw new GraphCapabilityUnsupportedError(
       "supportsGraphAlgorithms",
       this.backendKey,
