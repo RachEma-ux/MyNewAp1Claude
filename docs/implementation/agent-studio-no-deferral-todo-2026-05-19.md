@@ -1354,10 +1354,75 @@ the body-of-work but skipped the nav surface.
 | 63 | **vault-templates sidebar + type wiring** | Add `vault-templates` to `AgentStudioView` discriminated union; add Vaults-group sidebar entry; remove the 3 `as any` casts in AgentStudioShell. |
 | 64 | **Continuation-10 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names the "completion audit" as a reusable method. |
 
+## Continuation-10 closure receipt (2026-05-20)
+
+The tenth continuation arc shipped 1 implementation slice + 1
+catalogue + this closure across PRs #1581–#1583. The user's
+"continue with the next punch-list arc" directive turned out to be
+load-bearing: continuation-9 had declared the auto-detectable
+scope closed, but the **"completion audit"** method (verify each
+new-page slice covered all 7 nav-surface items) immediately
+surfaced a real follow-on gap — slice 53's VaultTemplatesPage
+was missing the `AgentStudioView` type entry + the Vaults sidebar
+group entry.
+
 ### Continuation-10 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 62 catalogue | this PR | TBD | Opens continuation-10; surfaces slice-53's nav-surface gap |
-| 63 sidebar + type wiring | TBD | TBD | `AgentStudioView` extended; Vaults sidebar gets Templates; `as any` casts removed |
-| 64 continuation-10 closure | TBD | TBD | Receipt + completion-audit lesson |
+| 62 catalogue | #1581 | `3649e8ef` | Opens continuation-10; names the completion-audit method + surfaces slice-53's nav-surface gap |
+| 63 vault-templates nav wiring | #1582 | `11548ded` | `AgentStudioView` extended + Vaults sidebar Templates entry + 3 `as any` casts removed; 6-test source-scan lockstep |
+| 64 continuation-10 closure | this PR | TBD | Receipt + completion-audit method named for re-use |
+
+### Continuation-10 carry-forward lessons
+
+1. **Completion audit > "next-file" audit when no files remain.**
+   Continuation-9 closed the caller-migration tail and declared
+   the auto-detectable scope complete. But "complete" depended on
+   the audit method — switching from "what files have raw
+   `getAsDb()` calls" to "what new-page slices have all 7 nav-
+   surface items wired" instantly surfaced a real gap. Lesson:
+   when one audit method exhausts, **try a different lens on the
+   same artifacts**. The completion audit's checklist:
+     1. Page file exists
+     2. Lazy-import in AgentStudioShell
+     3. Route resolution in AgentStudioShell
+     4. View switch case
+     5. Navigation-key dispatch
+     6. `AgentStudioView` discriminated-union entry
+     7. Sidebar group entry
+   Slice 53 covered 1-5 but missed 6+7. Future page-slices
+   should check off all 7 before claiming closure.
+2. **`as any` casts are a deferral marker.** Slice 53 used
+   `view: "vault-templates" as any` + `case "vault-templates" as
+   any` + `(key as string) === "vault-templates"` because the
+   `AgentStudioView` union didn't include the variant. The casts
+   shipped, the code compiled, but the discriminated-union
+   contract was broken. Source-scan tests can pin these as
+   regression markers — slice 63's test asserts all 3 cast
+   forms are absent. Lesson: when a slice introduces `as any` /
+   `as string` cast at the boundary of a discriminated union,
+   **extend the union in the same slice**.
+3. **Nav-surface gaps look complete from the URL.** Direct-URL
+   navigation to `/agent-studio/vault-templates` worked — the
+   page rendered correctly because all the routing infrastructure
+   was in place. Only sidebar discoverability + type safety were
+   broken. This is the worst kind of gap because it doesn't
+   surface in normal testing — operators just don't see the
+   feature exists. Lesson: when shipping a new operator surface,
+   **verify the discovery path** (sidebar group + label + icon)
+   alongside the body-of-work; don't trust "direct URL works" as
+   completion.
+
+After this slice, the no-deferral mission has shipped **64 slices
+across 10 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51 cont-6,
+52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64 cont-10).
+
+### Next-arc audit method
+
+Continuation-10 demonstrated that the **completion audit** is
+still surfacing real gaps. Continuation-11 should re-apply the
+same 7-point checklist to the OTHER recent operator-surface
+slices — verify each new mutation/endpoint has a UI consumer OR
+an explicit follow-on slice deferring the UI consumer.
