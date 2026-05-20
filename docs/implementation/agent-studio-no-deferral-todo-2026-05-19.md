@@ -3596,3 +3596,86 @@ is enabled-gated on the operator-supplied findingId numeric input.
 | 110 | **Open continuation-26 catalogue** | This entry. 12-endpoint largest-remaining gap. |
 | 111 | **`GraphQualityPanel` + page** | 5-card panel (dashboard / scans / agent runs / findings + proposals); full 7-point nav wiring; tests. |
 | 112 | **Continuation-26 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
+
+## Continuation-26 closure receipt (2026-05-20)
+
+The twenty-sixth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1629–#1631. **Fourth arc
+of the partial-consumer audit cycle** — the **largest unconsumed-
+endpoint count** in the partial-consumer cycle to date (12
+endpoints). Closes `graphQuality.*` (10/22 → 22/22).
+
+### Continuation-26 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 110 catalogue | #1629 | 7de0a329 | Opens continuation-26; 12-endpoint largest remaining gap, grouped by function |
+| 111 GraphQualityPanel + page | #1630 | 62bf69b6 | 12 endpoints consumed; 4-card panel (dashboard / scans / agent runs / findings + proposals); path-shadowing guard on /agent-studio/graph-quality; 8 nav-surface tests |
+| 112 continuation-26 closure | #1631 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-26 carry-forward lessons
+
+1. **Watch for path-prefix shadowing on `startsWith` route
+   resolvers.** This was the first arc where the new view's
+   route segment was a strict prefix of an existing route's
+   segment — `/agent-studio/graph-quality` is a prefix of
+   `/agent-studio/graph-quality-findings`. The default
+   `path.startsWith(...)` matcher would have shadowed the
+   findings page. Fix: use **exact-match-or-trailing-slash**
+   (`path === "/x" || path.startsWith("/x/")`) when the route
+   segment is a substring of another route's segment. Add the
+   lockstep test to assert the tighter matcher (so a future
+   refactor doesn't regress to plain prefix). Lesson:
+   **before wiring a new route, grep main for any existing
+   route segment that could be a prefix-shadow** —
+   `grep -rE '/agent-studio/[^"]*X' client/src/`. If found,
+   use exact-or-trailing-slash matching + an explicit lockstep
+   assertion.
+2. **Dashboard endpoints belong at the top.** First instinct
+   was to put `getOperatorDashboard` at the bottom of the panel
+   (it's the "aggregate" view). Wrong — operators want to land
+   on the dashboard summary first, then drill into scans /
+   agents / findings as needed. The dashboard-at-top layout
+   also primes the operator with current state before they
+   trigger a new scan. Lesson: **single-query aggregate
+   dashboards belong at the TOP of the panel**, above the
+   triggers + lists.
+3. **The 4-functional-group catalogue → 4-card panel mapping
+   is now a standing pattern.** Cont-25 surfaced it (4 groups
+   → 4 cards); cont-26 reinforced it (4 groups → 4 cards). At
+   this point the pattern is reliable enough to be the
+   default for any arc ≥ 6 endpoints. Lesson: **for any
+   partial-consumer arc with ≥6 unconsumed endpoints, group
+   by function in the catalogue THEN map 1:1 to panel cards
+   — don't try to invent a different layout** unless the
+   functional groups are deeply asymmetric.
+
+After this slice, the no-deferral mission has shipped **112
+slices across 26 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25,
+110-112 cont-26).
+
+### Partial-consumer audit status (post-cont-26)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 4 | `promotion`, `graphCorrection`, `semanticEnrichment`, `graphQuality` |
+| Remaining | 14 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphSkill / graphWorkspace / providerBindings / racEvaluation / toolApprovals / toolKnowledge / vault / workspaceObservability |
+
+### Next-arc target: vault
+
+`vault` is 23/44 consumed — **the largest absolute unconsumed-
+endpoint count** in the remaining routers (21 unconsumed),
+though it likely splits into multiple functional groups: member
+management, attachment lifecycle, saved-view CRUD, template
+instantiation, note import/export, link backfill, search. Per
+cont-25 lesson #1, the catalogue should pre-group these. Given
+the scope, this may warrant a 4-or-5 slice arc (catalogue +
+2-3 panel slices + closure) rather than the standard 3-slice.
