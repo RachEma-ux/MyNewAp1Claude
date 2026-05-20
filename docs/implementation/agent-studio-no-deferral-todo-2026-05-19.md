@@ -3182,3 +3182,86 @@ lifecycle gap** and likely surfaces 1-2 carry-forward lessons
 distinct from cont-19/23 (the `bulkApprove` / `bulkReject` /
 `requestRevision` shape is new, and unlike cont-19/23 this router
 HAS list/get/listAudit — true master-detail capability).
+
+## Continuation-24 — graphCorrection master-detail lifecycle (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Second arc of the partial-consumer audit cycle. Cont-23's
+closure named `graphCorrection` (2/12 → 12/12) as the
+**largest single-router lifecycle gap** with 10 unconsumed
+endpoints — and unlike cont-19/23 mutation-only lifecycles,
+this router HAS `list` + `get` + `listAudit`, making it the
+first true master-detail in the partial-consumer cycle.
+
+### Re-audit findings
+
+`graphCorrection.*` has 12 endpoints; 2 already consumed via
+`GraphCorrectionProposalsRetentionPanel`
+(`getProposalsRetentionCronStatus` + `pruneProposalsRetention`
+— retention domain). The 10 lifecycle endpoints are unconsumed:
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `submit` | mutation | proposalKind + targetTypeKey? + targetId? + proposedChange (Record) + confidence? + rationale? + proposedByAgentId? |
+| `list` | query | optional status (5-value enum) / proposalKind / limit ≤ 500 |
+| `get` | query | proposalId; throws NOT_FOUND |
+| `approve` | mutation | proposalId + rationale?; throws CONFLICT on already-decided |
+| `reject` | mutation | proposalId + rationale? |
+| `requestRevision` | mutation | proposalId + rationale? (NEW lifecycle node — distinct from approve/reject) |
+| `withdraw` | mutation | proposalId + rationale?; throws FORBIDDEN if non-proposer |
+| `bulkApprove` | mutation | proposalIds[] (1-500) + rationale? |
+| `bulkReject` | mutation | proposalIds[] (1-500) + rationale? |
+| `listAudit` | query | proposalId → audit-trail entries |
+
+`ProposalStatus` is a closed 5-value enum:
+`pending`, `approved`, `rejected`, `revision_requested`, `withdrawn`.
+
+### Distinct shape: true master-detail with bulk + audit + revision
+
+Three new affordances vs. cont-19/23:
+
+1. **list/get/listAudit** — the panel can discover proposals
+   (no operator-supplied id needed for approve/reject/etc.).
+   Multi-row select + per-row click-to-detail-with-audit.
+2. **bulkApprove / bulkReject** — operator can checkbox-select
+   multiple pending proposals and approve/reject in one call,
+   with a shared rationale.
+3. **requestRevision** — a NEW lifecycle node that doesn't
+   close the proposal; it flips status to `revision_requested`
+   without ending the lifecycle. Distinct UX gesture.
+
+### Approach
+
+`GraphCorrectionPanel` will have:
+
+- **Filter card** — status dropdown (5-value enum + "all") +
+  proposalKind text input + limit numeric. Drives the list
+  query.
+- **List card** — table with: checkbox column (multi-select
+  for bulk) + id + proposalKind + status badge + targetTypeKey/id
+  + click row → load detail. Bulk-action footer with
+  approve/reject buttons + shared rationale input, enabled when
+  ≥1 row selected.
+- **Detail card** — `get` driven by selected proposalId.
+  Renders proposedChange JSON + confidence + rationale +
+  proposer. Three lifecycle action buttons (Approve / Reject /
+  Request Revision) each with rationale input; one Withdraw
+  button (proposer-only path, may FORBIDDEN). Audit-trail
+  sub-card driven by `listAudit`.
+- **Submit form card** — kept simple (mostly agents submit, not
+  operators). proposalKind required + proposedChange JSON +
+  optional rationale/confidence/target.
+
+Per the cont-21 carry-forward lesson #2 (master-detail master
+endpoint carries detail rows → lift the invalidation), the
+detail's mutations invalidate `get` + `listAudit` + parent's
+`list`. Multi-select bulk mutations invalidate the list only
+(detail is for single rows).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 104 | **Open continuation-24 catalogue** | This entry. First true master-detail in partial-consumer cycle. |
+| 105 | **`GraphCorrectionPanel` + page** | 10-endpoint master-detail with multi-select bulk + audit drill-in + requestRevision lifecycle node; full 7-point nav wiring; tests. |
+| 106 | **Continuation-24 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
