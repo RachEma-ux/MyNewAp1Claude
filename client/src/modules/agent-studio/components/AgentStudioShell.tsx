@@ -189,6 +189,10 @@ const GraphAgentAdminPage = lazy(
 const GraphSkillAdminPage = lazy(
   () => import("../pages/GraphSkillAdminPage"),
 );
+// No-deferral continuation-33 slice 132: CAG Admin page —
+// eleventh arc of the partial-consumer audit cycle. 3-endpoint
+// surface (listPacks / refreshPack / listPackEvents).
+const CagAdminPage = lazy(() => import("../pages/CagAdminPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -414,6 +418,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-32 slice 129: Graph Skill Admin (no agent context) ──
   if (path.startsWith("/agent-studio/graph-skill-admin")) {
     return { ...empty, view: "graph-skill-admin", homeMode: null };
+  }
+  // ── No-deferral continuation-33 slice 132: CAG Admin (no agent context) ──
+  if (path.startsWith("/agent-studio/cag-admin")) {
+    return { ...empty, view: "cag-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -743,6 +751,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-skill-admin");
       return;
     }
+    // No-deferral continuation-33 slice 132: cag-admin is a global view.
+    if (key === "cag-admin") {
+      navigate("/agent-studio/cag-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -946,6 +959,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "graph-skill-admin":
           return <GraphSkillAdminPage />;
+        // ── No-deferral continuation-33 slice 132: CAG Admin
+        //    (typed via AgentStudioView). ──
+        case "cag-admin":
+          return <CagAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

@@ -48,7 +48,6 @@ import {
   Table2,
   Inbox,
   Gavel,
-  FileStack,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -218,6 +217,10 @@ export type AgentStudioView =
   //    graphSkill endpoints (listPackVersions / createPack /
   //    publishVersion). ──
   | "graph-skill-admin"
+  // ── No-deferral continuation-33 slice 132: CAG Admin.
+  //    Eleventh arc of the partial-consumer audit cycle. Closes 3
+  //    cag endpoints (listPacks / refreshPack / listPackEvents). ──
+  | "cag-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -488,6 +491,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "graph-skill-admin",
         label: "Pack Admin",
         icon: FileStack,
+      },
+    ],
+  },
+  // ── No-deferral continuation-33 slice 132: cag-admin page.
+  //    Eleventh arc of the partial-consumer audit cycle. CAG pack
+  //    inventory + governed refresh + lifecycle events. ──
+  {
+    label: "CAG",
+    items: [
+      {
+        key: "cag-admin",
+        label: "Pack Admin",
+        icon: Database,
       },
     ],
   },
