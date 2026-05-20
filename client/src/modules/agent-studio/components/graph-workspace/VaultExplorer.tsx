@@ -239,78 +239,102 @@ export default function VaultExplorer({
       )}
 
       {!isEmpty && (
-        <ul className="space-y-1">
-          {(vaultsQuery.data ?? []).map((vault) => (
-            <li key={vault.id}>
-              <button
-                type="button"
-                data-testid={`vault-explorer-vault-${vault.id}`}
-                className={`text-left text-sm w-full rounded px-2 py-1 hover:bg-gray-100 ${
-                  vault.id === selectedVaultId ? "bg-blue-50 font-medium" : ""
-                }`}
-                onClick={() => onSelectVault(vault.id)}
-              >
-                📁 {vault.name ?? `Vault ${vault.id}`}
-              </button>
-              {vault.id === selectedVaultId && (
-                <>
-                  <div className="pl-3 mt-1 mb-1">
-                    <button
-                      type="button"
-                      data-testid="vault-explorer-new-note-btn"
-                      className="text-xs text-blue-600 hover:underline"
-                      onClick={() => {
-                        setShowNoteForm((v) => !v);
-                        setFormError(null);
-                      }}
-                    >
-                      {showNoteForm ? "Cancel" : "+ New note"}
-                    </button>
-                  </div>
-                  {showNoteForm && (
-                    <form
-                      onSubmit={handleCreateNote}
-                      className="pl-3 mb-2 space-y-1.5"
-                      data-testid="vault-explorer-new-note-form"
-                    >
-                      <input
-                        type="text"
-                        value={noteTitle}
-                        onChange={(e) => setNoteTitle(e.target.value)}
-                        placeholder="Note title"
-                        data-testid="vault-explorer-new-note-title"
-                        className="w-full text-sm rounded border px-2 py-1"
-                        autoFocus
-                      />
-                      <button
-                        type="submit"
-                        data-testid="vault-explorer-new-note-submit"
-                        disabled={createNoteMutation.isPending}
-                        className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {createNoteMutation.isPending ? "Creating…" : "Create note"}
-                      </button>
-                    </form>
-                  )}
-                  <NoteList
-                    notes={notesQuery.data ?? []}
-                    loading={notesQuery.isLoading}
-                    error={notesQuery.error ?? null}
-                    selectedNoteId={selectedNoteId}
-                    onSelectNote={onSelectNote}
+        <>
+          {/* Dropdown selector — replaces the previous list-of-buttons
+              UX. Operators pick a vault from a single <select>; the
+              note list, FS-sync affordance, and inline new-note form
+              all hang off the selected vault below. */}
+          <div className="mb-2">
+            <label
+              className="block text-[10px] uppercase tracking-wide text-gray-500 mb-1"
+              htmlFor="vault-explorer-vault-select"
+            >
+              Vault
+            </label>
+            <select
+              id="vault-explorer-vault-select"
+              data-testid="vault-explorer-vault-select"
+              className="w-full text-sm rounded border px-2 py-1 bg-white"
+              value={selectedVaultId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") return;
+                const id = Number.parseInt(v, 10);
+                if (Number.isFinite(id) && id > 0) {
+                  onSelectVault(id);
+                }
+              }}
+            >
+              <option value="" disabled>
+                — pick a vault —
+              </option>
+              {(vaultsQuery.data ?? []).map((vault) => (
+                <option
+                  key={vault.id}
+                  value={vault.id}
+                  data-testid={`vault-explorer-vault-option-${vault.id}`}
+                >
+                  📁 {vault.name ?? `Vault ${vault.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {typeof selectedVaultId === "number" && selectedVaultId > 0 && (
+            <div data-testid="vault-explorer-selected-vault">
+              <div className="mt-1 mb-1">
+                <button
+                  type="button"
+                  data-testid="vault-explorer-new-note-btn"
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => {
+                    setShowNoteForm((v) => !v);
+                    setFormError(null);
+                  }}
+                >
+                  {showNoteForm ? "Cancel" : "+ New note"}
+                </button>
+              </div>
+              {showNoteForm && (
+                <form
+                  onSubmit={handleCreateNote}
+                  className="mb-2 space-y-1.5"
+                  data-testid="vault-explorer-new-note-form"
+                >
+                  <input
+                    type="text"
+                    value={noteTitle}
+                    onChange={(e) => setNoteTitle(e.target.value)}
+                    placeholder="Note title"
+                    data-testid="vault-explorer-new-note-title"
+                    className="w-full text-sm rounded border px-2 py-1"
+                    autoFocus
                   />
-                  {/* Track A — A7 — FS-sync settings panel for the
-                      selected vault. Lives at the bottom of the
-                      selected-vault expansion so operators see the
-                      sync state alongside the note list. */}
-                  <div className="mt-2 px-3">
-                    <FsSyncSettingsAffordance vaultId={vault.id} />
-                  </div>
-                </>
+                  <button
+                    type="submit"
+                    data-testid="vault-explorer-new-note-submit"
+                    disabled={createNoteMutation.isPending}
+                    className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {createNoteMutation.isPending ? "Creating…" : "Create note"}
+                  </button>
+                </form>
               )}
-            </li>
-          ))}
-        </ul>
+              <NoteList
+                notes={notesQuery.data ?? []}
+                loading={notesQuery.isLoading}
+                error={notesQuery.error ?? null}
+                selectedNoteId={selectedNoteId}
+                onSelectNote={onSelectNote}
+              />
+              {/* Track A — A7 — FS-sync settings panel for the
+                  selected vault. Sits below the note list. */}
+              <div className="mt-2">
+                <FsSyncSettingsAffordance vaultId={selectedVaultId} />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </aside>
   );
