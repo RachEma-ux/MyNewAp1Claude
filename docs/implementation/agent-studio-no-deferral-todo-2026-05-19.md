@@ -4422,3 +4422,38 @@ of the partial-consumer audit cycle**. Closes `graphSkill.*`
 | racEvaluation | TBD | TBD | TBD | next |
 | toolApprovals | TBD | TBD | TBD | next |
 | toolKnowledge | TBD | TBD | TBD | next |
+
+## Continuation-33 — cag operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Eleventh arc of the partial-consumer audit cycle. `cag`
+(2/5 → 5/5) — 3 unconsumed endpoints.
+
+### Re-audit findings
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listPacks` | query | workspaceId + agentId → pack rows newest-first |
+| `refreshPack` | mutation (governed) | workspaceId + agentId → { packId, packVersion, warnings } |
+| `listPackEvents` | query | workspaceId + agentId + limit? (max 500) → events newest-first |
+
+All 3 endpoints share an `agentRefSchema = { workspaceId, agentId }`
+input shape — natural fit for a panel with a single top-level
+agent-context input feeding all three cards.
+
+### Approach
+
+3-card panel: **List packs** (read-only inventory), **Refresh
+pack** (governed mutation), **Recent pack events** (read-only
+lifecycle timeline with limit knob).
+
+Shared workspaceId + agentId inputs at panel top; child cards
+consume the resolved context.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 131 | **Open continuation-33 catalogue** | This entry. 3-endpoint 3-card arc. |
+| 132 | **`CagAdminPanel` + page** | 3-card panel; shared agent-context input; full 7-point nav wiring; tests. |
+| 133 | **Continuation-33 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
