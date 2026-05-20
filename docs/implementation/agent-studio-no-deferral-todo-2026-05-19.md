@@ -3350,6 +3350,85 @@ shape from cont-24: more **run-centric observability** mixed with
 **candidate-promotion workflow**. Two distinct sub-panels likely
 (triggered runs + candidates → promotions).
 
+## Continuation-25 — semanticEnrichment run-monitoring + candidate-promotion (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Third arc of the partial-consumer audit cycle. Cont-24's closure
+named `semanticEnrichment` (3/11 → 11/11) as the next target —
+**largest unconsumed-endpoint count** in the partial-consumer
+cycle (8 endpoints).
+
+### Re-audit findings
+
+`semanticEnrichment.*` has 11 endpoints; 3 already consumed
+(`getProposalDetail` / `promote` / `promoteAndApprove` — used by
+the existing semantic-enrichment surfaces). The 8 unconsumed
+endpoints split into 3 functional groups:
+
+**Trigger group (1 endpoint):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `triggerRun` | mutation | workspaceId + proposalKind (5-value enum) + providerConnectionId + modelRef + actorId + 7 optional knobs (minConfidence / maxProposals / typeKey / weakDescriptionMaxLength / candidateLimit / temperature / staleFactGraceMs) |
+
+**Run monitoring group (3 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listRecentRuns` | query | limit (1-200, default 50) → recent runs newest-first |
+| `getRunStats` | query | runId → discriminated envelope (`ok`/`not_found`) with per-kind/status aggregates |
+| `listProposals` | query | runId + optional status filter + limit (1-500, default 100) → proposals (heavy JSON stripped) |
+
+**Candidate exploration group (3 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listKnownProposalKinds` | query | closed 5-value enum + metadata (label/description/requiresSourceCitation) |
+| `listCandidatesByKind` | query | proposalKind + workspaceId + limit → enrichment candidates fetched from the SoT |
+| `listRecentRejectionsByKind` | query | proposalKind + lookback knobs → rejected-below-threshold rows for audit |
+
+**Bulk promotion group (1 endpoint):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `promoteBulk` | mutation | proposalIds[] (1-500) + optional decidedByUserId + decisionRationale + proposedByAgentId; per-row outcome aggregation |
+
+### Distinct shape: run-centric observability + per-kind candidate exploration + bulk promotion
+
+Three new affordances vs. cont-19/23/24:
+
+1. **run-detail master-detail** — listRecentRuns drives the master;
+   getRunStats + listProposals drive the detail (two queries per
+   run, both `enabled`-gated on the selected runId).
+2. **per-kind exploration** — listCandidatesByKind and
+   listRecentRejectionsByKind are read-only filtered views that
+   don't need a runId. Operator picks a kind and sees what the
+   enrichment runner WOULD or WOULD NOT propose.
+3. **bulk promotion** — promoteBulk takes proposalIds[]; the UI
+   needs multi-select on the listProposals view, similar to
+   cont-24's bulkApprove pattern (footer-first per lesson #2).
+
+### Approach
+
+`SemanticEnrichmentPanel` will have 4 cards:
+
+- **Trigger run card** — proposalKind dropdown (closed 5-value
+  enum via listKnownProposalKinds) + workspace/provider/model/actor
+  + 7 optional knobs (most as collapsed details). Submit → mutation
+  + recent-submission shelf.
+- **Recent runs card** — listRecentRuns rows + click-to-select.
+  Selected run drives the detail.
+- **Run detail card** — getRunStats badge (or not_found
+  empty-state) + listProposals table with status filter +
+  multi-select checkboxes + bulk-promote footer. Detail mutations
+  invalidate stats + proposals.
+- **Per-kind exploration card** — proposalKind picker + 2 tabs
+  (Candidates / Recent Rejections). Read-only.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 107 | **Open continuation-25 catalogue** | This entry. 8-endpoint run-centric + candidate + bulk-promotion arc. |
+| 108 | **`SemanticEnrichmentPanel` + page** | 4-card panel: Trigger / Recent runs / Run detail (stats + proposals + bulk promote) / Per-kind exploration; full 7-point nav wiring; tests. |
+| 109 | **Continuation-25 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
+
 ## Continuation-25 closure receipt (2026-05-20)
 
 The twenty-fifth continuation arc shipped 1 implementation slice
