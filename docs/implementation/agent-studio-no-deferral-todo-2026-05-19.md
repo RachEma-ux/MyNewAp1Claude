@@ -1457,10 +1457,77 @@ so it's deferred to continuation-12.
 | 66 | **SavedViewVersionHistoryPanel Restore button** | Per-row Restore button calling `vault.restoreSavedViewVersion`; `confirm()` prompt + onSuccess invalidate version-history + saved-view caches. |
 | 67 | **Continuation-11 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names `goldenQuestions.triggerLiveEvaluation` as continuation-12's target. |
 
+## Continuation-11 closure receipt (2026-05-20)
+
+The eleventh continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1584–#1586. The **UI-
+consumer audit** (re-applied completion-audit method to recent
+operator-facing tRPC mutations) found 2 gaps: slice 50's
+`vault.restoreSavedViewVersion` + slice 44's
+`goldenQuestions.triggerLiveEvaluation` were shipped server-side
+without any UI caller.
+
+Slice 66 closed the saved-view restore gap by adding a per-row
+Restore button to `SavedViewVersionHistoryPanel`. The
+`triggerLiveEvaluation` gap is the explicit continuation-12
+target.
+
 ### Continuation-11 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 65 catalogue | this PR | TBD | Opens continuation-11; UI-consumer audit |
-| 66 Restore button | TBD | TBD | Per-row Restore button + cache invalidation + tests |
-| 67 continuation-11 closure | TBD | TBD | Receipt + continuation-12 target named |
+| 65 catalogue | #1584 | `57e3df29` | Opens continuation-11; UI-consumer audit finds 2 gaps |
+| 66 Restore button | #1585 | `5b5aced5` | Per-row Restore button + confirm() + cache invalidation + 5 new test cases |
+| 67 continuation-11 closure | this PR | TBD | Receipt + continuation-12 target (triggerLiveEvaluation) named |
+
+### Continuation-11 carry-forward lessons
+
+1. **Backend-first slices accumulate UI-consumer debt.** Slices
+   44 (`triggerLiveEvaluation`) and 50 (`restoreSavedViewVersion`)
+   both shipped polished server-side mutations with thorough unit
+   tests, but neither had a UI caller. The mutations were
+   reachable only via direct tRPC POSTs (which operators don't do
+   from a browser console in practice). Lesson: when shipping a
+   new operator-facing mutation, **either ship the UI consumer in
+   the same slice OR explicitly defer it in the closure receipt**.
+   Closure receipts with a "next-slice UI consumer" line item
+   stay visible across re-audits; un-flagged backend-only slices
+   silently accumulate consumer debt.
+2. **Reversibility wording matters in destructive UI flows.** The
+   Restore button's `confirm()` prompt names the restore as
+   reversible ("current content will be captured as a new version
+   row before the restore is applied"). This is true — the
+   server's `updateSavedView` snapshots BEFORE applying — but
+   operators don't know that unless we tell them. Lesson: when a
+   destructive-looking UI action is actually reversible because
+   of server-side invariants, **say so in the prompt** so
+   operators feel safe clicking.
+3. **Invalidate sibling lists, not just self.** The Restore
+   mutation's onSuccess invalidates BOTH
+   `listSavedViewVersions({savedViewId})` (the version history
+   itself) AND `listVisibleSavedViews` (the live row's content +
+   version number changed). Without the second invalidation, a
+   parent page showing the saved view's content next to the
+   history panel would render stale content even after a restore.
+   Lesson: **invalidate the upstream cache that consumes the row
+   you just mutated**, not just the cache the mutation produced.
+
+After this slice, the no-deferral mission has shipped **67 slices
+across 11 continuation arcs** (1-26 original, 27-32 cont-1,
+33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51
+cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64 cont-10,
+65-67 cont-11).
+
+### Next-arc target: triggerLiveEvaluation UI consumer
+
+Continuation-12 should add a UI consumer for slice 44's
+`goldenQuestions.triggerLiveEvaluation`. Open questions:
+- Where? No `GoldenQuestionsAdminPanel` exists today. Build a
+  small one or embed a trigger button under an existing admin
+  surface (e.g. `GraphHealthAdminPage`).
+- What inputs? `providerConnectionId` + `modelRef` +
+  `workspaceId` + `actorId` + optional `suiteKey` +
+  optional `perQuestionTimeoutMs`.
+- What feedback? The mutation returns the run id + per-suite
+  outcomes; the UI should surface that as a toast + optionally
+  link to a results page (its own slice if shipped).
