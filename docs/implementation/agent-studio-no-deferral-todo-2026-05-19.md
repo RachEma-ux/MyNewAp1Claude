@@ -2066,10 +2066,89 @@ The panel mirrors slice 78's pattern but with:
 | 81 | **`RecommendationBatchRunnerPanel`** | Multi-kind selector + per-kind result sections + per-kind status pill + mount on RecommendationPage; tests. |
 | 82 | **Continuation-16 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Declares the entire `recommendation.*` surface UI-consumed. |
 
+## Continuation-16 closure receipt (2026-05-20)
+
+The sixteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1599–#1601. Closes
+`recommendation.recommendBatch` via a sibling panel mounted on
+`RecommendationPage` below the single-kind runner.
+
+After this arc, **all 3 `recommendation.*` endpoints have UI
+consumers**:
+
+| tRPC | UI consumer | Shipped in |
+|---|---|---|
+| `listKnownKinds` | Both panels' kind selector | slice 78 + 81 |
+| `recommend` | `RecommendationRunnerPanel` Run button | slice 78 |
+| `recommendBatch` | `RecommendationBatchRunnerPanel` Run button | slice 81 |
+
+Combined with continuation-13 (`goldenQuestions.*`) +
+continuation-14 (`impactAnalysis.*`), the 3 operator-facing tRPC
+surfaces named at continuation-14's broad audit are now fully
+UI-consumed:
+
+| Router | Endpoints | UI consumers shipped in |
+|---|---|---|
+| `goldenQuestions` | 7 (listSuites + listQuestionsInSuite\* + listRecentRuns + getRunStats + listRunResults + getQuestionDetail + triggerLiveEvaluation) | continuations 12+13 (slices 69, 72) |
+| `impactAnalysis` | 3 (listKnownKinds + summarizeResult + runImpactAnalysis) | continuation 14 (slice 75) |
+| `recommendation` | 3 (listKnownKinds + recommend + recommendBatch) | continuations 15+16 (slices 78, 81) |
+
+\* `listQuestionsInSuite` is endpoint-shipped but workflow-
+unconsumed (no operator path navigates to "browse all questions
+in a suite" — anticipated future curation flow). Per
+continuation-13 lesson #1, this is not a gap.
+
 ### Continuation-16 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 80 catalogue | this PR | TBD | Opens continuation-16; sibling-panel pattern |
-| 81 batch panel | TBD | TBD | Multi-kind selector + per-kind sections + per-kind status pill; tests |
-| 82 continuation-16 closure | TBD | TBD | Receipt; declares `recommendation.*` fully UI-consumed |
+| 80 catalogue | #1599 | `d5f3671d` | Opens continuation-16; sibling-panel approach |
+| 81 batch panel | #1600 | `558364b8` | recommendBatch consumed; mounted as sibling on RecommendationPage; 11 tests |
+| 82 continuation-16 closure | this PR | TBD | Receipt + recommendation.* fully-consumed declaration |
+
+### Continuation-16 carry-forward lessons
+
+1. **Sibling-panel pattern is the right move when a new endpoint
+   shares an operator workflow but extends the fan-out shape.**
+   `recommendBatch` is "recommend, but for N kinds at once". The
+   operator journey is the same ("I want recommendations for an
+   anchor"); only the fanout grows. A new page would have forced
+   operators to navigate away from their single-kind context.
+   Mounting as a sibling lets them try both forms in one place
+   and compare results. Lesson: **the page is the operator's
+   mental model; panels are the verbs**. When a new verb extends
+   an existing mental model, add a panel, not a page.
+2. **Closed-taxonomy fan-out should preserve declaration order,
+   not click order.** The batch panel's multi-kind selector
+   tracks which kinds are selected via a `Set<string>`, but the
+   request body materializes them in the order `listKnownKinds`
+   returned them (not click order). This keeps result sections
+   in a stable predictable layout across re-renders + re-clicks.
+   Lesson: when an operator selects from a closed taxonomy,
+   **preserve the taxonomy's declared order** for downstream
+   rendering, not the operator's click order.
+3. **Per-element status pills + per-item error messages are the
+   right pattern for batch endpoints.** `recommendBatch`'s
+   per-kind `ok | error` discriminator lets partial successes
+   render alongside partial failures without an opaque
+   batch-level reject. The panel renders each kind's section
+   independently — operators see "Notes: ok, 5 results; Tools:
+   error, tools index offline" instead of a single
+   destructive-red banner that hides the partial wins. Lesson:
+   for batch endpoints with per-item discriminators, **render
+   one section per item, each with its own pill + per-item
+   error path**.
+
+After this slice, the no-deferral mission has shipped **82
+slices across 16 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16).
+
+### Next-arc target: another broad-audit cycle
+
+The 3 routers named at continuation-14's broad audit are now
+fully UI-consumed. Continuation-17 should re-run the broad
+audit — there may be other server-side surfaces shipped between
+then and now that lack UI consumers.
