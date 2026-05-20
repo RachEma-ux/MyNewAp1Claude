@@ -1243,10 +1243,83 @@ verbatim.
 | 60 | **listPresence caller migration** | Route the eviction DELETE + the SELECT through `resolveNoteRoutedConn(lookupDb, noteId)`; source-scan test pins the pattern. |
 | 61 | **Continuation-9 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Declares the caller-migration tail **functionally complete** for the auto-detectable scope. |
 
+## Continuation-9 closure receipt (2026-05-20)
+
+The ninth continuation arc shipped 1 trivial implementation slice +
+1 catalogue + this closure across PRs #1578–#1580. The last
+`getAsDb()` call site in `services/vault/presence.ts`'s
+`listPresence` was migrated using the file's own existing
+`resolveNoteRoutedConn` helper (PR-V1-132). The migration was 4
+LoC — `lookupDb = getAsDb()` + `db = await
+resolveNoteRoutedConn(lookupDb, noteId)` — replacing the raw
+`const db = getAsDb()`.
+
 ### Continuation-9 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 59 catalogue | this PR | TBD | Opens continuation-9; confirms 1 trivial migration left in presence.ts |
-| 60 listPresence | TBD | TBD | listPresence routed via the existing resolveNoteRoutedConn helper |
-| 61 continuation-9 closure | TBD | TBD | Receipt + caller-migration tail declared functionally complete |
+| 59 catalogue | #1578 | `efbdd705` | Opens continuation-9; confirms presence.ts has 1 trivial migration left |
+| 60 listPresence | #1579 | `af850160` | Routed via existing resolveNoteRoutedConn helper; 4-test source-scan lockstep |
+| 61 continuation-9 closure | this PR | TBD | Receipt + caller-migration tail declared functionally complete |
+
+### Continuation-9 carry-forward lessons
+
+1. **Look for module-local helpers before extracting new ones.**
+   Continuation-8 (slice 57) extracted two new top-of-file helpers
+   for template-instantiations because the file's call sites were
+   doing inline JOINs. Continuation-9 (slice 60) found that
+   `presence.ts` already had `resolveNoteRoutedConn` from PR-V1-132
+   — only one of the file's 4 functions was missing the call. The
+   migration was 4 LoC. Lesson: **before extracting a helper, grep
+   the file for an existing one** with the same chain.
+2. **"3 of 4 already migrated" is a common pattern.** Both
+   bases-service.ts (slice 54) and presence.ts (slice 60) had
+   their write paths migrated by earlier MR-3 batches but missed
+   the read paths. The reason: write paths surface workspaceId
+   bugs as visible failures (data writes to the wrong region),
+   while reads return empty results or fall through to bootstrap
+   silently. Lesson: **when auditing a partially-migrated file,
+   the read paths are usually the laggards** — search for
+   read-only functions (return `[]` / return `null` paths) and
+   check them first.
+3. **The "next arc" prediction loop is converging.** Each
+   continuation's closure predicted the next arc's target with
+   increasing accuracy: continuation-7 named 7 files (5 were
+   wrong), continuation-8 named 1 file (right but unknown
+   migratability), continuation-9 confirmed migratability and
+   shipped in 1 trivial slice. Lesson: **the closing arcs of a
+   long mission compress** — the next-arc prediction becomes a
+   reliable signal rather than guesswork.
+
+After this slice, the no-deferral mission has shipped **61 slices
+across 9 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51 cont-6,
+52-55 cont-7, 56-58 cont-8, 59-61 cont-9).
+
+### Caller-migration tail: **functionally complete**
+
+Every actually-migratable `getAsDb()` call site in
+`server/agent-studio/services/**` now follows the Path-A "lookupDb
+→ resolve → routedDb" pattern. The remaining raw `getAsDb()` calls
+are:
+
+| Category | Why it stays raw |
+|---|---|
+| Path-A pre-resolution `lookupDb`'s | Load-bearing — they ARE the bootstrap that finds workspaceId. Replacing them with `getAsDbForWorkspace` would create a chicken-and-egg cycle. |
+| Not-workspace-scoped entities | security-graph, code-graph, publish-targets, graph-quality, vault/link-queries, graph-enrichment, etc. — schemas have no workspaceId column. Migration requires schema change first (Phase 2 multi-region cutover). |
+| Region routing infrastructure | `services/region/*` — these files ARE the routing implementation. Can't bootstrap routing via routing. |
+
+### Operator-gated residuals (unchanged)
+
+- T-B.1 (Neo4j CE G3 benchmark — GHA workflow_dispatch).
+- T-H (V2 plugin framework + Aura migration — operator-approval-gated).
+- Conditional deferrals: `chat.ts:1117` (dashboard observability),
+  `runtime-lens-asdb-reader.ts:24` (shared-cluster deployment).
+- MVP-boundary intent (7 categories).
+
+The no-deferral mission's auto-detectable scope is now closed. Any
+future arc must either:
+- Re-audit with a fresh method to surface new categories.
+- Wait for a trigger condition (dashboard demand, shared-cluster
+  rollout, schema-change cutover) to convert a deferral into an
+  actionable item.
