@@ -74,6 +74,13 @@ const VaultSavedViewsPage = lazy(() => import("../pages/VaultSavedViewsPage"));
 // promoting `VaultTemplatesPanel` from `RetrofitPage`-embedded to a
 // first-class page with its own route + sidebar entry.
 const VaultTemplatesPage = lazy(() => import("../pages/VaultTemplatesPage"));
+// No-deferral continuation-12 slice 69: Golden Questions admin page —
+// closes the slice-44 triggerLiveEvaluation UI-consumer gap and opens
+// the operator entry point for the broader `goldenQuestions.*` tRPC
+// surface (6 reads + 1 mutation).
+const GoldenQuestionsPage = lazy(
+  () => import("../pages/GoldenQuestionsPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -217,6 +224,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-7 slice 53: Vault Templates admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-templates")) {
     return { ...empty, view: "vault-templates", homeMode: null };
+  }
+  // ── No-deferral continuation-12 slice 69: Golden Questions admin (no agent context) ──
+  if (path.startsWith("/agent-studio/golden-questions")) {
+    return { ...empty, view: "golden-questions", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -451,6 +462,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/vault-templates");
       return;
     }
+    // No-deferral continuation-12 slice 69: golden-questions is a global view.
+    if (key === "golden-questions") {
+      navigate("/agent-studio/golden-questions");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -578,6 +594,10 @@ export default function AgentStudioShell() {
         //    slice 63: Vault Templates admin (typed via AgentStudioView). ──
         case "vault-templates":
           return <VaultTemplatesPage />;
+        // ── No-deferral continuation-12 slice 69: Golden Questions admin
+        //    (typed via AgentStudioView). ──
+        case "golden-questions":
+          return <GoldenQuestionsPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
