@@ -1780,3 +1780,64 @@ mutations + drillable read-surfaces that landed without UI
 consumers. A grep over `client/src/` for
 `agentStudio.<router>.<endpoint>.useQuery|useMutation` patterns
 vs the full router export should surface candidates.
+
+## Continuation-14 — broad UI-consumer audit (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-13's closure named the broad UI-consumer audit as
+the next target. Re-applied the audit method to the wider
+`agentStudio.*` tRPC surface.
+
+### Re-audit findings
+
+`grep -rln "agentStudio\.<router>\." client/src/` across the
+sub-routers from `server/agent-studio/api/router.ts`:
+
+| Router | # endpoints | UI consumers |
+|---|---|---|
+| `recommendation` | 3 (`recommend`, `recommendBatch`, `listKnownKinds`) | **0** |
+| `impactAnalysis` | 3 (`listKnownKinds`, `summarizeResult`, `runImpactAnalysis`) | **0** |
+| `semanticEnrichment` | many | 1 (proposal detail panel) — partial |
+
+Two routers with zero UI consumers. Continuation-14 picks
+**impactAnalysis** as the slice 75 target — the operator
+workflow is concrete ("given a node, what does it impact?")
+and surfaces as a single-page Q&A. `recommendation` is the
+explicit continuation-15 target.
+
+### Approach
+
+Same shape as slice 69 (`GoldenQuestionsTriggerPanel`):
+standalone `ImpactAnalysisPage` mounted under the existing
+"Lenses" sidebar group, following the continuation-10
+completion-audit 7-point checklist in one slice.
+
+The runner panel:
+- **Kind dropdown** populated from `listKnownKinds` (closed
+  taxonomy — operators pick the impact-analysis type).
+- **Starting node form**: `typeKey` + `id` text inputs.
+- **Optional knobs**: `maxDepth` (1-64), `nodeTypeKeyFilter`
+  (comma-separated, capped at 64 entries).
+- **Run button** → calls `runImpactAnalysis` (a `query` on the
+  server, but operator-triggered — uses tRPC's `useUtils()` to
+  fetch on demand rather than auto-running).
+- **Result rendering**: mode discriminator pill (`stub` vs
+  `template`) + nodes + edges tables + a Summary section
+  populated by calling `summarizeResult` against the cached
+  result.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 74 | **Open continuation-14 catalogue** | This entry. Names the impactAnalysis target + the recommendation continuation-15 target. |
+| 75 | **`ImpactAnalysisRunnerPanel` + page** | Standalone page; 3-endpoint consumer; full 7-point nav-surface wiring; tests. |
+| 76 | **Continuation-14 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-15 target. |
+
+### Continuation-14 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 74 catalogue | this PR | TBD | Opens continuation-14; broad audit finds impactAnalysis + recommendation gaps |
+| 75 impact-analysis panel + page | TBD | TBD | Closes impactAnalysis UI-consumer gap; 3 endpoints + 7-point nav wiring |
+| 76 continuation-14 closure | TBD | TBD | Receipt + recommendation as continuation-15 target |
