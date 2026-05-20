@@ -2413,3 +2413,68 @@ Continuation-19 should ship `GraphChangeProposalsPanel` consuming
 the 4-endpoint approval workflow. The mutation-heavy shape will
 likely surface new lessons distinct from the read-heavy master-
 detail panels of slices 75 / 78 / 84 / 87.
+
+## Continuation-19 — graphChangeProposals UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-18's closure named graphChangeProposals as the next
+target (mutation-heavy approval workflow).
+
+### Re-audit findings
+
+`graphChangeProposals.*` is **mutation-only** — no list, no get,
+no read surface at all:
+
+| Endpoint | Kind | Input shape |
+|---|---|---|
+| `submit` | mutation | `{ proposalKind, summary?, confidence?, proposedByAgentId?, items: [{itemKind, itemPayload, sourceEvidence?}] }` |
+| `approve` | mutation | `{ proposalId, rationale? }` |
+| `reject` | mutation | `{ proposalId, rationale? }` |
+| `withdraw` | mutation | `{ proposalId }` |
+
+The 11-value `proposalKind` enum is closed: `create_node`,
+`update_node`, `deprecate_node`, `create_edge`, `update_edge`,
+`remove_edge`, `entity_merge`, `entity_split`,
+`observation_correction`, `provenance_correction`,
+`projection_correction`.
+
+### Mutation-only constraint
+
+Unlike the prior master-detail panels (slices 75 / 78 / 84 / 87),
+there is **no `listProposals` endpoint** to discover pending
+proposals. This forces the panel shape to be **operator-supplied
+ID** for approve / reject / withdraw — the operator must already
+know the `proposalId` (from upstream context such as a backend
+log, a separate dashboard, or a freshly-submitted response).
+
+A "submit" sub-panel can return the new `proposalId` to the
+operator on success, closing the loop for proposals created
+within this surface — but discovery of *external* pending
+proposals is genuinely out of scope until a `listProposals`
+query is added server-side.
+
+### Approach
+
+`GraphChangeProposalsPanel` will have two sub-sections:
+
+- **Submit** — `proposalKind` dropdown (closed enum) + summary +
+  confidence + items-array editor (itemKind + itemPayload as
+  JSON). On success, surfaces the new `proposalId` and approval
+  state for the operator to copy.
+- **Lifecycle** — three siblings (Approve / Reject / Withdraw),
+  each with a `proposalId` number input and optional `rationale`
+  text field (withdraw has no rationale field per the router
+  schema). Each independent mutation; clearing one form does
+  not affect the others.
+
+7-point nav-surface wiring under Lenses sidebar group, mounted
+alongside Security Graph + Code Graph + Impact Analysis +
+Recommendation.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 89 | **Open continuation-19 catalogue** | This entry. Names the mutation-only constraint up-front. |
+| 90 | **`GraphChangeProposalsPanel` + page** | 4-endpoint mutation-heavy panel with submit + lifecycle sub-sections; full 7-point nav wiring; tests. |
+| 91 | **Continuation-19 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-20 target (racIngestion — 3-endpoint preview/register/validate workflow). |
