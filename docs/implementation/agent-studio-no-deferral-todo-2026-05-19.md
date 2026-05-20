@@ -2293,3 +2293,59 @@ listIngestionNodes / listIngestionEdges / listRepositories
 mirror slice 84 verbatim — same master-detail layout, same
 cascading `enabled` gates, just bound to `codeGraph.*` instead.
 The pattern-replication win from slice 78 → 81 applies here.
+
+## Continuation-18 — codeGraph UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-17's closure named codeGraph as the next target
+with a "direct slice-84 template" note.
+
+### Re-audit findings
+
+`codeGraph.*` is structurally near-identical to `securityGraph.*`
+— same 7 endpoints, same master-detail shape, with field renames:
+
+| Concept | securityGraph (slice 84) | codeGraph (slice 87) |
+|---|---|---|
+| Per-source aggregate | `listSources` → `sourceKey` | `listRepositories` → `repositoryId` |
+| Per-ingestion failure rollup | `listRecentRejectionsByReason` (rejection by reason × count) | `listRecentParserErrors` (filePath + reason + message) |
+| Master | `listIngestions` | `listIngestions` (extra `parserErrorCount` field) |
+| Detail stats | `getIngestionStats` | `getIngestionStats` |
+| Node drill-in | `listIngestionNodes` (id + typeKey + name) | `listIngestionNodes` (id + typeKey + name + **filePath** + startLine / endLine) |
+| Edge drill-in | `listIngestionEdges` | `listIngestionEdges` |
+| Closed taxonomy | `listKnownTypes` (10 node + 8 edge) | `listKnownTypes` (12 node + 9 edge) |
+
+### Approach
+
+Per continuation-15 lesson #1 (pattern replication is the right
+outcome), slice 87 mirrors slice 84 verbatim:
+
+- `CodeGraphPanel` — single comprehensive panel with three top
+  sections (repositories rollup + parser-errors rollup + master
+  ingestion list) and one detail region (stats + filtered node
+  drill-in + filtered edge drill-in).
+- `CodeGraphPage` — PageHeader + panel.
+- Full 7-point nav-surface wiring; mounted under the Lenses
+  sidebar group alongside Impact Analysis + Recommendation +
+  Security Graph.
+
+The renderer adaptations for the parser-error row (filePath +
+reason + message vs securityGraph's reason + count) + the
+extra ingestion-row `parserErrorCount` field + node-row
+filePath are field-substitutions, not pattern changes.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 86 | **Open continuation-18 catalogue** | This entry. Names slice-84 as the direct template + field-rename map. |
+| 87 | **`CodeGraphPanel` + page** | 7-endpoint master-detail panel; full 7-point nav wiring; tests. |
+| 88 | **Continuation-18 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-19 target (graphChangeProposals — mutation-heavy 4-endpoint approval workflow). |
+
+### Continuation-18 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 86 catalogue | this PR | TBD | Opens continuation-18; field-rename map vs slice 84 |
+| 87 CodeGraph panel + page | TBD | TBD | 7 endpoints consumed; 7-point nav wiring; tests |
+| 88 continuation-18 closure | TBD | TBD | Receipt + graphChangeProposals as continuation-19 target |
