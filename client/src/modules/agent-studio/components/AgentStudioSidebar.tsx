@@ -169,6 +169,13 @@ export type AgentStudioView =
   //    mutations on top of the 10-value PromotionKind enum.
   //    Distinct from NotePromotionsRetentionPanel (retention). ──
   | "promotion-lifecycle"
+  // ── No-deferral continuation-24 slice 105: Graph Correction page.
+  //    Second arc of the partial-consumer audit cycle. Closes 10
+  //    graphCorrection lifecycle endpoints — first true master-detail
+  //    in the cycle with list + get + listAudit + bulk operations +
+  //    requestRevision lifecycle node. Distinct from
+  //    GraphCorrectionProposalsRetentionPanel (retention). ──
+  | "graph-correction"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -327,6 +334,20 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "promotion-lifecycle",
         label: "Lifecycle",
         icon: GitBranch,
+      },
+    ],
+  },
+  // ── No-deferral continuation-24 slice 105: graph-correction page.
+  //    Second arc of the partial-consumer audit cycle. Surfaces the
+  //    graphCorrection 10-endpoint master-detail (list/get/listAudit +
+  //    lifecycle + bulk) distinct from the existing retention panel. ──
+  {
+    label: "Graph Correction",
+    items: [
+      {
+        key: "graph-correction",
+        label: "Proposals",
+        icon: ShieldAlert,
       },
     ],
   },
