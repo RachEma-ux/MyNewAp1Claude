@@ -1072,3 +1072,65 @@ roadmap is **functionally complete** for the autonomous scope —
 remaining items are explicitly operator-action (T-B.1) or
 operator-approval-gated (T-H), with documented trigger conditions
 for both.
+
+## Continuation-8 — caller-migration tail (2026-05-20)
+
+User directive: "merge it and continue with the next punch-list arc".
+Continuation-7 closed the 2 genuinely-open punch-list items + named
+a 7-file caller-migration tail as the only autonomously-shippable
+residual. Continuation-8 picks the next file in that tail.
+
+### Re-audit findings
+
+Re-scanned the 56 `getAsDb()` call sites (excluding comment-only
+mentions). Files NOT migratable to the Path-A pattern:
+
+- `security-graph/persistence/security-graph-store.ts` (8 calls): no
+  `workspaceId` references at all — security-graph entities aren't
+  workspace-scoped. Migration requires schema change first.
+- `code-graph/persistence/code-graph-store.ts` (8 calls): same — no
+  workspaceId references.
+- `publish-targets/admin-queries.ts` (6 calls): no workspaceId refs.
+- `graph-quality/router.ts` (6 calls): no workspaceId refs.
+- `vault/link-queries.ts` (2 calls): no workspaceId refs.
+- `graph-enrichment/semantic-enrichment-store.ts` (3 calls): no
+  workspaceId refs.
+- `publish-targets/executor.ts` (4 calls): no workspaceId refs.
+- `region/*` files (5+4+2+2 calls): region routing infrastructure
+  itself — can't migrate (they ARE the routing).
+- `graph/repository/*` files (18+8 calls): already use the
+  `lookupConn = getAsDb()` Path-A bootstrap pattern; the calls are
+  load-bearing pre-resolution lookups, not migration candidates.
+- `cag/store.ts` (5 calls), `rac/sources/store.ts` (8 calls),
+  `approval/approval-gate.ts` (3 calls): already use the Path-A
+  lookupDb pattern — pre-resolution lookups only.
+- `canvas/canvas-service.ts` (9 calls), `vault/repository-asdb.ts`
+  (13 calls): same — Path-A lookupConn / lookupDb load-bearing.
+
+Files actually migratable:
+
+| File | Raw calls | Migratable functions | Resolution chain |
+|---|---|---|---|
+| `vault/template-instantiations.ts` | 4 (1 already migrated, 3 left) | 3 | template→vault→workspace OR note→vault→workspace |
+| `vault/presence.ts` | 4 | (TBD — needs inspection) | vault→workspace |
+
+`template-instantiations.ts` is the clearest candidate — the same
+file's `recordTemplateInstantiation` already uses the Path-A
+note→vault→workspace chain. Slice 57 extracts that into a helper
+and applies it to the 3 remaining functions.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 56 | **Open continuation-8 catalogue** | This entry. Re-audits the 56-file caller-migration list, separates migratable from structural, picks template-instantiations.ts as the slice-57 target. |
+| 57 | **template-instantiations caller migration** | Extract `resolveWorkspaceIdForTemplate` + `resolveWorkspaceIdForNote` helpers; migrate `listInstantiationsByTemplate` + `listInstantiationsByNote` + `countDistinctDigestsForTemplate` to Path-A; source-scan test. |
+| 58 | **Continuation-8 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names the next file (`vault/presence.ts`) for continuation-9. |
+
+### Continuation-8 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 56 catalogue | this PR | TBD | Opens continuation-8; classifies the 56-file list into migratable (2) vs structural (54) |
+| 57 template-instantiations | TBD | TBD | 3 functions migrated + 2 reusable helpers |
+| 58 continuation-8 closure | TBD | TBD | Receipt + next-arc target |
