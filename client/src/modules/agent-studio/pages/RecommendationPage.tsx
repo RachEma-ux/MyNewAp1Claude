@@ -1,21 +1,24 @@
 /**
- * Recommendation admin page — no-deferral continuation-15 slice 78.
+ * Recommendation admin page — no-deferral continuation-15 slice 78
+ * + continuation-16 slice 81.
  *
  * Global Agent Studio page (no agentId context) reachable at
  * `/agent-studio/recommendation`. Closes the UI-consumer gap for
  * the `recommendation.*` tRPC surface (3 endpoints — listKnownKinds /
  * recommend / recommendBatch) shipped at T-G.4.
  *
- * MVP scope (slice 78): single-kind recommend via
- * `RecommendationRunnerPanel`. The multi-kind `recommendBatch`
- * endpoint stays unconsumed and is the explicit continuation-16
- * candidate.
+ *   - Slice 78 (continuation-15): `RecommendationRunnerPanel`
+ *     surfaces single-kind `recommend` + `listKnownKinds`.
+ *   - Slice 81 (continuation-16): `RecommendationBatchRunnerPanel`
+ *     surfaces multi-kind `recommendBatch` mounted below the
+ *     single-kind panel.
  */
 
 import { Sparkles } from "lucide-react";
 
 import { PageHeader } from "../components/ui";
 import { RecommendationRunnerPanel } from "../components/RecommendationRunnerPanel";
+import { RecommendationBatchRunnerPanel } from "../components/RecommendationBatchRunnerPanel";
 
 export default function RecommendationPage() {
   return (
@@ -26,6 +29,7 @@ export default function RecommendationPage() {
         icon={<Sparkles className="h-5 w-5" />}
       />
       <RecommendationRunnerPanel />
+      <RecommendationBatchRunnerPanel />
     </div>
   );
 }
