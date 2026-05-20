@@ -4146,3 +4146,74 @@ functional groups:
 | 122 | **Open continuation-30 catalogue** | This entry. 6-endpoint 3-card arc. |
 | 123 | **`CanvasAdminPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
 | 124 | **Continuation-30 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-30 closure receipt (2026-05-20)
+
+The thirtieth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1641–#1643. **Eighth arc
+of the partial-consumer audit cycle**. Closes `canvas.*`
+(3/9 → 9/9, 6 endpoints).
+
+### Continuation-30 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 122 catalogue | #1641 | 3981edd6 | Opens continuation-30; 6-endpoint 3-card arc |
+| 123 CanvasAdminPanel + page | #1642 | 05dc2e37 | 6 endpoints consumed; 3-card panel (canvas / node / edge); closed 4-value CANVAS_NODE_KINDS enum dropdown; 8 nav-surface tests |
+| 124 continuation-30 closure | #1643 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-30 carry-forward lessons
+
+1. **Asymmetric CRUD (only `createX`, no `getX`/`listX`/`deleteX`)
+   is OK as long as the read path comes from a sibling endpoint.**
+   `canvas.createEdge` exists but `getEdge`/`listEdges`/`deleteEdge`
+   don't — edges are read via `getSnapshot` (which returns all
+   nodes + edges together). The Edge card surfaces only the
+   create form; the panel doc-block notes the read path is via
+   the existing snapshot surface. Lesson: **when a router has
+   create-only entities, surface only the create form** and
+   document the sibling read path in the panel header — don't
+   try to fake a list/get by re-querying snapshot client-side.
+2. **The Update card's `setX(value?)` pattern needs the empty-string
+   sentinel.** `updateNode` takes ALL fields optional — kind, note
+   id, x, y, width, height, data. The panel uses empty-string-means-
+   "leave unchanged" + a `(unchanged)` dropdown option for the
+   closed-enum kind field. Lesson: **for partial-update mutations,
+   empty input field = unchanged**; the help text should say so;
+   the closed enum gets a literal `(unchanged)` option.
+3. **6-endpoint arcs comfortably fit a 3-card panel.** Cont-30
+   confirms the cont-26 standing pattern: functional grouping
+   maps 1:1 to panel cards. 6 endpoints / 3 cards / 2 endpoints
+   per card on average is the sweet spot — operator can scan
+   one card at a time without scrolling fatigue. Lesson:
+   **the 3-card panel ceiling is ~9 endpoints (3 per card)** —
+   above that, split into multiple pages.
+
+After this slice, the no-deferral mission has shipped **124
+slices across 30 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25,
+110-112 cont-26, 113-115 cont-27, 116-118 cont-28, 119-121
+cont-29, 122-124 cont-30). **30 arcs / 124 slices** — the
+mission's structure is mature.
+
+### Partial-consumer audit status (post-cont-30)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 8 | `promotion`, `graphCorrection`, `semanticEnrichment`, `graphQuality`, `vault`, `workspaceObservability`, `providerBindings`, `canvas` |
+| Remaining | 10 | bases / cag / goldenQuestions / graphAgent / graphProjection / graphSkill / graphWorkspace / racEvaluation / toolApprovals / toolKnowledge |
+
+The next arc candidates ordered by absolute unconsumed-count:
+`graphAgent` (4/8 = 4 unconsumed), `cag` (4/7 = 3), `graphWorkspace`
+(5/8 = 3), `graphSkill` (1/4 = 3), `bases` (8/10 = 2 — finishing
+the partial-consumer remainder from cont-21's zero-consumer arc),
+`toolApprovals` (2/4 = 2), `racEvaluation` (2/3 = 1),
+`toolKnowledge` (1/2 = 1), `goldenQuestions` (6/7 = 1),
+`graphProjection` (4/6 = 2).
