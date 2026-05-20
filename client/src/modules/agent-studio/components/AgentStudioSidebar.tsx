@@ -37,6 +37,7 @@ import {
   Folder,
   FileText,
   Award,
+  Sparkles,
   Globe,
   LayoutGrid,
   Radio,
@@ -124,6 +125,11 @@ export type AgentStudioView =
   //    endpoints shipped at T-G.5.α + the no-deferral slice 29
   //    template registry). ──
   | "impact-analysis"
+  // ── No-deferral continuation-15 slice 78: Recommendation admin
+  //    page. Closes the recommendation.* UI-consumer gap (3
+  //    endpoints shipped at T-G.4 — slice 78 consumes listKnownKinds
+  //    + recommend; recommendBatch deferred to continuation-16). ──
+  | "recommendation"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -244,12 +250,13 @@ const HOME_GROUPS: SectionGroup[] = [
     ],
   },
   // ── T-F.62: graph-lens browser + continuation-14 slice 75
-  //    impact-analysis ──
+  //    impact-analysis + continuation-15 slice 78 recommendation ──
   {
     label: "Lenses",
     items: [
       { key: "graph-lens-browser", label: "Lens Browser", icon: Telescope },
       { key: "impact-analysis", label: "Impact Analysis", icon: Network },
+      { key: "recommendation", label: "Recommendation", icon: Sparkles },
     ],
   },
   // ── T-F.82 (T-F.4-α): graph-quality findings ──
