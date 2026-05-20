@@ -2219,10 +2219,77 @@ Same single-slice pattern as slice 84:
 | 84 | **`SecurityGraphPanel` + page** | Single comprehensive panel consuming 7 endpoints; 7-point nav wiring; tests. |
 | 85 | **Continuation-17 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-18 target (codeGraph — same shape). |
 
+## Continuation-17 closure receipt (2026-05-20)
+
+The seventeenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1602–#1604. Closes the
+`securityGraph.*` UI-consumer gap — all 7 endpoints consumed by
+the new `SecurityGraphPanel` + `SecurityGraphPage`, mounted under
+the Lenses sidebar group alongside Impact Analysis +
+Recommendation.
+
 ### Continuation-17 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 83 catalogue | this PR | TBD | Opens continuation-17; 6 zero-consumer routers identified; securityGraph picked |
-| 84 SecurityGraph panel + page | TBD | TBD | 7 endpoints consumed; 7-point nav wiring; tests |
-| 85 continuation-17 closure | TBD | TBD | Receipt + next-arc target (codeGraph) |
+| 83 catalogue | #1602 | `a99af98e` | Opens continuation-17; broad re-audit finds 6 zero-consumer routers |
+| 84 SecurityGraph panel + page | #1603 | `f5438506` | 7 endpoints consumed; 7-point nav wiring; 21 tests |
+| 85 continuation-17 closure | this PR | TBD | Receipt + continuation-18 target (codeGraph) |
+
+### Continuation-17 carry-forward lessons
+
+1. **One comprehensive panel beats N small ones when endpoints
+   share an operator workflow.** SecurityGraph has 7 endpoints
+   that all serve the same operator question: "what's the health
+   of my security feed ingestion pipeline?". Slice 84 packs all 7
+   into a single panel with three top sections (sources rollup +
+   rejections rollup + master ingestion list) and one detail
+   region (stats + nodes + edges). An alternative would be 4
+   sibling panels stacked on the page — but the operator's
+   workflow is "scan top → notice a stale source → drill into a
+   specific ingestion", which is one cohesive flow, not four
+   independent ones. Lesson: when 5+ endpoints serve a single
+   operator workflow, **prefer one panel with sections +
+   cascading `enabled` gates** over N sibling panels. The page
+   wrapping stays a thin shell.
+2. **`listKnownTypes` is the right shape for filter dropdowns.**
+   The closed-taxonomy enums (10 node types + 8 edge types) are
+   surfaced via `listKnownTypes` so the dashboard's drill-in
+   filters populate dynamically instead of hard-coding the
+   strings client-side. The panel queries `listKnownTypes` once
+   at mount, then uses the result to populate both the node-type
+   and edge-type select dropdowns inside the drill-in section.
+   Lesson: when the server has a closed taxonomy that the client
+   uses for filters, **expose it via a parameterless query
+   alongside the data endpoints** — keeps the client thin and
+   prevents drift.
+3. **`status` discriminator envelopes scale to multiple
+   endpoints.** `getIngestionStats` carries
+   `"ok" | "not_found"`; `listIngestionNodes` /
+   `listIngestionEdges` carry
+   `"ok" | "ingestion_not_found"`. The panel uses the same
+   envelope-rendering pattern from slice 78
+   (`if status === "ok"` happy-path, `if status === "not_found"`
+   destructive copy) at all three call sites. Lesson: when
+   several endpoints share a stale-link pattern (operator
+   pasted an ID, row was purged), **standardize on a `status`
+   discriminator envelope** so the consumer-side rendering
+   pattern stays uniform across calls.
+
+After this slice, the no-deferral mission has shipped **85
+slices across 17 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17).
+
+### Next-arc target: codeGraph UI consumer
+
+`codeGraph.*` has 7 endpoints with a **near-identical shape to
+securityGraph** — listIngestions / getIngestionStats /
+listIngestionNodes / listIngestionEdges / listRepositories
+(parallels listSources) / listKnownTypes / listRecentParserErrors
+(parallels listRecentRejectionsByReason). Continuation-18 should
+mirror slice 84 verbatim — same master-detail layout, same
+cascading `enabled` gates, just bound to `codeGraph.*` instead.
+The pattern-replication win from slice 78 → 81 applies here.
