@@ -50,6 +50,9 @@ import { GraphAgentRuntimeTracesRetentionPanel } from "../components/GraphAgentR
 import { PublishRequestsRetentionPanel } from "../components/PublishRequestsRetentionPanel";
 import { ApprovalStepsRetentionPanel } from "../components/ApprovalStepsRetentionPanel";
 import { NotePromotionsRetentionPanel } from "../components/NotePromotionsRetentionPanel";
+// No-deferral continuation-37 slice 144: closes toolApprovals.list +
+// toolApprovals.getByHash UI-consumer gap (the 2 unconsumed endpoints).
+import { ToolApprovalsLookupPanel } from "../components/ToolApprovalsLookupPanel";
 
 /**
  * M1-c4 (cycle-4 audit `/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M1-c4)
@@ -189,8 +192,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         <TabsContent value="tool-knowledge">
           <ToolKnowledgePanel workspaceId={workspaceId} />
         </TabsContent>
-        <TabsContent value="approvals">
+        <TabsContent value="approvals" className="space-y-3">
           <ApprovalsPanel agentDraftId={draftId} />
+          <ToolApprovalsLookupPanel agentDraftId={draftId} />
         </TabsContent>
         <TabsContent value="cron-status">
           <CronStatusPanel />
