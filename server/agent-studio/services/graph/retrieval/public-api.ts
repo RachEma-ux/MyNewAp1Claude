@@ -15,3 +15,26 @@ export type { ContextBlockInput, ContextBlockOutput, SafetyEvent, FilterResult }
 
 export { GraphRetrievalRouter } from "./retrieval-router.js";
 export type { RetrievalMode, GraphRetrievalInput, GraphRetrievalOutput } from "./retrieval-router.js";
+
+export {
+  rankHybrid,
+  extractDefaultSignals,
+  DEFAULT_RANK_WEIGHTS,
+} from "./hybrid-ranker.js";
+export type {
+  RankSignals,
+  RankWeights,
+  RankedBlock,
+  HybridRankInput,
+  HybridRankOptions,
+} from "./hybrid-ranker.js";
+
+export {
+  buildSignalLookup,
+  composeSignalLookups,
+} from "./vector-text-signal-bridge.js";
+export type {
+  VectorRetrieverHit,
+  TextRetrieverHit,
+  SignalBridgeInput,
+} from "./vector-text-signal-bridge.js";
