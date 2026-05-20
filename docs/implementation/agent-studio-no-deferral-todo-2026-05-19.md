@@ -1127,10 +1127,86 @@ and applies it to the 3 remaining functions.
 | 57 | **template-instantiations caller migration** | Extract `resolveWorkspaceIdForTemplate` + `resolveWorkspaceIdForNote` helpers; migrate `listInstantiationsByTemplate` + `listInstantiationsByNote` + `countDistinctDigestsForTemplate` to Path-A; source-scan test. |
 | 58 | **Continuation-8 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names the next file (`vault/presence.ts`) for continuation-9. |
 
+## Continuation-8 closure receipt (2026-05-20)
+
+The eighth continuation arc shipped 1 implementation slice + 1
+catalogue + this closure across PRs #1575–#1577. Caller-migration
+tail follow-on from continuation-7. The catalogue's re-audit of
+the 56 raw `getAsDb()` call sites surfaced that **only 2 files**
+are actually migratable to the Path-A pattern; the other 54 sites
+are either Path-A pre-resolution lookupDb's (load-bearing), not
+workspace-scoped (security-graph, code-graph, publish-targets,
+graph-quality, etc.), or region-routing infrastructure.
+
 ### Continuation-8 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 56 catalogue | this PR | TBD | Opens continuation-8; classifies the 56-file list into migratable (2) vs structural (54) |
-| 57 template-instantiations | TBD | TBD | 3 functions migrated + 2 reusable helpers |
-| 58 continuation-8 closure | TBD | TBD | Receipt + next-arc target |
+| 56 catalogue | #1575 | `0a8822fe` | Opens continuation-8; re-audits the 56-file list into migratable (2) vs structural (54) |
+| 57 template-instantiations | #1576 | `fef0a16f` | 3 functions migrated + 2 reusable helpers; `recordTemplateInstantiation` refactored to call the shared helper instead of inline JOIN |
+| 58 continuation-8 closure | this PR | TBD | Receipt + next-arc target named |
+
+### Continuation-8 carry-forward lessons
+
+1. **Re-audit before assuming "tail = 7 files".** Continuation-7's
+   closure named "7 more service files for the caller-migration
+   tail". Continuation-8's re-audit found only **2** of those 7
+   were actually migratable — the other 5 either had no
+   `workspaceId` references (so migration requires schema change
+   first) or were already using the lookupDb pre-resolution
+   pattern. Lesson: when sizing a "tail", **inspect each file's
+   `workspaceId` references AND its current Path-A adoption
+   state** before counting it as actionable. Raw `getAsDb()` count
+   over-states the migration surface 3-5x.
+2. **Extract helpers when a JOIN appears in multiple sites.**
+   `recordTemplateInstantiation` was running an inline
+   `agsVaultNotes × agsVaults` JOIN for workspaceId resolution
+   (PR-V1-131). Slice 57's read migrations needed the same JOIN
+   plus a sibling `agsVaultTemplates × agsVaults` chain. Rather
+   than copy-pasting 4 times, the helpers
+   (`resolveWorkspaceIdForTemplate`, `resolveWorkspaceIdForNote`)
+   were extracted and the existing write call site refactored to
+   use them. Cost: 0 LoC net. Lesson: when migration introduces
+   a sibling chain, **extract the resolution helper at the same
+   time** and refactor existing call sites to use it.
+3. **Update source-scan tests when extracting helpers.** The
+   existing PR-V1-131 source-scan test pinned the inline JOIN
+   inside `recordTemplateInstantiation`. The extraction moved the
+   JOIN to a top-of-file helper — the test needed to track the
+   contract (workspaceId resolved from noteId) rather than the
+   implementation (inline JOIN). Both surfaces are pinned: the
+   chain at the helper site + the call-site delegation shape at
+   each function. Lesson: **source-scan tests track contracts,
+   not implementation locations** — when refactoring, update them.
+
+After this slice, the no-deferral mission has shipped **58 slices
+across 8 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51 cont-6,
+52-55 cont-7, 56-58 cont-8).
+
+### Remaining caller-migration tail (updated)
+
+Files still candidate for Path-A migration:
+
+| File | Raw calls | Status |
+|---|---|---|
+| `vault/presence.ts` | 4 | TBD — likely vault→workspace chain via presence's vaultId; inspect in continuation-9 |
+
+Files NOT migration candidates (audited in slice 56):
+- All other `services/**` files in the original 56-file list. Either
+  Path-A pre-resolution lookupDb's (load-bearing), not
+  workspace-scoped (security-graph / code-graph / publish-targets
+  / graph-quality / etc.), or region routing infrastructure.
+
+### Operator-gated residuals (unchanged)
+
+- T-B.1 (Neo4j CE G3 benchmark — GHA workflow_dispatch).
+- T-H (V2 plugin framework + Aura migration — operator-approval-gated).
+- Conditional deferrals: `chat.ts:1117` (dashboard observability),
+  `runtime-lens-asdb-reader.ts:24` (shared-cluster deployment).
+- MVP-boundary intent (7 categories).
+
+Next arc (continuation-9) target: inspect `vault/presence.ts` for
+migratability; if positive, ship the migration. If presence.ts is
+also structural, the caller-migration tail is **functionally
+complete** — only schema-change-blocked entities remain.
