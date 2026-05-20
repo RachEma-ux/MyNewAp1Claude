@@ -3265,3 +3265,87 @@ detail's mutations invalidate `get` + `listAudit` + parent's
 | 104 | **Open continuation-24 catalogue** | This entry. First true master-detail in partial-consumer cycle. |
 | 105 | **`GraphCorrectionPanel` + page** | 10-endpoint master-detail with multi-select bulk + audit drill-in + requestRevision lifecycle node; full 7-point nav wiring; tests. |
 | 106 | **Continuation-24 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
+
+## Continuation-24 closure receipt (2026-05-20)
+
+The twenty-fourth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1623–#1625. **Second arc
+of the partial-consumer audit cycle** — and the **first true
+master-detail in the cycle** thanks to `list` + `get` + `listAudit`.
+Closes `graphCorrection.*` (2/12 consumed → 12/12).
+
+### Continuation-24 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 104 catalogue | #1623 | e97b18c2 | Opens continuation-24; first true master-detail in partial-consumer cycle |
+| 105 GraphCorrectionPanel + page | #1624 | e77df365 | 10 endpoints consumed; multi-select bulk + audit drill-in + requestRevision; 16 unit + 8 nav-surface tests |
+| 106 continuation-24 closure | #1625 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-24 carry-forward lessons
+
+1. **`requestRevision` is a third decision verb worth surfacing
+   alongside approve/reject.** The cont-19/23 lifecycle panels had
+   two terminal decisions (approve / reject) plus one
+   reversal/withdrawal verb. Cont-24's `requestRevision` is a
+   third decision that **doesn't end the lifecycle** — it flips
+   status to `revision_requested` so the proposer can re-submit
+   without starting fresh. Surfaced as a sibling button in the
+   detail card with the same rationale input. Lesson: **lifecycle
+   panels should hunt for non-terminal decision verbs** —
+   `requestRevision` is the most common one but not the only
+   shape (e.g. `defer`, `escalate`, `flag-for-policy-review`
+   could appear). When the router exposes one, surface it as a
+   distinct button, not folded into "reject".
+2. **Multi-select bulk needs a shared-input footer, not a per-row
+   button.** First instinct on bulk was per-row checkbox + each
+   row's own approve/reject button. Wrong shape: a 100-row bulk
+   approval would mean 100 button clicks. Right shape: single
+   checkbox column for selection + a "Bulk approve / Bulk reject"
+   footer that appears when `selectedIds.size > 0`, with a
+   shared rationale input applied to every selected proposal.
+   This matches the server-side `bulkApprove({ proposalIds[],
+   rationale? })` signature exactly. Lesson: **when the server
+   has a "bulk" mutation taking an `ids[]` array, build the UI
+   footer-first, not row-first** — the footer maps directly to
+   the call's signature.
+3. **Audit-trail rendering belongs in the detail, not in a
+   separate panel.** GraphCorrection's audit-trail is per-proposal
+   (`listAudit({ proposalId })`), so it makes no sense as a
+   global panel. Surfaced as a **sub-card inside the detail
+   region**, enabled-gated on the detail query (so the audit
+   doesn't fire until detail loads). The detail's mutation
+   buttons invalidate audit alongside list+get — so the audit
+   trail updates immediately when the operator clicks Approve.
+   Lesson: **per-record audit endpoints belong inside the
+   detail card** with detail-driven `enabled` gating + shared
+   invalidation.
+
+After this slice, the no-deferral mission has shipped **106
+slices across 24 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24).
+
+### Partial-consumer audit status (post-cont-24)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 2 | `promotion`, `graphCorrection` |
+| Remaining | 16 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphQuality / graphSkill / graphWorkspace / providerBindings / racEvaluation / semanticEnrichment / toolApprovals / toolKnowledge / vault / workspaceObservability |
+
+### Next-arc target: semanticEnrichment
+
+`semanticEnrichment` is 3/11 consumed with 8 unconsumed endpoints
+spanning `triggerRun` + run-monitoring (`getRunStats`,
+`listRecentRuns`) + proposal flow (`listProposals`,
+`listCandidatesByKind`, `listKnownProposalKinds`,
+`listRecentRejectionsByKind`, `promoteBulk`). This is a different
+shape from cont-24: more **run-centric observability** mixed with
+**candidate-promotion workflow**. Two distinct sub-panels likely
+(triggered runs + candidates → promotions).
