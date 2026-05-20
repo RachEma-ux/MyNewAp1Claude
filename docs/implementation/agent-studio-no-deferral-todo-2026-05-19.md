@@ -3779,3 +3779,78 @@ groups (per cont-25 lesson #1 + cont-26 lesson #3 standing pattern):
 | 113 | **Open continuation-27 catalogue** | This entry. 21-endpoint largest-absolute gap, 5 functional groups. |
 | 114 | **`VaultAdminPanel` + page** | 5-card panel consuming all 21 endpoints; full 7-point nav wiring; tests. |
 | 115 | **Continuation-27 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
+
+## Continuation-27 closure receipt (2026-05-20)
+
+The twenty-seventh continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1632–#1634. **Fifth arc
+of the partial-consumer audit cycle** — the **largest absolute
+unconsumed-endpoint count** (21 endpoints across 5 groups).
+Closes `vault.*` (23/44 → 44/44).
+
+### Continuation-27 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 113 catalogue | #1632 | a9010b18 | Opens continuation-27; 21-endpoint largest absolute gap, 5 functional groups |
+| 114 VaultAdminPanel + page | #1633 | 9fd9ac02 | 21 endpoints consumed; 5-card panel (membership / attachments / saved views / templates / notes & search); 8 nav-surface tests |
+| 115 continuation-27 closure | #1634 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-27 carry-forward lessons
+
+1. **5-card panels are at the edge of single-component
+   comprehensibility.** Cont-25/26 had 4-card panels; cont-27
+   pushes to 5. The 5-card layout still works (operator scrolls
+   one section at a time), but it's the practical ceiling — at
+   6+ cards the panel becomes unscannable. Lesson: **6+ functional
+   groups should split into multiple sibling pages**, not stack
+   into one mega-panel. For cont-27, 5 cards stayed manageable
+   only because the cards have asymmetric sizes (Membership is
+   tiny; Notes & Search is the largest).
+2. **Read-detail-by-id endpoints are common in the long-tail.**
+   Vault had 5 separate "get-by-id" queries (getAttachment,
+   getSavedView, getSavedViewVersion, getNoteVersion,
+   getViewKindBlueprint). Each was added as a "lookup" sub-section
+   with an operator-supplied id input + JSON pretty-print of the
+   result. Lesson: **always allocate a `lookup-by-id` sub-section
+   for routers with `getX(xId)` queries** — operators frequently
+   need to inspect a single row pulled from a log or trace.
+3. **Pragmatic-input mode is correct for long-tail admin
+   surfaces.** Many vault inputs require numeric ids the operator
+   pastes from a backend log (workspaceId, vaultId, noteId,
+   attachmentId, etc.). The panel doesn't try to autocomplete or
+   provide pickers — operators are power users with the ids
+   handy. Resisting the temptation to over-engineer dropdowns saved
+   ~50% of the panel complexity. Lesson: **operator-only admin
+   surfaces can stay raw-id-input mode** — UX polish belongs in
+   user-facing surfaces, not in operator chrome.
+
+After this slice, the no-deferral mission has shipped **115
+slices across 27 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25,
+110-112 cont-26, 113-115 cont-27).
+
+### Partial-consumer audit status (post-cont-27)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 5 | `promotion`, `graphCorrection`, `semanticEnrichment`, `graphQuality`, `vault` |
+| Remaining | 13 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphSkill / graphWorkspace / providerBindings / racEvaluation / toolApprovals / toolKnowledge / workspaceObservability |
+
+### Next-arc target: workspaceObservability
+
+`workspaceObservability` is 13/31 consumed (18 unconsumed) —
+second-largest absolute gap. Endpoints span notification CRUD
+(`listMyNotifications`, `markNotificationsRead`,
+`getMyUnreadNotificationCount`, `broadcastNotification`, etc.) +
+background-job CRUD (`listBackgroundJobs`, `cancelBackgroundJob`,
+`retryBackgroundJob`, etc.) + error event lookup
+(`listErrorEvents`, `getErrorEventById`, etc.). Three functional
+groups, 18 endpoints — a typical cont-26-shaped arc.
