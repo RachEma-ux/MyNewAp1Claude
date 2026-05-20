@@ -4743,3 +4743,5 @@ scores + mutation guards at button level).
 Sixteenth arc. toolKnowledge (1/2 → 2/2) — 1 unconsumed (getTool). Panel-extension on RetrofitPage tool-knowledge tab. Slices 146/147/148.
 
 ## Cont-37 catalogue — toolApprovals 2/4 → 4/4 (list + getByHash). Panel-extension on RetrofitPage approvals tab.
+
+## Cont-37 closure receipt — toolApprovals 2/4 → 4/4 closed via #1662/#1663/#1664. 5 lessons (scoping-axis per card / hash-regex / null vs envelope / panel-extension dominance / trust existing tabs).
