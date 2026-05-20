@@ -156,17 +156,40 @@ export default function VaultExplorer({
         <div className="font-semibold text-xs uppercase text-gray-500">
           Vaults
         </div>
-        <button
-          type="button"
-          data-testid="vault-explorer-new-vault-btn"
-          className="text-xs text-blue-600 hover:underline"
-          onClick={() => {
-            setShowVaultForm((v) => !v);
-            setFormError(null);
-          }}
-        >
-          {showVaultForm ? "Cancel" : "+ New"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="vault-explorer-header-new-note-btn"
+            className="text-xs text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+            disabled={
+              typeof selectedVaultId !== "number" ||
+              selectedVaultId <= 0 ||
+              (vaultsQuery.data ?? []).length === 0
+            }
+            title={
+              typeof selectedVaultId !== "number" || selectedVaultId <= 0
+                ? "Select a vault first"
+                : "Create a new note in the selected vault"
+            }
+            onClick={() => {
+              setShowNoteForm((v) => !v);
+              setFormError(null);
+            }}
+          >
+            {showNoteForm ? "Cancel note" : "+ New note"}
+          </button>
+          <button
+            type="button"
+            data-testid="vault-explorer-new-vault-btn"
+            className="text-xs text-blue-600 hover:underline"
+            onClick={() => {
+              setShowVaultForm((v) => !v);
+              setFormError(null);
+            }}
+          >
+            {showVaultForm ? "Cancel" : "+ New vault"}
+          </button>
+        </div>
       </div>
 
       {showVaultForm && (
