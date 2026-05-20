@@ -1834,10 +1834,74 @@ The runner panel:
 | 75 | **`ImpactAnalysisRunnerPanel` + page** | Standalone page; 3-endpoint consumer; full 7-point nav-surface wiring; tests. |
 | 76 | **Continuation-14 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-15 target. |
 
+## Continuation-14 closure receipt (2026-05-20)
+
+The fourteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1593–#1595. Closes the
+`impactAnalysis.*` UI-consumer gap surfaced by the broad
+agentStudio.* tRPC audit. After this arc all 3 endpoints have UI
+consumers and a new "Impact Analysis" surface lives under the
+Lenses sidebar group.
+
 ### Continuation-14 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 74 catalogue | this PR | TBD | Opens continuation-14; broad audit finds impactAnalysis + recommendation gaps |
-| 75 impact-analysis panel + page | TBD | TBD | Closes impactAnalysis UI-consumer gap; 3 endpoints + 7-point nav wiring |
-| 76 continuation-14 closure | TBD | TBD | Receipt + recommendation as continuation-15 target |
+| 74 catalogue | #1593 | `9070be12` | Opens continuation-14; broad audit finds impactAnalysis + recommendation gaps |
+| 75 impact-analysis panel + page | #1594 | `a33099b6` | 3 endpoints consumed; 7-point nav wiring; 21 tests |
+| 76 continuation-14 closure | this PR | TBD | Receipt + recommendation continuation-15 target |
+
+### Continuation-14 carry-forward lessons
+
+1. **`query` endpoints with form inputs need a submit-and-enable
+   pattern.** `runImpactAnalysis` is server-side a `query`
+   (read-only, no side-effects), but operator workflow is
+   "fill form → click Run". The clean React Query pattern: hold
+   form state, capture a submit snapshot into a separate
+   `submitted` state on click, then pass `enabled: submitted !==
+   null` to `useQuery`. Avoids two mistakes: (a) triggering
+   queries on every keystroke, (b) trying to force a query
+   surface to look like a mutation via `useUtils().fetch()`
+   (which bypasses React Query's caching contract). Lesson: when
+   a form-driven endpoint is a `query`, **build the submit
+   pattern with `enabled` + a snapshot state**, not with
+   imperative `.fetch()`.
+2. **Lazy server-side aggregators stack cleanly with the form
+   pattern.** `summarizeResult` is a pure transformation
+   server-side — operators don't trigger it; it runs whenever
+   `runImpactAnalysis` returns. The panel chains two `useQuery`s:
+   the result query enabled when submitted, and the summary
+   query enabled when the result is non-null. Both gates fire
+   lazily; the panel paints fast with no work, and each stage's
+   data unlocks the next. Lesson: when an API surface is
+   structured as "input → result → summary", **chain `useQuery`s
+   with cascading `enabled` gates**.
+3. **Mode discriminator pills are operator UX gold.** The
+   `runImpactAnalysis` envelope carries a `mode: "stub" |
+   "template"` field that tells operators whether the result is
+   anchor-only or a real traversal. The panel surfaces it as a
+   small colored pill (muted gray for stub, emerald for
+   template) next to the result header. Without that visible
+   signal, operators wouldn't know if "1 node returned" meant
+   "the graph has only the anchor" or "this kind isn't templated
+   yet" — same surface, two very different actionable states.
+   Lesson: when the server returns a discriminated envelope
+   about result fidelity, **render the discriminator visibly**;
+   don't hide it behind a tooltip or only in the empty state.
+
+After this slice, the no-deferral mission has shipped **76
+slices across 14 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14).
+
+### Next-arc target: recommendation router UI consumer
+
+The `recommendation.*` tRPC surface (3 endpoints —
+`recommend` / `recommendBatch` / `listKnownKinds`) still has
+zero UI consumers. Continuation-15 should build a
+`RecommendationRunnerPanel` mirroring slice 75's pattern: kind
+dropdown from `listKnownKinds`, a starting node/context form,
+Run button, result rendering. Mount under a new sidebar group
+OR add it alongside Impact Analysis under Lenses.
