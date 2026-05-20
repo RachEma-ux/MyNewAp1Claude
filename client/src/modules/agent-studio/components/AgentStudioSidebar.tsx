@@ -35,6 +35,7 @@ import {
   Network,
   ScanSearch,
   Folder,
+  FileText,
   Globe,
   LayoutGrid,
   Radio,
@@ -86,6 +87,10 @@ export type AgentStudioView =
   | "vault-attachments"
   // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
   | "vault-saved-views"
+  // ── No-deferral continuation-7 slice 53: Vault Templates admin
+  //    page (sibling of attachments + saved views). Continuation-10
+  //    slice 63 wires it into the discriminated union + sidebar group. ──
+  | "vault-templates"
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain ──
   | "canvas-projection-events-drain"
   // ── V2 Phase MR-1 Phase-2 (PR-V1-157): region admin ──
@@ -166,6 +171,11 @@ const HOME_GROUPS: SectionGroup[] = [
       { key: "graph-workspace", label: "Vault Explorer", icon: BookOpen },
       { key: "vault-attachments", label: "Attachments", icon: Folder },
       { key: "vault-saved-views", label: "Saved Views", icon: GitBranch },
+      // No-deferral continuation-10 slice 63 (follow-on to slice 53):
+      // wire the Templates standalone page into the Vaults sidebar
+      // group. The page + route + view shipped in slice 53; the
+      // sidebar entry + AgentStudioView union variant were missed.
+      { key: "vault-templates", label: "Templates", icon: FileText },
     ],
   },
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection events drain

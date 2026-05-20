@@ -216,7 +216,7 @@ function parseRoute(path: string): ParsedRoute {
   }
   // ── No-deferral continuation-7 slice 53: Vault Templates admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-templates")) {
-    return { ...empty, view: "vault-templates" as any, homeMode: null };
+    return { ...empty, view: "vault-templates", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -447,7 +447,7 @@ export default function AgentStudioShell() {
       return;
     }
     // No-deferral continuation-7 slice 53: vault-templates is a global view.
-    if ((key as string) === "vault-templates") {
+    if (key === "vault-templates") {
       navigate("/agent-studio/vault-templates");
       return;
     }
@@ -574,8 +574,9 @@ export default function AgentStudioShell() {
         // ── V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin ──
         case "vault-saved-views" as any:
           return <VaultSavedViewsPage />;
-        // ── No-deferral continuation-7 slice 53: Vault Templates admin ──
-        case "vault-templates" as any:
+        // ── No-deferral continuation-7 slice 53 + continuation-10
+        //    slice 63: Vault Templates admin (typed via AgentStudioView). ──
+        case "vault-templates":
           return <VaultTemplatesPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
