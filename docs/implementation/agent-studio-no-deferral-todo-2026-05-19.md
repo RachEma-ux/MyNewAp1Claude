@@ -4671,3 +4671,29 @@ ask for it.
 | 140 | **Open continuation-36 catalogue** | This entry. 1-endpoint panel-extension arc. |
 | 141 | **`RacEvaluateTracePanel`** | New panel rendered in RacPage; source-scan test. |
 | 142 | **Continuation-36 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-35 — graphProjection drain operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Thirteenth arc of the partial-consumer audit cycle. `graphProjection`
+(4/6 → 6/6) — 2 unconsumed endpoints.
+
+### Re-audit findings
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `getDrainCronStatus` | query (admin) | DrainCronStatus shape |
+| `runDrainNow` | mutation (admin) | { limit? max 1000 } → DrainSummary |
+
+### Approach
+
+Adds `GraphProjectionDrainPanel` inline in `GraphHealthAdminPage`.
+Panel-extension arc.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 137 | **Open continuation-35 catalogue** | This entry. 2-endpoint panel-extension arc. |
+| 138 | **`GraphProjectionDrainPanel`** | 2-card panel; source-scan test. |
+| 139 | **Continuation-35 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
