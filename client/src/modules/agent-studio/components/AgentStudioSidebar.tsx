@@ -207,6 +207,11 @@ export type AgentStudioView =
   //    canvas endpoints (get / create / createNode / updateNode /
   //    deleteNode / createEdge). Coexists with CanvasOperatorPage. ──
   | "canvas-admin"
+  // ── No-deferral continuation-31 slice 126: Graph Agent Admin.
+  //    Ninth arc of the partial-consumer audit cycle. Closes 4
+  //    graphAgent endpoints (health / run / exportTraceMarkdown /
+  //    exportTraceToNote). ──
+  | "graph-agent-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -451,6 +456,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "canvas-admin",
         label: "Write Surface",
         icon: LayoutGrid,
+      },
+    ],
+  },
+  // ── No-deferral continuation-31 slice 126: graph-agent-admin page.
+  //    Ninth arc of the partial-consumer audit cycle. Graph Agent
+  //    runtime operator surface. ──
+  {
+    label: "Graph Agent",
+    items: [
+      {
+        key: "graph-agent-admin",
+        label: "Run + Export",
+        icon: Brain,
       },
     ],
   },
