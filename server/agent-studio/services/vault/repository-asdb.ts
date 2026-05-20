@@ -16,6 +16,7 @@ import {
   agsVaultNotes,
   agsVaultNoteVersions,
   agsVaultNoteConflicts,
+  agsVaultFolders,
 } from "../../../../drizzle/tables/agent-studio-vault.js";
 import { recordFailureStateEvent } from "../failure-states/observability-bridge.js";
 import type {
@@ -189,6 +190,7 @@ export class AsdbVaultRepository implements VaultRepository {
         vaultId: agsVaultNotes.vaultId,
         slug: agsVaultNotes.slug,
         title: agsVaultNotes.title,
+        folderId: agsVaultNotes.folderId,
         currentVersionId: agsVaultNotes.currentVersionId,
         governanceStatus: agsVaultNotes.governanceStatus,
         createdAt: agsVaultNotes.createdAt,
@@ -387,6 +389,7 @@ export class AsdbVaultRepository implements VaultRepository {
         vaultId: agsVaultNotes.vaultId,
         slug: agsVaultNotes.slug,
         title: agsVaultNotes.title,
+        folderId: agsVaultNotes.folderId,
         currentVersionId: agsVaultNotes.currentVersionId,
         governanceStatus: agsVaultNotes.governanceStatus,
         createdAt: agsVaultNotes.createdAt,
@@ -396,6 +399,45 @@ export class AsdbVaultRepository implements VaultRepository {
       .where(and(...conditions))
       .orderBy(desc(agsVaultNotes.updatedAt))
       .limit(options?.limit ?? 100);
+    return rows;
+  }
+
+  async listFoldersInVault(
+    vaultId: number,
+  ): Promise<
+    Array<{
+      id: number;
+      vaultId: number;
+      parentFolderId: number | null;
+      name: string;
+      path: string;
+    }>
+  > {
+    // Folder listing uses the same workspace-routed read path as
+    // listNotesInVault (Path-A read consumer) so folder + note
+    // queries land on the same region.
+    const lookupConn = getAsDb();
+    if (!lookupConn) return [];
+    const ws = await lookupConn
+      .select({ workspaceId: agsVaults.workspaceId })
+      .from(agsVaults)
+      .where(eq(agsVaults.id, vaultId))
+      .limit(1);
+    const conn =
+      ws.length > 0
+        ? (getAsDbForWorkspace(ws[0].workspaceId) ?? lookupConn)
+        : lookupConn;
+    const rows = await conn
+      .select({
+        id: agsVaultFolders.id,
+        vaultId: agsVaultFolders.vaultId,
+        parentFolderId: agsVaultFolders.parentFolderId,
+        name: agsVaultFolders.name,
+        path: agsVaultFolders.path,
+      })
+      .from(agsVaultFolders)
+      .where(eq(agsVaultFolders.vaultId, vaultId))
+      .orderBy(agsVaultFolders.path);
     return rows;
   }
 

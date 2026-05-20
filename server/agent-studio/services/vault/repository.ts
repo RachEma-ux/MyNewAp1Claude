@@ -25,10 +25,31 @@ export interface NoteSelectByIdResult {
   vaultId: number;
   slug: string;
   title: string;
+  /**
+   * Containing folder id (null = root-level note inside the vault).
+   * Surfaced 2026-05-20 so the Vault Explorer can render the
+   * folder → notes tree without an extra getNote round-trip per
+   * note in the list.
+   */
+  folderId: number | null;
   currentVersionId: number | null;
   governanceStatus: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Folder row surfaced to the Vault Explorer to render the
+ * folder → notes tree. `parentFolderId === null` denotes a
+ * root-level folder. `path` is the human-readable slash-separated
+ * path from the vault root (e.g. `"projects/foo/bar"`).
+ */
+export interface VaultFolderRow {
+  id: number;
+  vaultId: number;
+  parentFolderId: number | null;
+  name: string;
+  path: string;
 }
 
 export interface NoteVersionSelectResult {
@@ -68,6 +89,14 @@ export interface VaultRepository {
     | { deleted: false; notFound: true }
   >;
   listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }): Promise<NoteSelectByIdResult[]>;
+
+  /**
+   * Lists every folder in the vault as a flat array. Callers build
+   * the tree by joining on `parentFolderId`. Returns an empty array
+   * for vaults with no folders. Bounded by the database — typical
+   * Obsidian-style vaults have O(10²) folders.
+   */
+  listFoldersInVault(vaultId: number): Promise<VaultFolderRow[]>;
 
   // Track A — FS-sync surface
   // ADR: docs/architecture/agent-studio-vault-fs-sync.md
@@ -141,6 +170,7 @@ export class VaultRepositoryStub implements VaultRepository {
       vaultId: input.vaultId,
       slug: input.slug,
       title: input.title,
+      folderId: input.folderId ?? null,
       currentVersionId: versionId,
       governanceStatus: "active",
       createdAt: new Date(),
@@ -205,8 +235,17 @@ export class VaultRepositoryStub implements VaultRepository {
   }
 
   async listNotesInVault(vaultId: number, options?: { folderId?: number; limit?: number }) {
-    const filtered = this.notes.filter((n) => n.vaultId === vaultId);
+    let filtered = this.notes.filter((n) => n.vaultId === vaultId);
+    if (options?.folderId != null) {
+      filtered = filtered.filter((n) => n.folderId === options.folderId);
+    }
     return filtered.slice(0, options?.limit ?? 100);
+  }
+
+  private folders: VaultFolderRow[] = [];
+
+  async listFoldersInVault(vaultId: number): Promise<VaultFolderRow[]> {
+    return this.folders.filter((f) => f.vaultId === vaultId);
   }
 
   // Track A — FS-sync stub surface.

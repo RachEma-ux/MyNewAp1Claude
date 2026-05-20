@@ -441,6 +441,20 @@ export const vaultRouter = router({
     }),
 
   /**
+   * Lists every folder in the vault for the Vault Explorer's
+   * folder-tree rendering. Returns a flat array; the client builds
+   * the tree by joining on `parentFolderId`. No paging — Obsidian-
+   * style vaults typically have O(10²) folders.
+   */
+  listFolders: protectedProcedure
+    .input(z.object({
+      vaultId: z.number().int().positive(),
+    }))
+    .query(async ({ input }) => {
+      return await getRepo().listFoldersInVault(input.vaultId);
+    }),
+
+  /**
    * Notes that link TO the given note via `[[<this-note's-slug>]]`.
    * Backed by `ags_vault_wikilinks` (populated on every
    * createNote/updateNote since #1482). Replaces the
