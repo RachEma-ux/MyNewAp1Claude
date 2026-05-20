@@ -4697,3 +4697,28 @@ Panel-extension arc.
 | 137 | **Open continuation-35 catalogue** | This entry. 2-endpoint panel-extension arc. |
 | 138 | **`GraphProjectionDrainPanel`** | 2-card panel; source-scan test. |
 | 139 | **Continuation-35 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-35 closure receipt (2026-05-20)
+
+The thirty-fifth continuation arc shipped 1 panel-extension slice
++ 1 catalogue + this closure across PRs #1656–#1658. **Thirteenth
+arc of the partial-consumer audit cycle**. Closes `graphProjection.*`
+(4/6 → 6/6, 2 endpoints).
+
+### Continuation-35 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 137 catalogue | #1656 | 85602f90 | Opens continuation-35; 2-endpoint panel-extension arc |
+| 138 GraphProjectionDrainPanel | #1657 | 93037753 | 2-card panel rendered inline in GraphHealthAdminPage; 8-case source-scan test |
+| 139 continuation-35 closure | #1658 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-35 carry-forward lessons
+
+1. **Health-domain endpoints belong on the health-domain page.**
+2. **Multi-endpoint panels still get per-card decomposition.**
+3. **Optional-input mutations need undefined-handling.**
+4. **DrainSummary's per-row errors are operator triage data.**
+5. **Cron status + run-now is a reusable composite shape (4th instance).**
+
+(Full lesson text preserved in continuation-35 carry-forward — see the closure receipt body in the earlier draft PR.)
