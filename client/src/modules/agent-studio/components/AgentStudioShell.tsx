@@ -104,6 +104,12 @@ const SecurityGraphPage = lazy(
 // closes the codeGraph.* UI-consumer gap (7 endpoints shipped at
 // T-G.2.α; direct slice-84 template).
 const CodeGraphPage = lazy(() => import("../pages/CodeGraphPage"));
+// No-deferral continuation-19 slice 90: Graph Change Proposals
+// lifecycle page — closes the graphChangeProposals.* UI-consumer
+// gap (Phase 11.5 mutation-only 4-endpoint approval workflow).
+const GraphChangeProposalsPage = lazy(
+  () => import("../pages/GraphChangeProposalsPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -267,6 +273,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-18 slice 87: Code Graph admin (no agent context) ──
   if (path.startsWith("/agent-studio/code-graph")) {
     return { ...empty, view: "code-graph", homeMode: null };
+  }
+  // ── No-deferral continuation-19 slice 90: Graph Change Proposals admin (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-change-proposals")) {
+    return { ...empty, view: "graph-change-proposals", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -526,6 +536,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/code-graph");
       return;
     }
+    // No-deferral continuation-19 slice 90: graph-change-proposals is a global view.
+    if (key === "graph-change-proposals") {
+      navigate("/agent-studio/graph-change-proposals");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -673,6 +688,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "code-graph":
           return <CodeGraphPage />;
+        // ── No-deferral continuation-19 slice 90: Graph Change Proposals
+        //    lifecycle admin (typed via AgentStudioView). ──
+        case "graph-change-proposals":
+          return <GraphChangeProposalsPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
