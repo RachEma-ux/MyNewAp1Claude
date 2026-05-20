@@ -141,6 +141,12 @@ const PromotionLifecyclePage = lazy(
 const GraphCorrectionPage = lazy(
   () => import("../pages/GraphCorrectionPage"),
 );
+// No-deferral continuation-25 slice 108: Semantic Enrichment admin
+// page — third arc of the partial-consumer audit cycle. 8-endpoint
+// run-centric + candidate exploration + bulk promotion.
+const SemanticEnrichmentPage = lazy(
+  () => import("../pages/SemanticEnrichmentPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -328,6 +334,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-24 slice 105: Graph Correction admin (no agent context) ──
   if (path.startsWith("/agent-studio/graph-correction")) {
     return { ...empty, view: "graph-correction", homeMode: null };
+  }
+  // ── No-deferral continuation-25 slice 108: Semantic Enrichment admin (no agent context) ──
+  if (path.startsWith("/agent-studio/semantic-enrichment")) {
+    return { ...empty, view: "semantic-enrichment", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -617,6 +627,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-correction");
       return;
     }
+    // No-deferral continuation-25 slice 108: semantic-enrichment is a global view.
+    if (key === "semantic-enrichment") {
+      navigate("/agent-studio/semantic-enrichment");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -788,6 +803,10 @@ export default function AgentStudioShell() {
         //    admin (typed via AgentStudioView). ──
         case "graph-correction":
           return <GraphCorrectionPage />;
+        // ── No-deferral continuation-25 slice 108: Semantic Enrichment
+        //    admin (typed via AgentStudioView). ──
+        case "semantic-enrichment":
+          return <SemanticEnrichmentPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
