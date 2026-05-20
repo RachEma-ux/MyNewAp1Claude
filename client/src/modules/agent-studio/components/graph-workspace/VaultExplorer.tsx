@@ -59,6 +59,16 @@ export default function VaultExplorer({
     { vaultId: selectedVaultId ?? 0, limit: 200 },
     { enabled: typeof selectedVaultId === "number" && selectedVaultId > 0 },
   );
+  // Tag chip filter — scans the latest version of every note in the
+  // vault server-side. Capped at 500 by the procedure itself. The
+  // response shape is { tags: [{ tag, count, noteIds }] }. We only
+  // surface the top 30 tags as chips to keep the sidebar tidy; an
+  // operator can always rely on the text filter for tags outside
+  // that window.
+  const tagsForVaultQuery = trpc.agentStudio.vault.listTagsForVault.useQuery(
+    { vaultId: selectedVaultId ?? 0 },
+    { enabled: typeof selectedVaultId === "number" && selectedVaultId > 0 },
+  );
 
   const [showVaultForm, setShowVaultForm] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -66,23 +76,59 @@ export default function VaultExplorer({
   const [noteTitle, setNoteTitle] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [noteFilter, setNoteFilter] = useState("");
+  const [selectedTags, setSelectedTags] = useState<ReadonlyArray<string>>([]);
 
-  // Clear the filter when the operator switches vaults — keeping a
-  // stale query across an unrelated note list would be surprising.
+  // Clear text + tag filters when the operator switches vaults —
+  // keeping stale filters across an unrelated note list would be
+  // surprising and the tag set itself is vault-scoped.
   useEffect(() => {
     setNoteFilter("");
+    setSelectedTags([]);
   }, [selectedVaultId]);
 
   const allNotes = notesQuery.data ?? [];
+  const allTags = useMemo(
+    () =>
+      (tagsForVaultQuery.data?.tags ?? []) as ReadonlyArray<{
+        tag: string;
+        count: number;
+        noteIds: ReadonlyArray<number>;
+      }>,
+    [tagsForVaultQuery.data],
+  );
+
+  // OR-semantics tag membership: a note passes the tag filter if it
+  // appears in the noteIds list of ANY selected tag. (AND would be a
+  // valid alternate model but most note-app conventions use OR.)
+  const allowedNoteIdsByTags = useMemo<ReadonlySet<number> | null>(() => {
+    if (selectedTags.length === 0) return null;
+    const selectedSet = new Set(selectedTags);
+    const allow = new Set<number>();
+    for (const t of allTags) {
+      if (!selectedSet.has(t.tag)) continue;
+      for (const id of t.noteIds) allow.add(id);
+    }
+    return allow;
+  }, [allTags, selectedTags]);
+
   const filteredNotes = useMemo(() => {
     const q = noteFilter.trim().toLowerCase();
-    if (q.length === 0) return allNotes;
     return allNotes.filter((n) => {
+      if (allowedNoteIdsByTags !== null && !allowedNoteIdsByTags.has(n.id)) {
+        return false;
+      }
+      if (q.length === 0) return true;
       const title = (n.title ?? "").toLowerCase();
       const slug = (n.slug ?? "").toLowerCase();
       return title.includes(q) || slug.includes(q);
     });
-  }, [allNotes, noteFilter]);
+  }, [allNotes, noteFilter, allowedNoteIdsByTags]);
+
+  function toggleTag(tag: string): void {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  }
 
   const createVaultMutation = trpc.agentStudio.vault.createVault.useMutation({
     onSuccess: (vault) => {
@@ -365,7 +411,52 @@ export default function VaultExplorer({
                   </button>
                 )}
               </div>
-              {noteFilter.trim().length > 0 && !notesQuery.isLoading && (
+              {/* Tag chip filter — top 30 tags by occurrence. Click a
+                  chip to toggle it into the filter. Multi-select with
+                  OR semantics (a note matches if it carries any of
+                  the selected tags). AND-combined with the text
+                  filter above. */}
+              {allTags.length > 0 && (
+                <div
+                  className="mb-1"
+                  data-testid="vault-explorer-tag-filter-chips"
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {allTags.slice(0, 30).map((t) => {
+                      const isOn = selectedTags.includes(t.tag);
+                      return (
+                        <button
+                          key={t.tag}
+                          type="button"
+                          data-testid={`vault-explorer-tag-filter-chip-${t.tag}`}
+                          data-active={isOn ? "true" : "false"}
+                          onClick={() => toggleTag(t.tag)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                            isOn
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                          }`}
+                          title={`${t.count} use${t.count === 1 ? "" : "s"}`}
+                        >
+                          #{t.tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedTags.length > 0 && (
+                    <button
+                      type="button"
+                      data-testid="vault-explorer-tag-filter-clear"
+                      onClick={() => setSelectedTags([])}
+                      className="text-[10px] text-blue-600 hover:underline mt-1"
+                    >
+                      Clear tags ({selectedTags.length})
+                    </button>
+                  )}
+                </div>
+              )}
+              {(noteFilter.trim().length > 0 || selectedTags.length > 0) &&
+                !notesQuery.isLoading && (
                 <div
                   className="text-[10px] text-gray-500 mb-1 pl-3"
                   data-testid="vault-explorer-note-filter-count"
@@ -380,7 +471,7 @@ export default function VaultExplorer({
                 selectedNoteId={selectedNoteId}
                 onSelectNote={onSelectNote}
                 emptyMessage={
-                  noteFilter.trim().length > 0
+                  noteFilter.trim().length > 0 || selectedTags.length > 0
                     ? "No notes match this filter."
                     : "No notes in this vault."
                 }

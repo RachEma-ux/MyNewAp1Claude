@@ -100,8 +100,12 @@ describe("Vault Explorer note filter", () => {
     });
 
     it("clears the filter when the operator switches vaults", () => {
+      // The tag-chip filter (added later) extended this effect to
+      // also clear `setSelectedTags([])`. Assert the text-filter
+      // reset specifically; the tag-filter test file owns the
+      // assertion for the full effect body.
       expect(
-        /useEffect\(\s*\(\)\s*=>\s*\{\s*setNoteFilter\(""\);?\s*\},\s*\[selectedVaultId\]\)/.test(
+        /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?setNoteFilter\(""\);?[\s\S]*?\},\s*\[selectedVaultId\]\)/.test(
           src,
         ),
       ).toBe(true);
