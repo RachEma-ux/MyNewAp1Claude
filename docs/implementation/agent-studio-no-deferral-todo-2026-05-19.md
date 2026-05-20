@@ -1426,3 +1426,41 @@ still surfacing real gaps. Continuation-11 should re-apply the
 same 7-point checklist to the OTHER recent operator-surface
 slices — verify each new mutation/endpoint has a UI consumer OR
 an explicit follow-on slice deferring the UI consumer.
+
+## Continuation-11 — UI-consumer audit (2026-05-20)
+
+User directive: "continue with the next punch-list arc". Applied
+the completion audit to the OTHER recent operator-facing
+mutations from prior arcs. Re-audit method: grep `client/src/`
+for tRPC mutation usage; verify each new mutation has a UI
+caller.
+
+### Re-audit findings
+
+| Mutation | Slice | UI consumer | Status |
+|---|---|---|---|
+| `vault.restoreSavedViewVersion` | 50 (continuation-6) | **none** | Gap — `SavedViewVersionHistoryPanel` renders versions without a Restore button |
+| `goldenQuestions.triggerLiveEvaluation` | 44 (continuation-4) | **none** | Gap — no operator-facing trigger button anywhere |
+
+Both are real gaps. The slice-50 gap is the more natural target:
+`SavedViewVersionHistoryPanel` is already the operator's natural
+landing spot for restore action — operators look at the history,
+pick a version, and want to roll back. The slice-44 gap is more
+ambiguous (no obvious panel exists for golden-questions today),
+so it's deferred to continuation-12.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 65 | **Open continuation-11 catalogue** | This entry. Names both UI-consumer gaps + picks the restore as the slice-66 target. |
+| 66 | **SavedViewVersionHistoryPanel Restore button** | Per-row Restore button calling `vault.restoreSavedViewVersion`; `confirm()` prompt + onSuccess invalidate version-history + saved-view caches. |
+| 67 | **Continuation-11 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names `goldenQuestions.triggerLiveEvaluation` as continuation-12's target. |
+
+### Continuation-11 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 65 catalogue | this PR | TBD | Opens continuation-11; UI-consumer audit |
+| 66 Restore button | TBD | TBD | Per-row Restore button + cache invalidation + tests |
+| 67 continuation-11 closure | TBD | TBD | Receipt + continuation-12 target named |
