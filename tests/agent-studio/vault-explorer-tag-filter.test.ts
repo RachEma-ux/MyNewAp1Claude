@@ -167,8 +167,12 @@ describe("Vault Explorer tag-chip filter", () => {
     });
 
     it("vault switch clears BOTH text and tag filters", () => {
+      // The reset effect was extended (folder-tree work) to also
+      // clear `setExpandedFolderIds`. Assert text + tag resets are
+      // both inside the same selectedVaultId-keyed useEffect body,
+      // tolerating any extra resets that landed alongside them.
       expect(
-        /useEffect\(\s*\(\)\s*=>\s*\{\s*setNoteFilter\(""\);\s*setSelectedTags\(\[\]\);\s*\},\s*\[selectedVaultId\]\)/.test(
+        /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?setNoteFilter\(""\);[\s\S]*?setSelectedTags\(\[\]\);[\s\S]*?\},\s*\[selectedVaultId\]\)/.test(
           clientSrc,
         ),
       ).toBe(true);

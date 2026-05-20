@@ -118,14 +118,18 @@ describe("Vault Explorer note filter", () => {
     });
 
     it("forwards a filter-specific empty message when a filter is active", () => {
-      expect(
-        /emptyMessage=\{\s*noteFilter\.trim\(\)\.length\s*>\s*0[\s\S]+?No notes match this filter[\s\S]+?No notes in this vault/.test(
-          src,
-        ),
-      ).toBe(true);
+      // Folder-tree work made NoteList filter-only — the no-filter
+      // branch now renders FolderTree which owns its own empty
+      // state. So the NoteList empty-message is now the literal
+      // "No notes match this filter." rather than the prior
+      // conditional. Assert the literal copy directly.
+      expect(/emptyMessage="No notes match this filter\."/.test(src)).toBe(
+        true,
+      );
     });
 
     it("the default empty-state copy is unchanged", () => {
+      // Now owned by the FolderTree's empty branch.
       expect(/No notes in this vault\./.test(src)).toBe(true);
     });
   });

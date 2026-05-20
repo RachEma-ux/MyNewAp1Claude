@@ -22,7 +22,7 @@
  * full-fidelity form is added.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import VaultFsSyncPanel from "./VaultFsSyncPanel";
 import WorkspaceStateLayer, {
@@ -69,6 +69,15 @@ export default function VaultExplorer({
     { vaultId: selectedVaultId ?? 0 },
     { enabled: typeof selectedVaultId === "number" && selectedVaultId > 0 },
   );
+  // Folder tree — sourced from agsVaultFolders. The Vault Explorer
+  // composes (folders + notes) into a hierarchical tree when no
+  // filter is active. When a filter (text or tag) is active the
+  // tree collapses to a flat hit list (the tree shape is noise
+  // when you're searching).
+  const foldersForVaultQuery = trpc.agentStudio.vault.listFolders.useQuery(
+    { vaultId: selectedVaultId ?? 0 },
+    { enabled: typeof selectedVaultId === "number" && selectedVaultId > 0 },
+  );
 
   const [showVaultForm, setShowVaultForm] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -77,13 +86,22 @@ export default function VaultExplorer({
   const [formError, setFormError] = useState<string | null>(null);
   const [noteFilter, setNoteFilter] = useState("");
   const [selectedTags, setSelectedTags] = useState<ReadonlyArray<string>>([]);
+  // Folder ids that are currently expanded in the tree. Undefined in
+  // the Set === collapsed. Defaults to all-expanded on every vault
+  // switch (initialized in the effect below) so operators don't have
+  // to click through every folder on first paint.
+  const [expandedFolderIds, setExpandedFolderIds] = useState<ReadonlySet<number>>(
+    () => new Set<number>(),
+  );
 
   // Clear text + tag filters when the operator switches vaults —
   // keeping stale filters across an unrelated note list would be
-  // surprising and the tag set itself is vault-scoped.
+  // surprising and the tag set itself is vault-scoped. Also reset
+  // the expanded-folders set; the next folder-query result seeds it.
   useEffect(() => {
     setNoteFilter("");
     setSelectedTags([]);
+    setExpandedFolderIds(new Set<number>());
   }, [selectedVaultId]);
 
   const allNotes = notesQuery.data ?? [];
@@ -123,6 +141,43 @@ export default function VaultExplorer({
       return title.includes(q) || slug.includes(q);
     });
   }, [allNotes, noteFilter, allowedNoteIdsByTags]);
+
+  // Folder list (flat) — the tree shape is built inside FolderTree.
+  const allFolders = useMemo(
+    () =>
+      (foldersForVaultQuery.data ?? []) as ReadonlyArray<{
+        id: number;
+        vaultId: number;
+        parentFolderId: number | null;
+        name: string;
+        path: string;
+      }>,
+    [foldersForVaultQuery.data],
+  );
+
+  // Default every folder to expanded the first time the folders
+  // query resolves for a given vault. Subsequent toggles are owned
+  // by `onToggleFolder` below. Re-runs when the folder set changes
+  // identity (e.g. after createFolder lands) — but skip when the
+  // operator has explicitly collapsed a folder so we don't yank it
+  // open on a refetch.
+  const seededExpansionForVaultRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (typeof selectedVaultId !== "number" || selectedVaultId <= 0) return;
+    if (seededExpansionForVaultRef.current === selectedVaultId) return;
+    if (foldersForVaultQuery.isLoading) return;
+    seededExpansionForVaultRef.current = selectedVaultId;
+    setExpandedFolderIds(new Set(allFolders.map((f) => f.id)));
+  }, [selectedVaultId, foldersForVaultQuery.isLoading, allFolders]);
+
+  // Reset the seeded-vault sentinel when the operator switches
+  // vaults so the next vault gets its own default-expanded pass.
+  useEffect(() => {
+    seededExpansionForVaultRef.current = null;
+  }, [selectedVaultId]);
+
+  const isFilterActive =
+    noteFilter.trim().length > 0 || selectedTags.length > 0;
 
   function toggleTag(tag: string): void {
     setSelectedTags((prev) =>
@@ -464,18 +519,36 @@ export default function VaultExplorer({
                   {filteredNotes.length} of {allNotes.length} notes
                 </div>
               )}
-              <NoteList
-                notes={filteredNotes}
-                loading={notesQuery.isLoading}
-                error={notesQuery.error ?? null}
-                selectedNoteId={selectedNoteId}
-                onSelectNote={onSelectNote}
-                emptyMessage={
-                  noteFilter.trim().length > 0 || selectedTags.length > 0
-                    ? "No notes match this filter."
-                    : "No notes in this vault."
-                }
-              />
+              {isFilterActive ? (
+                <NoteList
+                  notes={filteredNotes}
+                  loading={notesQuery.isLoading}
+                  error={notesQuery.error ?? null}
+                  selectedNoteId={selectedNoteId}
+                  onSelectNote={onSelectNote}
+                  emptyMessage="No notes match this filter."
+                />
+              ) : (
+                <FolderTree
+                  folders={allFolders}
+                  notes={allNotes}
+                  loading={notesQuery.isLoading || foldersForVaultQuery.isLoading}
+                  error={
+                    (notesQuery.error ?? foldersForVaultQuery.error) ?? null
+                  }
+                  selectedNoteId={selectedNoteId}
+                  onSelectNote={onSelectNote}
+                  expandedFolderIds={expandedFolderIds}
+                  onToggleFolder={(folderId) =>
+                    setExpandedFolderIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(folderId)) next.delete(folderId);
+                      else next.add(folderId);
+                      return next;
+                    })
+                  }
+                />
+              )}
               {/* Track A — A7 — FS-sync settings panel for the
                   selected vault. Sits below the note list. */}
               <div className="mt-2">
@@ -569,5 +642,220 @@ function NoteList({
         </li>
       ))}
     </ul>
+  );
+}
+
+interface FolderTreeProps {
+  readonly folders: ReadonlyArray<{
+    id: number;
+    parentFolderId: number | null;
+    name: string;
+  }>;
+  readonly notes: ReadonlyArray<{
+    id: number;
+    title?: string | null;
+    slug?: string | null;
+    folderId?: number | null;
+  }>;
+  readonly loading: boolean;
+  readonly error: { data?: { code?: string }; message?: string } | null;
+  readonly selectedNoteId: number | null;
+  readonly onSelectNote: (noteId: number) => void;
+  readonly expandedFolderIds: ReadonlySet<number>;
+  readonly onToggleFolder: (folderId: number) => void;
+}
+
+/**
+ * Hierarchical folder → notes tree. Notes whose `folderId` is null
+ * render at the root level alongside top-level folders. Each folder
+ * row toggles its own expansion state; descendant folders + notes
+ * render with depth-based indentation. Empty folders render with a
+ * faint "(empty)" tag so the operator can still see the structure.
+ */
+function FolderTree({
+  folders,
+  notes,
+  loading,
+  error,
+  selectedNoteId,
+  onSelectNote,
+  expandedFolderIds,
+  onToggleFolder,
+}: FolderTreeProps): React.ReactElement {
+  // Index folders + notes by parent for O(1) lookups during render.
+  const childFoldersByParent = useMemo(() => {
+    const m = new Map<number | null, typeof folders[number][]>();
+    for (const f of folders) {
+      const key = f.parentFolderId ?? null;
+      const list = m.get(key) ?? [];
+      list.push(f);
+      m.set(key, list);
+    }
+    for (const list of m.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return m;
+  }, [folders]);
+
+  const notesByFolder = useMemo(() => {
+    const m = new Map<number | null, typeof notes[number][]>();
+    for (const n of notes) {
+      const key = n.folderId ?? null;
+      const list = m.get(key) ?? [];
+      list.push(n);
+      m.set(key, list);
+    }
+    return m;
+  }, [notes]);
+
+  if (loading) {
+    return (
+      <div className="pl-4 text-xs text-gray-500" data-testid="folder-tree-loading">
+        Loading…
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div
+        className="pl-4 text-xs text-red-500"
+        data-testid="folder-tree-error"
+        data-raw-error={error.message ?? ""}
+      >
+        Could not load folders.
+      </div>
+    );
+  }
+
+  const rootFolders = childFoldersByParent.get(null) ?? [];
+  const rootNotes = notesByFolder.get(null) ?? [];
+  if (rootFolders.length === 0 && rootNotes.length === 0 && notes.length === 0) {
+    return (
+      <div className="pl-4 text-xs text-gray-500" data-testid="folder-tree-empty">
+        No notes in this vault.
+      </div>
+    );
+  }
+
+  return (
+    <ul className="pl-1 mt-1 space-y-0.5" data-testid="folder-tree">
+      <FolderTreeLevel
+        depth={0}
+        childFolders={rootFolders}
+        notes={rootNotes}
+        childFoldersByParent={childFoldersByParent}
+        notesByFolder={notesByFolder}
+        selectedNoteId={selectedNoteId}
+        onSelectNote={onSelectNote}
+        expandedFolderIds={expandedFolderIds}
+        onToggleFolder={onToggleFolder}
+      />
+    </ul>
+  );
+}
+
+interface FolderTreeLevelProps {
+  readonly depth: number;
+  readonly childFolders: ReadonlyArray<{
+    id: number;
+    parentFolderId: number | null;
+    name: string;
+  }>;
+  readonly notes: ReadonlyArray<{
+    id: number;
+    title?: string | null;
+    slug?: string | null;
+    folderId?: number | null;
+  }>;
+  readonly childFoldersByParent: Map<
+    number | null,
+    Array<{ id: number; parentFolderId: number | null; name: string }>
+  >;
+  readonly notesByFolder: Map<
+    number | null,
+    Array<{
+      id: number;
+      title?: string | null;
+      slug?: string | null;
+      folderId?: number | null;
+    }>
+  >;
+  readonly selectedNoteId: number | null;
+  readonly onSelectNote: (noteId: number) => void;
+  readonly expandedFolderIds: ReadonlySet<number>;
+  readonly onToggleFolder: (folderId: number) => void;
+}
+
+function FolderTreeLevel({
+  depth,
+  childFolders,
+  notes,
+  childFoldersByParent,
+  notesByFolder,
+  selectedNoteId,
+  onSelectNote,
+  expandedFolderIds,
+  onToggleFolder,
+}: FolderTreeLevelProps): React.ReactElement {
+  // Indent 12px per depth. Tailwind doesn't have dynamic spacing so
+  // we use an inline style — the only call site is here, so the
+  // ad-hoc inline-style does not leak elsewhere.
+  const indent = depth === 0 ? undefined : { paddingLeft: `${depth * 12}px` };
+  return (
+    <>
+      {childFolders.map((folder) => {
+        const isOpen = expandedFolderIds.has(folder.id);
+        const subFolders = childFoldersByParent.get(folder.id) ?? [];
+        const folderNotes = notesByFolder.get(folder.id) ?? [];
+        return (
+          <li key={`folder-${folder.id}`} style={indent}>
+            <button
+              type="button"
+              data-testid={`folder-row-${folder.id}`}
+              data-expanded={isOpen ? "true" : "false"}
+              className="text-left text-sm w-full rounded px-2 py-0.5 hover:bg-gray-100 font-medium text-gray-700"
+              onClick={() => onToggleFolder(folder.id)}
+            >
+              {isOpen ? "▾" : "▸"} 📁 {folder.name}
+              {subFolders.length === 0 && folderNotes.length === 0 && (
+                <span className="text-[10px] text-gray-400 ml-1">(empty)</span>
+              )}
+            </button>
+            {isOpen && (subFolders.length > 0 || folderNotes.length > 0) && (
+              <ul
+                className="space-y-0.5"
+                data-testid={`folder-children-${folder.id}`}
+              >
+                <FolderTreeLevel
+                  depth={depth + 1}
+                  childFolders={subFolders}
+                  notes={folderNotes}
+                  childFoldersByParent={childFoldersByParent}
+                  notesByFolder={notesByFolder}
+                  selectedNoteId={selectedNoteId}
+                  onSelectNote={onSelectNote}
+                  expandedFolderIds={expandedFolderIds}
+                  onToggleFolder={onToggleFolder}
+                />
+              </ul>
+            )}
+          </li>
+        );
+      })}
+      {notes.map((note) => (
+        <li key={`note-${note.id}`} style={indent}>
+          <button
+            type="button"
+            data-testid={`note-list-item-${note.id}`}
+            className={`text-left text-sm w-full rounded px-2 py-0.5 hover:bg-gray-100 ${
+              note.id === selectedNoteId ? "bg-blue-50 font-medium" : ""
+            }`}
+            onClick={() => onSelectNote(note.id)}
+          >
+            📄 {note.title ?? note.slug ?? `Note ${note.id}`}
+          </button>
+        </li>
+      ))}
+    </>
   );
 }
