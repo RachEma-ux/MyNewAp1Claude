@@ -1210,3 +1210,43 @@ Next arc (continuation-9) target: inspect `vault/presence.ts` for
 migratability; if positive, ship the migration. If presence.ts is
 also structural, the caller-migration tail is **functionally
 complete** — only schema-change-blocked entities remain.
+
+## Continuation-9 — last-mile presence migration (2026-05-20)
+
+User directive: "continue with the next punch-list arc". Continuation-8
+named `vault/presence.ts` as the next inspection target. Inspection
+result: 3 of the 4 `getAsDb()` call sites already use the file's
+own `resolveNoteRoutedConn` helper (Path-A note → vault → workspace
+chain, PR-V1-132). Only `listPresence(noteId)` was missed — a one-
+function migration that reuses the existing helper verbatim.
+
+### Re-audit findings
+
+```
+server/agent-studio/services/vault/presence.ts:
+  L111  const lookupDb = getAsDb()  → resolveNoteRoutedConn   (already migrated)
+  L167  const lookupDb = getAsDb()  → resolveNoteRoutedConn   (already migrated)
+  L191  const lookupDb = getAsDb()  → resolveNoteRoutedConn   (already migrated)
+  L213  const db      = getAsDb()                              ← only un-migrated
+```
+
+`listPresence(noteId)` does an eviction-then-select pattern; both
+queries scope by `noteId` and should ride the same workspace-routed
+handle as the file's other 3 functions. Reuse `resolveNoteRoutedConn`
+verbatim.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 59 | **Open continuation-9 catalogue** | This entry. Confirms `vault/presence.ts` has 1 trivial migration left; helper already exists. |
+| 60 | **listPresence caller migration** | Route the eviction DELETE + the SELECT through `resolveNoteRoutedConn(lookupDb, noteId)`; source-scan test pins the pattern. |
+| 61 | **Continuation-9 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Declares the caller-migration tail **functionally complete** for the auto-detectable scope. |
+
+### Continuation-9 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 59 catalogue | this PR | TBD | Opens continuation-9; confirms 1 trivial migration left in presence.ts |
+| 60 listPresence | TBD | TBD | listPresence routed via the existing resolveNoteRoutedConn helper |
+| 61 continuation-9 closure | TBD | TBD | Receipt + caller-migration tail declared functionally complete |
