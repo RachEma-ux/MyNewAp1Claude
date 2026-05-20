@@ -3512,3 +3512,87 @@ larger than cont-25 but follows the same shape (trigger + run
 monitoring + apply-mutation workflow). Per cont-25 lesson #1,
 the catalogue should group these into functional clusters
 up-front.
+
+## Continuation-26 — graphQuality scan + agent + proposal lifecycle (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Fourth arc of the partial-consumer audit cycle. Cont-25's closure
+named `graphQuality` (10/22 → 22/22) as the next target — the
+**largest remaining saturation gap** with 12 unconsumed endpoints.
+
+### Re-audit findings
+
+`graphQuality.*` has 22 endpoints; 10 already consumed (by various
+existing surfaces including `GraphQualityFindingsPage`, retention
+panels, etc.). The 12 unconsumed endpoints split into 4 functional
+groups per cont-25 lesson #1:
+
+**Scan group (4 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listRegisteredScanKinds` | query | closed enum source for the scan picker |
+| `listScans` | query | recent scan rows newest-first |
+| `getScan` | query | scanId → detailed scan row |
+| `runScan` | mutation | scanKind + workspace + actor + knobs → triggers a scan |
+
+**Agent group (2 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listAgentRuns` | query | recent agent runs newest-first |
+| `runAgent` | mutation | agentKind + workspace + actor + knobs → triggers an agent run |
+
+**Proposal lifecycle group (5 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `getFinding` | query | findingId → finding detail |
+| `listAppliedProposals` | query | recent applied proposals (post-mutation-worker) |
+| `applyApprovedProposal` | mutation | proposalId + actorId → applies an already-approved proposal |
+| `approveAndApply` | mutation | proposalId + actorId + rationale? → atomic approve+apply |
+| `verifyProposalApply` | mutation | proposalId → verifies the apply landed in SoT |
+
+**Dashboard group (1 endpoint):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `getOperatorDashboard` | query | aggregate counters / open findings / agent health for the operator landing surface |
+
+### Distinct shape: scan + agent + proposal applier with dashboard summary
+
+Three new affordances vs. cont-24/25:
+
+1. **Two parallel run kinds** — `runScan` and `runAgent` are
+   independent triggers feeding the same proposal-finding pipeline.
+   The panel surfaces both in a sibling pattern, not as nested
+   sub-sections.
+2. **Apply-mutation chain** — `applyApprovedProposal` /
+   `approveAndApply` / `verifyProposalApply` are three distinct
+   mutations across the apply lifecycle, where `approveAndApply` is
+   the most-common-path combo + the individual mutations are
+   escape hatches.
+3. **Dashboard summary at top** — `getOperatorDashboard` is a
+   single-call aggregate that drives the operator's landing summary;
+   it goes at the TOP of the panel, not the bottom.
+
+### Approach
+
+`GraphQualityPanel` will have 5 cards:
+
+- **Dashboard summary card** — `getOperatorDashboard` at the top
+  with counters / health indicators.
+- **Scans card** — listScans master + click-to-detail with getScan;
+  runScan form with scanKind dropdown from listRegisteredScanKinds.
+- **Agent runs card** — listAgentRuns rows; runAgent form.
+- **Findings + applied proposals card** — operator-supplied findingId
+  → getFinding detail; applyApprovedProposal / approveAndApply /
+  verifyProposalApply action buttons; listAppliedProposals history.
+
+Per cont-25 lesson #2 (enabled-gated sibling queries on the same
+key), `getScan` is enabled-gated on `selectedScanId`; `getFinding`
+is enabled-gated on the operator-supplied findingId numeric input.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 110 | **Open continuation-26 catalogue** | This entry. 12-endpoint largest-remaining gap. |
+| 111 | **`GraphQualityPanel` + page** | 5-card panel (dashboard / scans / agent runs / findings + proposals); full 7-point nav wiring; tests. |
+| 112 | **Continuation-26 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
