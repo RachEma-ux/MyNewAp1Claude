@@ -4741,3 +4741,5 @@ scores + mutation guards at button level).
 
 ## Continuation-38 — toolKnowledge (catalogue)
 Sixteenth arc. toolKnowledge (1/2 → 2/2) — 1 unconsumed (getTool). Panel-extension on RetrofitPage tool-knowledge tab. Slices 146/147/148.
+
+## Cont-37 catalogue — toolApprovals 2/4 → 4/4 (list + getByHash). Panel-extension on RetrofitPage approvals tab.
