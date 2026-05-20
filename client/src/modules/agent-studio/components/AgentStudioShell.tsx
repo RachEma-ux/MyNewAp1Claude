@@ -154,6 +154,11 @@ const SemanticEnrichmentPage = lazy(
 const GraphQualityPage = lazy(
   () => import("../pages/GraphQualityPage"),
 );
+// No-deferral continuation-27 slice 114: Vault Admin page —
+// fifth arc of the partial-consumer audit cycle. 21-endpoint
+// long-tail operator surface (membership / attachments / saved
+// views / templates / notes & search).
+const VaultAdminPage = lazy(() => import("../pages/VaultAdminPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -355,6 +360,10 @@ function parseRoute(path: string): ParsedRoute {
     path.startsWith("/agent-studio/graph-quality/")
   ) {
     return { ...empty, view: "graph-quality", homeMode: null };
+  }
+  // ── No-deferral continuation-27 slice 114: Vault Admin (no agent context) ──
+  if (path.startsWith("/agent-studio/vault-admin")) {
+    return { ...empty, view: "vault-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -654,6 +663,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-quality");
       return;
     }
+    // No-deferral continuation-27 slice 114: vault-admin is a global view.
+    if (key === "vault-admin") {
+      navigate("/agent-studio/vault-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -833,6 +847,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "graph-quality":
           return <GraphQualityPage />;
+        // ── No-deferral continuation-27 slice 114: Vault Admin
+        //    (typed via AgentStudioView). ──
+        case "vault-admin":
+          return <VaultAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
