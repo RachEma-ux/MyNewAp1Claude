@@ -87,10 +87,13 @@ describe("Vault Explorer dropdown selector", () => {
       );
     });
 
-    it("renders NoteList for the selected vault", () => {
-      expect(/<NoteList[\s\S]+?notes=\{notesQuery\.data\s*\?\?\s*\[\]\}/.test(src)).toBe(
-        true,
-      );
+    it("renders NoteList for the selected vault (fed from listNotes via the filter)", () => {
+      // NoteList's notes prop now flows through `filteredNotes` (the
+      // note-filter PR added a client-side filter step), but the data
+      // source is still `notesQuery.data ?? []`. Assert both legs so
+      // the invariant survives future refactors of the filter shape.
+      expect(/<NoteList[\s\S]+?notes=\{filteredNotes\}/.test(src)).toBe(true);
+      expect(/notesQuery\.data\s*\?\?\s*\[\]/.test(src)).toBe(true);
     });
 
     it("renders FsSyncSettingsAffordance using selectedVaultId (not the closure vault.id)", () => {
