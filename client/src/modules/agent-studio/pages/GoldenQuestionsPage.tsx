@@ -1,22 +1,25 @@
 /**
- * Golden Questions admin page — no-deferral continuation-12 slice 69.
+ * Golden Questions admin page — no-deferral continuation-12 slice 69
+ * + continuation-13 slice 72.
  *
  * Global Agent Studio page (no agentId context) reachable at
  * `/agent-studio/golden-questions`. Closes the UI-consumer gap
- * for slice 44's `goldenQuestions.triggerLiveEvaluation` mutation
- * + provides the operator entry point for the broader
- * `goldenQuestions.*` tRPC surface (6 read endpoints +
+ * for the entire `goldenQuestions.*` tRPC surface (6 reads +
  * 1 mutation shipped server-side at slices 44 / T-D.5.α-δ).
  *
- * MVP scope (slice 69): wraps `GoldenQuestionsTriggerPanel`. The
- * recent-runs list + per-run drill-in (`listRecentRuns` +
- * `getRunStats` + `listRunResults`) are continuation-13+ scope.
+ *   - Slice 69 (continuation-12): `GoldenQuestionsTriggerPanel`
+ *     surfaces `triggerLiveEvaluation` + `listSuites`.
+ *   - Slice 72 (continuation-13): `GoldenQuestionsRecentRunsPanel`
+ *     surfaces `listRecentRuns` + `getRunStats` + `listRunResults`
+ *     + `getQuestionDetail` in a master-detail layout below the
+ *     trigger panel.
  */
 
 import { ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "../components/ui";
 import { GoldenQuestionsTriggerPanel } from "../components/GoldenQuestionsTriggerPanel";
+import { GoldenQuestionsRecentRunsPanel } from "../components/GoldenQuestionsRecentRunsPanel";
 
 export default function GoldenQuestionsPage() {
   return (
@@ -27,6 +30,7 @@ export default function GoldenQuestionsPage() {
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <GoldenQuestionsTriggerPanel />
+      <GoldenQuestionsRecentRunsPanel />
     </div>
   );
 }
