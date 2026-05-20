@@ -12,6 +12,15 @@
  * Permission-aware: the runtime context (workspace + userId) is
  * threaded into every read; the repository filters out other users'
  * traces.
+ *
+ * View modes — 2026-05-20 (closes the items 23 / 24 graph-visual gap
+ * from PR #1397's classification):
+ *   - "list" — JSON-row list of impacted entities (the original).
+ *   - "graph" — radial SVG node-link diagram with the trace's start
+ *     id at the center and one satellite per impacted row. No new
+ *     runtime dependency (pure SVG; matches the LocalGraphCanvas
+ *     reuse-first principle while keeping the bundle slim — the
+ *     trace surfaces don't need react-flow's drag/pan affordances).
  */
 
 import React, { useMemo, useState } from "react";
@@ -19,6 +28,10 @@ import { trpc } from "../../../../lib/trpc";
 import WorkspaceStateLayer, {
   classifyWorkspaceState,
 } from "./WorkspaceStateLayer";
+import TraceGraphView from "./TraceGraphView";
+
+const VIEW_MODES = ["graph", "list"] as const;
+type TraceViewMode = (typeof VIEW_MODES)[number];
 
 export interface RuntimeAndDecisionTraceViewProps {
   readonly defaultRuntimeRunId?: string;
@@ -28,15 +41,44 @@ export default function RuntimeAndDecisionTraceView({
   defaultRuntimeRunId = "",
 }: RuntimeAndDecisionTraceViewProps): React.ReactElement {
   const [runtimeRunId, setRuntimeRunId] = useState<string>(defaultRuntimeRunId);
+  // View-mode shared by BOTH the runtime and decision projections —
+  // operators reading a trace usually want the same mode for both,
+  // and a shared toggle keeps the header tidy.
+  const [viewMode, setViewMode] = useState<TraceViewMode>("graph");
 
   return (
     <section
       className="border rounded"
       data-testid="runtime-decision-trace-view"
       data-runtime-run-id={runtimeRunId}
+      data-view-mode={viewMode}
     >
-      <header className="border-b px-3 py-1.5 text-xs font-semibold uppercase text-gray-500">
-        Runtime + decision trace
+      <header className="flex items-center justify-between border-b px-3 py-1.5 text-xs gap-2">
+        <span className="font-semibold uppercase text-gray-500">
+          Runtime + decision trace
+        </span>
+        <div
+          className="flex items-center gap-1"
+          data-testid="trace-view-mode-toggle"
+        >
+          {VIEW_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              data-testid={`trace-view-mode-${mode}`}
+              data-active={mode === viewMode ? "true" : "false"}
+              onClick={() => setViewMode(mode)}
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                mode === viewMode
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+              }`}
+              title={mode === "graph" ? "Radial node-link view" : "JSON-row list view"}
+            >
+              {mode === "graph" ? "Graph" : "List"}
+            </button>
+          ))}
+        </div>
       </header>
       <div className="p-3 space-y-3 text-xs">
         <label className="flex items-center gap-2">
@@ -59,12 +101,14 @@ export default function RuntimeAndDecisionTraceView({
               templateKey="impact_runtime"
               runtimeRunId={runtimeRunId}
               title="Runtime trace"
+              viewMode={viewMode}
             />
             <TraceTemplate
               testIdPrefix="decision-trace"
               templateKey="impact_governance"
               runtimeRunId={runtimeRunId}
               title="Decision trace (governance projection)"
+              viewMode={viewMode}
             />
           </>
         )}
@@ -78,11 +122,13 @@ function TraceTemplate({
   runtimeRunId,
   title,
   testIdPrefix,
+  viewMode,
 }: {
   templateKey: string;
   runtimeRunId: string;
   title: string;
   testIdPrefix: string;
+  viewMode: TraceViewMode;
 }): React.ReactElement {
   const query = trpc.agentStudio.graphWorkspace.runImpactTemplate.useQuery(
     {
@@ -107,13 +153,23 @@ function TraceTemplate({
   }, [query.isLoading, query.error, query.data]);
 
   return (
-    <div data-testid={testIdPrefix} className="border rounded">
+    <div
+      data-testid={testIdPrefix}
+      data-view-mode={viewMode}
+      className="border rounded"
+    >
       <div className="px-2 py-1 font-semibold border-b">{title}</div>
       <div className="p-2">
         {state !== null ? (
           <WorkspaceStateLayer
             state={state}
             rawErrorForDevtools={query.error?.message}
+          />
+        ) : viewMode === "graph" ? (
+          <TraceGraphView
+            seedId={runtimeRunId}
+            rows={(query.data?.rows ?? []) as ReadonlyArray<Record<string, unknown>>}
+            testIdPrefix={testIdPrefix}
           />
         ) : (
           <ul className="space-y-0.5">

@@ -17,6 +17,7 @@ export { default as GraphInspector } from "./GraphInspector";
 export type { InspectorTarget } from "./GraphInspector";
 export { default as ImpactAnalysisView } from "./ImpactAnalysisView";
 export { default as RuntimeAndDecisionTraceView } from "./RuntimeAndDecisionTraceView";
+export { default as TraceGraphView } from "./TraceGraphView";
 export { default as VaultFsSyncPanel } from "./VaultFsSyncPanel";
 export { default as CodeMirrorMdEditor } from "./CodeMirrorMdEditor";
 export { default as NoteFrontmatterPanel } from "./NoteFrontmatterPanel";
