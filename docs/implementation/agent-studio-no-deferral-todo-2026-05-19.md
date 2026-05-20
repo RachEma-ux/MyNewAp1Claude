@@ -4637,3 +4637,37 @@ Adds a 3rd panel (`GoldenQuestionsSuiteBrowserPanel`) inline in
 | 134 | **Open continuation-34 catalogue** | This entry. 1-endpoint panel-extension arc. |
 | 135 | **`GoldenQuestionsSuiteBrowserPanel`** | New panel + page wiring; source-scan test. |
 | 136 | **Continuation-34 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-36 — racEvaluation operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Fourteenth arc of the partial-consumer audit cycle. `racEvaluation`
+(2/3 → 3/3) — 1 unconsumed endpoint.
+
+### Re-audit findings
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `evaluate` | mutation | workspaceId + traceId + modelOutput + chunks? → { traceId, groundedness, relevance, citationCoverage } scores; also persists groundedness + citationCoverage back into the trace row |
+
+### Approach
+
+Adds `RacEvaluateTracePanel` rendered as a 3rd component inside
+`RacPage` (per-agent surface). Card with workspaceId + traceId
+inputs + modelOutput textarea + Evaluate button; renders the 3
+returned scores (groundedness / relevance / citationCoverage)
+inline.
+
+Caller-supplied `chunks` array is omitted in this slice — the
+server falls back to persisted block stubs with a
+`no_chunk_content` warning surfaced in the groundedness section.
+Adding the chunk-injection knob is a future α-slice if operators
+ask for it.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 140 | **Open continuation-36 catalogue** | This entry. 1-endpoint panel-extension arc. |
+| 141 | **`RacEvaluateTracePanel`** | New panel rendered in RacPage; source-scan test. |
+| 142 | **Continuation-36 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
