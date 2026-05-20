@@ -2719,3 +2719,96 @@ arc** so far and may need to split across multiple slices
 shape: list page (`listBases` + `getBase` + `createBase` +
 `deleteBase`) + detail page (`updateBase` + the 5 row/column
 ops).
+
+## Continuation-21 — bases canonical CRUD UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-20's closure named `bases` α-shell rewrite as the
+final zero-consumer target — the largest scope yet (10 endpoints).
+
+### Re-audit findings
+
+`bases.*` is a **10-endpoint full-CRUD** router for the Phase 24
+MVP data model (`ags_bases` / `ags_base_columns` / `ags_base_rows`):
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `create` | mutation | New base: workspaceId? + vaultId? + name + slug + description? + icon? + color? |
+| `list` | query | List bases by workspace/vault, optional includeArchived |
+| `getSnapshot` | query | Base header + columns + rows in one call (NOT_FOUND on missing) |
+| `update` | mutation | Update base name / desc / icon / color / sortKey / archived flag |
+| `createColumn` | mutation | Add column: key + name + dataType (closed 7-value enum) + config? |
+| `listColumns` | query | List columns for a base |
+| `createRow` | mutation | New row: cells (record) + slug? + noteId? + sortKey? |
+| `updateRow` | mutation | Update cells + noteId + sortKey by rowId |
+| `listRows` | query | List rows for a base |
+| `deleteRow` | mutation | Delete row by id |
+
+The closed `AGS_BASE_COLUMN_DATA_TYPES` 7-value enum is:
+`text`, `number`, `date`, `checkbox`, `select`, `multiselect`,
+`note_link`.
+
+### α-shell coexistence strategy
+
+The existing `BasesPanel` is the slice T-F.91 / T-F.2-α **saved-view
+α-shell** — it persists "bases" as `agsVaultSavedViews` rows with
+`viewKind="base"` and renders extensive filter-language UX
+(`bases-filter-language` shared module, preview pagination, vault
+picker, etc.). This is a fundamentally different data model from
+`ags_bases` / `ags_base_columns` / `ags_base_rows`.
+
+**Decision: add NEW `BasesAdminPanel` alongside the α-shell, do
+NOT rewrite the α-shell.** The α-shell's filter-language work is
+real and shouldn't be thrown away as part of this no-deferral arc;
+its eventual deprecation can be a separate sub-arc once the
+operator workflow is proven on the canonical CRUD surface. This
+is consistent with continuation-18's slice 87 lesson on naming:
+distinct routers get distinct panels.
+
+The new panel lives at `/agent-studio/bases-admin` (the α-shell
+stays at `/agent-studio/bases`).
+
+### Approach
+
+`BasesAdminPanel` will have three top-level sections:
+
+- **Workspace/Vault scope picker** — workspaceId + vaultId
+  numeric inputs (both optional but mutually-related — vault
+  belongs to a workspace; if both empty, list all bases the
+  caller can see).
+- **Bases list section** — `list` query result with
+  Create-base form (name + slug + description + icon + color),
+  Archive/Restore actions via `update`, click-to-select row
+  promoting the base to the detail section.
+- **Base detail section** — `getSnapshot` driven by the
+  selected baseId; shows header + columns subsection (with
+  Create-column inline form + 7-value dataType dropdown) + rows
+  subsection (with Create-row JSON-cells form + per-row
+  Update / Delete actions).
+
+7-point nav-surface wiring under the existing **Bases** sidebar
+group (which currently holds the α-shell entry) as a sibling
+entry "Bases Admin (canonical)" — or under a new "Admin" group if
+the existing Bases group structure resists.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 95 | **Open continuation-21 catalogue** | This entry. Names α-shell coexistence strategy + 10-endpoint scope. |
+| 96 | **`BasesAdminPanel` + page** | 10-endpoint canonical CRUD panel with scope picker + list + detail; full 7-point nav wiring; tests. |
+| 97 | **Continuation-21 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Finalizes the slice-83 zero-consumer audit (5/5 routers now consumed). |
+
+### Closing the slice-83 audit
+
+After continuation-21 ships, all 5 routers from the original
+slice-83 zero-consumer audit will have first-class UI consumers:
+
+- continuation-17 (slices 83-85): `securityGraph` ✅ shipped
+- continuation-18 (slices 86-88): `codeGraph` ✅ shipped
+- continuation-19 (slices 89-91): `graphChangeProposals` ✅ shipped
+- continuation-20 (slices 92-94): `racIngestion` ✅ shipped
+- continuation-21 (slices 95-97): `bases` (canonical CRUD) — in flight
+
+The α-shell deprecation is a follow-up sub-arc out of scope for
+the no-deferral mission's closure.
