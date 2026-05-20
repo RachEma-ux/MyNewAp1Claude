@@ -197,6 +197,11 @@ export type AgentStudioView =
   //    workspaceObservability endpoints (notifications + background
   //    jobs + error events). ──
   | "workspace-observability"
+  // ── No-deferral continuation-29 slice 120: Provider Bindings Admin.
+  //    Seventh arc of the partial-consumer audit cycle. Closes 4
+  //    providerBindings endpoints (listForAgent / resolveForRun /
+  //    remove / testRunWithBinding). ──
+  | "provider-bindings-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -416,6 +421,18 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "workspace-observability",
         label: "Notifications + Jobs",
         icon: Activity,
+      },
+    ],
+  },
+  // ── No-deferral continuation-29 slice 120: provider-bindings-admin page.
+  //    Seventh arc of the partial-consumer audit cycle. ──
+  {
+    label: "Provider Bindings",
+    items: [
+      {
+        key: "provider-bindings-admin",
+        label: "Admin",
+        icon: Plug,
       },
     ],
   },
