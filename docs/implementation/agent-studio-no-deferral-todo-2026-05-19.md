@@ -4722,3 +4722,19 @@ arc of the partial-consumer audit cycle**. Closes `graphProjection.*`
 5. **Cron status + run-now is a reusable composite shape (4th instance).**
 
 (Full lesson text preserved in continuation-35 carry-forward — see the closure receipt body in the earlier draft PR.)
+
+## Continuation-36 closure receipt (2026-05-20)
+
+The thirty-sixth continuation arc shipped 1 panel-extension slice
++ 1 catalogue + this closure across PRs #1659–#1661. **Fourteenth
+arc**. Closes `racEvaluation.*` (2/3 → 3/3, 1 endpoint).
+
+| Slice | PR | Merge SHA |
+|---|---|---|
+| 140 catalogue | #1659 | 4f5979d4 |
+| 141 RacEvaluateTracePanel | #1660 | f6ecf1ba |
+| 142 cont-36 closure | #1661 | TBD |
+
+5 carry-forward lessons (per-agent surfaces audit + multi-score
+result rendering + chunks knob deferred + .toFixed(3) bounded
+scores + mutation guards at button level).
