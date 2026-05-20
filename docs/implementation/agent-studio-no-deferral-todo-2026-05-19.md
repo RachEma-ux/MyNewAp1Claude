@@ -2812,3 +2812,93 @@ slice-83 zero-consumer audit will have first-class UI consumers:
 
 The α-shell deprecation is a follow-up sub-arc out of scope for
 the no-deferral mission's closure.
+
+## Continuation-21 closure receipt (2026-05-20)
+
+The twenty-first continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1614–#1616. Closes the
+**final** UI-consumer gap from the slice-83 audit — all 10
+`bases.*` endpoints consumed by the new `BasesAdminPanel` +
+`BasesAdminPage` mounted at `/agent-studio/bases-admin` under a
+new **"Bases (canonical)"** sidebar group with the `Table2` icon.
+
+Coexists with the existing T-F.91 / T-F.2-α saved-view α-shell at
+`/agent-studio/bases`. The α-shell's filter-language UX is
+preserved; its eventual deprecation is a follow-up sub-arc out of
+scope for this no-deferral mission.
+
+### Continuation-21 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 95 catalogue | #1614 | 280e64a2 | Opens continuation-21; documents the α-shell coexistence strategy + 10-endpoint scope |
+| 96 BasesAdminPanel + page | #1615 | 4f5e1062 | 10 endpoints consumed; 7-point nav wiring; 16 unit + 8 nav-surface tests |
+| 97 continuation-21 closure | #1616 | TBD | Receipt + slice-83 audit close-out (5/5 routers consumed) |
+
+### Continuation-21 carry-forward lessons
+
+1. **Coexistence beats rewrite when the legacy surface holds real
+   work.** The existing T-F.91 `BasesPanel` is a saved-view α-shell
+   with extensive filter-language UX (`bases-filter-language`
+   shared module, preview pagination, vault picker). Rewriting it
+   to consume the canonical CRUD would have thrown away that
+   work as collateral damage. Adding `BasesAdminPanel` as a
+   sibling mount preserves both surfaces and lets the deprecation
+   happen on its own schedule. Lesson: **when a new canonical
+   surface lands, the path from α-shell to canonical is usually
+   sibling-mount then deprecate, not rewrite-in-place.**
+2. **Master-detail with sub-section CRUDs needs three layers of
+   invalidation.** When the operator creates a column (or row /
+   edits a row / deletes a row) inside the base-detail card, the
+   sub-section needs to refresh the `getSnapshot` query — which
+   in turn carries the columns and rows. The naive approach
+   (invalidate the sub-section's own query) doesn't work because
+   the data is sourced from the snapshot. The pattern: pass an
+   `onMutate: () => utils.bases.getSnapshot.invalidate({baseId})`
+   callback from the detail-section parent to each sub-section,
+   so mutations bubble up the invalidation. Top-level list
+   mutations invalidate the list separately. Lesson: **when a
+   master-detail master endpoint carries detail rows, lift the
+   invalidation to the master query** — don't try to keep
+   sub-section caches in sync with their own queries.
+3. **Closed-enum dropdowns surface the contract.** The
+   `AGS_BASE_COLUMN_DATA_TYPES` 7-value enum (`text`, `number`,
+   `date`, `checkbox`, `select`, `multiselect`, `note_link`) is
+   hardcoded into the panel as a `const COLUMN_DATA_TYPES`
+   tuple. This is duplication of the server's source-of-truth
+   constant, but the alternatives are worse: importing through
+   a shared module adds coupling, fetching at runtime via
+   `listKnownKinds` adds a query that may never resolve before
+   first paint. Lesson: **closed enums in form selects are OK
+   to duplicate client-side** as long as the duplication is
+   visible (commented to the server source) and the dropdown
+   uses the literal list — a future drift will surface as a
+   server-side BAD_REQUEST that operators can read.
+
+After this slice, the no-deferral mission has shipped **97
+slices across 21 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21).
+
+### Slice-83 audit close-out
+
+All 5 routers identified as zero-consumer in the slice 83 audit
+now have first-class UI consumers:
+
+| Router | Continuation | Slices | Surface |
+|---|---|---|---|
+| `securityGraph` | cont-17 | 83-85 | `SecurityGraphPanel` + page |
+| `codeGraph` | cont-18 | 86-88 | `CodeGraphPanel` + page |
+| `graphChangeProposals` | cont-19 | 89-91 | `GraphChangeProposalsLifecyclePanel` + page |
+| `racIngestion` | cont-20 | 92-94 | `RacIngestionPanel` + page |
+| `bases` | cont-21 | 95-97 | `BasesAdminPanel` + page |
+
+The no-deferral mission's **slice-83 audit close-out arc is
+complete**. The mission may continue with new audit cycles to
+discover further zero-consumer surfaces (e.g. mounted routers
+with zero `client/src/**` references in the production tree)
+or shift to deprecation arcs (e.g. retire the α-shell once
+operator parity is proven on the canonical CRUD).
