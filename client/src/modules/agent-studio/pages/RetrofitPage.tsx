@@ -53,6 +53,9 @@ import { NotePromotionsRetentionPanel } from "../components/NotePromotionsRetent
 // No-deferral continuation-37 slice 144: closes toolApprovals.list +
 // toolApprovals.getByHash UI-consumer gap (the 2 unconsumed endpoints).
 import { ToolApprovalsLookupPanel } from "../components/ToolApprovalsLookupPanel";
+// No-deferral continuation-38 slice 147: closes toolKnowledge.getTool
+// UI-consumer gap (the only unconsumed endpoint on the router).
+import { ToolKnowledgeDetailPanel } from "../components/ToolKnowledgeDetailPanel";
 
 /**
  * M1-c4 (cycle-4 audit `/sdcard/Download/APPROVAL_AUDIT_2026-05-09.md` §M1-c4)
@@ -189,8 +192,9 @@ export default function RetrofitPage({ agentId, workspaceId = 1 }: Props) {
         <TabsContent value="provenance">
           <ProvenancePanel workspaceId={workspaceId} />
         </TabsContent>
-        <TabsContent value="tool-knowledge">
+        <TabsContent value="tool-knowledge" className="space-y-3">
           <ToolKnowledgePanel workspaceId={workspaceId} />
+          <ToolKnowledgeDetailPanel workspaceId={workspaceId} />
         </TabsContent>
         <TabsContent value="approvals" className="space-y-3">
           <ApprovalsPanel agentDraftId={draftId} />
