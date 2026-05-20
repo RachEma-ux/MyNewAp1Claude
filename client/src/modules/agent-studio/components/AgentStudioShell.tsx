@@ -94,6 +94,12 @@ const ImpactAnalysisPage = lazy(
 const RecommendationPage = lazy(
   () => import("../pages/RecommendationPage"),
 );
+// No-deferral continuation-17 slice 84: Security Graph admin page —
+// closes the securityGraph.* UI-consumer gap (7 endpoints shipped
+// at T-G.3.α).
+const SecurityGraphPage = lazy(
+  () => import("../pages/SecurityGraphPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -249,6 +255,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-15 slice 78: Recommendation admin (no agent context) ──
   if (path.startsWith("/agent-studio/recommendation")) {
     return { ...empty, view: "recommendation", homeMode: null };
+  }
+  // ── No-deferral continuation-17 slice 84: Security Graph admin (no agent context) ──
+  if (path.startsWith("/agent-studio/security-graph")) {
+    return { ...empty, view: "security-graph", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -498,6 +508,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/recommendation");
       return;
     }
+    // No-deferral continuation-17 slice 84: security-graph is a global view.
+    if (key === "security-graph") {
+      navigate("/agent-studio/security-graph");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -637,6 +652,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "recommendation":
           return <RecommendationPage />;
+        // ── No-deferral continuation-17 slice 84: Security Graph admin
+        //    (typed via AgentStudioView). ──
+        case "security-graph":
+          return <SecurityGraphPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

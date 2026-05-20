@@ -130,6 +130,10 @@ export type AgentStudioView =
   //    endpoints shipped at T-G.4 — slice 78 consumes listKnownKinds
   //    + recommend; recommendBatch deferred to continuation-16). ──
   | "recommendation"
+  // ── No-deferral continuation-17 slice 84: Security Graph admin
+  //    page. Closes the securityGraph.* UI-consumer gap (7
+  //    endpoints shipped at T-G.3.α). ──
+  | "security-graph"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -250,13 +254,15 @@ const HOME_GROUPS: SectionGroup[] = [
     ],
   },
   // ── T-F.62: graph-lens browser + continuation-14 slice 75
-  //    impact-analysis + continuation-15 slice 78 recommendation ──
+  //    impact-analysis + continuation-15 slice 78 recommendation +
+  //    continuation-17 slice 84 security-graph ──
   {
     label: "Lenses",
     items: [
       { key: "graph-lens-browser", label: "Lens Browser", icon: Telescope },
       { key: "impact-analysis", label: "Impact Analysis", icon: Network },
       { key: "recommendation", label: "Recommendation", icon: Sparkles },
+      { key: "security-graph", label: "Security Graph", icon: ShieldAlert },
     ],
   },
   // ── T-F.82 (T-F.4-α): graph-quality findings ──
