@@ -127,6 +127,13 @@ const BasesAdminPage = lazy(() => import("../pages/BasesAdminPage"));
 const McpSchemaSyncPage = lazy(
   () => import("../pages/McpSchemaSyncPage"),
 );
+// No-deferral continuation-23 slice 102: Promotion Lifecycle admin
+// page — first arc of the partial-consumer audit cycle. Closes the
+// promotion.{submit,approve,reject,rollback} lifecycle (distinct
+// from the existing retention panel).
+const PromotionLifecyclePage = lazy(
+  () => import("../pages/PromotionLifecyclePage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -306,6 +313,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-22 slice 99: MCP Schema Sync admin (no agent context) ──
   if (path.startsWith("/agent-studio/mcp-schema-sync")) {
     return { ...empty, view: "mcp-schema-sync", homeMode: null };
+  }
+  // ── No-deferral continuation-23 slice 102: Promotion Lifecycle admin (no agent context) ──
+  if (path.startsWith("/agent-studio/promotion-lifecycle")) {
+    return { ...empty, view: "promotion-lifecycle", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -585,6 +596,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/mcp-schema-sync");
       return;
     }
+    // No-deferral continuation-23 slice 102: promotion-lifecycle is a global view.
+    if (key === "promotion-lifecycle") {
+      navigate("/agent-studio/promotion-lifecycle");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -748,6 +764,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "mcp-schema-sync":
           return <McpSchemaSyncPage />;
+        // ── No-deferral continuation-23 slice 102: Promotion Lifecycle
+        //    admin (typed via AgentStudioView). ──
+        case "promotion-lifecycle":
+          return <PromotionLifecyclePage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

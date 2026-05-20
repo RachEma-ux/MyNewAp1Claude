@@ -163,6 +163,12 @@ export type AgentStudioView =
   //    tools snapshot into ags_mcp_tool_knowledge +
   //    ags_knowledge_units). ──
   | "mcp-schema-sync"
+  // ── No-deferral continuation-23 slice 102: Promotion Lifecycle page.
+  //    First arc of the partial-consumer audit cycle. Closes
+  //    promotion.{submit,approve,reject,rollback} — 4 lifecycle
+  //    mutations on top of the 10-value PromotionKind enum.
+  //    Distinct from NotePromotionsRetentionPanel (retention). ──
+  | "promotion-lifecycle"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -308,6 +314,20 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "MCP Schema",
     items: [
       { key: "mcp-schema-sync", label: "Schema Sync", icon: Webhook },
+    ],
+  },
+  // ── No-deferral continuation-23 slice 102: promotion-lifecycle page.
+  //    First arc of the partial-consumer audit cycle. Surfaces the
+  //    promotion.{submit,approve,reject,rollback} lifecycle distinct
+  //    from the existing retention panel embedded elsewhere. ──
+  {
+    label: "Promotion",
+    items: [
+      {
+        key: "promotion-lifecycle",
+        label: "Lifecycle",
+        icon: GitBranch,
+      },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
