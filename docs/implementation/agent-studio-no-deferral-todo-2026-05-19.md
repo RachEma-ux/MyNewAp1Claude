@@ -4248,3 +4248,31 @@ trigger), **Export trace** (markdown export + export-to-vault-note).
 | 125 | **Open continuation-31 catalogue** | This entry. 4-endpoint 3-card arc. |
 | 126 | **`GraphAgentAdminPanel` + page** | 3-card panel; full 7-point nav wiring; tests. |
 | 127 | **Continuation-31 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-32 — graphSkill operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Tenth arc of the partial-consumer audit cycle. `graphSkill`
+(1/4 → 4/4) — 3 unconsumed endpoints.
+
+### Re-audit findings
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listPackVersions` | query | skillKey + limit? → version rows |
+| `createPack` | mutation (governed) | skillKey (regex) + name + description? + domain? + supportedNodeTypeKeys[] + supportedEdgeTypeKeys[] + riskLevel (3-value enum) + approvalRequired? |
+| `publishVersion` | mutation (governed) | skillKey + version (regex) + manifest (JSON) + changelog? + sourceNoteVersionId? |
+
+### Approach
+
+3-card panel: **List pack versions** (skillKey input → version table),
+**Create pack** (governed form with riskLevel enum), **Publish version**
+(governed form with manifest JSON textarea).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 128 | **Open continuation-32 catalogue** | This entry. 3-endpoint 3-card arc. |
+| 129 | **`GraphSkillAdminPanel` + page** | 3-card panel; full 7-point nav wiring; tests. |
+| 130 | **Continuation-32 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
