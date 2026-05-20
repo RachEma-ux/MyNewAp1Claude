@@ -23,6 +23,10 @@ import CagPackPanel from "../components/CagPackPanel";
 import RacSourcesPanel from "../components/RacSourcesPanel";
 import RacRetrievalPolicyPanel from "../components/RacRetrievalPolicyPanel";
 import RacEvaluationPanel from "../components/RacEvaluationPanel";
+// No-deferral continuation-36 slice 141: rounds out racEvaluation
+// surface by surfacing `evaluate` alongside the existing preview +
+// groundedness consumers inside the Evaluation tab.
+import { RacEvaluateTracePanel } from "../components/RacEvaluateTracePanel";
 import RacTracesPanel from "../components/RacTracesPanel";
 
 export default function RacPage({
@@ -93,12 +97,13 @@ export default function RacPage({
             profileId={selectedProfileId}
           />
         </TabsContent>
-        <TabsContent value="evaluation" className="mt-3">
+        <TabsContent value="evaluation" className="mt-3 space-y-3">
           <RacEvaluationPanel
             workspaceId={workspaceId}
             agentId={agentId}
             agentDraftId={draft.id}
           />
+          <RacEvaluateTracePanel workspaceId={workspaceId} />
         </TabsContent>
         <TabsContent value="traces" className="mt-3">
           <RacTracesPanel workspaceId={workspaceId} agentId={agentId} />
