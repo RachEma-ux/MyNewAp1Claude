@@ -162,6 +162,7 @@ For detailed architecture, layer mapping, and security controls, see [ARCHITECTU
 - **Run a single test:** `npx vitest run server/path/to/file.test.ts`
 - **DB migrations:** `npm run db:push` (drizzle-kit generate + migrate)
 - **Start production:** `npm run start`
+- **Builder Deploy:** `.github/workflows/builder-deploy.yml` is a GHA workflow that builds, releases, and runs the app behind a `*.trycloudflare.com` tunnel for a chosen duration. `workflow_dispatch` only; inputs include `version` (auto-increments by default), `run_app` (yes/no), `duration` (5/10/15/30 min), `dev_mode`. The live tunnel URL is published to gist `54451f4f49427f293bfdc9fc0a037b2d` (repo variable `TUNNEL_GIST_ID`, file `tunnel-status.json`).
 
 ## Architecture
 
