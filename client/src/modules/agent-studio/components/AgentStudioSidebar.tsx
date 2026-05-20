@@ -181,6 +181,12 @@ export type AgentStudioView =
   //    semanticEnrichment endpoints across trigger / run-monitoring /
   //    candidate-exploration / bulk-promotion. ──
   | "semantic-enrichment"
+  // ── No-deferral continuation-26 slice 111: Graph Quality page.
+  //    Fourth arc of the partial-consumer audit cycle. Closes 12
+  //    graphQuality endpoints across dashboard / scan / agent /
+  //    proposal-lifecycle groups. Distinct from the existing
+  //    GraphQualityFindingsPage (findings table). ──
+  | "graph-quality"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -367,6 +373,16 @@ const HOME_GROUPS: SectionGroup[] = [
         label: "Runs",
         icon: Sparkles,
       },
+    ],
+  },
+  // ── No-deferral continuation-26 slice 111: graph-quality page.
+  //    Fourth arc of the partial-consumer audit cycle. Dashboard +
+  //    scan + agent + apply-mutation chain. Distinct from the
+  //    existing GraphQualityFindingsPage (findings table). ──
+  {
+    label: "Graph Quality",
+    items: [
+      { key: "graph-quality", label: "Quality Admin", icon: Award },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──

@@ -147,6 +147,13 @@ const GraphCorrectionPage = lazy(
 const SemanticEnrichmentPage = lazy(
   () => import("../pages/SemanticEnrichmentPage"),
 );
+// No-deferral continuation-26 slice 111: Graph Quality admin
+// page — fourth arc of the partial-consumer audit cycle. 12-endpoint
+// dashboard + scan + agent + apply-mutation chain. Distinct from
+// GraphQualityFindingsPage (findings table).
+const GraphQualityPage = lazy(
+  () => import("../pages/GraphQualityPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -338,6 +345,16 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-25 slice 108: Semantic Enrichment admin (no agent context) ──
   if (path.startsWith("/agent-studio/semantic-enrichment")) {
     return { ...empty, view: "semantic-enrichment", homeMode: null };
+  }
+  // ── No-deferral continuation-26 slice 111: Graph Quality admin (no agent context) ──
+  // NOTE: must use exact-or-trailing-slash match (NOT prefix) to avoid
+  // shadowing `/agent-studio/graph-quality-findings` which has its own
+  // case below.
+  if (
+    path === "/agent-studio/graph-quality" ||
+    path.startsWith("/agent-studio/graph-quality/")
+  ) {
+    return { ...empty, view: "graph-quality", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -632,6 +649,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/semantic-enrichment");
       return;
     }
+    // No-deferral continuation-26 slice 111: graph-quality is a global view.
+    if (key === "graph-quality") {
+      navigate("/agent-studio/graph-quality");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -807,6 +829,10 @@ export default function AgentStudioShell() {
         //    admin (typed via AgentStudioView). ──
         case "semantic-enrichment":
           return <SemanticEnrichmentPage />;
+        // ── No-deferral continuation-26 slice 111: Graph Quality admin
+        //    (typed via AgentStudioView). ──
+        case "graph-quality":
+          return <GraphQualityPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
