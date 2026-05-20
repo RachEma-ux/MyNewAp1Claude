@@ -47,6 +47,7 @@ import {
   ShieldAlert,
   Table2,
   Inbox,
+  Gavel,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -138,6 +139,13 @@ export type AgentStudioView =
   //    page. Closes the codeGraph.* UI-consumer gap (7
   //    endpoints shipped at T-G.2.α). ──
   | "code-graph"
+  // ── No-deferral continuation-19 slice 90: Graph Change Proposals
+  //    lifecycle page. Closes the graphChangeProposals.* UI-consumer
+  //    gap (Phase 11.5 — 4-mutation approval workflow:
+  //    submit / approve / reject / withdraw). Mutation-only;
+  //    no listProposals query, so approve/reject/withdraw require
+  //    operator-supplied proposalId. ──
+  | "graph-change-proposals"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -241,6 +249,20 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Approval bus",
     items: [
       { key: "approval-bus-admin", label: "Pubsub Status", icon: Radio },
+    ],
+  },
+  // ── No-deferral continuation-19 slice 90: graph-change-proposals
+  //    lifecycle page. Distinct from the GraphChangeProposalsRetentionPanel
+  //    inside RetrofitPage (which handles the pruning cron); this surfaces
+  //    the lifecycle itself (submit / approve / reject / withdraw). ──
+  {
+    label: "Proposals",
+    items: [
+      {
+        key: "graph-change-proposals",
+        label: "Graph Change Proposals",
+        icon: Gavel,
+      },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
