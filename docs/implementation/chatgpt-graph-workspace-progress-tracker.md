@@ -275,16 +275,16 @@ only to a full Obsidian-like workspace shell with 13 surfaces.
 | Item | Description | Classification |
 |---|---|---|
 | 14 | Full Markdown editor surface | **FULLY IMPLEMENTED** |
-| 15 | Vault explorer / folder tree | **PARTIALLY IMPLEMENTED** (folder nesting deferred — needs `vault.listFoldersInVault`) |
+| 15 | Vault explorer / folder tree | **FULLY IMPLEMENTED** (folder nesting closed by PR #1681 — `vault.listFolders` tRPC + `FolderTree` component; tree shows root-level notes alongside top-level folders, each folder row toggle-able, filter collapses to flat list) |
 | 16 | Note reading/editing/source modes | **FULLY IMPLEMENTED** |
-| 17 | Wikilinks / backlinks UI | **PARTIALLY IMPLEMENTED** (outgoing FULL; backlinks heuristic — projection writer deferred) |
+| 17 | Wikilinks / backlinks UI | **FULLY IMPLEMENTED** (both legs DB-backed via #1482 link-persistence + #1486/#1487 panel rewrite against `ags_vault_wikilinks`; the prior "heuristic" classification was stale once those landed — reclassified 2026-05-20 with no new code work needed) |
 | 18 | Local graph view | **FULLY IMPLEMENTED** |
 | 19 | Global graph view | **FULLY IMPLEMENTED** |
 | 20 | Graph inspector | **FULLY IMPLEMENTED** |
 | 21 | Impact analysis UI backed by traversal | **FULLY IMPLEMENTED** (7 impact_* templates, allow-list enforced) |
 | 22 | Graph quality panel as workspace UX | **FULLY IMPLEMENTED** (reused) |
-| 23 | Runtime trace graph view | **PARTIALLY IMPLEMENTED** (list-view; graph-visual rendering deferred pending graph library approval) |
-| 24 | Decision trace graph view | **PARTIALLY IMPLEMENTED** (same visualization caveat) |
+| 23 | Runtime trace graph view | **FULLY IMPLEMENTED** (graph-visual closed by PR #1682 — `TraceGraphView` radial SVG + view-mode toggle; pure-SVG so no new runtime dep, list-view preserved behind the toggle) |
+| 24 | Decision trace graph view | **FULLY IMPLEMENTED** (same `TraceGraphView` via PR #1682 — `impact_governance` projection shares the toggle with the runtime trace) |
 | 25 | Permission-denied / stale / projection-drift workspace states | **FULLY IMPLEMENTED** (11 closed-taxonomy states) |
 
 Evidence: `docs/evidence/agent-studio-graph-workspace-product-closure-2026-05-17.md`.
