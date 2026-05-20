@@ -2021,3 +2021,55 @@ add a sibling `RecommendationBatchRunnerPanel` mounted below
 the single-kind panel. The shape is similar to slice 78 but the
 form takes an array of `kinds` (multi-select) and the result is
 a `BatchKindResult[]` per-kind discriminator.
+
+## Continuation-16 — recommendBatch UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-15's closure named `recommendBatch` as the next
+target — the last unconsumed endpoint in the `recommendation.*`
+surface.
+
+### Approach
+
+**Sibling panel on the existing page, not a new page.** The
+multi-kind variant lives at the same operator workflow ("I want
+recommendations for an anchor") with a different fanout shape
+("for several kinds at once"). The right UX is a second panel
+on `RecommendationPage` below the single-kind runner — operators
+see the single-kind form first (the primary workflow), and the
+batch panel below for the "show me all kinds at once" power
+mode.
+
+Since this slice doesn't introduce a new page or sidebar entry,
+the 7-point nav-surface checklist doesn't apply. The work is
+just the panel + the mount.
+
+The panel mirrors slice 78's pattern but with:
+- **Multi-kind selector**: checkbox list populated from
+  `listKnownKinds` (operators select 1+ kinds; at least 1
+  required server-side). Order preserved for the request.
+- **Same anchor + workspace + limit + minConfidence inputs.**
+- **Run button** → `recommendBatch` (`query` — same query-with-
+  form pattern via `enabled` gate).
+- **Result rendering**: per-kind sections. Each section header
+  shows the kind's label + `ok | error` pill. `ok` sections
+  render the per-result rows from slice 78's pattern; `error`
+  sections render the `errorMessage` in destructive red.
+- **`graphrag_unavailable` envelope**: same informational banner
+  as the single-kind panel.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 80 | **Open continuation-16 catalogue** | This entry. Names the sibling-panel approach (no new nav-surface). |
+| 81 | **`RecommendationBatchRunnerPanel`** | Multi-kind selector + per-kind result sections + per-kind status pill + mount on RecommendationPage; tests. |
+| 82 | **Continuation-16 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Declares the entire `recommendation.*` surface UI-consumed. |
+
+### Continuation-16 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 80 catalogue | this PR | TBD | Opens continuation-16; sibling-panel pattern |
+| 81 batch panel | TBD | TBD | Multi-kind selector + per-kind sections + per-kind status pill; tests |
+| 82 continuation-16 closure | TBD | TBD | Receipt; declares `recommendation.*` fully UI-consumed |
