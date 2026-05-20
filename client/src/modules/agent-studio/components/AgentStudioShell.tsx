@@ -87,6 +87,13 @@ const GoldenQuestionsPage = lazy(
 const ImpactAnalysisPage = lazy(
   () => import("../pages/ImpactAnalysisPage"),
 );
+// No-deferral continuation-15 slice 78: Recommendation admin page —
+// closes the recommendation.* UI-consumer gap (3 endpoints shipped
+// at T-G.4; slice 78 consumes listKnownKinds + recommend,
+// recommendBatch deferred to continuation-16).
+const RecommendationPage = lazy(
+  () => import("../pages/RecommendationPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -238,6 +245,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-14 slice 75: Impact Analysis admin (no agent context) ──
   if (path.startsWith("/agent-studio/impact-analysis")) {
     return { ...empty, view: "impact-analysis", homeMode: null };
+  }
+  // ── No-deferral continuation-15 slice 78: Recommendation admin (no agent context) ──
+  if (path.startsWith("/agent-studio/recommendation")) {
+    return { ...empty, view: "recommendation", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -482,6 +493,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/impact-analysis");
       return;
     }
+    // No-deferral continuation-15 slice 78: recommendation is a global view.
+    if (key === "recommendation") {
+      navigate("/agent-studio/recommendation");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -617,6 +633,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "impact-analysis":
           return <ImpactAnalysisPage />;
+        // ── No-deferral continuation-15 slice 78: Recommendation admin
+        //    (typed via AgentStudioView). ──
+        case "recommendation":
+          return <RecommendationPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
