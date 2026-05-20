@@ -3349,3 +3349,87 @@ spanning `triggerRun` + run-monitoring (`getRunStats`,
 shape from cont-24: more **run-centric observability** mixed with
 **candidate-promotion workflow**. Two distinct sub-panels likely
 (triggered runs + candidates → promotions).
+
+## Continuation-25 closure receipt (2026-05-20)
+
+The twenty-fifth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1626–#1628. **Third arc
+of the partial-consumer audit cycle** — the **largest unconsumed-
+endpoint count** yet (8 endpoints across 4 functional groups).
+Closes `semanticEnrichment.*` (3/11 → 11/11).
+
+### Continuation-25 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 107 catalogue | #1626 | TBD | Opens continuation-25; 8-endpoint largest arc |
+| 108 SemanticEnrichmentPanel + page | #1627 | TBD | 8 endpoints consumed; 4-card panel (trigger / runs / detail+bulk / exploration); 7-point nav wiring; 8 nav-surface tests |
+| 109 continuation-25 closure | #1628 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-25 carry-forward lessons
+
+1. **8-endpoint arcs benefit from explicit functional grouping
+   in the catalogue.** Cont-24's catalogue listed 10 endpoints as
+   a flat table; cont-25's catalogue grouped 8 endpoints into 4
+   functional clusters (trigger / run monitoring / candidate
+   exploration / bulk promotion). The grouped catalogue mapped
+   directly to the panel's 4-card layout and made the cross-
+   endpoint invariants visible (e.g. `selectedRunId` shared by
+   getRunStats + listProposals; `proposalKind` shared by
+   listCandidatesByKind + listRecentRejectionsByKind). Lesson:
+   **for arcs ≥ 6 endpoints, group the catalogue table by
+   functional cluster up-front** — the grouping survives into
+   the panel cards 1:1 and surfaces shared-state invariants
+   early.
+2. **`enabled`-gated sibling queries on the same key are the
+   default master-detail composition primitive.** RunDetailSection
+   has TWO queries (`getRunStats` + `listProposals`) both keyed
+   on `runId`. Cont-24 had the same pattern (`get` + `listAudit`
+   both keyed on `proposalId`). The composition is always: parent
+   passes the master key down → both queries fire in parallel →
+   both render in the detail card → mutations invalidate both.
+   No need to combine into a single tRPC procedure server-side;
+   the two-query parallel-fire is fine. Lesson: **don't fold
+   parallel sibling queries server-side** — keep them distinct;
+   the client composes via parent-passed key.
+3. **Inline option-list tabs work for paired read-only surfaces
+   keyed on a shared filter.** KindExplorationSection has TWO
+   sub-sections (Candidates + Recent rejections) both keyed on
+   `proposalKind`. First instinct was to add a tab widget; right
+   shape was to render both stacked in the same card with their
+   own headers — the operator visually scans both at once
+   without a click. Tabs add chrome without value when both
+   sub-sections are short. Lesson: **when paired read-only views
+   share a filter and both fit on one viewport, render them
+   stacked, not tabbed** — fewer clicks, faster scan.
+
+After this slice, the no-deferral mission has shipped **109
+slices across 25 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25).
+
+### Partial-consumer audit status (post-cont-25)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 3 | `promotion`, `graphCorrection`, `semanticEnrichment` |
+| Remaining | 15 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphQuality / graphSkill / graphWorkspace / providerBindings / racEvaluation / toolApprovals / toolKnowledge / vault / workspaceObservability |
+
+### Next-arc target: graphQuality
+
+`graphQuality` is 10/22 consumed — **the largest saturation gap
+remaining** (12 unconsumed endpoints). Candidate endpoints
+include `runAgent` / `runScan` / `listScans` / `getScan` /
+`listAgentRuns` / `applyApprovedProposal` / `approveAndApply` /
+`getFinding` / `getOperatorDashboard` / `listAppliedProposals` /
+`listRegisteredScanKinds` / `verifyProposalApply`. This is even
+larger than cont-25 but follows the same shape (trigger + run
+monitoring + apply-mutation workflow). Per cont-25 lesson #1,
+the catalogue should group these into functional clusters
+up-front.
