@@ -1531,3 +1531,63 @@ Continuation-12 should add a UI consumer for slice 44's
 - What feedback? The mutation returns the run id + per-suite
   outcomes; the UI should surface that as a toast + optionally
   link to a results page (its own slice if shipped).
+
+## Continuation-12 — triggerLiveEvaluation UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-11's closure named slice 44's
+`goldenQuestions.triggerLiveEvaluation` as the next target.
+
+### Re-audit findings
+
+`grep -rln "goldenQuestions\." client/src/` returns **zero**
+matches. The entire `goldenQuestions.*` tRPC surface — 6 read
+endpoints + 1 mutation — ships server-side without any UI
+consumer at all. The gap is larger than just the mutation:
+
+| tRPC | Server slice | UI consumer |
+|---|---|---|
+| `listSuites` | T-D.5.α | none |
+| `listQuestionsInSuite` | T-D.5.α | none |
+| `listRecentRuns` | T-D.5.γ | none |
+| `getRunStats` | T-D.5.γ | none |
+| `listRunResults` | T-D.5.γ | none |
+| `getQuestionDetail` | T-D.5.δ | none |
+| `triggerLiveEvaluation` | 44 (cont-4) | **target** |
+
+Continuation-12 picks the **trigger mutation** as the highest-
+leverage UI: an operator's first action with golden questions
+is "run an evaluation", not "browse the history". Pairing it
+with a `listSuites` dropdown gives operators a discoverable
+form (no need to memorize `suiteKey` literals). Recent-runs +
+per-run drill-down UI are continuation-13+ candidates.
+
+### Approach
+
+Standalone page (mirrors slice 53 `VaultTemplatesPage` + slice
+63 nav wiring). Following the continuation-10 completion-audit
+7-point checklist in **one** slice this time, not in two:
+
+1. Page file: `GoldenQuestionsPage.tsx`
+2. Lazy import in `AgentStudioShell.tsx`
+3. Path resolver: `/agent-studio/golden-questions` → `view`
+4. View switch case
+5. Navigation-key dispatch
+6. `AgentStudioView` discriminated-union entry
+7. Sidebar group entry (under a new "Evaluation" group)
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 68 | **Open continuation-12 catalogue** | This entry. Picks the standalone-page approach + the 7-point completion-audit checklist. |
+| 69 | **GoldenQuestionsTriggerPanel + standalone page** | Form (provider connection / model ref / workspace / actor / suite dropdown / timeout) → `triggerLiveEvaluation`; sonner toast with summary on success; full 7-point nav-surface wiring; tests. |
+| 70 | **Continuation-12 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-13 target (recent-runs + drill-in UI) OR declares cycle complete. |
+
+### Continuation-12 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 68 catalogue | this PR | TBD | Opens continuation-12; standalone-page approach |
+| 69 trigger panel + page | TBD | TBD | Full 7-point nav-surface wiring + form + mutation + tests |
+| 70 continuation-12 closure | TBD | TBD | Receipt + next-arc target |
