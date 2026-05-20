@@ -1695,10 +1695,88 @@ Master-detail with progressive disclosure:
 | 72 | **`GoldenQuestionsRecentRunsPanel`** | Master-detail panel + mount below trigger panel on `GoldenQuestionsPage`; tests. |
 | 73 | **Continuation-13 closure receipt** | Per-slice merge SHAs + carry-forward lessons. All 7 `goldenQuestions.*` endpoints have UI consumers — the audit cycle closes for golden-questions. |
 
+## Continuation-13 closure receipt (2026-05-20)
+
+The thirteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1590–#1592. Closes the
+remaining 4 unconsumed `goldenQuestions.*` read endpoints
+(`listRecentRuns` / `getRunStats` / `listRunResults` /
+`getQuestionDetail`) via a master-detail panel mounted below the
+trigger panel on `GoldenQuestionsPage`.
+
+After this arc, **all 7 `goldenQuestions.*` tRPC endpoints have
+UI consumers**:
+
+| tRPC | UI consumer | Shipped in |
+|---|---|---|
+| `listSuites` | `GoldenQuestionsTriggerPanel` suite dropdown + `GoldenQuestionsRecentRunsPanel` suite filter | slice 69 + 72 |
+| `triggerLiveEvaluation` | `GoldenQuestionsTriggerPanel` Run button | slice 69 |
+| `listRecentRuns` | `GoldenQuestionsRecentRunsPanel` master list | slice 72 |
+| `getRunStats` | Detail badge row on selected run | slice 72 |
+| `listRunResults` | Per-question PASS/FAIL table | slice 72 |
+| `getQuestionDetail` | Expandable result row inline detail | slice 72 |
+| `listQuestionsInSuite` | _none_ — see lesson #1 | — |
+
 ### Continuation-13 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 71 catalogue | this PR | TBD | Opens continuation-13; recent-runs master-detail design |
-| 72 recent-runs panel | TBD | TBD | Panel + page mount + tests; 4 endpoint consumers |
-| 73 continuation-13 closure | TBD | TBD | Receipt + audit-cycle closure for golden-questions |
+| 71 catalogue | #1590 | `8c75ff3e` | Opens continuation-13; master-detail design + 4-endpoint consumer plan |
+| 72 recent-runs panel | #1591 | `a300e3e2` | Master-detail panel + page mount + 10 test cases; consumes 4 endpoints |
+| 73 continuation-13 closure | this PR | TBD | Receipt + golden-questions audit-cycle closure |
+
+### Continuation-13 carry-forward lessons
+
+1. **"All endpoints UI-consumed" is the wrong success metric;
+   "all operator workflows reachable" is the right one.** The
+   `listQuestionsInSuite` endpoint still has no UI consumer
+   after slice 72. But operators don't need it — the trigger
+   panel surfaces the suite-key list (via `listSuites`) and
+   per-question detail flows from a RESULT row (via
+   `getQuestionDetail`), not from an arbitrary "browse all
+   questions in a suite" path. The endpoint exists for an
+   anticipated future operator workflow (suite-level
+   curation/editing) that isn't shipped yet. Lesson: when
+   declaring a tRPC surface "UI-consumed", **enumerate the
+   operator workflows** the consumers cover; don't just count
+   endpoints. Un-consumed endpoints aren't gaps if their
+   workflow isn't a thing yet.
+2. **Master-detail with progressive disclosure is the right
+   default for "list + drill" surfaces.** Three levels —
+   list (master), aggregated stats (detail level 1), per-row
+   detail (detail level 2 = expanded inline) — let the panel
+   render with one selected run + zero expanded results in
+   the default state, and grow only on operator interaction.
+   The `enabled: selectedRunId !== null` and
+   `enabled: expandedQuestionId !== null` gates on the tRPC
+   queries mean we don't pay for the detail fetches until the
+   operator actually wants the data. Lesson: for new
+   master-detail surfaces, **default to progressive disclosure
+   + `enabled` gates** so the panel is fast at first paint and
+   only fetches what the operator clicked.
+3. **Click handlers belong on a known testid, not on bubbling
+   parents.** Slice 72's tests initially clicked the outer
+   result-row `<li>` (which had a `data-testid` but no onClick).
+   The click wasn't reaching the inner div's onClick because
+   the `<li>` is the click target, not a descendant of the
+   inner div. The fix: give the click-target div its own
+   `data-testid="...-toggle"` so the test fires the click on
+   the actual handler-owning element. Lesson: when a row's
+   click expands an inline detail, **the test should target the
+   click-handler element directly**, not the row container.
+
+After this slice, the no-deferral mission has shipped **73
+slices across 13 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13).
+
+### Next-arc target
+
+The golden-questions UI-consumer cycle is **closed**.
+Continuation-14 should re-run the UI-consumer audit across the
+broader Agent Studio tRPC surface — find OTHER backend-first
+mutations + drillable read-surfaces that landed without UI
+consumers. A grep over `client/src/` for
+`agentStudio.<router>.<endpoint>.useQuery|useMutation` patterns
+vs the full router export should surface candidates.
