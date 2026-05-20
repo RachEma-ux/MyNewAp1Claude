@@ -48,6 +48,7 @@ import {
   Table2,
   Inbox,
   Gavel,
+  FileStack,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -212,6 +213,11 @@ export type AgentStudioView =
   //    graphAgent endpoints (health / run / exportTraceMarkdown /
   //    exportTraceToNote). ──
   | "graph-agent-admin"
+  // ── No-deferral continuation-32 slice 129: Graph Skill Admin.
+  //    Tenth arc of the partial-consumer audit cycle. Closes 3
+  //    graphSkill endpoints (listPackVersions / createPack /
+  //    publishVersion). ──
+  | "graph-skill-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -469,6 +475,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "graph-agent-admin",
         label: "Run + Export",
         icon: Brain,
+      },
+    ],
+  },
+  // ── No-deferral continuation-32 slice 129: graph-skill-admin page.
+  //    Tenth arc of the partial-consumer audit cycle. Pack-version
+  //    inventory + governed create + governed publish. ──
+  {
+    label: "Graph Skills",
+    items: [
+      {
+        key: "graph-skill-admin",
+        label: "Pack Admin",
+        icon: FileStack,
       },
     ],
   },
