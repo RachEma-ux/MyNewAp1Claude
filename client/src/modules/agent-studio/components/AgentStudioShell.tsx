@@ -159,6 +159,13 @@ const GraphQualityPage = lazy(
 // long-tail operator surface (membership / attachments / saved
 // views / templates / notes & search).
 const VaultAdminPage = lazy(() => import("../pages/VaultAdminPage"));
+// No-deferral continuation-28 slice 117: Workspace Observability
+// admin page — sixth arc of the partial-consumer audit cycle.
+// 18-endpoint long-tail operator surface (notifications + background
+// jobs + error events).
+const WorkspaceObservabilityPage = lazy(
+  () => import("../pages/WorkspaceObservabilityPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -364,6 +371,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-27 slice 114: Vault Admin (no agent context) ──
   if (path.startsWith("/agent-studio/vault-admin")) {
     return { ...empty, view: "vault-admin", homeMode: null };
+  }
+  // ── No-deferral continuation-28 slice 117: Workspace Observability (no agent context) ──
+  if (path.startsWith("/agent-studio/workspace-observability")) {
+    return { ...empty, view: "workspace-observability", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -668,6 +679,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/vault-admin");
       return;
     }
+    // No-deferral continuation-28 slice 117: workspace-observability is a global view.
+    if (key === "workspace-observability") {
+      navigate("/agent-studio/workspace-observability");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -851,6 +867,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "vault-admin":
           return <VaultAdminPage />;
+        // ── No-deferral continuation-28 slice 117: Workspace Observability
+        //    (typed via AgentStudioView). ──
+        case "workspace-observability":
+          return <WorkspaceObservabilityPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

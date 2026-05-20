@@ -192,6 +192,11 @@ export type AgentStudioView =
   //    vault endpoints across 5 functional groups (membership,
   //    attachments, saved views, templates, notes & search). ──
   | "vault-admin"
+  // ── No-deferral continuation-28 slice 117: Workspace Observability.
+  //    Sixth arc of the partial-consumer audit cycle. Closes 18
+  //    workspaceObservability endpoints (notifications + background
+  //    jobs + error events). ──
+  | "workspace-observability"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -399,6 +404,19 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Vault Admin",
     items: [
       { key: "vault-admin", label: "Operator", icon: BookOpen },
+    ],
+  },
+  // ── No-deferral continuation-28 slice 117: workspace-observability page.
+  //    Sixth arc of the partial-consumer audit cycle. Operator
+  //    observability for notifications / background jobs / error events. ──
+  {
+    label: "Observability",
+    items: [
+      {
+        key: "workspace-observability",
+        label: "Notifications + Jobs",
+        icon: Activity,
+      },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
