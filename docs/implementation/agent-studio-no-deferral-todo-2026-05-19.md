@@ -4217,3 +4217,34 @@ the partial-consumer remainder from cont-21's zero-consumer arc),
 `toolApprovals` (2/4 = 2), `racEvaluation` (2/3 = 1),
 `toolKnowledge` (1/2 = 1), `goldenQuestions` (6/7 = 1),
 `graphProjection` (4/6 = 2).
+
+## Continuation-31 — graphAgent operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Ninth arc of the partial-consumer audit cycle. `graphAgent`
+(4/8 → 8/8) — 4 unconsumed endpoints across 3 functional groups.
+
+### Re-audit findings
+
+`graphAgent.*` has 8 endpoints; 4 already consumed (existing
+graph-workspace surfaces). The 4 unconsumed:
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `health` | query | `{ ok, agentKey }` — no input |
+| `run` | mutation | query + agentKey enum (graph_agent_lite/advanced) + retrievalPreference (5-value) + maxSteps + modelHint? |
+| `exportTraceMarkdown` | query | runId + title? + redact? |
+| `exportTraceToNote` | mutation | runId + vaultId + folderId? + title? + redact? + overwrite? |
+
+### Approach
+
+3-card panel: **Health** (no-input ping), **Run** (LLM agent
+trigger), **Export trace** (markdown export + export-to-vault-note).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 125 | **Open continuation-31 catalogue** | This entry. 4-endpoint 3-card arc. |
+| 126 | **`GraphAgentAdminPanel` + page** | 3-card panel; full 7-point nav wiring; tests. |
+| 127 | **Continuation-31 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
