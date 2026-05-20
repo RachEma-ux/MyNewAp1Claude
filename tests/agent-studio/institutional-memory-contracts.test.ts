@@ -61,12 +61,16 @@ describe("Source-table mapping coverage", () => {
       ["team", "workspace_members"],
       ["project", "workspaces"],
       ["decision", "ags_approval_steps"],
-      ["policy", "ags_governance_records"],
+      // 2026-05-20: policy + governance_record repointed from the
+      // never-shipped `ags_governance_records` table to the real
+      // `ags_approval_steps`. The runner dedupes by approver_role for
+      // policy and keeps one node per row for governance_record.
+      ["policy", "ags_approval_steps"],
       ["workflow", "workflows"],
       ["document", "ags_vault_notes"],
       ["outcome", "ags_runtime_runs"],
       ["timeline_event", "ags_runtime_runs"],
-      ["governance_record", "ags_governance_records"],
+      ["governance_record", "ags_approval_steps"],
     ]);
     for (const [type, table] of expected.entries()) {
       expect(

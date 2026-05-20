@@ -515,6 +515,41 @@ aggregation), or wait on SoT tables that don't yet exist
 The natural next pivot is T-G.2 (code-graph parser) or a different
 roadmap track — not more T-G.1 slices.
 
+**2026-05-20 closure update:** Items 17/18/19 from the
+post-#1404 audit are now CLOSED:
+
+- **Item 17 — 3 of the remaining types now wired:** `team`,
+  `policy`, `governance_record`. Runner has read-row shapes +
+  handlers for all three. `policy` + `governance_record` were
+  repointed from the never-shipped `ags_governance_records`
+  table to the real `ags_approval_steps` (policy dedupes by
+  `approver_role`, governance_record keeps one node per row).
+  The remaining 3 unwired types (`system` / `service` /
+  `responsibility`) still wait on dedicated SoT tables —
+  recorded as PARTIALLY mapped, no longer "blocked by a missing
+  table that PR #1404 named as the gap."
+- **Item 18 — ASDB reader saturation:** the original reader
+  populated only `agents`. The 2026-05-20 reader populates
+  every read field the runner consumes — agents / workflows /
+  persons / projects / decisions / outcomes / timelineEvents /
+  documents / teams / policies / governanceRecords. The
+  carve-out for `users` closes; the reader uses both the ASDB
+  handle (for `agents` / `agsApprovalSteps` / `agsRuntimeRuns` /
+  `agsVaultNotes`) and a main-DB handle (for `users` /
+  `workspaces` / `workspaceMembers` / `workflows`). When the
+  main DB isn't reachable the reader degrades gracefully — the
+  ASDB-resident slice still returns.
+- **Item 19 — Cross-node edges:** 9 new edge typeKeys land
+  beside the legacy `owned_by` + `belongs_to_domain` pair:
+  `owns_agent` (person → agent), `owns_workflow` (person →
+  workflow), `contains_workflow` (project → workflow),
+  `contains_document` (project → document), `produced_outcome`
+  (agent → outcome), `member_of` (person → team), `works_on`
+  (team → project), `enforces` (governance_record → policy),
+  `audits` (decision → governance_record). Every edge is
+  emitted only when both endpoints exist in the snapshot —
+  preserves the "no dangling edges" invariant.
+
 ## 17. T-G.2 Code Graph operator-facing tRPC surface (2026-05-17)
 
 Pivot from T-G.1 to T-G.2 per §16 recommendation. Prior to this
