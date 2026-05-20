@@ -134,6 +134,13 @@ const McpSchemaSyncPage = lazy(
 const PromotionLifecyclePage = lazy(
   () => import("../pages/PromotionLifecyclePage"),
 );
+// No-deferral continuation-24 slice 105: Graph Correction admin
+// page — second arc of the partial-consumer audit cycle. 10-endpoint
+// master-detail (list/get/listAudit + lifecycle + bulk) distinct
+// from the existing retention panel.
+const GraphCorrectionPage = lazy(
+  () => import("../pages/GraphCorrectionPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -317,6 +324,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-23 slice 102: Promotion Lifecycle admin (no agent context) ──
   if (path.startsWith("/agent-studio/promotion-lifecycle")) {
     return { ...empty, view: "promotion-lifecycle", homeMode: null };
+  }
+  // ── No-deferral continuation-24 slice 105: Graph Correction admin (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-correction")) {
+    return { ...empty, view: "graph-correction", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -601,6 +612,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/promotion-lifecycle");
       return;
     }
+    // No-deferral continuation-24 slice 105: graph-correction is a global view.
+    if (key === "graph-correction") {
+      navigate("/agent-studio/graph-correction");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -768,6 +784,10 @@ export default function AgentStudioShell() {
         //    admin (typed via AgentStudioView). ──
         case "promotion-lifecycle":
           return <PromotionLifecyclePage />;
+        // ── No-deferral continuation-24 slice 105: Graph Correction
+        //    admin (typed via AgentStudioView). ──
+        case "graph-correction":
+          return <GraphCorrectionPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
