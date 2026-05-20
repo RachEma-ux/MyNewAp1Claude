@@ -3984,3 +3984,41 @@ pick from the next-largest absolute gap — `canvas` (3/9 = 6
 unconsumed) or `cag` (4/7 = 3 unconsumed) are the simplest
 remaining targets; `providerBindings` (7/11 = 4 unconsumed)
 is a good infra-adjacent arc.
+
+## Continuation-29 — providerBindings operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Seventh arc of the partial-consumer audit cycle. Cont-28's closure
+named `providerBindings` (7/11 → 11/11) as an infra-adjacent
+target with 4 unconsumed endpoints.
+
+### Re-audit findings
+
+`providerBindings.*` has 11 endpoints; 7 already consumed by
+the existing per-agent binding picker (Phase 14). The 4
+unconsumed endpoints split into 3 functional groups:
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listForAgent` | query | agentId → public no-secret projection |
+| `remove` | mutation | (draftId, role?) — idempotent |
+| `resolveForRun` | query | (draftId, role?) → runtime refs (no credentials) |
+| `testRunWithBinding` | mutation | (draftId, role?, workspaceId, prompt, systemPrompt?, intent?, temperature?, tokenBudget?, correlationId?) — Phase 16 test-run with policy + Model Access gate |
+
+### Approach
+
+`ProviderBindingsAdminPanel` will have 3 cards:
+
+- **List for agent** — agentId input → list (no-secret projection).
+- **Resolve + Remove by binding key** — `(draftId, role?)` shared
+  input + 2 actions (Resolve query → JSON, Remove mutation).
+- **Test run with binding** — (draftId, role?, workspaceId, prompt
+  + optional knobs) → mutation result.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 119 | **Open continuation-29 catalogue** | This entry. Smallest-yet partial-consumer arc (4 endpoints, 3 cards). |
+| 120 | **`ProviderBindingsAdminPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
+| 121 | **Continuation-29 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
