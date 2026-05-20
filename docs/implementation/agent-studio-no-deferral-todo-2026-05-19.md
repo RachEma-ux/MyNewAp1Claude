@@ -2902,3 +2902,80 @@ discover further zero-consumer surfaces (e.g. mounted routers
 with zero `client/src/**` references in the production tree)
 or shift to deprecation arcs (e.g. retire the α-shell once
 operator parity is proven on the canonical CRUD).
+
+## Continuation-22 closure receipt (2026-05-20)
+
+The twenty-second continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1617–#1619. Closes the
+`mcpSchemaSync.*` UI-consumer gap (Retrofit P11 governed
+mutation) — discovered as the **lone new zero-consumer** in the
+post-cont-21 re-audit.
+
+### Continuation-22 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 98 catalogue | #1617 | TBD | Opens continuation-22; names smallest-arc shape (single governed mutation) |
+| 99 McpSchemaSyncPanel + page | #1618 | TBD | 1 mutation consumed; 7-point nav wiring; 13 unit + 8 nav-surface tests |
+| 100 continuation-22 closure | #1619 | TBD | Receipt + post-arc audit decision |
+
+### Continuation-22 carry-forward lessons
+
+1. **The smallest viable arc is still a full 3-slice arc.** This
+   was tempting to collapse into a single PR — one new component,
+   one mutation, no master-detail. Resisting and keeping the 3-PR
+   shape (catalogue → panel → closure) was the right call: the
+   catalogue documented the **governed-procedure** vs.
+   protected-procedure distinction up-front (operators who hit
+   `FORBIDDEN` need to know it isn't a router bug), and the
+   closure-receipt SHAs let future audits cross-reference. The
+   3-slice template is the floor, not a target — even single-
+   endpoint arcs benefit from it.
+2. **Tolerant validators carry the contract.** The `parseToolsArray`
+   helper does five distinct checks (parseable JSON, top-level
+   array, ≤1000 entries, non-empty string name on each entry,
+   object `inputSchema` when present). Each rejection re-routes
+   to the same `mss-tools-error` test id — operators get one
+   error envelope per category but the helper enforces the
+   server-side schema's shape before the network call. This
+   beats sending malformed JSON to a `BAD_REQUEST` round-trip.
+   Lesson: **mirror server-side input shape constraints in the
+   form-level validator** for free pre-flight protection.
+3. **Re-audit cadence: post-arc, not post-batch.** The cont-21
+   closure receipt named the slice-83 audit close-out and
+   speculated about "future audit cycles." The right cadence
+   turned out to be **per-arc**: run the audit immediately after
+   each closure, not at some batched milestone. That surfaced
+   `mcpSchemaSync` within minutes of cont-21's merge and let
+   the no-deferral mission keep moving without a planning beat.
+   Lesson: **audits are cheap; run them at every closure.**
+
+After this slice, the no-deferral mission has shipped **100
+slices across 22 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22). The 100-slice milestone.
+
+### Post-arc audit (continuation-22)
+
+Re-running the audit `grep "trpc.agentStudio.X." client/src/`
+against all 68 mounted sub-routers after cont-22 ships finds
+**zero new zero-consumer routers**. The slice-83 audit
+close-out, extended by cont-22's mcpSchemaSync close-out, is
+complete: all 68 mounted sub-routers now have at least one
+production-client consumer.
+
+The next arc may either:
+- Pivot to **partial-consumer audit** (routers with only 1 of
+  N endpoints consumed — gaps within otherwise-wired routers),
+- Pivot to **deprecation** (e.g. retire the T-F.91 / T-F.2-α
+  saved-view Bases α-shell once operator parity is proven on
+  the canonical CRUD), or
+- Pivot to **operator-discoverability** (e.g. dashboard /
+  command-palette / search surface that surfaces the 100+
+  Agent Studio pages efficiently).
+
+The user's next directive will select.
