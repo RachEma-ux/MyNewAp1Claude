@@ -4749,3 +4749,5 @@ Sixteenth arc. toolKnowledge (1/2 → 2/2) — 1 unconsumed (getTool). Panel-ext
 ## Cont-38 closure receipt — toolKnowledge 1/2 → 2/2 closed via #1665/#1666/#1667. 5 lessons (retry:false on NOT_FOUND / <details> for nested JSON / mirror-not-found errors / finite cycle / composite-key hoisting). Penultimate arc.
 
 ## Cont-39 catalogue — graphWorkspace utilities (FINAL arc). 3 unconsumed (backendHealth + neighborhood + shortestPath). New-page admin surface. Slices 149/150/151.
+
+## CYCLE CLOSE — partial-consumer audit COMPLETE. All 17 routers 100% UI-consumed. Cycle PR range #1644-#1670. **Authority discharged.**
