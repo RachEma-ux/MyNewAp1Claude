@@ -119,6 +119,11 @@ export type AgentStudioView =
   //    gap and opens the operator entry point for the broader
   //    `goldenQuestions.*` tRPC surface (6 reads + 1 mutation). ──
   | "golden-questions"
+  // ── No-deferral continuation-14 slice 75: Impact Analysis admin
+  //    page. Closes the impactAnalysis.* UI-consumer gap (3
+  //    endpoints shipped at T-G.5.α + the no-deferral slice 29
+  //    template registry). ──
+  | "impact-analysis"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -238,11 +243,13 @@ const HOME_GROUPS: SectionGroup[] = [
       { key: "graph-health-admin", label: "Alerts + Cron", icon: HeartPulse },
     ],
   },
-  // ── T-F.62: graph-lens browser ──
+  // ── T-F.62: graph-lens browser + continuation-14 slice 75
+  //    impact-analysis ──
   {
     label: "Lenses",
     items: [
       { key: "graph-lens-browser", label: "Lens Browser", icon: Telescope },
+      { key: "impact-analysis", label: "Impact Analysis", icon: Network },
     ],
   },
   // ── T-F.82 (T-F.4-α): graph-quality findings ──

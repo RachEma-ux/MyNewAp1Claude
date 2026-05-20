@@ -81,6 +81,12 @@ const VaultTemplatesPage = lazy(() => import("../pages/VaultTemplatesPage"));
 const GoldenQuestionsPage = lazy(
   () => import("../pages/GoldenQuestionsPage"),
 );
+// No-deferral continuation-14 slice 75: Impact Analysis admin page —
+// closes the impactAnalysis.* UI-consumer gap (3 endpoints shipped
+// at T-G.5.α + the no-deferral slice 29 template registry).
+const ImpactAnalysisPage = lazy(
+  () => import("../pages/ImpactAnalysisPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -228,6 +234,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-12 slice 69: Golden Questions admin (no agent context) ──
   if (path.startsWith("/agent-studio/golden-questions")) {
     return { ...empty, view: "golden-questions", homeMode: null };
+  }
+  // ── No-deferral continuation-14 slice 75: Impact Analysis admin (no agent context) ──
+  if (path.startsWith("/agent-studio/impact-analysis")) {
+    return { ...empty, view: "impact-analysis", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -467,6 +477,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/golden-questions");
       return;
     }
+    // No-deferral continuation-14 slice 75: impact-analysis is a global view.
+    if (key === "impact-analysis") {
+      navigate("/agent-studio/impact-analysis");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -598,6 +613,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "golden-questions":
           return <GoldenQuestionsPage />;
+        // ── No-deferral continuation-14 slice 75: Impact Analysis admin
+        //    (typed via AgentStudioView). ──
+        case "impact-analysis":
+          return <ImpactAnalysisPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
