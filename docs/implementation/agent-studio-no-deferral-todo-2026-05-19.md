@@ -1948,10 +1948,76 @@ natural home for anchor-based traversal/recommendation surfaces).
 | 78 | **`RecommendationRunnerPanel` + page** | Standalone page; 3-endpoint consumer (`recommend` + `listKnownKinds`; `recommendBatch` is the multi-kind extension that's a continuation-16 candidate); full 7-point nav-surface wiring; tests. |
 | 79 | **Continuation-15 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-16 target. |
 
+## Continuation-15 closure receipt (2026-05-20)
+
+The fifteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1596–#1598. Closes the
+`recommendation.*` UI-consumer gap from the continuation-14
+broad audit. 2 of 3 endpoints (`listKnownKinds` + `recommend`)
+now have UI consumers via the new `RecommendationRunnerPanel` +
+`RecommendationPage` — mounted under the Lenses sidebar group
+alongside Impact Analysis.
+
 ### Continuation-15 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 77 catalogue | this PR | TBD | Opens continuation-15; recommendation router UI-consumer arc |
-| 78 recommendation panel + page | TBD | TBD | 2-endpoint consumer (recommend + listKnownKinds) + 7-point nav wiring |
-| 79 continuation-15 closure | TBD | TBD | Receipt + continuation-16 target |
+| 77 catalogue | #1596 | `5e33021f` | Opens continuation-15; recommendation router arc |
+| 78 recommendation panel + page | #1597 | `044d087b` | 2 endpoints consumed; 7-point nav wiring; 22 tests |
+| 79 continuation-15 closure | this PR | TBD | Receipt + continuation-16 target |
+
+### Continuation-15 carry-forward lessons
+
+1. **Pattern replication is the right outcome of a successful
+   slice.** Slice 78 is structurally identical to slice 75 —
+   form with kind dropdown + anchor + Run → query-with-form
+   pattern → envelope-aware result rendering. The cost dropped
+   from "design + implement" to "replicate + adapt": the
+   recommendation panel reused slice 75's `parsePositiveInt` +
+   submit-snapshot + `enabled` gate + mode pill patterns
+   verbatim. Lesson: when two backend surfaces have similar
+   shapes (kind dropdown + anchor + result), **the second
+   slice's job is to confirm + extend the pattern**, not
+   re-design. Source-scan tests of "all 7 nav-surface items"
+   become near-mechanical to write.
+2. **Envelope discriminators deserve dedicated empty-states.**
+   `recommend`'s `"graphrag_unavailable"` envelope isn't an
+   error — it's a legitimate operator state ("GraphRAG backend
+   isn't installed in this environment"). Rendering it as a
+   plain error toast would be misleading. The panel uses a
+   muted-foreground informational banner instead — clearly
+   distinct from the destructive-red error path. Lesson: when
+   the envelope's `status` discriminator distinguishes "data
+   unavailable" from "actual error", **render each
+   discriminator's empty-state separately** (informational
+   gray vs destructive red).
+3. **Permission-pill semantics matter for redaction-aware
+   surfaces.** The `recommend` response carries 3 permission
+   statuses (`visible` / `redacted` / `hidden`) and 2 hidden
+   counts (`redactedCount` + `fullyHiddenCount`). The panel
+   renders each `visible` row in full, `redacted` rows with an
+   amber pill + the redacted reason + empty citations, and
+   `hidden` rows are dropped server-side. The amber "N redacted,
+   M fully hidden" banner sits at the result-header level so
+   operators see "search ran wider than you can see" without
+   any specific node leaking. Lesson: when a surface mixes
+   visible + redacted + hidden results, **dedicate a banner for
+   the cumulative redacted-count signal** + per-row pills for
+   individual permission status — both surfaces are needed.
+
+After this slice, the no-deferral mission has shipped **79
+slices across 15 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15).
+
+### Next-arc target: recommendBatch UI consumer
+
+`recommendation.recommendBatch` (multi-kind recommend in one
+round-trip) still has no UI consumer. Continuation-16 should
+extend `RecommendationRunnerPanel` with a "multi-kind" tab — or
+add a sibling `RecommendationBatchRunnerPanel` mounted below
+the single-kind panel. The shape is similar to slice 78 but the
+form takes an array of `kinds` (multi-select) and the result is
+a `BatchKindResult[]` per-kind discriminator.
