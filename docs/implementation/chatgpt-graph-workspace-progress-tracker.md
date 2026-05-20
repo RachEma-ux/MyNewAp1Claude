@@ -249,7 +249,7 @@ Honest classification of the **13 previously-stubbed methods**:
 | `enqueueProjectionJob` | returned `{jobId: 0}` | **FULLY IMPLEMENTED** (real ASDB insert into `ags_graph_projection_sync_jobs`) |
 | `takeSnapshot` | returned `{snapshotId: ""}` | **FULLY IMPLEMENTED** (Neo4j counts + ASDB row in `ags_graph_projection_snapshots`) |
 | `detectDrift` | returned empty array | **FULLY IMPLEMENTED** (reads unresolved drift events + failed sync jobs) |
-| `rebuildProjection` | returned zero result | **PARTIALLY IMPLEMENTED** (records rebuild row + queues for worker-side SoT replay; counts come from the worker) |
+| `rebuildProjection` | returned zero result | **FULLY IMPLEMENTED** (closed-taxonomy scope replay via `replayProjectionScope` — loads vault_notes / wikilinks / bases from Postgres SoT, feeds synthetic ProjectionEvents through `ProjectionSyncWorker`, returns real counts and lands per-source `counts` + `writes` in the rebuild row's summary; row status flows `running` → `completed`/`failed`) |
 | `runAlgorithm` | returned empty rows | **FULLY IMPLEMENTED** (allow-list `shortest_path` + throws `GraphCapabilityUnsupportedError` for unsupported keys — no false-empty success) |
 | `filterByPermissions` | pass-through | **FULLY IMPLEMENTED** (Neo4j round-trip per id + safe-default-deny + workspace/governance/visibility/sensitivity rules) |
 | `isVisibleToUser` | returned `true` | **FULLY IMPLEMENTED** (single-node visibility query routed through `isVisibleToRuntime`) |

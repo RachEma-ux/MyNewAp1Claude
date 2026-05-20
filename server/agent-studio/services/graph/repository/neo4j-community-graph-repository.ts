@@ -86,6 +86,7 @@ import type {
 } from "./types.js";
 import { GraphCapabilityUnsupportedError } from "./types.js";
 import { NEO4J_CE_CAPABILITIES } from "./capabilities.js";
+import type { ReplayCounts } from "../projection/rebuild-replay.js";
 
 // ============================================================================
 // Resolver + executor seams
@@ -761,34 +762,77 @@ export class Neo4jCommunityGraphRepository implements GraphRepository {
       .returning({ id: agsGraphProjectionRebuilds.id });
 
     const tStart = this.now();
-    // CE-level rebuild: this is the wiring point. A production
-    // rebuild reads from Postgres SoT, replays projection writes via
-    // applyProjectionJob. The scope decoding (which projection kind
-    // to rebuild) is delegated to downstream workers reading the
-    // rebuild row's `scope` column; this method records the intent
-    // and returns a zero-counts result so the caller's contract
-    // (ProjectionResult shape) is honoured. Worker-side replay
-    // lands updated counts back to `agsGraphProjectionSyncResults`.
-    const result: ProjectionResult = {
-      nodesCreated: 0,
-      nodesUpdated: 0,
-      nodesDeleted: 0,
-      edgesCreated: 0,
-      edgesUpdated: 0,
-      edgesDeleted: 0,
-      durationMs: this.now() - tStart,
-      errors: [],
-    };
+    // Closes the partial-implementation gap (PR #1397 item 14):
+    // synchronous worker-side replay against Postgres SoT. The replay
+    // module loads source rows for the scope, synthesises
+    // ProjectionEvents, and feeds them through ProjectionSyncWorker
+    // which writes to Neo4j via applyProjectionJob (this very
+    // repository's method). Counts come from the real writes — not
+    // a placeholder zero — and land in the rebuild row's `summary`
+    // so admin UIs can render them honestly.
+    let result: ProjectionResult;
+    let scopeCounts: ReplayCounts | null = null;
+    let replayErrors = 0;
+    try {
+      const { replayProjectionScope } = await import(
+        "../projection/rebuild-replay.js"
+      );
+      const { ProjectionSyncWorker } = await import(
+        "../projection/sync-worker.js"
+      );
+      const replay = await replayProjectionScope(scope, {
+        worker: new ProjectionSyncWorker({ repository: this }),
+      });
+      result = {
+        nodesCreated: replay.nodesCreated,
+        nodesUpdated: replay.nodesUpdated,
+        nodesDeleted: replay.nodesDeleted,
+        edgesCreated: replay.edgesCreated,
+        edgesUpdated: replay.edgesUpdated,
+        edgesDeleted: replay.edgesDeleted,
+        durationMs: this.now() - tStart,
+        errors: replay.errors,
+      };
+      scopeCounts = replay.counts;
+      replayErrors = replay.errors.length;
+    } catch (err) {
+      result = {
+        nodesCreated: 0,
+        nodesUpdated: 0,
+        nodesDeleted: 0,
+        edgesCreated: 0,
+        edgesUpdated: 0,
+        edgesDeleted: 0,
+        durationMs: this.now() - tStart,
+        errors: [
+          {
+            write: {
+              kind: "upsert_node",
+              node: { typeKey: "_rebuild_replay", id: scope },
+            },
+            error: err instanceof Error ? err.message : String(err),
+          } as unknown as ProjectionResult["errors"][number],
+        ],
+      };
+      replayErrors = 1;
+    }
 
     if (rebuildRow) {
       await db
         .update(agsGraphProjectionRebuilds)
         .set({
           completedAt: new Date(),
-          status: "queued",
+          status: replayErrors === 0 ? "completed" : "failed",
           summary: {
             backendKey: this.backendKey,
-            note: "Rebuild row queued for worker replay against Postgres SoT.",
+            scope,
+            counts: scopeCounts,
+            writes: {
+              nodesUpdated: result.nodesUpdated,
+              edgesUpdated: result.edgesUpdated,
+            },
+            errors: replayErrors,
+            durationMs: result.durationMs,
           } as Record<string, unknown>,
         })
         .where(eq(agsGraphProjectionRebuilds.id, rebuildRow.id));
