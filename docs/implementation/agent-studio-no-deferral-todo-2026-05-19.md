@@ -2478,3 +2478,90 @@ Recommendation.
 | 89 | **Open continuation-19 catalogue** | This entry. Names the mutation-only constraint up-front. |
 | 90 | **`GraphChangeProposalsPanel` + page** | 4-endpoint mutation-heavy panel with submit + lifecycle sub-sections; full 7-point nav wiring; tests. |
 | 91 | **Continuation-19 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-20 target (racIngestion — 3-endpoint preview/register/validate workflow). |
+
+## Continuation-19 closure receipt (2026-05-20)
+
+The nineteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1608–#1610. Closes the
+`graphChangeProposals.*` UI-consumer gap — all 4 mutations
+(`submit` / `approve` / `reject` / `withdraw`) consumed by the
+new `GraphChangeProposalsLifecyclePanel` + `GraphChangeProposalsPage`,
+mounted under a new **"Proposals"** sidebar group (sibling to
+"Approval bus" + "Publish") with the `Gavel` icon.
+
+### Continuation-19 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 89 catalogue | #1608 | 591c1c82 | Opens continuation-19; documents the mutation-only constraint up-front |
+| 90 GraphChangeProposalsLifecyclePanel + page | #1609 | 74c1546c | 4 mutations consumed; 7-point nav wiring; 17 unit + 9 nav-surface tests |
+| 91 continuation-19 closure | #1610 | TBD | Receipt + racIngestion as continuation-20 target |
+
+### Continuation-19 carry-forward lessons
+
+1. **Mutation-only routers need a session-local "what I just
+   submitted" affordance.** `graphChangeProposals.*` has no
+   `listProposals` query, so approve / reject / withdraw rely on
+   operator-supplied `proposalId` values. To bridge the gap, the
+   submit sub-section maintains a session-local
+   `recent: SubmitResultRow[]` list capped at 10 entries —
+   operators can read the new `proposalId` off-screen and paste
+   it into the lifecycle sub-sections. This is materially weaker
+   than a server-side `listProposals` query (it doesn't survive
+   reload + doesn't show externally-created proposals) but is
+   honest about what the router exposes. Lesson: when consuming
+   a **mutation-only router**, plan a "what-this-session-did"
+   client-state shelf so the operator isn't left juggling
+   numeric IDs across browser tabs.
+2. **Sibling-panel composition beats a single mega-form for
+   N-mutation routers.** Submit + Approve + Reject + Withdraw
+   are 4 distinct mutations with overlapping but non-identical
+   inputs (`approve`/`reject` take `rationale`, `withdraw`
+   doesn't). Rather than fold them into one form with
+   `useState`-flipped action buttons, each sub-section is its
+   own sibling component with its own form state +
+   `useMutation`. Decouples the success/error UX per action +
+   keeps the form-clear behavior independent. Lesson:
+   **N-mutation routers should map to N sibling sub-panels**,
+   not a single switching form.
+3. **Conditional-spread on optional input fields catches the
+   "empty string vs undefined" gotcha.** The router's input
+   schema makes `summary`, `confidence`, `rationale`,
+   `proposedByAgentId`, `sourceEvidence` all genuinely optional
+   (z.optional). Sending `summary: ""` is **not** equivalent to
+   omitting the field — server-side validation may bounce
+   zero-length strings. Use the conditional-spread idiom
+   (`...(summary.trim() !== "" ? { summary: summary.trim() } : {})`)
+   so the field literally disappears from the payload when
+   empty. This same pattern was used in slice 78
+   (RecommendationRunnerPanel) for `limit` / `minConfidence`
+   defaults. Lesson: **on z.optional inputs, conditional-spread
+   the trim-defaulted value or omit the key** — never let
+   `""` ride through to the server.
+
+After this slice, the no-deferral mission has shipped **91
+slices across 19 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19).
+
+### Remaining zero-consumer routers (after continuation-19)
+
+2 routers still unconsumed from the slice 83 audit:
+
+| Router | Endpoints | Why next |
+|---|---|---|
+| `racIngestion` | 3 (ingestPreview / registerIndexedSource / validateIndex) | RAC source-registration workflow. Mix of 2 queries + 1 mutation — different from continuation-19's mutation-only shape. |
+| `bases` (α-shell gap) | 10 | BasesPanel rewrite to consume real CRUD instead of saved-view emulation. Largest scope of the two. |
+
+### Next-arc target: racIngestion UI consumer
+
+Continuation-20 should ship `RacIngestionPanel` consuming the
+3-endpoint registration workflow (`ingestPreview` query +
+`registerIndexedSource` mutation + `validateIndex` query). The
+mix of 2 read-only previews + 1 commit mutation is a third
+distinct shape — neither pure master-detail (84/87) nor pure
+mutation-only (90). Likely lesson surface: how to thread a
+preview-then-commit UX across cascading queries.
