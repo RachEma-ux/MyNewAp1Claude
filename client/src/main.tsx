@@ -7,9 +7,15 @@ import App from "./App";
 import { getLoginUrl, isOAuthConfigured } from "./const";
 import { isAuthRequiredError } from "@/lib/appBlockers";
 import { wireOfflineCacheToTrpc } from "./modules/agent-studio/services/offline-cache-app-wireup";
+import { bootstrapClientErrorReporter } from "@/lib/error-reporter";
 import "./index.css";
 
 const queryClient = new QueryClient();
+// Universal error event log — wires mutation + query error subscribers,
+// window.onerror, and unhandledrejection into
+// `agentStudio.clientObservability.recordClientError` → server-side
+// `logs/error-events-YYYY-MM-DD.jsonl` + `ags_workspace_error_events`.
+bootstrapClientErrorReporter(queryClient);
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
