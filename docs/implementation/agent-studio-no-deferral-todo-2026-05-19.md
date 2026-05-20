@@ -3912,3 +3912,75 @@ named `workspaceObservability` (13/31 → 31/31) as the next target.
 | 116 | **Open continuation-28 catalogue** | This entry. 18-endpoint 3-card arc. |
 | 117 | **`WorkspaceObservabilityPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
 | 118 | **Continuation-28 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-28 closure receipt (2026-05-20)
+
+The twenty-eighth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1635–#1637. **Sixth arc
+of the partial-consumer audit cycle**. Closes
+`workspaceObservability.*` (13/31 → 31/31, 18 endpoints).
+
+### Continuation-28 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 116 catalogue | #1635 | 5d97ebf2 | Opens continuation-28; 18-endpoint 3-card arc |
+| 117 WorkspaceObservabilityPanel + page | #1636 | 15c954e7 | 18 endpoints consumed; 3-card panel (notifications / background jobs / error events); 8 nav-surface tests |
+| 118 continuation-28 closure | #1637 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-28 carry-forward lessons
+
+1. **`{getById, getByIds}` query pairs deserve sibling sub-sections.**
+   workspaceObservability had THREE separate by-id-vs-by-ids pairs
+   (notifications, background jobs, error events). The natural shape
+   is two "Lookup by id" + "Lookup by ids" sibling sub-sections per
+   group, each with its own input and JSON renderer. Trying to fold
+   them into one "Lookup" with a mode toggle would have added
+   complexity for no benefit. Lesson: **`getX(id)` and `getXs(ids[])`
+   are distinct affordances** — give them distinct sub-sections,
+   not a mode-toggled shared input.
+2. **Single-action + bulk-action need parallel sibling sub-sections.**
+   The background-jobs card has both `cancelBackgroundJob(jobId)`
+   and `cancelBackgroundJobs(ids[])` (same for retry). Surfaced as
+   TWO sub-sections per action group ("Single action" with one id
+   input + 2 buttons; "Bulk action" with ids[] input + 2 buttons).
+   This contrasts with the cont-24 multi-select-list-footer pattern
+   (which assumed the list was the multi-select surface). When
+   there's no list-row context, parallel sub-sections beat
+   multi-select. Lesson: **multi-select-list-footer only applies
+   when the bulk action operates on rows the operator has already
+   seen** — for context-free bulk actions, ship parallel
+   single/bulk sub-sections.
+3. **`comma-or-space-separated ids` parsing is now a standing
+   primitive.** This arc introduced `parseIdList(s)` (splits on
+   `[,\s]+`, validates each as positive int, returns `null` on any
+   invalid). The same shape will recur across any router with
+   bulk-by-ids operations. Lesson: **add `parseIdList` to the
+   panel-template toolbox** alongside `parsePositiveInt` and
+   `parseJsonRecord` (both standing primitives from cont-21+).
+
+After this slice, the no-deferral mission has shipped **118
+slices across 28 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25,
+110-112 cont-26, 113-115 cont-27, 116-118 cont-28).
+
+### Partial-consumer audit status (post-cont-28)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 6 | `promotion`, `graphCorrection`, `semanticEnrichment`, `graphQuality`, `vault`, `workspaceObservability` |
+| Remaining | 12 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphSkill / graphWorkspace / providerBindings / racEvaluation / toolApprovals / toolKnowledge |
+
+The audit cycle is now **one-third through** (6/18 closed).
+The remaining 12 routers vary in scope; the next arc should
+pick from the next-largest absolute gap — `canvas` (3/9 = 6
+unconsumed) or `cag` (4/7 = 3 unconsumed) are the simplest
+remaining targets; `providerBindings` (7/11 = 4 unconsumed)
+is a good infra-adjacent arc.
