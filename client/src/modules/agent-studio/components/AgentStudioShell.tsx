@@ -193,6 +193,12 @@ const GraphSkillAdminPage = lazy(
 // eleventh arc of the partial-consumer audit cycle. 3-endpoint
 // surface (listPacks / refreshPack / listPackEvents).
 const CagAdminPage = lazy(() => import("../pages/CagAdminPage"));
+// No-deferral continuation-39 slice 150: Graph Workspace Admin page —
+// FINAL arc of the partial-consumer audit cycle. 3-endpoint surface
+// (backendHealth / neighborhood / shortestPath).
+const GraphWorkspaceAdminPage = lazy(
+  () => import("../pages/GraphWorkspaceAdminPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -422,6 +428,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-33 slice 132: CAG Admin (no agent context) ──
   if (path.startsWith("/agent-studio/cag-admin")) {
     return { ...empty, view: "cag-admin", homeMode: null };
+  }
+  // ── No-deferral continuation-39 slice 150: Graph Workspace Admin (no agent context) ──
+  if (path.startsWith("/agent-studio/graph-workspace-admin")) {
+    return { ...empty, view: "graph-workspace-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -756,6 +766,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/cag-admin");
       return;
     }
+    // No-deferral continuation-39 slice 150: graph-workspace-admin is a global view.
+    if (key === "graph-workspace-admin") {
+      navigate("/agent-studio/graph-workspace-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -963,6 +978,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "cag-admin":
           return <CagAdminPage />;
+        // ── No-deferral continuation-39 slice 150: Graph Workspace
+        //    Admin (FINAL arc). ──
+        case "graph-workspace-admin":
+          return <GraphWorkspaceAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

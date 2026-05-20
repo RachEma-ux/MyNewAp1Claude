@@ -221,6 +221,11 @@ export type AgentStudioView =
   //    Eleventh arc of the partial-consumer audit cycle. Closes 3
   //    cag endpoints (listPacks / refreshPack / listPackEvents). ──
   | "cag-admin"
+  // ── No-deferral continuation-39 slice 150: Graph Workspace
+  //    Utilities (FINAL arc of the partial-consumer audit cycle).
+  //    Closes the last 3 unconsumed endpoints across the cycle:
+  //    graphWorkspace.{backendHealth, neighborhood, shortestPath}. ──
+  | "graph-workspace-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -504,6 +509,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "cag-admin",
         label: "Pack Admin",
         icon: Database,
+      },
+    ],
+  },
+  // ── No-deferral continuation-39 slice 150: graph-workspace-admin
+  //    page (FINAL arc). Graph backend probes (health / neighborhood
+  //    / shortest-path) for operator triage. ──
+  {
+    label: "Graph Utilities",
+    items: [
+      {
+        key: "graph-workspace-admin",
+        label: "Backend Probes",
+        icon: Telescope,
       },
     ],
   },
