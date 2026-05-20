@@ -4340,3 +4340,85 @@ of the partial-consumer audit cycle**. Closes `graphAgent.*`
 | racEvaluation | TBD | TBD | TBD | next |
 | toolApprovals | TBD | TBD | TBD | next |
 | toolKnowledge | TBD | TBD | TBD | next |
+
+## Continuation-32 closure receipt (2026-05-20)
+
+The thirty-second continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1647–#1649. **Tenth arc
+of the partial-consumer audit cycle**. Closes `graphSkill.*`
+(1/4 → 4/4, 3 endpoints).
+
+### Continuation-32 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 128 catalogue | #1647 | 8b5b4cb9 | Opens continuation-32; 3-endpoint 3-card arc |
+| 129 GraphSkillAdminPanel + page | #1648 | f198055d | 3 endpoints consumed; 3-card panel (list versions / create pack governed / publish version governed); 9 nav-surface tests |
+| 130 continuation-32 closure | #1649 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-32 carry-forward lessons
+
+1. **Governed mutations need form-level regex validation, not just
+   server-side rejection.** Both `createPack` (skillKey regex
+   `^[a-z0-9][a-z0-9._-]*$`) and `publishVersion` (version regex
+   `^[a-zA-Z0-9][a-zA-Z0-9._+-]*$`) reject malformed input at the
+   tRPC boundary, but operators get faster feedback when the form
+   shows the regex constraint inline as they type. Lesson: **mirror
+   server-side regex constraints in client-side validators with
+   the regex source string surfaced in the error message** so the
+   operator can fix the input without round-tripping through the
+   server.
+2. **JSON object payloads belong in a textarea with parse-on-blur
+   validation.** `publishVersion.manifest` is an opaque
+   `Record<string, unknown>` from the server's perspective.
+   Surface it as a monospace textarea, parse on every change, and
+   show a red "must be a JSON object" error inline when the parse
+   fails or returns a non-object. Lesson: **for any tRPC mutation
+   taking a structured object input, give it its own JSON textarea
+   with inline parse validation**; never force operators to type
+   `{"foo":"bar"}` into a one-line text Input.
+3. **CSV-to-array parsing is reusable infrastructure.** The
+   `supportedNodeTypeKeys` + `supportedEdgeTypeKeys` arrays are
+   the third instance of "operator types CSV, panel splits on
+   comma+whitespace" (cont-28 `parseIdList`, cont-30 entity-typeKey
+   inputs, now cont-32). Lesson: **comma-or-whitespace-split-and-trim
+   is a standing primitive**; reuse the same shape (no separate
+   abstraction needed yet, but the pattern stays uniform across
+   panels).
+4. **Closed 3-value enums use the same dropdown-with-unset-default
+   shape every time.** `riskLevel` is the second 3-value enum in
+   the cycle (after cont-30's `kind`). Both surface as `<select>`
+   with a leading `(unset)` blank option. Lesson: **for optional
+   closed enum fields, the dropdown shape is: `(unset)` first +
+   all enum values; emit the field only when set**. Don't try to
+   model "unset" as a sentinel server-side value.
+5. **Pack lifecycle is a natural 3-card decomposition.** The
+   graphSkill 3 endpoints split 1 read + 2 write, but the 2 writes
+   are semantically a parent-child lifecycle (pack → version).
+   Cards: list (read), create-parent (write), publish-child
+   (write). Lesson: **when a router decomposes into pack/version-
+   style parent-child writes**, the parent and child each get
+   their own card even if they could nominally share inputs.
+
+### Partial-consumer audit status (post-cont-32)
+
+| Router | Endpoints | Consumed pre | Consumed post | Arc |
+|---|---|---|---|---|
+| promotion | 14 | 10 | 14 | cont-23 |
+| graphCorrection | 13 | 3 | 13 | cont-24 |
+| semanticEnrichment | 12 | 4 | 12 | cont-25 |
+| graphQuality | 17 | 5 | 17 | cont-26 |
+| vault | 36 | 15 | 36 | cont-27 |
+| workspaceObservability | 23 | 5 | 23 | cont-28 |
+| providerBindings | 7 | 3 | 7 | cont-29 |
+| canvas | 8 | 2 | 8 | cont-30 |
+| graphAgent | 8 | 4 | 8 | cont-31 |
+| graphSkill | 4 | 1 | 4 | cont-32 |
+| **bases** | TBD | TBD | TBD | **cont-33 (next)** |
+| cag | TBD | TBD | TBD | next |
+| goldenQuestions | TBD | TBD | TBD | next |
+| graphProjection | TBD | TBD | TBD | next |
+| graphWorkspace | TBD | TBD | TBD | next |
+| racEvaluation | TBD | TBD | TBD | next |
+| toolApprovals | TBD | TBD | TBD | next |
+| toolKnowledge | TBD | TBD | TBD | next |
