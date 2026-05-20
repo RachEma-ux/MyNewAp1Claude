@@ -4096,3 +4096,53 @@ The next arc should pick from the remaining 11. `canvas` (3/9 =
 small. `bases` (8/10 = 2 unconsumed) is small too — finishing
 the bases partial-consumer gap (different from the cont-21
 α-shell rewrite which closed the *zero-consumer* gap).
+
+## Continuation-30 — canvas operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Eighth arc of the partial-consumer audit cycle. Cont-29's closure
+named `canvas` (3/9 → 9/9) as the **next-largest absolute gap**
+in the remaining routers (6 unconsumed endpoints).
+
+### Re-audit findings
+
+`canvas.*` has 9 endpoints; 3 already consumed via existing canvas
+surfaces (listByVault + getSnapshot + listNoteReferences — the
+read-only browser path). The 6 unconsumed endpoints split into 3
+functional groups:
+
+**Canvas (2 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `get` | query | canvasId → null if missing |
+| `create` | mutation | vaultId + slug + title + description? + settings? |
+
+**Node (3 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `createNode` | mutation | canvasId + kind (closed enum) + referencedNoteId? + x?/y?/width?/height? + data? |
+| `updateNode` | mutation | nodeId + all node fields optional |
+| `deleteNode` | mutation | nodeId → `{ removed: boolean }` |
+
+**Edge (1 endpoint):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `createEdge` | mutation | canvasId + sourceCanvasNodeId + targetCanvasNodeId + relationshipKind? + data? |
+
+### Approach
+
+`CanvasAdminPanel` will have 3 cards (per cont-26 standing pattern):
+
+- **Canvas card** — Lookup by id (get) + Create form (create).
+- **Node card** — Create + Update + Delete sub-sections, each
+  with operator-supplied node id + form inputs.
+- **Edge card** — Create form only (no list / get / delete on the
+  router yet — edge crud is read-only via getSnapshot).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 122 | **Open continuation-30 catalogue** | This entry. 6-endpoint 3-card arc. |
+| 123 | **`CanvasAdminPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
+| 124 | **Continuation-30 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
