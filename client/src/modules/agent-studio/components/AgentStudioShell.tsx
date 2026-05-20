@@ -173,6 +173,10 @@ const WorkspaceObservabilityPage = lazy(
 const ProviderBindingsAdminPage = lazy(
   () => import("../pages/ProviderBindingsAdminPage"),
 );
+// No-deferral continuation-30 slice 123: Canvas Admin admin page —
+// eighth arc of the partial-consumer audit cycle. 6-endpoint
+// write-side (canvas / node / edge create+update+delete).
+const CanvasAdminPage = lazy(() => import("../pages/CanvasAdminPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -386,6 +390,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-29 slice 120: Provider Bindings Admin (no agent context) ──
   if (path.startsWith("/agent-studio/provider-bindings-admin")) {
     return { ...empty, view: "provider-bindings-admin", homeMode: null };
+  }
+  // ── No-deferral continuation-30 slice 123: Canvas Admin (no agent context) ──
+  if (path.startsWith("/agent-studio/canvas-admin")) {
+    return { ...empty, view: "canvas-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -700,6 +708,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/provider-bindings-admin");
       return;
     }
+    // No-deferral continuation-30 slice 123: canvas-admin is a global view.
+    if (key === "canvas-admin") {
+      navigate("/agent-studio/canvas-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -891,6 +904,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "provider-bindings-admin":
           return <ProviderBindingsAdminPage />;
+        // ── No-deferral continuation-30 slice 123: Canvas Admin
+        //    (typed via AgentStudioView). ──
+        case "canvas-admin":
+          return <CanvasAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

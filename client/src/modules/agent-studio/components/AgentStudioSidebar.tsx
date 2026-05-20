@@ -202,6 +202,11 @@ export type AgentStudioView =
   //    providerBindings endpoints (listForAgent / resolveForRun /
   //    remove / testRunWithBinding). ──
   | "provider-bindings-admin"
+  // ── No-deferral continuation-30 slice 123: Canvas Admin.
+  //    Eighth arc of the partial-consumer audit cycle. Closes 6
+  //    canvas endpoints (get / create / createNode / updateNode /
+  //    deleteNode / createEdge). Coexists with CanvasOperatorPage. ──
+  | "canvas-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -433,6 +438,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "provider-bindings-admin",
         label: "Admin",
         icon: Plug,
+      },
+    ],
+  },
+  // ── No-deferral continuation-30 slice 123: canvas-admin page.
+  //    Eighth arc of the partial-consumer audit cycle. Write-side
+  //    for the canvas/node/edge primitives. ──
+  {
+    label: "Canvas Admin",
+    items: [
+      {
+        key: "canvas-admin",
+        label: "Write Surface",
+        icon: LayoutGrid,
       },
     ],
   },
