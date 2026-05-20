@@ -4457,3 +4457,77 @@ consume the resolved context.
 | 131 | **Open continuation-33 catalogue** | This entry. 3-endpoint 3-card arc. |
 | 132 | **`CagAdminPanel` + page** | 3-card panel; shared agent-context input; full 7-point nav wiring; tests. |
 | 133 | **Continuation-33 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-33 closure receipt (2026-05-20)
+
+The thirty-third continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1650–#1652. **Eleventh
+arc of the partial-consumer audit cycle**. Closes `cag.*`
+(2/5 → 5/5, 3 endpoints).
+
+### Continuation-33 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 131 catalogue | #1650 | c93ff804 | Opens continuation-33; 3-endpoint 3-card arc |
+| 132 CagAdminPanel + page | #1651 | b74bcca3 | 3 endpoints consumed; 3-card panel (list packs / refresh pack governed / pack events) + agent-context card; 9 nav-surface tests |
+| 133 continuation-33 closure | #1652 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-33 carry-forward lessons
+
+1. **Agent-context hoisting beats per-card duplicate inputs.** All
+   three cag endpoints share `agentRefSchema = { workspaceId,
+   agentId }`. Rather than asking the operator to type the same
+   pair into each card, the panel hoists those two inputs into a
+   first "Agent context" card, and each downstream card consumes
+   the resolved context. The downstream cards render "Awaiting
+   agent context" when the IDs aren't set yet. Lesson: **when N
+   endpoints share an input shape, lift that shape to a panel-
+   level context card and gate downstream queries on resolution**.
+2. **Hoisted context cards add a 4th card without violating the
+   3-card pattern.** Earlier arcs (cont-30/31/32) settled on a
+   3-card layout. Cont-33 adds a 4th card by promoting the shared
+   input shape into its own card. Lesson: **the "3-card pattern"
+   is a guideline for functional grouping, not a hard cap; hoisted
+   context cards count separately from the functional cards**.
+3. **`useUtils().<router>.<query>.invalidate()` after a governed
+   mutation is the standing pattern.** `refreshPack` mutates DB
+   state, so the panel invalidates both `listPacks` and
+   `listPackEvents` on success. Lesson: **governed mutations
+   should invalidate ALL sibling read queries that could observe
+   the mutation's side effects** — not just the most obvious one.
+4. **Show warnings inline in the mutation result, not just toast.**
+   `refreshPack` returns a `warnings: string[]` field. The result
+   card renders warnings in yellow below pack/version, in
+   addition to firing the success toast. Lesson: **when a governed
+   mutation returns auxiliary diagnostic data**, render it in the
+   result card alongside the primary outcome.
+5. **The `(undefined as never)` enabled-gate pattern stabilizes
+   across arcs.** Cont-32's ListVersionsCard + cont-33's three
+   child cards use the same pattern: `enabled` gate + `(undefined
+   as never)` input fallback. Lesson: **this pattern is stable
+   enough to standardize**; continue using it for any child card
+   whose input depends on parent panel state.
+
+### Partial-consumer audit status (post-cont-33)
+
+| Router | Endpoints | Consumed pre | Consumed post | Arc |
+|---|---|---|---|---|
+| promotion | 14 | 10 | 14 | cont-23 |
+| graphCorrection | 13 | 3 | 13 | cont-24 |
+| semanticEnrichment | 12 | 4 | 12 | cont-25 |
+| graphQuality | 17 | 5 | 17 | cont-26 |
+| vault | 36 | 15 | 36 | cont-27 |
+| workspaceObservability | 23 | 5 | 23 | cont-28 |
+| providerBindings | 7 | 3 | 7 | cont-29 |
+| canvas | 8 | 2 | 8 | cont-30 |
+| graphAgent | 8 | 4 | 8 | cont-31 |
+| graphSkill | 4 | 1 | 4 | cont-32 |
+| cag | 5 | 2 | 5 | cont-33 |
+| bases | 10 | 8 | already saturated (cont-21) | — |
+| **goldenQuestions** | TBD | TBD | TBD | **cont-34 (next)** |
+| graphProjection | TBD | TBD | TBD | next |
+| graphWorkspace | TBD | TBD | TBD | next |
+| racEvaluation | TBD | TBD | TBD | next |
+| toolApprovals | TBD | TBD | TBD | next |
+| toolKnowledge | TBD | TBD | TBD | next |
