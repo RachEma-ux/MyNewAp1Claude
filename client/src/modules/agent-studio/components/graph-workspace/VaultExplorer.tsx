@@ -22,7 +22,7 @@
  * full-fidelity form is added.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import VaultFsSyncPanel from "./VaultFsSyncPanel";
 import WorkspaceStateLayer, {
@@ -65,6 +65,24 @@ export default function VaultExplorer({
   const [vaultName, setVaultName] = useState("");
   const [noteTitle, setNoteTitle] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [noteFilter, setNoteFilter] = useState("");
+
+  // Clear the filter when the operator switches vaults — keeping a
+  // stale query across an unrelated note list would be surprising.
+  useEffect(() => {
+    setNoteFilter("");
+  }, [selectedVaultId]);
+
+  const allNotes = notesQuery.data ?? [];
+  const filteredNotes = useMemo(() => {
+    const q = noteFilter.trim().toLowerCase();
+    if (q.length === 0) return allNotes;
+    return allNotes.filter((n) => {
+      const title = (n.title ?? "").toLowerCase();
+      const slug = (n.slug ?? "").toLowerCase();
+      return title.includes(q) || slug.includes(q);
+    });
+  }, [allNotes, noteFilter]);
 
   const createVaultMutation = trpc.agentStudio.vault.createVault.useMutation({
     onSuccess: (vault) => {
@@ -320,12 +338,52 @@ export default function VaultExplorer({
                   </button>
                 </form>
               )}
+              {/* Client-side substring filter over the already-fetched
+                  note list. Matches case-insensitively against title
+                  and slug. The list above runs `listNotes` with
+                  limit: 200, so this is bounded; if we ever raise the
+                  limit, swap for a server-side `q` param. */}
+              <div className="mt-1 mb-1 relative">
+                <input
+                  type="search"
+                  value={noteFilter}
+                  onChange={(e) => setNoteFilter(e.target.value)}
+                  placeholder="Filter notes…"
+                  aria-label="Filter notes"
+                  data-testid="vault-explorer-note-filter-input"
+                  className="w-full text-sm rounded border px-2 py-1 pr-6"
+                />
+                {noteFilter.length > 0 && (
+                  <button
+                    type="button"
+                    aria-label="Clear note filter"
+                    data-testid="vault-explorer-note-filter-clear"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700 px-1"
+                    onClick={() => setNoteFilter("")}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              {noteFilter.trim().length > 0 && !notesQuery.isLoading && (
+                <div
+                  className="text-[10px] text-gray-500 mb-1 pl-3"
+                  data-testid="vault-explorer-note-filter-count"
+                >
+                  {filteredNotes.length} of {allNotes.length} notes
+                </div>
+              )}
               <NoteList
-                notes={notesQuery.data ?? []}
+                notes={filteredNotes}
                 loading={notesQuery.isLoading}
                 error={notesQuery.error ?? null}
                 selectedNoteId={selectedNoteId}
                 onSelectNote={onSelectNote}
+                emptyMessage={
+                  noteFilter.trim().length > 0
+                    ? "No notes match this filter."
+                    : "No notes in this vault."
+                }
               />
               {/* Track A — A7 — FS-sync settings panel for the
                   selected vault. Sits below the note list. */}
@@ -371,6 +429,7 @@ interface NoteListProps {
   readonly error: { data?: { code?: string }; message?: string } | null;
   readonly selectedNoteId: number | null;
   readonly onSelectNote: (noteId: number) => void;
+  readonly emptyMessage?: string;
 }
 
 function NoteList({
@@ -379,6 +438,7 @@ function NoteList({
   error,
   selectedNoteId,
   onSelectNote,
+  emptyMessage,
 }: NoteListProps): React.ReactElement {
   if (loading) {
     return <div className="pl-4 text-xs text-gray-500" data-testid="note-list-loading">Loading notes…</div>;
@@ -397,7 +457,7 @@ function NoteList({
   if (notes.length === 0) {
     return (
       <div className="pl-4 text-xs text-gray-500" data-testid="note-list-empty">
-        No notes in this vault.
+        {emptyMessage ?? "No notes in this vault."}
       </div>
     );
   }
