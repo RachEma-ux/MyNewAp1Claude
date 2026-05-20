@@ -4276,3 +4276,67 @@ Tenth arc of the partial-consumer audit cycle. `graphSkill`
 | 128 | **Open continuation-32 catalogue** | This entry. 3-endpoint 3-card arc. |
 | 129 | **`GraphSkillAdminPanel` + page** | 3-card panel; full 7-point nav wiring; tests. |
 | 130 | **Continuation-32 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-31 closure receipt (2026-05-20)
+
+The thirty-first continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1644–#1646. **Ninth arc
+of the partial-consumer audit cycle**. Closes `graphAgent.*`
+(4/8 → 8/8, 4 endpoints).
+
+### Continuation-31 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 125 catalogue | #1644 | c0b6fe12 | Opens continuation-31; 4-endpoint 3-card arc |
+| 126 GraphAgentAdminPanel + page | #1645 | 1fcedf0d | 4 endpoints consumed; 3-card panel (health / run / export trace); 8 nav-surface tests |
+| 127 continuation-31 closure | #1646 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-31 carry-forward lessons
+
+1. **Two destinations for the same export are sibling sub-sections,
+   not parameter-toggle on one mutation.** `exportTraceMarkdown`
+   (query → markdown string) and `exportTraceToNote` (mutation →
+   note row) share the same source (a runId) but produce different
+   side-effects. Surface them as TWO sibling sub-sections inside
+   the same card, each with their own runId input + per-destination
+   knobs.
+2. **Closed-enum dropdowns with sensible defaults beat free-text
+   for power-user inputs.** `retrievalPreference` is a 5-value
+   closed enum; default `"auto"` keeps the form usable.
+3. **Health probe as the first card is operator-discoverability.**
+   When a router exposes a no-input `health` query, surface it as
+   the first card.
+4. **Two-line catalog gap analysis: the "missing 4" are usually
+   write-side or export-side.** graphAgent surfaced 8 procedures
+   but only 4 had UI consumers (read-side). The 4 unconsumed split
+   cleanly: 1 read-side (health), 1 write-side (run), 2 export-side
+   (markdown + note). Lesson: when auditing a router, group
+   un-consumed endpoints by I/O side before designing card layout.
+5. **Three-card panels keep working past 4 endpoints.** Going from
+   cont-30's 6 endpoints to cont-31's 4 endpoints stayed in the
+   3-card shape. Card count is driven by functional grouping, not
+   endpoint count.
+
+### Partial-consumer audit status (post-cont-31)
+
+| Router | Endpoints | Consumed pre | Consumed post | Arc |
+|---|---|---|---|---|
+| promotion | 14 | 10 | 14 | cont-23 |
+| graphCorrection | 13 | 3 | 13 | cont-24 |
+| semanticEnrichment | 12 | 4 | 12 | cont-25 |
+| graphQuality | 17 | 5 | 17 | cont-26 |
+| vault | 36 | 15 | 36 | cont-27 |
+| workspaceObservability | 23 | 5 | 23 | cont-28 |
+| providerBindings | 7 | 3 | 7 | cont-29 |
+| canvas | 8 | 2 | 8 | cont-30 |
+| graphAgent | 8 | 4 | 8 | cont-31 |
+| **graphSkill** | **4** | **1** | **TBD** | **cont-32** |
+| bases | TBD | TBD | TBD | next |
+| cag | TBD | TBD | TBD | next |
+| goldenQuestions | TBD | TBD | TBD | next |
+| graphProjection | TBD | TBD | TBD | next |
+| graphWorkspace | TBD | TBD | TBD | next |
+| racEvaluation | TBD | TBD | TBD | next |
+| toolApprovals | TBD | TBD | TBD | next |
+| toolKnowledge | TBD | TBD | TBD | next |
