@@ -22,8 +22,10 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../../_core/trpc";
+import { router, publicProcedure, adminProcedure } from "../../_core/trpc";
 import { recordErrorEvent } from "../services/workspace-observability/error-events.js";
+import { pruneOldErrorLogFiles } from "../services/workspace-observability/error-log-file-retention.js";
+import { getErrorLogFileRetentionCronStatus } from "../services/workspace-observability/error-log-file-retention-cron.js";
 
 const SOURCE_KIND_REGEX = /^[a-z][a-z0-9_]*$/;
 
@@ -78,4 +80,33 @@ export const clientObservabilityRouter = router({
         return { ok: false as const, reason: msg };
       }
     }),
+
+  /**
+   * Operator-triggered manual prune of the daily-rotated
+   * `error-events-YYYY-MM-DD.jsonl` files. Mirrors the
+   * `pruneRetention` shape used by the 16+ DB-row retention sweeps.
+   * adminProcedure because the sweep deletes from the host filesystem
+   * (operator-scoped action, not per-workspace).
+   */
+  pruneErrorLogFilesRetention: adminProcedure
+    .input(
+      z
+        .object({
+          retentionDays: z.number().int().min(1).max(3650).optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ input }) => {
+      const days = input?.retentionDays ?? 30;
+      const olderThan = new Date(Date.now() - days * 86_400_000);
+      return pruneOldErrorLogFiles({ olderThan });
+    }),
+
+  /**
+   * Status surface for the daily retention cron. Mirrors
+   * `getXxxRetentionCronStatus` shape used by every retention cron.
+   */
+  getErrorLogFilesRetentionCronStatus: adminProcedure.query(async () => {
+    return getErrorLogFileRetentionCronStatus();
+  }),
 });
