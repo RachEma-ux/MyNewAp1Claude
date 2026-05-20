@@ -1584,10 +1584,66 @@ Standalone page (mirrors slice 53 `VaultTemplatesPage` + slice
 | 69 | **GoldenQuestionsTriggerPanel + standalone page** | Form (provider connection / model ref / workspace / actor / suite dropdown / timeout) → `triggerLiveEvaluation`; sonner toast with summary on success; full 7-point nav-surface wiring; tests. |
 | 70 | **Continuation-12 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-13 target (recent-runs + drill-in UI) OR declares cycle complete. |
 
+## Continuation-12 closure receipt (2026-05-20)
+
+The twelfth continuation arc shipped 1 implementation slice + 1
+catalogue + this closure across PRs #1587–#1589. Closes the
+`triggerLiveEvaluation` UI-consumer gap named at continuation-11's
+closure + opens the operator entry point for the broader
+`goldenQuestions.*` tRPC surface (6 reads + 1 mutation shipped
+server-side at slices 44 / T-D.5.α-δ but un-consumed until now).
+
 ### Continuation-12 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 68 catalogue | this PR | TBD | Opens continuation-12; standalone-page approach |
-| 69 trigger panel + page | TBD | TBD | Full 7-point nav-surface wiring + form + mutation + tests |
-| 70 continuation-12 closure | TBD | TBD | Receipt + next-arc target |
+| 68 catalogue | #1587 | `f4ff65f4` | Opens continuation-12; standalone-page approach + 7-point completion-audit checklist |
+| 69 trigger panel + page | #1588 | `e6c6ead1` | GoldenQuestionsTriggerPanel + GoldenQuestionsPage + all 7 nav-surface items + 16 tests |
+| 70 continuation-12 closure | this PR | TBD | Receipt + continuation-13 target named |
+
+### Continuation-12 carry-forward lessons
+
+1. **The 7-point checklist works as a single-slice scope when
+   followed up-front.** Slice 53 (VaultTemplatesPage) shipped 5 of
+   7 items and required slice 63 (continuation-10) to close the
+   remaining 2. Slice 69 (GoldenQuestionsPage) shipped all 7 in
+   one PR by treating the checklist as a contract from the
+   beginning. The slice grew slightly (~665 LoC in one commit) but
+   the completion-audit follow-on slice was unnecessary. Lesson:
+   when the slice introduces a new operator surface, **plan all 7
+   nav-surface items into the slice's task list before opening
+   the PR**, not after.
+2. **Server schema → client validation should be reproduced
+   verbatim, with comments.** The trigger panel's per-question
+   timeout enforces the same 1_000–600_000 ms bounds as the
+   server's Zod `.min(1_000).max(600_000)`. The client constants
+   carry an explicit "same bounds as the server-side Zod schema —
+   keep in lockstep" comment, so a future change on either side
+   surfaces drift via code review. Lesson: when the client form
+   mirrors server validation, **constant-mirror the bounds + add a
+   lockstep comment**; don't let the numbers float independently.
+3. **Form-validation gating beats client-side throw.** The Run
+   button is `disabled` when any field is invalid. This is
+   strictly nicer than letting the user click + showing a toast
+   error: the disabled state + the helper text ("Fill provider,
+   model, workspace, actor, valid timeout to enable") tells the
+   operator exactly what's missing without sending a malformed
+   request. Lesson: **client validation gates the action; server
+   validation is the safety net**, not the primary feedback path.
+
+After this slice, the no-deferral mission has shipped **70 slices
+across 12 continuation arcs** (1-26 original, 27-32 cont-1, 33-37
+cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5, 49-51 cont-6,
+52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64 cont-10, 65-67
+cont-11, 68-70 cont-12).
+
+### Next-arc target: golden-questions recent-runs panel
+
+The trigger panel surfaces evaluation outcomes via a sonner toast
++ logs run ids, but operators have no way to **drill into a
+historical run** today. The `goldenQuestions.listRecentRuns` +
+`getRunStats` + `listRunResults` + `getQuestionDetail` tRPC reads
+are all wired server-side; continuation-13 should add a
+`GoldenQuestionsRecentRunsPanel` mounted below the trigger panel
+on the same page (the natural drill-down sequence: "I just ran
+it → I want to see what happened").
