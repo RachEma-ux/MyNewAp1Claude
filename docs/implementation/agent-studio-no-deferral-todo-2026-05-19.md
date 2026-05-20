@@ -2565,3 +2565,72 @@ mix of 2 read-only previews + 1 commit mutation is a third
 distinct shape — neither pure master-detail (84/87) nor pure
 mutation-only (90). Likely lesson surface: how to thread a
 preview-then-commit UX across cascading queries.
+
+## Continuation-20 — racIngestion UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-19's closure named racIngestion as the next target
+(3-endpoint preview/register/validate workflow).
+
+### Re-audit findings
+
+`racIngestion.*` is a **3-endpoint mixed query/mutation** RAC
+source-registration workflow (Phase 3):
+
+| Endpoint | Kind | Input shape | Output |
+|---|---|---|---|
+| `ingestPreview` | query | `{ workspaceId, sourceId, sampleSize? (1-50, default 5) }` | `{ sourceType, sampleChunks: [{content, citation, metadata?}], warnings: string[] }` |
+| `registerIndexedSource` | mutation | `{ workspaceId, sourceId }` | `{ sourceId, embeddingProviderConnectionId, embeddingModelRef, embeddingModelDim, resolvedFrom }` |
+| `validateIndex` | query | `{ workspaceId, sourceId }` | `{ ok, reason?, health: {status, ...}, details? }` |
+
+### Preview-then-commit shape
+
+Unlike the prior arcs — pure master-detail (slices 75 / 78 /
+84 / 87) or pure mutation-only (slice 90) — this is a 3-step
+operator workflow:
+
+1. **Preview** the source's first N chunks (default 5) to
+   confirm what will be indexed.
+2. **Register** the indexed source — resolves embedding binding
+   (source-level → workspace default fallback, fail-closed),
+   stamps `embedding_model_pinned_at` if workspace-default was
+   used.
+3. **Validate** the index post-register — surfaces adapter
+   health + structured `index_missing` / `embedding_dim_mismatch`
+   reasons.
+
+The same `{ workspaceId, sourceId }` reference threads through
+all 3 endpoints, so the panel will use a single shared form
+input and cascade the queries via React Query's `enabled` gate.
+
+### Approach
+
+`RacIngestionPanel` will have one shared source-reference form
+at the top + three sequential action sections:
+
+- **Source reference form** — workspaceId + sourceId number
+  inputs + sampleSize numeric (1-50, default 5). On "Load
+  preview", snapshots into `submitted` state and enables the
+  preview query.
+- **Preview section** — renders `ingestPreview` envelope:
+  sourceType badge + warnings list + N sample chunks
+  (content + citation + optional metadata JSON).
+- **Register section** — only enabled after a successful
+  preview load; mutation button + on-success surface of the
+  resolved binding (`resolvedFrom`, connection id, model ref,
+  dim).
+- **Validate section** — `validateIndex` query button; surfaces
+  `ok` boolean + `reason` (when not ok) + adapter health
+  status.
+
+7-point nav-surface wiring under a new sidebar group "RAC"
+(or extend the existing retrofit-adjacent layout), mounted as
+its own standalone admin page.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 92 | **Open continuation-20 catalogue** | This entry. Names the preview-then-commit shape. |
+| 93 | **`RacIngestionPanel` + page** | 3-endpoint mixed query/mutation panel with shared source-reference form + 3 sequential sections; full 7-point nav wiring; tests. |
+| 94 | **Continuation-20 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-21 target (bases α-shell rewrite — last remaining zero-consumer from the slice 83 audit). |
