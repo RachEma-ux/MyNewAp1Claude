@@ -233,9 +233,23 @@ export type AgentStudioView =
   // operators can find "+ New vault / + New note" affordances.
   | "graph-workspace";
 
+/**
+ * Sidebar items can be internal views (default: `key` dispatches to
+ * the Shell's view router) or external links (`externalUrl` opens in
+ * a new tab). External-link items keep a `key` for React reconciliation
+ * + active-state styling but never dispatch a view change.
+ */
+interface SidebarItem {
+  key: AgentStudioView | `external:${string}`;
+  label: string;
+  icon: React.ElementType;
+  /** When set, clicking opens this URL in a new tab instead of navigating internally. */
+  externalUrl?: string;
+}
+
 interface SectionGroup {
   label: string;
-  items: { key: AgentStudioView; label: string; icon: React.ElementType }[];
+  items: SidebarItem[];
 }
 
 const HOME_GROUPS: SectionGroup[] = [
@@ -515,6 +529,11 @@ const HOME_GROUPS: SectionGroup[] = [
   // ── No-deferral continuation-39 slice 150: graph-workspace-admin
   //    page (FINAL arc). Graph backend probes (health / neighborhood
   //    / shortest-path) for operator triage. ──
+  //
+  // ── 2026-05-20: external link to Neo4j Studio (browser UI shipped
+  //    with Neo4j CE). URL defaults to http://localhost:7474/browser/
+  //    matching the local Neo4j CE default; override via
+  //    `VITE_NEO4J_BROWSER_URL` at build time for staging/prod. ──
   {
     label: "Graph Utilities",
     items: [
@@ -522,6 +541,14 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "graph-workspace-admin",
         label: "Backend Probes",
         icon: Telescope,
+      },
+      {
+        key: "external:neo4j-studio",
+        label: "Neo4j Studio",
+        icon: Database,
+        externalUrl:
+          (import.meta as unknown as { env?: Record<string, string> }).env
+            ?.VITE_NEO4J_BROWSER_URL ?? "http://localhost:7474/browser/",
       },
     ],
   },
@@ -730,11 +757,22 @@ export default function AgentStudioSidebar({
               </div>
             )}
             <div className={cn(collapsed ? "" : "px-1")}>
-              {group.items.map(({ key, label, icon: Icon }) => (
+              {group.items.map(({ key, label, icon: Icon, externalUrl }) => (
                 <button
                   key={key}
-                  onClick={() => onNavigate(key)}
-                  title={label}
+                  onClick={() => {
+                    // External-link items open in a new tab and never
+                    // dispatch an internal view change.
+                    if (externalUrl) {
+                      if (typeof window !== "undefined") {
+                        window.open(externalUrl, "_blank", "noopener,noreferrer");
+                      }
+                      return;
+                    }
+                    onNavigate(key as AgentStudioView);
+                  }}
+                  title={externalUrl ? `${label} — ${externalUrl}` : label}
+                  data-external-url={externalUrl ?? undefined}
                   className={cn(
                     "flex items-center w-full rounded transition-colors relative",
                     collapsed ? "justify-center py-1.5 mx-auto" : "gap-2 px-2 py-1.5 text-xs",
