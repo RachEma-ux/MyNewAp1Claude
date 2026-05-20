@@ -3099,3 +3099,86 @@ write disjoint columns.
 | 101 | **Open continuation-23 catalogue** | This entry. First arc of partial-consumer audit cycle. |
 | 102 | **`PromotionLifecyclePanel` + page** | 4-mutation lifecycle panel cloning cont-19 shape; 10-value PromotionKind closed dropdown; full 7-point nav wiring; tests. |
 | 103 | **Continuation-23 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
+
+## Continuation-23 closure receipt (2026-05-20)
+
+The twenty-third continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1620–#1622. **First arc
+of the partial-consumer audit cycle** opened by continuation-22's
+closure: closes the 4 unconsumed lifecycle mutations on
+`promotion.{submit, approve, reject, rollback}`.
+
+### Continuation-23 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 101 catalogue | #1620 | 6b926d3a | Opens continuation-23; first arc of partial-consumer audit cycle |
+| 102 PromotionLifecyclePanel + page | #1621 | 46b84541 | 4 lifecycle mutations consumed; 7-point nav wiring; 15 unit + 8 nav-surface tests |
+| 103 continuation-23 closure | #1622 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-23 carry-forward lessons
+
+1. **Pattern-replication is the right primitive when lifecycle
+   shapes match.** `PromotionLifecyclePanel` is a near-verbatim
+   clone of `GraphChangeProposalsLifecyclePanel` (slice 90) —
+   same 4 sub-section split (Submit / Approve / Reject /
+   Rollback ↔ Withdraw), same operator-supplied id pattern, same
+   session-local recent shelf, same closed-enum dropdown. The
+   one notable divergence (Reject takes `reason` not `rationale`;
+   Rollback prompts a confirm before mutation) reflects the
+   actual schema and threat model — rollback unwinds applied
+   state, so an extra friction step is warranted. Lesson:
+   **when two routers share a lifecycle shape, replicate the
+   panel structure verbatim and divergence-by-exception** —
+   don't try to factor a shared abstraction prematurely; each
+   pair of mutations has too many small subtle differences to
+   abstract cleanly.
+2. **The partial-consumer audit cycle has a natural saturation
+   metric.** Cont-22's audit found 18 partial-consumer routers
+   spanning 1-of-N, 2-of-N, 8-of-N, 13-of-N, 23-of-N, 4-of-N,
+   etc. Cont-23 closed `promotion` (2/6 → 6/6). The right
+   per-arc target is **lifecycle clusters**, not individual
+   endpoint count — endpoints that share a domain (approve /
+   reject / rollback) are best shipped as one arc since their
+   shape repeats. Continuing the audit, the next high-value
+   targets are: `graphCorrection` (2/12 — 10 endpoints, 7+ in
+   lifecycle pattern), `semanticEnrichment` (3/11 — 8 endpoints
+   spanning candidate-run + proposal-promotion), and
+   `graphQuality` (10/22 — large saturation gap).
+3. **The session-local recent-submissions shelf is now a
+   standing primitive.** First introduced in cont-19, reused in
+   cont-22, reused again in cont-23. Lesson: **mutation-only
+   surfaces always need a session-local "what I just submitted"
+   shelf** capped at 10 entries so operators can read returned
+   ids without losing them. The pattern is now mature enough to
+   be a panel-template starter: when planning a new mutation-
+   heavy surface, the recent-shelf is included by default unless
+   ruled out.
+
+After this slice, the no-deferral mission has shipped **103
+slices across 23 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23).
+
+### Partial-consumer audit status (post-cont-23)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed (this arc) | 1 | `promotion` |
+| Remaining | 17 | bases / cag / canvas / goldenQuestions / graphAgent / graphCorrection / graphProjection / graphQuality / graphSkill / graphWorkspace / providerBindings / racEvaluation / semanticEnrichment / toolApprovals / toolKnowledge / vault / workspaceObservability |
+
+The remaining 17 routers vary in scope. The next-arc target
+recommendation is `graphCorrection` (2/12 consumed; 10 unconsumed
+endpoints including `submit` / `approve` / `bulkApprove` /
+`bulkReject` / `reject` / `requestRevision` / `withdraw` / `get` /
+`list` / `listAudit`). This is the **largest single-router
+lifecycle gap** and likely surfaces 1-2 carry-forward lessons
+distinct from cont-19/23 (the `bulkApprove` / `bulkReject` /
+`requestRevision` shape is new, and unlike cont-19/23 this router
+HAS list/get/listAudit — true master-detail capability).
