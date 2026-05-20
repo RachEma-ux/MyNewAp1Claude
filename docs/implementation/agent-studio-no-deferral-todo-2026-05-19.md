@@ -2342,10 +2342,74 @@ filePath are field-substitutions, not pattern changes.
 | 87 | **`CodeGraphPanel` + page** | 7-endpoint master-detail panel; full 7-point nav wiring; tests. |
 | 88 | **Continuation-18 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-19 target (graphChangeProposals — mutation-heavy 4-endpoint approval workflow). |
 
+## Continuation-18 closure receipt (2026-05-20)
+
+The eighteenth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1605–#1607. Closes the
+`codeGraph.*` UI-consumer gap — all 7 endpoints consumed by the
+new `CodeGraphPanel` + `CodeGraphPage`, mounted under the Lenses
+sidebar group alongside Security Graph.
+
 ### Continuation-18 receipts
 
 | Slice | PR | Merge SHA | Notes |
 |---|---|---|---|
-| 86 catalogue | this PR | TBD | Opens continuation-18; field-rename map vs slice 84 |
-| 87 CodeGraph panel + page | TBD | TBD | 7 endpoints consumed; 7-point nav wiring; tests |
-| 88 continuation-18 closure | TBD | TBD | Receipt + graphChangeProposals as continuation-19 target |
+| 86 catalogue | #1605 | 3b85d49a | Opens continuation-18; field-rename map vs slice 84 |
+| 87 CodeGraph panel + page | #1606 | 4f5cc4e4 | 7 endpoints consumed; 7-point nav wiring; 21 tests |
+| 88 continuation-18 closure | #1607 | TBD | Receipt + graphChangeProposals as continuation-19 target |
+
+### Continuation-18 carry-forward lessons
+
+1. **Field-rename map up-front beats per-call discovery.** The
+   continuation-18 catalogue (slice 86) listed the 4 field
+   renames before slice 87 wrote any code: `listSources →
+   listRepositories`, `sourceKey → repositoryId`,
+   `listRecentRejectionsByReason → listRecentParserErrors`,
+   `reason+count → filePath+reason+message`. This let slice 87
+   write the panel in one pass instead of stumbling over each
+   rename mid-implementation. The new fields (`parserErrorCount`
+   on ingestion rows; `filePath` + `startLine`/`endLine` on node
+   rows) were additions, not renames — also pre-listed. Lesson:
+   when replicating a panel across structurally-similar routers,
+   **write the field-rename map into the catalogue first**; the
+   implementation cost drops near-zero per rename.
+2. **Envelope key drift is the most common copy-paste error.**
+   The first draft of slice 87 used
+   `parserErrorsQuery.data?.parserErrors` (mirroring
+   `sourcesQuery.data?.sources`), but the server-side envelope
+   is `{ errors: [...] }`, not `{ parserErrors: [...] }`.
+   Caught during the source review. Lesson: when copying a
+   sibling panel's pattern, **double-check the envelope key
+   name at the server boundary** — schema-mirroring breaks on
+   the envelope key, not on the row shape.
+3. **Pre-imported icons make sidebar additions free.** The
+   `ScanSearch` icon used for the Code Graph sidebar entry was
+   already imported in `AgentStudioSidebar.tsx` (used by the
+   per-agent `rac` view). No new import needed. Lesson: when
+   adding a sidebar entry, **check the existing lucide-react
+   imports first** — the right icon is often already there.
+
+After this slice, the no-deferral mission has shipped **88
+slices across 18 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18).
+
+### Remaining zero-consumer routers (after continuation-18)
+
+3 routers still unconsumed from the slice 83 audit:
+
+| Router | Endpoints | Why next |
+|---|---|---|
+| `graphChangeProposals` | 4 (submit / approve / reject / withdraw) | Mutation-heavy approval workflow — different shape from the prior 5 master-detail panels. New lessons likely. |
+| `racIngestion` | 3 (ingestPreview / registerIndexedSource / validateIndex) | RAC source-registration workflow. |
+| `bases` (α-shell gap) | 10 | BasesPanel rewrite to consume real CRUD instead of saved-view emulation. Largest scope of the three. |
+
+### Next-arc target: graphChangeProposals UI consumer
+
+Continuation-19 should ship `GraphChangeProposalsPanel` consuming
+the 4-endpoint approval workflow. The mutation-heavy shape will
+likely surface new lessons distinct from the read-heavy master-
+detail panels of slices 75 / 78 / 84 / 87.
