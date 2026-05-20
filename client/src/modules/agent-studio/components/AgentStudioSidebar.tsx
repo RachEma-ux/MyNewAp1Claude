@@ -176,6 +176,11 @@ export type AgentStudioView =
   //    requestRevision lifecycle node. Distinct from
   //    GraphCorrectionProposalsRetentionPanel (retention). ──
   | "graph-correction"
+  // ── No-deferral continuation-25 slice 108: Semantic Enrichment page.
+  //    Third arc of the partial-consumer audit cycle. Closes 8
+  //    semanticEnrichment endpoints across trigger / run-monitoring /
+  //    candidate-exploration / bulk-promotion. ──
+  | "semantic-enrichment"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -348,6 +353,19 @@ const HOME_GROUPS: SectionGroup[] = [
         key: "graph-correction",
         label: "Proposals",
         icon: ShieldAlert,
+      },
+    ],
+  },
+  // ── No-deferral continuation-25 slice 108: semantic-enrichment page.
+  //    Third arc of the partial-consumer audit cycle. Run-centric
+  //    observability + candidate exploration + bulk promotion. ──
+  {
+    label: "Semantic Enrichment",
+    items: [
+      {
+        key: "semantic-enrichment",
+        label: "Runs",
+        icon: Sparkles,
       },
     ],
   },
