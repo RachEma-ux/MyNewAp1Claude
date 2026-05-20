@@ -100,6 +100,10 @@ const RecommendationPage = lazy(
 const SecurityGraphPage = lazy(
   () => import("../pages/SecurityGraphPage"),
 );
+// No-deferral continuation-18 slice 87: Code Graph admin page —
+// closes the codeGraph.* UI-consumer gap (7 endpoints shipped at
+// T-G.2.α; direct slice-84 template).
+const CodeGraphPage = lazy(() => import("../pages/CodeGraphPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -259,6 +263,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-17 slice 84: Security Graph admin (no agent context) ──
   if (path.startsWith("/agent-studio/security-graph")) {
     return { ...empty, view: "security-graph", homeMode: null };
+  }
+  // ── No-deferral continuation-18 slice 87: Code Graph admin (no agent context) ──
+  if (path.startsWith("/agent-studio/code-graph")) {
+    return { ...empty, view: "code-graph", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -513,6 +521,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/security-graph");
       return;
     }
+    // No-deferral continuation-18 slice 87: code-graph is a global view.
+    if (key === "code-graph") {
+      navigate("/agent-studio/code-graph");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -656,6 +669,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "security-graph":
           return <SecurityGraphPage />;
+        // ── No-deferral continuation-18 slice 87: Code Graph admin
+        //    (typed via AgentStudioView). ──
+        case "code-graph":
+          return <CodeGraphPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;

@@ -134,6 +134,10 @@ export type AgentStudioView =
   //    page. Closes the securityGraph.* UI-consumer gap (7
   //    endpoints shipped at T-G.3.α). ──
   | "security-graph"
+  // ── No-deferral continuation-18 slice 87: Code Graph admin
+  //    page. Closes the codeGraph.* UI-consumer gap (7
+  //    endpoints shipped at T-G.2.α). ──
+  | "code-graph"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -255,7 +259,8 @@ const HOME_GROUPS: SectionGroup[] = [
   },
   // ── T-F.62: graph-lens browser + continuation-14 slice 75
   //    impact-analysis + continuation-15 slice 78 recommendation +
-  //    continuation-17 slice 84 security-graph ──
+  //    continuation-17 slice 84 security-graph + continuation-18
+  //    slice 87 code-graph ──
   {
     label: "Lenses",
     items: [
@@ -263,6 +268,7 @@ const HOME_GROUPS: SectionGroup[] = [
       { key: "impact-analysis", label: "Impact Analysis", icon: Network },
       { key: "recommendation", label: "Recommendation", icon: Sparkles },
       { key: "security-graph", label: "Security Graph", icon: ShieldAlert },
+      { key: "code-graph", label: "Code Graph", icon: ScanSearch },
     ],
   },
   // ── T-F.82 (T-F.4-α): graph-quality findings ──
