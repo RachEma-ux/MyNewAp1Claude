@@ -41,14 +41,29 @@ describe("MR-3 sixty-first batch — recordTemplateInstantiation Path-A migratio
     expect(/agsVaults\b/.test(src)).toBe(true);
   });
 
-  it("recordTemplateInstantiation does a Notes × Vaults JOIN keyed on input.noteId", () => {
-    const fn = src.slice(src.indexOf("recordTemplateInstantiation"));
-    expect(/innerJoin\s*\(\s*agsVaults\s*,/.test(fn)).toBe(true);
+  it("file does a Notes × Vaults JOIN keyed on noteId (extracted into the resolveWorkspaceIdForNote helper at no-deferral slice 57)", () => {
+    // Pre-slice-57: the JOIN lived inline inside recordTemplateInstantiation.
+    // Post-slice-57: the JOIN was extracted into a shared
+    // resolveWorkspaceIdForNote helper so the reads + writes share
+    // the same chain. The contract — "workspaceId is resolved from
+    // a noteId via Notes × Vaults" — is preserved; only the call
+    // site moved. Both the helper's JOIN + recordTemplateInstantiation's
+    // delegation to it are pinned below.
+    expect(/innerJoin\s*\(\s*agsVaults\s*,/.test(src)).toBe(true);
     expect(
-      /eq\s*\(\s*agsVaultNotes\.vaultId\s*,\s*agsVaults\.id\s*\)/.test(fn),
+      /eq\s*\(\s*agsVaultNotes\.vaultId\s*,\s*agsVaults\.id\s*\)/.test(src),
     ).toBe(true);
     expect(
-      /eq\s*\(\s*agsVaultNotes\.id\s*,\s*input\.noteId\s*\)/.test(fn),
+      /eq\s*\(\s*agsVaultNotes\.id\s*,\s*noteId\s*\)/.test(src),
+    ).toBe(true);
+  });
+
+  it("recordTemplateInstantiation resolves workspaceId via resolveWorkspaceIdForNote(lookupDb, input.noteId)", () => {
+    const fn = src.slice(src.indexOf("export async function recordTemplateInstantiation"));
+    expect(
+      /await\s+resolveWorkspaceIdForNote\(\s*lookupDb\s*,\s*input\.noteId\s*\)/.test(
+        fn,
+      ),
     ).toBe(true);
   });
 

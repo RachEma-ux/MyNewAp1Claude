@@ -30,10 +30,59 @@ import { eq, sql } from "drizzle-orm";
 
 import { getAsDb, getAsDbForWorkspace } from "../../db/connection.js";
 import { agsVaultTemplateInstantiations } from "../../../../drizzle/tables/agent-studio-vault-template-instantiations.js";
-import { agsVaultNotes, agsVaults } from "../../../../drizzle/tables/agent-studio-vault.js";
+import {
+  agsVaultNotes,
+  agsVaults,
+  agsVaultTemplates,
+} from "../../../../drizzle/tables/agent-studio-vault.js";
 
 export function computeTemplateDigest(contentMd: string): string {
   return createHash("sha256").update(contentMd, "utf8").digest("hex");
+}
+
+// ----- Workspace resolution helpers (no-deferral slice 57) ----------
+//
+// Path-A "lookupDb → resolve → routedDb" pattern shared by the
+// instantiation reads + the existing record write site. Both helpers
+// return `null` when the resolution chain breaks (missing row, NULL
+// vaultId on catalog-wide templates, etc.) — callers fall back to the
+// bootstrap handle so the FK constraint / empty-result semantics
+// surface naturally instead of tangling the routing path with
+// NotFound logic. Mirrors `bases-service.ts` (no-deferral slice 54).
+
+type AsDbHandle = NonNullable<ReturnType<typeof getAsDb>>;
+
+async function resolveWorkspaceIdForTemplate(
+  lookupDb: AsDbHandle,
+  templateId: number,
+): Promise<number | null> {
+  // Templates can be catalog-wide (`agsVaultTemplates.vaultId` is
+  // nullable) — innerJoin returns 0 rows in that case + we degrade
+  // to the bootstrap handle. workspace-scoped templates resolve via
+  // template → vault → workspace.
+  const rows = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaultTemplates)
+    .innerJoin(agsVaults, eq(agsVaultTemplates.vaultId, agsVaults.id))
+    .where(eq(agsVaultTemplates.id, templateId))
+    .limit(1);
+  return rows[0]?.workspaceId ?? null;
+}
+
+async function resolveWorkspaceIdForNote(
+  lookupDb: AsDbHandle,
+  noteId: number,
+): Promise<number | null> {
+  // The same chain `recordTemplateInstantiation` was already using
+  // inline — promoted into a helper so both writes + reads share the
+  // same resolution. note → vault → workspace.
+  const rows = await lookupDb
+    .select({ workspaceId: agsVaults.workspaceId })
+    .from(agsVaultNotes)
+    .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
+    .where(eq(agsVaultNotes.id, noteId))
+    .limit(1);
+  return rows[0]?.workspaceId ?? null;
 }
 
 export interface RecordInstantiationInput {
@@ -61,23 +110,13 @@ export interface RecordedInstantiation {
 export async function recordTemplateInstantiation(
   input: RecordInstantiationInput,
 ): Promise<RecordedInstantiation | null> {
-  // V1+ MR-3 sixty-first batch (PR-V1-131): Path-A style discovering
-  // helper. The ledger row points at a note, and note→vault→
-  // workspace gives us the routing key. Two-table JOIN on
-  // agsVaultNotes × agsVaults walks the chain in one round-trip,
-  // then the INSERT routes via getAsDbForWorkspace. Falls back to
-  // bootstrap when the note's vault is missing OR vault.workspaceId
-  // is null (legacy / pre-Phase-1 data); the FK constraint catches
-  // an orphan noteId at the DB layer.
+  // V1+ MR-3 sixty-first batch (PR-V1-131): Path-A "lookupDb →
+  // resolve → routedDb" pattern. No-deferral slice 57 promoted the
+  // inline note→vault→workspace JOIN into the shared
+  // `resolveWorkspaceIdForNote` helper at the top of this file.
   const lookupDb = getAsDb();
   if (!lookupDb) return null;
-  const lookup = await lookupDb
-    .select({ workspaceId: agsVaults.workspaceId })
-    .from(agsVaultNotes)
-    .innerJoin(agsVaults, eq(agsVaultNotes.vaultId, agsVaults.id))
-    .where(eq(agsVaultNotes.id, input.noteId))
-    .limit(1);
-  const workspaceId = lookup[0]?.workspaceId;
+  const workspaceId = await resolveWorkspaceIdForNote(lookupDb, input.noteId);
   const db =
     workspaceId != null
       ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
@@ -124,8 +163,13 @@ export async function listInstantiationsByTemplate(
   templateId: number,
   limit: number = 100,
 ): Promise<ReadonlyArray<InstantiationRow>> {
-  const db = getAsDb();
-  if (!db) return [];
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const workspaceId = await resolveWorkspaceIdForTemplate(lookupDb, templateId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select({
       id: agsVaultTemplateInstantiations.id,
@@ -148,8 +192,13 @@ export async function listInstantiationsByTemplate(
 export async function listInstantiationsByNote(
   noteId: number,
 ): Promise<ReadonlyArray<InstantiationRow>> {
-  const db = getAsDb();
-  if (!db) return [];
+  const lookupDb = getAsDb();
+  if (!lookupDb) return [];
+  const workspaceId = await resolveWorkspaceIdForNote(lookupDb, noteId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select({
       id: agsVaultTemplateInstantiations.id,
@@ -176,8 +225,13 @@ export async function listInstantiationsByNote(
 export async function countDistinctDigestsForTemplate(
   templateId: number,
 ): Promise<number> {
-  const db = getAsDb();
-  if (!db) return 0;
+  const lookupDb = getAsDb();
+  if (!lookupDb) return 0;
+  const workspaceId = await resolveWorkspaceIdForTemplate(lookupDb, templateId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
   const rows = await db
     .select({
       n: sql<number>`count(distinct ${agsVaultTemplateInstantiations.templateVersionDigest})::int`,
