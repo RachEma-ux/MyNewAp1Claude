@@ -2152,3 +2152,77 @@ The 3 routers named at continuation-14's broad audit are now
 fully UI-consumed. Continuation-17 should re-run the broad
 audit — there may be other server-side surfaces shipped between
 then and now that lack UI consumers.
+
+## Continuation-17 — broad UI-consumer re-audit (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-16's closure named the broad audit as the target.
+
+### Re-audit findings
+
+`grep -rn "agentStudio\.<router>\."` across all 68 sub-router
+mounts in `server/agent-studio/api/router.ts` returned **6
+routers with ZERO UI consumers**:
+
+| Router | Endpoint count | Endpoints |
+|---|---|---|
+| `bases` | 10 | createBase / listBases / getBaseSnapshot / updateBase / createBaseColumn / listBaseColumns / createBaseRow / updateBaseRow / deleteBaseRow / listBaseRows |
+| `codeGraph` | 7 | listIngestions / listRecentParserErrors / listRepositories / getIngestionStats / listKnownTypes / listIngestionNodes / listIngestionEdges |
+| `graphChangeProposals` | 4 | submit / approve / reject / withdraw |
+| `mcpSchemaSync` | 0 | (router shell — no procedures yet) |
+| `racIngestion` | 3 | ingestPreview / registerIndexedSource / validateIndex |
+| `securityGraph` | 7 | listIngestions / getIngestionStats / listRecentRejectionsByReason / listSources / listKnownTypes / listIngestionNodes / listIngestionEdges |
+
+Sub-finding: `BasesPanel` exists and is mounted at
+`/agent-studio/bases`, but it consumes `agentStudio.vault.*`
+(saved-view emulation per the α-shell pattern), NOT
+`agentStudio.bases.*`. The real `ags_bases` CRUD endpoints are
+operator-callable via tRPC but un-consumed by UI. This is a
+genuine α-shell-to-MVP gap, not a brand-new endpoint addition.
+
+### Slice target priority
+
+Pick **securityGraph** — same master-detail shape as
+slice 72's `GoldenQuestionsRecentRunsPanel` and slice 75's
+`ImpactAnalysisRunnerPanel`. 7 endpoints map cleanly to:
+
+- **Master**: `listIngestions` newest-first list
+- **Detail (stats)**: `getIngestionStats` for the selected
+  ingestion
+- **Detail (drill-in)**: `listIngestionNodes` + `listIngestionEdges`
+  for per-typeKey drill-in
+- **Cross-cutting**: `listSources` (per-source summary) +
+  `listRecentRejectionsByReason` (cross-ingestion rollup)
+- **Closed taxonomy reference**: `listKnownTypes` for
+  edge/node type pickers
+
+The remaining 5 zero-consumer routers (bases, codeGraph,
+graphChangeProposals, racIngestion, plus securityGraph's
+sibling readouts) are continuation-18+ candidates.
+`mcpSchemaSync` has zero endpoints so there's nothing to
+consume — skip.
+
+### Approach
+
+Same single-slice pattern as slice 84:
+- `SecurityGraphPanel` (one panel, master-detail with cascading
+  `enabled` gates per slice 75 lesson #2)
+- `SecurityGraphPage` (PageHeader + panel)
+- Full 7-point nav-surface wiring (per continuation-12 lesson)
+- Mounted under the Lenses sidebar group
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 83 | **Open continuation-17 catalogue** | This entry. Broad re-audit; 6 zero-consumer routers + bases α-shell finding. |
+| 84 | **`SecurityGraphPanel` + page** | Single comprehensive panel consuming 7 endpoints; 7-point nav wiring; tests. |
+| 85 | **Continuation-17 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-18 target (codeGraph — same shape). |
+
+### Continuation-17 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 83 catalogue | this PR | TBD | Opens continuation-17; 6 zero-consumer routers identified; securityGraph picked |
+| 84 SecurityGraph panel + page | TBD | TBD | 7 endpoints consumed; 7-point nav wiring; tests |
+| 85 continuation-17 closure | TBD | TBD | Receipt + next-arc target (codeGraph) |
