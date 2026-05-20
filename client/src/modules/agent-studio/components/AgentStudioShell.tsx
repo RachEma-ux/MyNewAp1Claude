@@ -110,6 +110,10 @@ const CodeGraphPage = lazy(() => import("../pages/CodeGraphPage"));
 const GraphChangeProposalsPage = lazy(
   () => import("../pages/GraphChangeProposalsPage"),
 );
+// No-deferral continuation-20 slice 93: RAC Ingestion admin page —
+// closes the racIngestion.* UI-consumer gap (RAC Phase 3 — 3-endpoint
+// preview/register/validate workflow over a shared source reference).
+const RacIngestionPage = lazy(() => import("../pages/RacIngestionPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -277,6 +281,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-19 slice 90: Graph Change Proposals admin (no agent context) ──
   if (path.startsWith("/agent-studio/graph-change-proposals")) {
     return { ...empty, view: "graph-change-proposals", homeMode: null };
+  }
+  // ── No-deferral continuation-20 slice 93: RAC Ingestion admin (no agent context) ──
+  if (path.startsWith("/agent-studio/rac-ingestion")) {
+    return { ...empty, view: "rac-ingestion", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -541,6 +549,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-change-proposals");
       return;
     }
+    // No-deferral continuation-20 slice 93: rac-ingestion is a global view.
+    if (key === "rac-ingestion") {
+      navigate("/agent-studio/rac-ingestion");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -692,6 +705,10 @@ export default function AgentStudioShell() {
         //    lifecycle admin (typed via AgentStudioView). ──
         case "graph-change-proposals":
           return <GraphChangeProposalsPage />;
+        // ── No-deferral continuation-20 slice 93: RAC Ingestion admin
+        //    (typed via AgentStudioView). ──
+        case "rac-ingestion":
+          return <RacIngestionPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
