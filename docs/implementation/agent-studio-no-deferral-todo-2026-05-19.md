@@ -4747,3 +4747,5 @@ Sixteenth arc. toolKnowledge (1/2 → 2/2) — 1 unconsumed (getTool). Panel-ext
 ## Cont-37 closure receipt — toolApprovals 2/4 → 4/4 closed via #1662/#1663/#1664. 5 lessons (scoping-axis per card / hash-regex / null vs envelope / panel-extension dominance / trust existing tabs).
 
 ## Cont-38 closure receipt — toolKnowledge 1/2 → 2/2 closed via #1665/#1666/#1667. 5 lessons (retry:false on NOT_FOUND / <details> for nested JSON / mirror-not-found errors / finite cycle / composite-key hoisting). Penultimate arc.
+
+## Cont-39 catalogue — graphWorkspace utilities (FINAL arc). 3 unconsumed (backendHealth + neighborhood + shortestPath). New-page admin surface. Slices 149/150/151.
