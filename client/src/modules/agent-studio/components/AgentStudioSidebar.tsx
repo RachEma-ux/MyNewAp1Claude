@@ -146,6 +146,11 @@ export type AgentStudioView =
   //    no listProposals query, so approve/reject/withdraw require
   //    operator-supplied proposalId. ──
   | "graph-change-proposals"
+  // ── No-deferral continuation-20 slice 93: RAC Ingestion page.
+  //    Closes the racIngestion.* UI-consumer gap (RAC Phase 3 —
+  //    3-endpoint preview/register/validate workflow over a shared
+  //    {workspaceId, sourceId} reference). ──
+  | "rac-ingestion"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -263,6 +268,15 @@ const HOME_GROUPS: SectionGroup[] = [
         label: "Graph Change Proposals",
         icon: Gavel,
       },
+    ],
+  },
+  // ── No-deferral continuation-20 slice 93: rac-ingestion admin page.
+  //    Surfaces the racIngestion.* RAC Phase 3 preview/register/validate
+  //    workflow as a standalone operator surface. ──
+  {
+    label: "RAC",
+    items: [
+      { key: "rac-ingestion", label: "Ingestion", icon: Database },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
