@@ -2979,3 +2979,60 @@ The next arc may either:
   Agent Studio pages efficiently).
 
 The user's next directive will select.
+
+## Continuation-22 — mcpSchemaSync.sync UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+The slice-83 audit close-out finished at continuation-21. A
+fresh post-cont-21 re-audit (grep `trpc.agentStudio.X.` against
+all 68 mounted sub-routers) surfaced **1 new zero-consumer**:
+`mcpSchemaSync`.
+
+### Re-audit findings
+
+`mcpSchemaSync.*` is a **single-mutation governed** router
+(Retrofit P11) that mirrors a caller-provided live snapshot of
+an MCP server's tools into `agsMcpToolKnowledge` +
+`agsKnowledgeUnits`:
+
+| Endpoint | Kind | Input shape | Output |
+|---|---|---|---|
+| `sync` | mutation (governed) | `{ workspaceId, mcpServerId, knowledgeSourceId, actorId, tools: [{name, description?, inputSchema?}] }` (max 1000 tools) | diff summary from `syncToolKnowledge` |
+
+Notable router-level affordances:
+- Input is data-in/data-out: the caller passes the tool snapshot,
+  not a live registry handle. This was an intentional design (per
+  the router's doc-block) so operator UIs can preview a sync
+  against a fixture before running it for real.
+- `governedProcedure` (not `protectedProcedure`) — bound to
+  `evaluateGovernance()` so the operator's role/permission is
+  consulted before the mutation runs.
+
+### Smallest-arc shape
+
+This is the smallest arc surfaced by the no-deferral mission so
+far: a single governed mutation, no read sibling. The panel
+shape is therefore a single form card:
+
+- workspaceId / mcpServerId / knowledgeSourceId / actorId — four
+  numeric/string scalar inputs.
+- `tools` — JSON textarea (operator pastes the snapshot exported
+  from a live MCP server probe), validated as an array of
+  `{name, description?, inputSchema?}` shapes.
+- Sync button → mutation; success renders the returned diff
+  summary; failure surfaces the structured `TRPCError` (governed
+  procedure: caller may see `FORBIDDEN`).
+
+No master-detail, no preview-then-commit cascade, no list. The
+session-local "what I just synced" pattern from continuation-19
+(graphChangeProposals) applies here — recent-syncs shelf capped
+at 10 entries so the operator can review diff summaries from
+multiple servers across a session without losing them.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 98 | **Open continuation-22 catalogue** | This entry. Names the smallest-arc shape + governed-procedure note. |
+| 99 | **`McpSchemaSyncPanel` + page** | Single-form panel consuming `mcpSchemaSync.sync`; tools JSON textarea + recent-syncs shelf; full 7-point nav wiring; tests. |
+| 100 | **Continuation-22 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next-arc decision (re-audit again or pivot to α-shell deprecation). |
