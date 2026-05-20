@@ -4022,3 +4022,77 @@ unconsumed endpoints split into 3 functional groups:
 | 119 | **Open continuation-29 catalogue** | This entry. Smallest-yet partial-consumer arc (4 endpoints, 3 cards). |
 | 120 | **`ProviderBindingsAdminPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
 | 121 | **Continuation-29 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
+
+## Continuation-29 closure receipt (2026-05-20)
+
+The twenty-ninth continuation arc shipped 1 implementation slice
++ 1 catalogue + this closure across PRs #1638–#1640. **Seventh
+arc of the partial-consumer audit cycle** — and the smallest yet
+(4 endpoints across 3 cards). Closes `providerBindings.*`
+(7/11 → 11/11).
+
+### Continuation-29 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 119 catalogue | #1638 | ef66e8f4 | Opens continuation-29; 4-endpoint 3-card arc |
+| 120 ProviderBindingsAdminPanel + page | #1639 | 81520dfc | 4 endpoints consumed; 3-card panel (List for agent / Resolve+Remove / Test run); 8 nav-surface tests |
+| 121 continuation-29 closure | #1640 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-29 carry-forward lessons
+
+1. **Composite-key inputs deserve a shared sub-section header.**
+   The Resolve + Remove card shares a `(draftId, role?)` binding
+   key across two distinct actions. Surfacing the key inputs at
+   the top of the card, then two buttons underneath (one for the
+   query result, one for the mutation), is cleaner than two
+   parallel sub-sections each with their own copies. Lesson:
+   **when multiple actions share a composite key**, share the
+   key inputs at the top of the card and surface the actions as
+   sibling buttons + result regions below.
+2. **Optional-role-defaults-to-`primary` is a vault-style operator
+   nicety.** The provider-bindings router defaults `role` to
+   `"primary"` server-side when undefined. The panel surfaces this
+   in the placeholder/help text ("Role (optional, default
+   'primary')"). Operators don't need to type "primary" most of
+   the time, but the help text gives them the hint when needed.
+   Lesson: **document server-side defaults in the input
+   placeholder/help text** so operators don't have to read the
+   router code.
+3. **Test-run mutations with closed-enum intent + numeric knobs
+   benefit from a single big card.** The testRunWithBinding
+   mutation has 8 optional inputs (intent enum + temperature +
+   token budget + correlation id + system prompt + workspace
+   + role + prompt). Putting them in a single 2-column grid
+   inside ONE card kept the cognitive load manageable —
+   operators see the full call shape at once. Lesson: **resist
+   the urge to break a multi-input mutation into sub-cards** —
+   the call's full input is one logical unit; a single card +
+   2-column grid scales to ~10 fields cleanly.
+
+After this slice, the no-deferral mission has shipped **121
+slices across 29 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20, 95-97 cont-21, 98-100
+cont-22, 101-103 cont-23, 104-106 cont-24, 107-109 cont-25,
+110-112 cont-26, 113-115 cont-27, 116-118 cont-28, 119-121
+cont-29).
+
+### Partial-consumer audit status (post-cont-29)
+
+Of the 18 partial-consumer routers found in cont-22's audit:
+
+| Status | Count | Routers |
+|---|---|---|
+| Closed | 7 | `promotion`, `graphCorrection`, `semanticEnrichment`, `graphQuality`, `vault`, `workspaceObservability`, `providerBindings` |
+| Remaining | 11 | bases / cag / canvas / goldenQuestions / graphAgent / graphProjection / graphSkill / graphWorkspace / racEvaluation / toolApprovals / toolKnowledge |
+
+The next arc should pick from the remaining 11. `canvas` (3/9 =
+6 unconsumed) is the next-largest absolute gap. `cag` (4/7 =
+3 unconsumed) and `goldenQuestions` (6/7 = 1 unconsumed) are
+small. `bases` (8/10 = 2 unconsumed) is small too — finishing
+the bases partial-consumer gap (different from the cont-21
+α-shell rewrite which closed the *zero-consumer* gap).
