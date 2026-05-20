@@ -2634,3 +2634,88 @@ its own standalone admin page.
 | 92 | **Open continuation-20 catalogue** | This entry. Names the preview-then-commit shape. |
 | 93 | **`RacIngestionPanel` + page** | 3-endpoint mixed query/mutation panel with shared source-reference form + 3 sequential sections; full 7-point nav wiring; tests. |
 | 94 | **Continuation-20 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-21 target (bases α-shell rewrite — last remaining zero-consumer from the slice 83 audit). |
+
+## Continuation-20 closure receipt (2026-05-20)
+
+The twentieth continuation arc shipped 1 implementation slice +
+1 catalogue + this closure across PRs #1611–#1613. Closes the
+`racIngestion.*` UI-consumer gap — all 3 endpoints
+(`ingestPreview` query + `registerIndexedSource` mutation +
+`validateIndex` query) consumed by the new `RacIngestionPanel`
++ `RacIngestionPage`, mounted under a new **"RAC"** sidebar
+group with the `Database` icon.
+
+### Continuation-20 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 92 catalogue | #1611 | 9d1f67f3 | Opens continuation-20; documents the preview-then-commit shape up-front |
+| 93 RacIngestionPanel + page | #1612 | 05b98520 | 3 endpoints consumed; 7-point nav wiring; 16 unit + 8 nav-surface tests |
+| 94 continuation-20 closure | #1613 | TBD | Receipt + bases α-shell rewrite as continuation-21 target |
+
+### Continuation-20 carry-forward lessons
+
+1. **Cascade gates make the operator workflow self-documenting.**
+   The Register button is enable-gated on a successful preview
+   load (`previewEnvelope !== null`), and the empty-state hint
+   says "Load a preview first to enable registration." This
+   substitutes for an explicit numbered wizard — the operator
+   experiences the 3-step order through enable-gates rather than
+   through stepper UI. Cheaper to build, easier to extend with
+   a 4th step (e.g. ingest-now), and operators who already know
+   the workflow can skip the preview cleanly by clicking Validate
+   directly. Lesson: **for N-step preview-then-commit workflows,
+   `enabled`-gated buttons beat a stepper widget** — they convey
+   sequence without enforcing it.
+2. **Three-state cascade — preview snapshot + validate snapshot
+   + register mutation — needs THREE pieces of state, not one.**
+   Initial draft tried a single `submitted: SourceRef | null`
+   feeding both queries; broke when operator wanted to validate
+   without re-running preview, because clearing for re-preview
+   also cleared the validate. Fix: split into `previewRef` and
+   `validateRef`, each driving its own query's `enabled` gate.
+   The mutation lives outside both — it reads the live form
+   directly (since it represents the operator's current
+   intent, not a snapshot). Lesson: **independent action buttons
+   need independent snapshot state**; don't try to fold two
+   query-with-form patterns into a single `submitted` variable.
+3. **Conditional `JSON.stringify` rendering prevents empty
+   `<pre>` blocks.** Preview chunks may or may not have
+   `metadata`; the validate response may or may not have
+   `details`. Render `<pre>{JSON.stringify(x)}</pre>` only
+   when `x && Object.keys(x).length > 0` — otherwise the
+   operator sees a misleading "{}" or an empty bordered block
+   that looks like a placeholder for something missing.
+   Lesson: **on optional `Record<string, unknown>` payloads,
+   gate the renderer on `Object.keys(...).length > 0`**, not
+   just on `!= null`.
+
+After this slice, the no-deferral mission has shipped **94
+slices across 20 continuation arcs** (1-26 original, 27-32
+cont-1, 33-37 cont-2, 38-41 cont-3, 42-45 cont-4, 46-48 cont-5,
+49-51 cont-6, 52-55 cont-7, 56-58 cont-8, 59-61 cont-9, 62-64
+cont-10, 65-67 cont-11, 68-70 cont-12, 71-73 cont-13, 74-76
+cont-14, 77-79 cont-15, 80-82 cont-16, 83-85 cont-17, 86-88
+cont-18, 89-91 cont-19, 92-94 cont-20).
+
+### Remaining zero-consumer routers (after continuation-20)
+
+1 router still unconsumed from the slice 83 audit:
+
+| Router | Endpoints | Why next |
+|---|---|---|
+| `bases` (α-shell gap) | 10 | `BasesPanel` rewrite — the existing α-shell renders saved-view emulation; this is the rewrite to consume real CRUD endpoints (createBase / updateBase / deleteBase / listBases / getBase + 5 row/column ops). Largest scope of all the no-deferral arcs to date. |
+
+### Next-arc target: bases α-shell rewrite
+
+Continuation-21 will rewrite the existing `BasesPanel` to
+consume the 10-endpoint real CRUD surface shipped at Phase 24
+MVP (PRs #1508/#1509). The α-shell currently emulates bases
+on top of saved-view storage; the rewrite swaps to canonical
+`ags_bases` / `ags_base_columns` / `ags_base_rows` tables via
+the `bases.*` tRPC. This is the **largest-scope continuation
+arc** so far and may need to split across multiple slices
+(suggested: per-endpoint slice or per-feature slice). Likely
+shape: list page (`listBases` + `getBase` + `createBase` +
+`deleteBase`) + detail page (`updateBase` + the 5 row/column
+ops).
