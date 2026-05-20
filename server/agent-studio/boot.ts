@@ -334,6 +334,23 @@ export async function bootAgentStudio(): Promise<void> {
     );
   }
 
+  // Step 3.12.5: Universal error event log file retention cron.
+  // Sister of the DB-row retention sweeps — prunes
+  // `logs/error-events-YYYY-MM-DD.jsonl` files older than the
+  // configured window (default 30 days, daily 09:30 UTC). Env-flag-
+  // gated via AGS_ERROR_LOG_FILE_RETENTION_CRON_DISABLED.
+  try {
+    const { ensureErrorLogFileRetentionCronStarted } = await import(
+      "./services/workspace-observability/error-log-file-retention-cron"
+    );
+    ensureErrorLogFileRetentionCronStarted();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[ags-error-log-file-retention-cron] start skipped — ${message}`,
+    );
+  }
+
   // Step 3.13: Phase 22 follow-up #650 — simulation-runs retention cron.
   // The ags_simulation_runs + ags_simulation_run_steps tables had no
   // retention before #649 + #650. Default daily 10:00 UTC sweep — 8th
