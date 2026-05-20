@@ -4738,3 +4738,6 @@ arc**. Closes `racEvaluation.*` (2/3 → 3/3, 1 endpoint).
 5 carry-forward lessons (per-agent surfaces audit + multi-score
 result rendering + chunks knob deferred + .toFixed(3) bounded
 scores + mutation guards at button level).
+
+## Continuation-38 — toolKnowledge (catalogue)
+Sixteenth arc. toolKnowledge (1/2 → 2/2) — 1 unconsumed (getTool). Panel-extension on RetrofitPage tool-knowledge tab. Slices 146/147/148.
