@@ -3854,3 +3854,61 @@ background-job CRUD (`listBackgroundJobs`, `cancelBackgroundJob`,
 `retryBackgroundJob`, etc.) + error event lookup
 (`listErrorEvents`, `getErrorEventById`, etc.). Three functional
 groups, 18 endpoints — a typical cont-26-shaped arc.
+
+## Continuation-28 — workspaceObservability operator surface (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Sixth arc of the partial-consumer audit cycle. Cont-27's closure
+named `workspaceObservability` (13/31 → 31/31) as the next target.
+**Second-largest absolute gap** with 18 unconsumed endpoints across
+3 functional groups (per cont-25/26 standing pattern).
+
+### Re-audit findings
+
+**Notifications group (8 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listMyNotifications` | query | filter + cursor pagination |
+| `getMyNotificationById` | query | notificationId |
+| `getMyNotificationsByIds` | query | ids[] |
+| `getMyUnreadNotificationCount` | query | (no input) → number |
+| `markNotificationsRead` | mutation | ids[] |
+| `markAllNotificationsRead` | mutation | (no input) |
+| `dismissAllNotifications` | mutation | (no input) |
+| `broadcastNotification` | mutation (admin) | kind + payload + audience |
+
+**Background jobs group (7 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listBackgroundJobs` | query | filter (status / kind / actor) + limit |
+| `getBackgroundJob` | query | jobId |
+| `getBackgroundJobsByIds` | query | ids[] |
+| `cancelBackgroundJob` | mutation | jobId |
+| `cancelBackgroundJobs` | mutation | ids[] |
+| `retryBackgroundJob` | mutation | jobId |
+| `retryBackgroundJobs` | mutation | ids[] |
+
+**Error events group (3 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listErrorEvents` | query | filter + cursor pagination |
+| `getErrorEventById` | query | eventId |
+| `getErrorEventsByIds` | query | ids[] |
+
+### Approach
+
+`WorkspaceObservabilityPanel` will have 3 cards (per cont-26 lesson):
+
+- **Notifications card** — unread-count badge + list + lookup-by-id +
+  mark-read/dismiss bulk + broadcast form (admin).
+- **Background jobs card** — list with status filter + lookup-by-id +
+  cancel/retry per-id + bulk cancel/retry sub-section.
+- **Error events card** — list with filter + lookup-by-id.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 116 | **Open continuation-28 catalogue** | This entry. 18-endpoint 3-card arc. |
+| 117 | **`WorkspaceObservabilityPanel` + page** | 3-card panel; 7-point nav wiring; tests. |
+| 118 | **Continuation-28 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
