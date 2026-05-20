@@ -3679,3 +3679,103 @@ instantiation, note import/export, link backfill, search. Per
 cont-25 lesson #1, the catalogue should pre-group these. Given
 the scope, this may warrant a 4-or-5 slice arc (catalogue +
 2-3 panel slices + closure) rather than the standard 3-slice.
+
+## Continuation-27 — vault operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Fifth arc of the partial-consumer audit cycle. Cont-26's closure
+named `vault` (23/44 → 44/44) as the next target — **largest
+absolute unconsumed-endpoint count** in the remaining routers
+(21 unconsumed endpoints spanning many functional clusters).
+
+### Re-audit findings
+
+`vault.*` has 44 endpoints; 23 already consumed via the rich
+existing surfaces (`BasesPanel` filter-language α-shell + various
+vault retention / saved-view / attachment surfaces from Phase 16+
+sprints). The 21 unconsumed endpoints split into 5 functional
+groups per cont-25 lesson #1:
+
+**Membership group (1 endpoint):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `addMember` | mutation | vaultId + userId + role |
+
+**Attachment group (5 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `createAttachment` | mutation | vaultId + filename + mimeType + size + sha256? |
+| `getAttachment` | query | attachmentId |
+| `linkAttachmentToNote` | mutation | attachmentId + noteId |
+| `unlinkAttachmentFromNote` | mutation | attachmentId + noteId |
+| `markAttachmentAsSourceArtifact` | mutation | attachmentId |
+
+**Saved-view group (5 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listSavedViews` | query | vaultId + optional viewKind filter |
+| `getSavedView` | query | savedViewId |
+| `getSavedViewVersion` | query | versionId |
+| `listViewKindBlueprints` | query | enumerates registered view kinds |
+| `getViewKindBlueprint` | query | viewKind |
+
+**Template group (4 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `createNoteFromTemplate` | mutation | templateId + vaultId + variables |
+| `countDistinctDigestsForTemplate` | query | templateId |
+| `listInstantiationsByNote` | query | noteId |
+| `listInstantiationsByTemplate` | query | templateId |
+
+**Notes & Search group (6 endpoints):**
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `deleteNote` | mutation | noteId |
+| `exportNote` | query | noteId → markdown |
+| `getNoteVersion` | query | versionId → version detail |
+| `importNoteFromMarkdown` | mutation | vaultId + filename + markdown |
+| `backfillLinks` | mutation | vaultId (re-scans `[[wikilinks]]`) |
+| `search` | query | vaultId + q (full-text) |
+
+### Distinct shape: 5-card breadth panel + 4 standing lessons applied
+
+Three observations vs. cont-19/23/24/25/26:
+
+1. **Pure read-detail-by-id endpoints (getSavedView, getAttachment,
+   getNoteVersion, etc.) are common in the vault surface**. They're
+   each their own "lookup by id" mini-surface — operator pastes an
+   id, sees the detail. Per cont-26 lesson #2 (dashboards at top),
+   these go at the BOTTOM of each card as "lookup detail" subsections.
+2. **View-kind blueprints are a meta-surface**. `listViewKindBlueprints`
+   + `getViewKindBlueprint` document the saved-view ecosystem itself.
+   Operators can use this to discover what view kinds exist before
+   creating a new saved view. Goes in the saved-view card as a
+   "what view kinds are available?" sub-section.
+3. **`backfillLinks` is a maintenance one-shot**. Re-scans the entire
+   vault's `[[wikilinks]]` and rebuilds the `ags_vault_wikilinks` rows.
+   Operator clicks the button after fixing data drift. Goes in the
+   Notes & Search card with a confirm prompt (one-shot scope = vault-
+   wide reindex).
+
+### Approach
+
+`VaultAdminPanel` will have 5 cards mapped 1:1 to the functional
+groups (per cont-25 lesson #1 + cont-26 lesson #3 standing pattern):
+
+- **Membership card** — addMember form (vaultId + userId + role enum).
+- **Attachments card** — create-attachment form + lookup by id +
+  link/unlink-to-note + markAsSourceArtifact (operator-supplied ids).
+- **Saved views card** — list (with vaultId + viewKind filter) +
+  lookup by id + view-kind blueprints (list + by-kind detail).
+- **Templates card** — create-note-from-template form + count-distinct-
+  digests + listInstantiationsByNote + listInstantiationsByTemplate.
+- **Notes & Search card** — search form + delete / export / get-version
+  / import-from-markdown + backfillLinks one-shot (with confirm).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 113 | **Open continuation-27 catalogue** | This entry. 21-endpoint largest-absolute gap, 5 functional groups. |
+| 114 | **`VaultAdminPanel` + page** | 5-card panel consuming all 21 endpoints; full 7-point nav wiring; tests. |
+| 115 | **Continuation-27 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
