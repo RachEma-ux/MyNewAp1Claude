@@ -518,19 +518,37 @@ export const vaultRouter = router({
       const notes = await repo.listNotesInVault(input.vaultId, {
         limit: input.limit,
       });
+      // `counts` preserves the original occurrence-based semantics (each
+      // `#tag` mention bumps the count, even within a single note) so the
+      // pre-existing autocomplete consumer's `detail` "X uses" copy is
+      // unaffected. `noteIdsByTag` is the additive, deduped (per-note)
+      // index introduced 2026-05-20 to power the Vault Explorer tag-chip
+      // filter — a note appears at most once per tag.
       const counts = new Map<string, number>();
+      const noteIdsByTag = new Map<string, number[]>();
       for (const note of notes) {
         const latest = await repo.getLatestNoteVersion(note.id);
         if (!latest) continue;
         const { tagSlugs } = extractLinksFromMarkdown(latest.contentMd);
+        const seenForThisNote = new Set<string>();
         for (const tag of tagSlugs) {
           counts.set(tag, (counts.get(tag) ?? 0) + 1);
+          if (!seenForThisNote.has(tag)) {
+            seenForThisNote.add(tag);
+            const ids = noteIdsByTag.get(tag);
+            if (ids) ids.push(note.id);
+            else noteIdsByTag.set(tag, [note.id]);
+          }
         }
       }
       // Sort by count desc, then alpha asc.
       const sorted = Array.from(counts.entries())
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([tag, count]) => ({ tag, count }));
+        .map(([tag, count]) => ({
+          tag,
+          count,
+          noteIds: noteIdsByTag.get(tag) ?? [],
+        }));
       return { tags: sorted };
     }),
 
