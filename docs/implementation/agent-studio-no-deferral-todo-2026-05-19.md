@@ -3036,3 +3036,66 @@ multiple servers across a session without losing them.
 | 98 | **Open continuation-22 catalogue** | This entry. Names the smallest-arc shape + governed-procedure note. |
 | 99 | **`McpSchemaSyncPanel` + page** | Single-form panel consuming `mcpSchemaSync.sync`; tools JSON textarea + recent-syncs shelf; full 7-point nav wiring; tests. |
 | 100 | **Continuation-22 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next-arc decision (re-audit again or pivot to α-shell deprecation). |
+
+## Continuation-23 — promotion lifecycle UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+First arc of the **partial-consumer audit cycle** flagged by
+continuation-22's closure. The audit (per-router endpoint count
+vs. `trpc.agentStudio.X.<endpoint>` client refs) surfaced 18
+routers with 1≤consumed<endpoint_count. Picking `promotion` as
+the highest-pattern-replication target — its 4 unconsumed
+endpoints are a clean clone of cont-19's `graphChangeProposals`
+mutation-only lifecycle.
+
+### Re-audit findings
+
+`promotion.*` has 6 endpoints; 2 already consumed via
+`NotePromotionsRetentionPanel` (`getRetentionCronStatus` query +
+`pruneRetention` mutation — retention domain). The 4 lifecycle
+mutations are unconsumed:
+
+| Endpoint | Kind | Input shape |
+|---|---|---|
+| `submit` | mutation | `{ noteId, noteVersionId, promotionKind (10-value enum), rationale? }` |
+| `approve` | mutation | `{ promotionId }` |
+| `reject` | mutation | `{ promotionId, reason? }` |
+| `rollback` | mutation | `{ promotionId }` |
+
+`PromotionKind` is a closed 10-value enum: `knowledge_unit`,
+`cag_block`, `graph_skill_pack`, `tool_knowledge`, `workflow`,
+`policy`, `evaluation_case`, `runtime_investigation`,
+`graph_entity`, `temporal_observation`.
+
+### Pattern: clone graphChangeProposals lifecycle
+
+Same shape as cont-19's `GraphChangeProposalsLifecyclePanel`:
+- mutation-only (no list/get; operator supplies the promotionId)
+- 4 sub-sections (Submit / Approve / Reject / Rollback)
+- Submit has the closed-enum dropdown + noteId + noteVersionId +
+  rationale; success surfaces the new promotionId onto a
+  session-local recent-submissions shelf.
+- Approve / Reject / Rollback take a numeric promotionId; Reject
+  also takes an optional `reason` text field.
+
+Per the cont-19 carry-forward lesson #1 (mutation-only routers
+need a session-local "what I just submitted" affordance), the
+recent-submissions shelf is reused verbatim — capped at 10
+entries, surfaces returned `promotionId` for the operator to
+copy into the lifecycle sub-sections.
+
+### Distinct from NotePromotionsRetentionPanel
+
+The retention panel (existing) sweeps OLD promotion rows. The
+lifecycle panel (this arc) drives NEW promotion rows through
+submit/approve/reject/rollback. Distinct domains; both should
+exist; their AGS_NOTE_PROMOTIONS table is shared but they read/
+write disjoint columns.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 101 | **Open continuation-23 catalogue** | This entry. First arc of partial-consumer audit cycle. |
+| 102 | **`PromotionLifecyclePanel` + page** | 4-mutation lifecycle panel cloning cont-19 shape; 10-value PromotionKind closed dropdown; full 7-point nav wiring; tests. |
+| 103 | **Continuation-23 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next partial-consumer arc target. |
