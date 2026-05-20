@@ -166,6 +166,13 @@ const VaultAdminPage = lazy(() => import("../pages/VaultAdminPage"));
 const WorkspaceObservabilityPage = lazy(
   () => import("../pages/WorkspaceObservabilityPage"),
 );
+// No-deferral continuation-29 slice 120: Provider Bindings Admin
+// admin page — seventh arc of the partial-consumer audit cycle.
+// 4-endpoint surface (listForAgent / resolveForRun / remove /
+// testRunWithBinding).
+const ProviderBindingsAdminPage = lazy(
+  () => import("../pages/ProviderBindingsAdminPage"),
+);
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -375,6 +382,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-28 slice 117: Workspace Observability (no agent context) ──
   if (path.startsWith("/agent-studio/workspace-observability")) {
     return { ...empty, view: "workspace-observability", homeMode: null };
+  }
+  // ── No-deferral continuation-29 slice 120: Provider Bindings Admin (no agent context) ──
+  if (path.startsWith("/agent-studio/provider-bindings-admin")) {
+    return { ...empty, view: "provider-bindings-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -684,6 +695,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/workspace-observability");
       return;
     }
+    // No-deferral continuation-29 slice 120: provider-bindings-admin is a global view.
+    if (key === "provider-bindings-admin") {
+      navigate("/agent-studio/provider-bindings-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -871,6 +887,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "workspace-observability":
           return <WorkspaceObservabilityPage />;
+        // ── No-deferral continuation-29 slice 120: Provider Bindings Admin
+        //    (typed via AgentStudioView). ──
+        case "provider-bindings-admin":
+          return <ProviderBindingsAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
