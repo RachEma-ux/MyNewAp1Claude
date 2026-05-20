@@ -114,6 +114,12 @@ const GraphChangeProposalsPage = lazy(
 // closes the racIngestion.* UI-consumer gap (RAC Phase 3 — 3-endpoint
 // preview/register/validate workflow over a shared source reference).
 const RacIngestionPage = lazy(() => import("../pages/RacIngestionPage"));
+// No-deferral continuation-21 slice 96: Bases Admin (canonical CRUD)
+// page — closes the bases.* UI-consumer gap (10-endpoint CRUD over
+// the Phase 24 MVP ags_bases / ags_base_columns / ags_base_rows
+// data model). Coexists with the existing T-F.91 / T-F.2-α saved-
+// view α-shell at /agent-studio/bases.
+const BasesAdminPage = lazy(() => import("../pages/BasesAdminPage"));
 // V1+ 17-γ slice (PR-V1-86): Canvas projection events drain page.
 const CanvasProjectionEventsDrainPage = lazy(
   () => import("../pages/CanvasProjectionEventsDrainPage"),
@@ -285,6 +291,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── No-deferral continuation-20 slice 93: RAC Ingestion admin (no agent context) ──
   if (path.startsWith("/agent-studio/rac-ingestion")) {
     return { ...empty, view: "rac-ingestion", homeMode: null };
+  }
+  // ── No-deferral continuation-21 slice 96: Bases Admin canonical CRUD (no agent context) ──
+  if (path.startsWith("/agent-studio/bases-admin")) {
+    return { ...empty, view: "bases-admin", homeMode: null };
   }
   // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain status (no agent context) ──
   if (path.startsWith("/agent-studio/canvas-projection-events-drain")) {
@@ -554,6 +564,11 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/rac-ingestion");
       return;
     }
+    // No-deferral continuation-21 slice 96: bases-admin is a global view.
+    if (key === "bases-admin") {
+      navigate("/agent-studio/bases-admin");
+      return;
+    }
     // V1+ 17-γ slice (PR-V1-86): canvas-projection-events-drain is global.
     if ((key as string) === "canvas-projection-events-drain") {
       navigate("/agent-studio/canvas-projection-events-drain");
@@ -709,6 +724,10 @@ export default function AgentStudioShell() {
         //    (typed via AgentStudioView). ──
         case "rac-ingestion":
           return <RacIngestionPage />;
+        // ── No-deferral continuation-21 slice 96: Bases Admin canonical CRUD
+        //    (typed via AgentStudioView). ──
+        case "bases-admin":
+          return <BasesAdminPage />;
         // ── V1+ 17-γ slice (PR-V1-86): Canvas projection drain ──
         case "canvas-projection-events-drain" as any:
           return <CanvasProjectionEventsDrainPage />;
