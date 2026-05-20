@@ -1323,3 +1323,41 @@ future arc must either:
 - Wait for a trigger condition (dashboard demand, shared-cluster
   rollout, schema-change cutover) to convert a deferral into an
   actionable item.
+
+## Continuation-10 — slice 53 follow-on (2026-05-20)
+
+User directive: "continue with the next punch-list arc". With the
+caller-migration tail closed at continuation-9, continuation-10
+ran the **"completion audit"** method — for each slice that
+landed a new operator surface, verify it's fully wired:
+
+1. Page file exists ✓
+2. Route resolution in AgentStudioShell ✓
+3. Lazy-import in AgentStudioShell ✓
+4. View switch case ✓
+5. Navigation-key dispatch ✓
+6. `AgentStudioView` discriminated-union entry ?
+7. Sidebar group entry ?
+
+Slice 53 (`VaultTemplatesPage`) covered items 1-5 but missed 6+7.
+The page works when navigated directly (URL `/agent-studio/vault-
+templates`), but **operators can't discover it from the sidebar**
+and the type cast `as any` was needed at the call sites to bypass
+the missing union variant. This is a real gap — the slice did
+the body-of-work but skipped the nav surface.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 62 | **Open continuation-10 catalogue** | This entry. Names the slice-53 nav gap surfaced by the "completion audit" method. |
+| 63 | **vault-templates sidebar + type wiring** | Add `vault-templates` to `AgentStudioView` discriminated union; add Vaults-group sidebar entry; remove the 3 `as any` casts in AgentStudioShell. |
+| 64 | **Continuation-10 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names the "completion audit" as a reusable method. |
+
+### Continuation-10 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 62 catalogue | this PR | TBD | Opens continuation-10; surfaces slice-53's nav-surface gap |
+| 63 sidebar + type wiring | TBD | TBD | `AgentStudioView` extended; Vaults sidebar gets Templates; `as any` casts removed |
+| 64 continuation-10 closure | TBD | TBD | Receipt + completion-audit lesson |
