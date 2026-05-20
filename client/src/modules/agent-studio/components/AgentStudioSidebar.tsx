@@ -151,6 +151,12 @@ export type AgentStudioView =
   //    3-endpoint preview/register/validate workflow over a shared
   //    {workspaceId, sourceId} reference). ──
   | "rac-ingestion"
+  // ── No-deferral continuation-21 slice 96: Bases Admin (canonical
+  //    CRUD) page. Closes the bases.* UI-consumer gap (10-endpoint
+  //    CRUD over the Phase 24 MVP ags_bases / ags_base_columns /
+  //    ags_base_rows data model). Coexists with the existing T-F.91
+  //    / T-F.2-α saved-view α-shell at /agent-studio/bases. ──
+  | "bases-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -277,6 +283,15 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "RAC",
     items: [
       { key: "rac-ingestion", label: "Ingestion", icon: Database },
+    ],
+  },
+  // ── No-deferral continuation-21 slice 96: bases-admin canonical CRUD
+  //    page. Coexists with the existing T-F.91 / T-F.2-α saved-view
+  //    α-shell at /agent-studio/bases — see continuation-21 catalogue. ──
+  {
+    label: "Bases (canonical)",
+    items: [
+      { key: "bases-admin", label: "Bases Admin", icon: Table2 },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
