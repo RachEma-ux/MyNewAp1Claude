@@ -4531,3 +4531,83 @@ arc of the partial-consumer audit cycle**. Closes `cag.*`
 | racEvaluation | TBD | TBD | TBD | next |
 | toolApprovals | TBD | TBD | TBD | next |
 | toolKnowledge | TBD | TBD | TBD | next |
+
+## Continuation-34 closure receipt (2026-05-20)
+
+The thirty-fourth continuation arc shipped 1 panel-extension slice
++ 1 catalogue + this closure across PRs #1653–#1655. **Twelfth
+arc of the partial-consumer audit cycle**. Closes `goldenQuestions.*`
+(6/7 → 7/7, 1 endpoint).
+
+### Continuation-34 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 134 catalogue | #1653 | TBD | Opens continuation-34; 1-endpoint panel-extension arc |
+| 135 GoldenQuestionsSuiteBrowserPanel | #1654 | TBD | New panel rendered inline in GoldenQuestionsPage; 9-case source-scan test |
+| 136 continuation-34 closure | #1655 | TBD | Receipt + next partial-consumer arc target |
+
+### Continuation-34 carry-forward lessons
+
+1. **Single-endpoint gaps justify panel-extension over new-page.**
+   When the partial-consumer gap is one read endpoint and there's
+   already an admin page for the same router, the cleanest close
+   is to add a new panel inline in the existing page. Avoid
+   creating a new sidebar entry / route / page just to ship one
+   useQuery. Lesson: **the unit of cohesion is the router, not
+   the panel**: if a page already exists for a router, prefer
+   extending it; new pages are for routers without existing
+   operator surfaces.
+2. **The 3-PR catalogue + slice + closure pattern still applies
+   even for panel-extensions.** Cont-34 ships 3 PRs (catalogue +
+   panel + closure) without a 7-point nav-surface lockstep test —
+   the page already has nav wiring. Lesson: **the 3-PR pattern is
+   about audit + implementation + receipt, not about new-route
+   nav-wiring**; the nav-surface lockstep step is only required
+   when introducing a new view.
+3. **Discriminated envelope handling is still required.**
+   `listQuestionsInSuite` returns `{ status: "ok", questions }`
+   or `{ status: "not_found" }`. The new panel handles both
+   branches with explicit data-testid coverage. Lesson: **even
+   single-endpoint arcs need envelope-shape handling in the panel
+   and assertion coverage in the source-scan test** — a panel
+   that only renders the ok branch silently breaks operator UX
+   when a suiteKey typo hits the not_found path.
+4. **Panel ordering inside the page matters for operator flow.**
+   The new SuiteBrowser panel sits BETWEEN the existing Trigger
+   panel and the RecentRuns panel, not after both. Rationale:
+   operator workflow is (1) browse the suite to know what
+   questions exist, (2) trigger a run against that suite, (3)
+   browse recent runs. The browse-suite step belongs before the
+   run-history step. Lesson: **panel ordering in a page should
+   match the operator's read/write workflow**, not the order in
+   which panels were shipped.
+5. **A single endpoint isn't too thin to deserve an arc.**
+   Cont-33 audit (the previous closure) listed goldenQuestions as
+   "next" with 1 unconsumed. Even with N=1, the arc still produces
+   value (closes the gap + documents the pattern + extends the
+   page). Lesson: **don't skip a router because its gap is small**;
+   the cycle goal is closure, not throughput per arc.
+
+### Partial-consumer audit status (post-cont-34)
+
+| Router | Endpoints | Consumed pre | Consumed post | Arc |
+|---|---|---|---|---|
+| promotion | 14 | 10 | 14 | cont-23 |
+| graphCorrection | 13 | 3 | 13 | cont-24 |
+| semanticEnrichment | 12 | 4 | 12 | cont-25 |
+| graphQuality | 17 | 5 | 17 | cont-26 |
+| vault | 36 | 15 | 36 | cont-27 |
+| workspaceObservability | 23 | 5 | 23 | cont-28 |
+| providerBindings | 7 | 3 | 7 | cont-29 |
+| canvas | 8 | 2 | 8 | cont-30 |
+| graphAgent | 8 | 4 | 8 | cont-31 |
+| graphSkill | 4 | 1 | 4 | cont-32 |
+| cag | 5 | 2 | 5 | cont-33 |
+| goldenQuestions | 7 | 6 | 7 | cont-34 |
+| bases | 10 | 8 | saturated (cont-21) | — |
+| **graphProjection** | 6 | 4 | TBD | **cont-35 (next: drain operator surface — 2 unconsumed)** |
+| racEvaluation | 3 | 2 | TBD | next (1 unconsumed: evaluate) |
+| toolApprovals | 4 | 2 | TBD | next (2 unconsumed: list, getByHash) |
+| toolKnowledge | 2 | 1 | TBD | next (1 unconsumed) |
+| graphWorkspace | 8 | 7 | TBD | next (saturation re-audit) |
