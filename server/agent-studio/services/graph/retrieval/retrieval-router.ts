@@ -23,8 +23,15 @@ import type {
   NodeIdentity,
   RuntimeContext,
 } from "../repository/index.js";
-import { filterContextBlocks, type ContextBlockInput, type FilterResult } from "./safety-filter.js";
+import { filterContextBlocks, type ContextBlockInput, type ContextBlockOutput, type FilterResult } from "./safety-filter.js";
 import { validateCypherReadOnly } from "./text2cypher-validator.js";
+import {
+  extractDefaultSignals,
+  rankHybrid,
+  type HybridRankOptions,
+  type RankedBlock,
+  type RankSignals,
+} from "./hybrid-ranker.js";
 import { recordFailureStateEvent } from "../../failure-states/observability-bridge.js";
 import {
   selectTemplateForEligiblePacks,
@@ -121,6 +128,22 @@ export interface GraphRetrievalInput {
    * direct router callers (tests, simulation harness) typically omit it.
    */
   readonly runtimeRunId?: number;
+
+  /**
+   * Closes item 30 follow-up (PR #1398): per-block signal lookup for
+   * the hybrid ranker. Callers thread their vector / lexical /
+   * freshness retrievers in here via the bridge module
+   * (`vector-text-signal-bridge.buildSignalLookup`). The lookup is
+   * called once per filtered block at rank time — the router never
+   * re-fetches signals.
+   *
+   * When omitted, ranking still runs using the default signals
+   * (hopDistance + confidence from `extractDefaultSignals`) so the
+   * existing graph-only path still gets a stable ranked order.
+   */
+  readonly signalLookup?: (block: ContextBlockOutput) => Partial<RankSignals>;
+  /** Optional `rankHybrid` options pass-through (weights, hop ceiling). */
+  readonly rankOptions?: HybridRankOptions;
 }
 
 /**
@@ -260,6 +283,15 @@ export interface GraphRetrievalOutput {
     readonly templateKey: string;
     readonly reason: "first_template_in_top_pack" | "preferred_key_matched";
   };
+
+  /**
+   * Closes item 30 follow-up (PR #1398): per-block hybrid-ranker
+   * output. One `RankedBlock` per element of `contextBlocks` in the
+   * SAME order (descending score). Callers that don't need score /
+   * contribution detail can keep reading `contextBlocks`; callers
+   * that need to show "why this block was ranked here" read here.
+   */
+  readonly rankedBlocks?: ReadonlyArray<RankedBlock<ContextBlockOutput>>;
 }
 
 export class GraphRetrievalRouter {
@@ -634,7 +666,10 @@ export class GraphRetrievalRouter {
     }
 
     const filtered = filterContextBlocks(rawBlocks, input.runtime);
-    const citations = filtered.blocks.map((b) => b.citation);
+    // Citations get re-computed AFTER the hybrid-ranker pass below
+    // so they follow the same descending-score order as
+    // `contextBlocks`. The original pre-rank order would be a
+    // confusing mismatch for operators reading both fields.
 
     // T-I.5 batch A — bridge safety-filter pruning to the Phase 22
     // closed-taxonomy emission surface. One event per retrieval call
@@ -737,13 +772,33 @@ export class GraphRetrievalRouter {
       }
     }
 
+    // Item 30 follow-up (PR #1398 closure): hybrid-ranker pass over
+    // the filtered blocks. Default signals are extracted per block
+    // (hopDistance from the payload + confidence from provenance);
+    // when the caller threads a `signalLookup` we merge its
+    // vector / text / freshness scores on top. Ranking ALWAYS runs
+    // — even with no caller signals, the graph-only path benefits
+    // from a stable hop-proximity ordering with explicit scores.
+    const rankInputs = filtered.blocks.map((block) => {
+      const defaults = extractDefaultSignals(block);
+      const caller = input.signalLookup ? input.signalLookup(block) : {};
+      return {
+        block,
+        signals: { ...defaults, ...caller } as RankSignals,
+      };
+    });
+    const rankedBlocks = rankHybrid(rankInputs, input.rankOptions ?? {});
+    const orderedBlocks = rankedBlocks.map((r) => r.block);
+    const orderedCitations = orderedBlocks.map((b) => b.citation);
+
     return {
       mode: input.mode,
-      contextBlocks: filtered.blocks,
+      contextBlocks: orderedBlocks,
       safetyEvents,
-      citations,
+      citations: orderedCitations,
       truncated,
       durationMs: Date.now() - startedAt,
+      rankedBlocks,
       ...(resolvedSkill ? { resolvedSkill } : {}),
     };
   }
