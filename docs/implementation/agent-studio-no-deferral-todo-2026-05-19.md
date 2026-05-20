@@ -1905,3 +1905,53 @@ zero UI consumers. Continuation-15 should build a
 dropdown from `listKnownKinds`, a starting node/context form,
 Run button, result rendering. Mount under a new sidebar group
 OR add it alongside Impact Analysis under Lenses.
+
+## Continuation-15 — recommendation UI consumer (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-14's closure named the recommendation router as the
+target. Closes the second of the two ZERO-consumer surfaces
+surfaced by the broad audit.
+
+### Approach
+
+Mirrors slice 75 verbatim:
+
+- **Kind dropdown** from `listKnownKinds` (closed-taxonomy 8
+  values: `relevant_notes`, `relevant_cag_blocks`, `relevant_
+  graph_skill_packs`, `relevant_tools`, `relevant_policies`,
+  `relevant_workflows`, `relevant_experts`, `next_actions`)
+- **Anchor form**: `typeKey` + `id`
+- **Workspace id** (required positive integer — recommendations
+  NEVER cross workspaces in MVP per the contract)
+- **Optional knobs**: `limit` (1–100, default 10), `minConfidence`
+  (0–1, default 0.5)
+- **Run button** → calls `recommend` (a `query`, query-with-form
+  pattern via `enabled` gate per slice 75 lesson #1)
+- **Envelope handling**: top-level discriminator
+  `"ok" | "graphrag_unavailable"` — render an empty-state when
+  the backend isn't installed
+- **Result rendering**: per-result row with rank, permission
+  status pill, confidence bar, reason, graph path, citations.
+  `redactedCount` + `fullyHiddenCount` rendered as a "search ran
+  wider than you can see" banner.
+
+Mounted under the Lenses sidebar group alongside Impact
+Analysis (continuation-14 set the precedent — Lenses is the
+natural home for anchor-based traversal/recommendation surfaces).
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 77 | **Open continuation-15 catalogue** | This entry. Mirrors slice 75's pattern for the recommendation router. |
+| 78 | **`RecommendationRunnerPanel` + page** | Standalone page; 3-endpoint consumer (`recommend` + `listKnownKinds`; `recommendBatch` is the multi-kind extension that's a continuation-16 candidate); full 7-point nav-surface wiring; tests. |
+| 79 | **Continuation-15 closure receipt** | Per-slice merge SHAs + carry-forward lessons. Names continuation-16 target. |
+
+### Continuation-15 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 77 catalogue | this PR | TBD | Opens continuation-15; recommendation router UI-consumer arc |
+| 78 recommendation panel + page | TBD | TBD | 2-endpoint consumer (recommend + listKnownKinds) + 7-point nav wiring |
+| 79 continuation-15 closure | TBD | TBD | Receipt + continuation-16 target |
