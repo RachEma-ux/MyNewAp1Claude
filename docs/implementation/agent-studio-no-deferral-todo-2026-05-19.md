@@ -4611,3 +4611,29 @@ arc of the partial-consumer audit cycle**. Closes `goldenQuestions.*`
 | toolApprovals | 4 | 2 | TBD | next (2 unconsumed: list, getByHash) |
 | toolKnowledge | 2 | 1 | TBD | next (1 unconsumed) |
 | graphWorkspace | 8 | 7 | TBD | next (saturation re-audit) |
+
+## Continuation-34 — goldenQuestions operator admin (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Twelfth arc of the partial-consumer audit cycle. `goldenQuestions`
+(6/7 → 7/7) — 1 unconsumed endpoint.
+
+### Re-audit findings
+
+| Endpoint | Kind | Notes |
+|---|---|---|
+| `listQuestionsInSuite` | query (admin) | suiteKey → discriminated envelope (ok / not_found) with question rows |
+
+### Approach
+
+Adds a 3rd panel (`GoldenQuestionsSuiteBrowserPanel`) inline in
+`GoldenQuestionsPage` alongside the existing `GoldenQuestionsTriggerPanel`
++ `GoldenQuestionsRecentRunsPanel`. Panel-extension arc.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 134 | **Open continuation-34 catalogue** | This entry. 1-endpoint panel-extension arc. |
+| 135 | **`GoldenQuestionsSuiteBrowserPanel`** | New panel + page wiring; source-scan test. |
+| 136 | **Continuation-34 closure receipt** | Per-slice merge SHAs + carry-forward lessons + next target. |
