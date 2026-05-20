@@ -15,6 +15,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lt } from "drizzle-orm";
 import { getAsDb } from "../../db/connection.js";
 import { agsWorkspaceErrorEvents } from "../../../../drizzle/tables/agent-studio-graph-quality.js";
+import { appendErrorLog } from "./error-log-file.js";
 
 export class AsdbUnavailableError extends Error {
   constructor() {
@@ -69,8 +70,21 @@ export async function recordErrorEvent(
   const db = getDb();
   // Fail-soft on ASDB-null. Error event recording is observability,
   // not the operational hot path — losing an event row is preferable
-  // to throwing inside an already-failing flow.
-  if (!db) return null;
+  // to throwing inside an already-failing flow. We STILL mirror to
+  // the log file in this branch so ASDB-less environments still get
+  // forensic coverage.
+  if (!db) {
+    appendErrorLog({
+      sourceKind: input.sourceKind,
+      sourceId: input.sourceId,
+      userId: input.userId,
+      errorClass: input.errorClass,
+      errorMessage: input.errorMessage,
+      metadata: input.metadata ?? null,
+      errorEventRowId: null,
+    });
+    return null;
+  }
 
   const inserted = await db
     .insert(agsWorkspaceErrorEvents)
@@ -94,7 +108,18 @@ export async function recordErrorEvent(
     });
   const row = inserted[0];
   if (!row) return null;
-  return rowToEvent(row);
+  const event = rowToEvent(row);
+  // Mirror to log file. Fail-soft inside appendErrorLog — never throws.
+  appendErrorLog({
+    sourceKind: event.sourceKind,
+    sourceId: event.sourceId,
+    userId: event.userId,
+    errorClass: event.errorClass,
+    errorMessage: event.errorMessage,
+    metadata: event.metadata,
+    errorEventRowId: event.id,
+  });
+  return event;
 }
 
 /**
@@ -124,7 +149,21 @@ export async function recordErrorEvents(
 
   const getDb = options.getDb ?? getAsDb;
   const db = getDb();
-  if (!db) return [];
+  if (!db) {
+    // Mirror to log file even when ASDB is unavailable.
+    for (const input of inputs) {
+      appendErrorLog({
+        sourceKind: input.sourceKind,
+        sourceId: input.sourceId,
+        userId: input.userId,
+        errorClass: input.errorClass,
+        errorMessage: input.errorMessage,
+        metadata: input.metadata ?? null,
+        errorEventRowId: null,
+      });
+    }
+    return [];
+  }
 
   const inserted = await db
     .insert(agsWorkspaceErrorEvents)
@@ -149,7 +188,19 @@ export async function recordErrorEvents(
       createdAt: agsWorkspaceErrorEvents.createdAt,
     });
 
-  return inserted.map((row) => rowToEvent(row));
+  const events = inserted.map((row) => rowToEvent(row));
+  for (const event of events) {
+    appendErrorLog({
+      sourceKind: event.sourceKind,
+      sourceId: event.sourceId,
+      userId: event.userId,
+      errorClass: event.errorClass,
+      errorMessage: event.errorMessage,
+      metadata: event.metadata,
+      errorEventRowId: event.id,
+    });
+  }
+  return events;
 }
 
 /**

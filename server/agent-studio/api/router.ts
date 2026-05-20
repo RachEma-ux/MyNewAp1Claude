@@ -60,6 +60,7 @@ import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import { providerBindingsRouter } from "./provider-bindings-router";
 import { workspaceDefaultBindingsRouter } from "./workspace-default-bindings-router";
 import { cagRouter } from "./cag-router";
+import { clientObservabilityRouter } from "./client-observability-router";
 import { racSourcesRouter } from "./rac-sources-router";
 import { racIngestionRouter } from "./rac-ingestion-router";
 import { ingestionRouter } from "./ingestion-router";
@@ -2912,6 +2913,11 @@ export const agentStudioRouter = router({
   workspaceDefaultBindings: workspaceDefaultBindingsRouter,
   // RAC Phase 1D: Capability Pack preview/refresh APIs
   cag: cagRouter,
+  // Universal error event log — client-side reporter endpoint.
+  // Paired with `client/src/lib/error-reporter.ts`. All client errors
+  // land in `logs/error-events-YYYY-MM-DD.jsonl` + the
+  // `ags_workspace_error_events` table via `recordErrorEvent`.
+  clientObservability: clientObservabilityRouter,
   // RAC Phase 2: Source registry CRUD (profiles / sources / policies / ws-embedding-default)
   racSources: racSourcesRouter,
   // RAC Phase 3: Ingestion adapter contract (preview / register / validate)
