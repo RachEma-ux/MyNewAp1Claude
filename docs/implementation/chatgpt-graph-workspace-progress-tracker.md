@@ -250,7 +250,7 @@ Honest classification of the **13 previously-stubbed methods**:
 | `takeSnapshot` | returned `{snapshotId: ""}` | **FULLY IMPLEMENTED** (Neo4j counts + ASDB row in `ags_graph_projection_snapshots`) |
 | `detectDrift` | returned empty array | **FULLY IMPLEMENTED** (reads unresolved drift events + failed sync jobs) |
 | `rebuildProjection` | returned zero result | **FULLY IMPLEMENTED** (closed-taxonomy scope replay via `replayProjectionScope` — loads vault_notes / wikilinks / bases from Postgres SoT, feeds synthetic ProjectionEvents through `ProjectionSyncWorker`, returns real counts and lands per-source `counts` + `writes` in the rebuild row's summary; row status flows `running` → `completed`/`failed`) |
-| `runAlgorithm` | returned empty rows | **FULLY IMPLEMENTED** (allow-list `shortest_path` + throws `GraphCapabilityUnsupportedError` for unsupported keys — no false-empty success) |
+| `runAlgorithm` | returned empty rows | **FULLY IMPLEMENTED** (Memgraph MAGE pass-through closed by PR #1686 — pagerank / betweenness_centrality / community_detection / weakly_connected_components — plus `shortest_path` via Bolt; MAGE-not-installed condition surfaces as `GraphCapabilityUnsupportedError`; Neo4j CE continues to reject unsupported algos correctly per its capability declaration) |
 | `filterByPermissions` | pass-through | **FULLY IMPLEMENTED** (Neo4j round-trip per id + safe-default-deny + workspace/governance/visibility/sensitivity rules) |
 | `isVisibleToUser` | returned `true` | **FULLY IMPLEMENTED** (single-node visibility query routed through `isVisibleToRuntime`) |
 | `explainPath` | returned `{path: null}` | **FULLY IMPLEMENTED** (composes `shortestPath` + returns `{path, cypher, cost}`) |
@@ -311,7 +311,9 @@ Code surface: `server/agent-studio/services/graph/retrieval/{retrieval-router.ts
 
 Test surface: `tests/agent-studio/graphrag-retrieval-closure.test.ts` (42 tests / 6 sections) plus 7 adjacent suites (124 tests total) all green via `pnpm exec vitest run --pool=forks --poolOptions.forks.singleFork`.
 
-What is intentionally NOT in this PR: live Neo4j 5 CE evidence (BLOCKED BY MISSING CREDENTIALS / INFRA — operator-runnable via existing `graph-p0-smoke-neo4j-ce.yml` workflow dispatch), GDS algorithm pass-through (out of MVP-0-4 scope; CE backend correctly rejects via `GraphCapabilityUnsupportedError`), vector/text signal caller-side wiring (separate slice; ranker contract proven).
+What is intentionally NOT in this PR: live Neo4j 5 CE evidence (BLOCKED BY MISSING CREDENTIALS / INFRA — operator-runnable via existing `graph-p0-smoke-neo4j-ce.yml` workflow dispatch). The two prior follow-up carve-outs have shipped 2026-05-20:
+- GDS / real graph algorithm pass-through — closed by PR #1686 (Memgraph MAGE: pagerank / betweenness_centrality / community_detection / weakly_connected_components). Neo4j CE continues to reject unsupported algos by design; real GDS still requires Neo4j Enterprise + the GDS plugin (intentionally out of MVP scope).
+- Vector / text signal caller-side wiring — closed by PR #1685 (new `signalLookup` on `GraphRetrievalInput` + the `vector-text-signal-bridge` module). The router now invokes `rankHybrid` on every retrieval — even graph-only paths benefit from a stable hop-proximity score order.
 
 ## 12. Graph Agent Runtime closure (items 33–37, 2026-05-17)
 
