@@ -1647,3 +1647,58 @@ are all wired server-side; continuation-13 should add a
 `GoldenQuestionsRecentRunsPanel` mounted below the trigger panel
 on the same page (the natural drill-down sequence: "I just ran
 it → I want to see what happened").
+
+## Continuation-13 — golden-questions recent-runs drill-down (2026-05-20)
+
+User directive: "continue with the next punch-list arc".
+Continuation-12's closure named the recent-runs panel as the
+target. Of the 7 `goldenQuestions.*` tRPC endpoints, 2 now have
+UI consumers (`listSuites` + `triggerLiveEvaluation` from slice
+69); the remaining 4 reads are unconsumed:
+
+| tRPC | UI consumer status (post slice 69) |
+|---|---|
+| `listRecentRuns` | none |
+| `getRunStats` | none |
+| `listRunResults` | none |
+| `getQuestionDetail` | none |
+
+Slice 72 builds `GoldenQuestionsRecentRunsPanel` as a master-
+detail surface that consumes all 4 in one panel, mounted below
+the trigger panel on `GoldenQuestionsPage` for the natural
+"trigger → drill-down" sequence operators want.
+
+### Design
+
+Master-detail with progressive disclosure:
+
+1. **Master**: recent-runs list (`listRecentRuns`) — newest-first
+   table with optional `suiteKey` filter (reuses the
+   `listSuites` query already in the trigger panel). Click a row
+   → selects it.
+2. **Detail (stats)**: when a run is selected, fetch + render
+   `getRunStats` as a badge row (passed / failed / total /
+   status / started / completed).
+3. **Detail (results)**: alongside stats, fetch + render
+   `listRunResults` as a per-question table with PASS/FAIL pill
+   + failure reason + truncated `actualAnswer`. Click a result
+   row → expands inline.
+4. **Detail (question)**: the expanded result row lazily fetches
+   `getQuestionDetail` and renders `expectedPaths` JSON — the
+   triage view operators want when a question fails.
+
+### Catalogue
+
+| Slice | Surface | Notes |
+|---|---|---|
+| 71 | **Open continuation-13 catalogue** | This entry. Master-detail design + 4-endpoint consumer plan. |
+| 72 | **`GoldenQuestionsRecentRunsPanel`** | Master-detail panel + mount below trigger panel on `GoldenQuestionsPage`; tests. |
+| 73 | **Continuation-13 closure receipt** | Per-slice merge SHAs + carry-forward lessons. All 7 `goldenQuestions.*` endpoints have UI consumers — the audit cycle closes for golden-questions. |
+
+### Continuation-13 receipts
+
+| Slice | PR | Merge SHA | Notes |
+|---|---|---|---|
+| 71 catalogue | this PR | TBD | Opens continuation-13; recent-runs master-detail design |
+| 72 recent-runs panel | TBD | TBD | Panel + page mount + tests; 4 endpoint consumers |
+| 73 continuation-13 closure | TBD | TBD | Receipt + audit-cycle closure for golden-questions |
