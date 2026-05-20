@@ -187,6 +187,11 @@ export type AgentStudioView =
   //    proposal-lifecycle groups. Distinct from the existing
   //    GraphQualityFindingsPage (findings table). ──
   | "graph-quality"
+  // ── No-deferral continuation-27 slice 114: Vault Admin page.
+  //    Fifth arc of the partial-consumer audit cycle. Closes 21
+  //    vault endpoints across 5 functional groups (membership,
+  //    attachments, saved views, templates, notes & search). ──
+  | "vault-admin"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -383,6 +388,17 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Graph Quality",
     items: [
       { key: "graph-quality", label: "Quality Admin", icon: Award },
+    ],
+  },
+  // ── No-deferral continuation-27 slice 114: vault-admin page.
+  //    Fifth arc of the partial-consumer audit cycle. Operator
+  //    long-tail surface for membership / attachments / saved
+  //    views / templates / notes & search. Coexists with existing
+  //    vault surfaces. ──
+  {
+    label: "Vault Admin",
+    items: [
+      { key: "vault-admin", label: "Operator", icon: BookOpen },
     ],
   },
   // ── PR-V1-186: publish-targets admin ──
