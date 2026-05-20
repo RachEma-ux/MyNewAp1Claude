@@ -36,6 +36,7 @@ import {
   ScanSearch,
   Folder,
   FileText,
+  Award,
   Globe,
   LayoutGrid,
   Radio,
@@ -113,6 +114,11 @@ export type AgentStudioView =
   | "bases"
   // ── T-F.107 (T-F.6-α): inbox ──
   | "inbox"
+  // ── No-deferral continuation-12 slice 69: Golden Questions admin
+  //    page. Closes the slice-44 triggerLiveEvaluation UI-consumer
+  //    gap and opens the operator entry point for the broader
+  //    `goldenQuestions.*` tRPC surface (6 reads + 1 mutation). ──
+  | "golden-questions"
   // ── 2026-05-18 ops-discoverability: Graph Workspace explorer
   // (vault tree + markdown editor + local/global graph + impact +
   // runtime/decision trace). Previously only reachable via direct
@@ -270,6 +276,15 @@ const HOME_GROUPS: SectionGroup[] = [
         label: "Inbox",
         icon: Inbox,
       },
+    ],
+  },
+  // ── No-deferral continuation-12 slice 69: Golden Questions admin
+  //    page. Operator entry point for triggering live evaluation runs
+  //    against seeded golden-question suites. ──
+  {
+    label: "Evaluation",
+    items: [
+      { key: "golden-questions", label: "Golden Questions", icon: Award },
     ],
   },
 ];
