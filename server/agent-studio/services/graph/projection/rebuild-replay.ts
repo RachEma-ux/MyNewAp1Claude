@@ -208,16 +208,14 @@ export async function replayProjectionScope(
   deps: RebuildReplayDeps,
 ): Promise<ReplayResult> {
   const startedAt = Date.now();
-  const aggregate: ProjectionResult = {
-    nodesCreated: 0,
-    nodesUpdated: 0,
-    nodesDeleted: 0,
-    edgesCreated: 0,
-    edgesUpdated: 0,
-    edgesDeleted: 0,
-    durationMs: 0,
-    errors: [],
-  };
+  // `ProjectionResult` fields are readonly on the interface; track
+  // running totals in mutable locals and construct the result object
+  // at the end. The errors array IS appendable in TS (the interface
+  // says `errors: ProjectionResult["errors"]`, not Readonly<...>),
+  // but we keep it in a local for symmetry with the counters.
+  let nodesUpdated = 0;
+  let edgesUpdated = 0;
+  const errors: ProjectionResult["errors"] = [];
   const counts: { -readonly [K in keyof ReplayCounts]: ReplayCounts[K] } = {
     notes: 0,
     wikilinks: 0,
@@ -227,10 +225,15 @@ export async function replayProjectionScope(
 
   if (!isSupportedScope(scope)) {
     return {
-      ...aggregate,
+      nodesCreated: 0,
+      nodesUpdated: 0,
+      nodesDeleted: 0,
+      edgesCreated: 0,
+      edgesUpdated: 0,
+      edgesDeleted: 0,
+      durationMs: Date.now() - startedAt,
       scope: "vault_notes",
       counts,
-      durationMs: Date.now() - startedAt,
       errors: [
         {
           write: { kind: "upsert_node", node: { typeKey: "_unknown", id: scope } },
@@ -325,13 +328,13 @@ export async function replayProjectionScope(
       // base.row_changed) contribute their writes to `edgesUpdated`
       // for operator-readable totals.
       if (event.kind === "wikilink.changed" || event.kind === "base.row_changed") {
-        aggregate.edgesUpdated += writes;
+        edgesUpdated += writes;
       } else {
-        aggregate.nodesUpdated += writes;
+        nodesUpdated += writes;
       }
       if (r.status === "failed") {
         for (const err of r.errors) {
-          aggregate.errors.push({
+          errors.push({
             write: {
               kind: "upsert_node",
               node: { typeKey: event.kind, id: JSON.stringify(event.payload) },
@@ -341,7 +344,7 @@ export async function replayProjectionScope(
         }
       }
     } catch (err) {
-      aggregate.errors.push({
+      errors.push({
         write: {
           kind: "upsert_node",
           node: { typeKey: event.kind, id: JSON.stringify(event.payload) },
@@ -352,9 +355,15 @@ export async function replayProjectionScope(
   }
 
   return {
-    ...aggregate,
+    nodesCreated: 0,
+    nodesUpdated,
+    nodesDeleted: 0,
+    edgesCreated: 0,
+    edgesUpdated,
+    edgesDeleted: 0,
+    durationMs: Date.now() - startedAt,
     scope: scope as RebuildScope,
     counts,
-    durationMs: Date.now() - startedAt,
+    errors,
   };
 }
