@@ -418,19 +418,19 @@ items 54 + 59 + 60 per CLAUDE.md and the remaining-execution plan.
 
 | # | Item | Status |
 |---|---|---|
-| 52 | Full Canvas capability | PARTIALLY IMPLEMENTED (V1+ Phase 17-α shipped; canvas table + service + 2 pages on main) |
-| 53 | Full Bases capability | PARTIALLY IMPLEMENTED (T-F.91–T-F.105 burst, ~15 PRs shipped) |
-| 54 | Governed plugin framework | DEFERRED BY SCOPE (CLAUDE.md §T-H.1; foundation = extensions service) |
-| 55 | Offline sync | PARTIALLY IMPLEMENTED (V1+ OL-1..OL-9 shipped) |
-| 56 | Local-first mode | PARTIALLY IMPLEMENTED (same OL-* phases as item 55) |
-| 57 | Publish strategy | PARTIALLY IMPLEMENTED (publish-targets table + promotion service + Phase 19-α) |
+| 52 | Full Canvas capability | PARTIALLY IMPLEMENTED (V1+ Phase 17-α shipped; canvas table + service + 2 pages on main). **Next-slice candidate:** Phase 17-β operator-facing canvas page with reactflow editor + drag-drop note references + share/export. Foundation is shipped; remaining work is UI surface, not data model. |
+| 53 | Full Bases capability | PARTIALLY IMPLEMENTED (T-F.91–T-F.105 burst, ~15 PRs shipped; **column lifecycle + archive verbs shipped 2026-05-21 via PR #1689** — `updateColumn` / `deleteColumn` / `archiveBase` / `unarchiveBase`). **Next-slice candidates:** bulk-import-from-vault, CSV export, multi-base joins. |
+| 54 | Governed plugin framework | DEFERRED BY SCOPE (CLAUDE.md §T-H.1; foundation = extensions service). **Trigger to unblock:** explicit operator approval per CLAUDE.md "Plugin framework / marketplace — V2.x scope per Phase 26 (T-H, gated on operator approval)". No code shipped without that signal. |
+| 55 | Offline sync | PARTIALLY IMPLEMENTED (V1+ OL-1..OL-9 shipped). **Next-slice candidate:** OL-10 production-rollout — App.tsx call-site wiring with real tRPC closures + conflict-resolution UI per `agent-studio-offline-local-first.md`. |
+| 56 | Local-first mode | PARTIALLY IMPLEMENTED (same OL-* phases as item 55). **Next-slice candidate:** shares item 55's OL-10 rollout — single rollout closes both items. |
+| 57 | Publish strategy | PARTIALLY IMPLEMENTED (publish-targets table + promotion service + Phase 19-α). **Next-slice candidate:** Phase 19-β governance integration — publish-target validation gate against enterprise SDLC policies; rolled into the promotion-chain admin UI. |
 | 58 | Advanced GraphRAG | **FULLY IMPLEMENTED (NEW slice)** — `strategy-selector.ts` + 15 tests + engine wiring |
-| 59 | Multi-agent GraphRAG | DEFERRED BY SCOPE (T-H.3) |
-| 60 | Cross-workspace GraphRAG | DEFERRED BY SCOPE (T-H.3 — highest-risk surface) |
-| 61 | Advanced code architecture graph | PARTIALLY IMPLEMENTED (T-E spike OUTCOME A; foundation ready) |
-| 62 | Advanced security / DevSecOps graph | PARTIALLY IMPLEMENTED (security-graph table + service) |
-| 63 | Neo4j Enterprise / Aura upgrade | BLOCKED BY MISSING CREDENTIALS / INFRA (5 ADRs ready) |
-| 64 | Production HA / backup / RBAC hardening | BLOCKED BY MISSING CREDENTIALS / INFRA (hardening-invariants + production-readiness docs ready) |
+| 59 | Multi-agent GraphRAG | DEFERRED BY SCOPE (T-H.3). **Trigger to unblock:** explicit operator approval + cross-agent isolation review per T-H.3 ADR. Foundation: existing per-agent retrieval router stays single-agent. |
+| 60 | Cross-workspace GraphRAG | DEFERRED BY SCOPE (T-H.3 — highest-risk surface). **Trigger to unblock:** explicit operator approval + workspace-fence audit (cross-tenant data leak is the load-bearing risk). Permission filters are already workspace-scoped; cross-workspace retrieval would require explicit allow-list per workspace pair. |
+| 61 | Advanced code architecture graph | PARTIALLY IMPLEMENTED (T-E spike OUTCOME A; foundation ready). **Next-slice candidate:** dependency-cycle detection via Tarjan SCC on `IMPORTS` edges (requires Memgraph MAGE — shipped via PR #1686 — or Neo4j GDS) + coupling-metrics tRPC procedure. |
+| 62 | Advanced security / DevSecOps graph | PARTIALLY IMPLEMENTED (security-graph table + service). **Next-slice candidate:** exposure-chain operator query (vulnerable_component → exposed_endpoint → external_consumer) + policy-violation alerting. Existing `agsSecurityNodes` / `agsSecurityEdges` tables already model the data; query layer is the gap. |
+| 63 | Neo4j Enterprise / Aura upgrade | BLOCKED BY MISSING CREDENTIALS / INFRA (5 ADRs ready). **Trigger to unblock:** licensed Neo4j Enterprise install OR Aura tenant + connection credentials. The Neo4jCommunityGraphRepository already throws `GraphCapabilityUnsupportedError` for GDS algorithms — the wire-up to Enterprise GDS would be additive: detect `gds.*` procedure availability at `verifyConnectivity()`, then route algorithms through it. No CE-code churn needed. |
+| 64 | Production HA / backup / RBAC hardening | BLOCKED BY MISSING CREDENTIALS / INFRA (hardening-invariants + production-readiness docs ready). **Trigger to unblock:** target-cluster spec (HA topology, backup retention SLA, RBAC role matrix) + operator credentials. The hardening checklist at `docs/architecture/agent-studio-production-readiness.md` enumerates every check; running it requires production infra access. |
 
 New code on this PR: `server/agent-studio/services/graph/retrieval/strategy-selector.ts` (pure-deterministic `pickGraphRagStrategy` selecting from 5 RetrievalMode values via query keywords + caller hints) + `tests/agent-studio/item-58-graphrag-strategy-selector.test.ts` (15 tests) + engine `pickRetrievalMode` wiring. Replaces the hard-coded `graphrag_local` fallback with query-shape-aware selection. Engine regression: 4 graph-agent suites green (34 tests).
 
