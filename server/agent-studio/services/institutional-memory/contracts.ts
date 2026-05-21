@@ -215,10 +215,19 @@ export const INSTITUTIONAL_MEMORY_SOURCE_MAPPING: Readonly<
       "Approval steps ARE decisions. Outcome (approved/rejected) is on the row.",
   },
   policy: {
-    sourceTable: "ags_governance_records",
+    // 2026-05-20: Repointed from `ags_governance_records` (never
+    // shipped — no migration in /drizzle/tables) to the real
+    // `ags_approval_steps` table. Approval steps carry policy
+    // ENFORCEMENT (which policy fired, what outcome) — the runner
+    // dedupes by `approver_role` to surface one inst_policy node
+    // per distinct policy. A dedicated `ags_policies` table would
+    // be the right long-term home; until then the synthesized
+    // projection gives operators a real graph view.
+    sourceTable: "ags_approval_steps",
     idColumn: "id",
-    labelColumn: "policy_key",
-    notes: "Governance records carry the policy decisions.",
+    labelColumn: "approver_role",
+    notes:
+      "Synthesized from ags_approval_steps — one inst_policy per distinct approver_role.",
   },
   workflow: {
     sourceTable: "workflows",
@@ -253,11 +262,17 @@ export const INSTITUTIONAL_MEMORY_SOURCE_MAPPING: Readonly<
       "Runtime runs are timeline events keyed by createdAt. The lens-runner unions multiple tables (approval_steps, vault_versions, governance_records) into the timeline; the primary mapping here is the largest.",
   },
   governance_record: {
-    sourceTable: "ags_governance_records",
+    // 2026-05-20: Repointed (same reason as `policy` above). Each
+    // approval step is itself a governance audit record — who
+    // decided what, when, with what note. The lens-runner emits
+    // one inst_governance_record per row (alongside the inst_decision
+    // emit that already exists; same source, distinct typeKey + label
+    // so operators can scope to audit-shape views).
+    sourceTable: "ags_approval_steps",
     idColumn: "id",
-    labelColumn: "policy_key",
+    labelColumn: "decision_note",
     notes:
-      "Distinct from `policy` node type — same table, different label/scope. The lens-runner emits TWO nodes per row (one as policy, one as governance_record) when both lenses are active.",
+      "Distinct from `policy` node type — same source rows, different projection. policy dedupes by approver_role; governance_record keeps one node per row.",
   },
 };
 

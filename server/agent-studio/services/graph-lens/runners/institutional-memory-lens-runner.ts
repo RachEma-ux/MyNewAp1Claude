@@ -78,6 +78,12 @@ export interface InstitutionalMemoryLensWorkflowRow {
   readonly name: string;
   readonly description: string | null;
   readonly createdAt: Date;
+  /** 2026-05-20 — owner-person FK (workflows.userId). Drives the
+   *  cross-node person → workflow `owns_workflow` edge. */
+  readonly userId?: number | null;
+  /** 2026-05-20 — parent-project FK (workflows.workspaceId). Drives
+   *  the cross-node project → workflow `contains_workflow` edge. */
+  readonly workspaceId?: number | null;
 }
 
 /**
@@ -212,6 +218,56 @@ export interface InstitutionalMemoryLensDocumentRow {
   readonly createdByUserId: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** 2026-05-20 — parent-project FK (resolved from agsVaults.workspaceId).
+   *  Drives the cross-node project → document `contains_document` edge.
+   *  Null when the vault has no workspace association. */
+  readonly projectId?: number | null;
+}
+
+/**
+ * Team row — eighth projector-backed institutional memory node
+ * type (2026-05-20 closure). Synthesized from `workspace_members`
+ * per `INSTITUTIONAL_MEMORY_SOURCE_MAPPING.team`: a "team" is the
+ * group of members on a workspace. One `inst_team` is emitted per
+ * unique workspace, with the member roster surfaced in meta.
+ */
+export interface InstitutionalMemoryLensTeamRow {
+  /** Workspace id this team belongs to (used as both the synthetic team id and the project link). */
+  readonly workspaceId: number;
+  /** Workspace name (display label fallback). */
+  readonly workspaceName: string;
+  /** Member user-ids on the workspace. */
+  readonly memberUserIds: ReadonlyArray<number>;
+}
+
+/**
+ * Policy row — ninth projector-backed institutional memory node
+ * type (2026-05-20 closure). Synthesized from `ags_approval_steps`
+ * by deduping on `approverRole`: one `inst_policy` per distinct
+ * approver role surfaces the policy that's actively enforced via
+ * approvals.
+ */
+export interface InstitutionalMemoryLensPolicyRow {
+  /** Deduped approver role — the policy key. */
+  readonly policyKey: string;
+  /** How many approval steps reference this policy. */
+  readonly enforcementCount: number;
+}
+
+/**
+ * Governance record row — tenth projector-backed institutional
+ * memory node type (2026-05-20 closure). Each `ags_approval_steps`
+ * row becomes a governance audit record (distinct typeKey from
+ * inst_decision so operators can filter to audit-shape views).
+ */
+export interface InstitutionalMemoryLensGovernanceRecordRow {
+  readonly id: number;
+  readonly approverRole: string;
+  readonly state: string;
+  readonly decidedBy: number | null;
+  readonly decisionNote: string | null;
+  readonly decidedAt: Date | null;
+  readonly createdAt: Date;
 }
 
 export interface InstitutionalMemoryLensReadResult {
@@ -231,6 +287,12 @@ export interface InstitutionalMemoryLensReadResult {
   readonly timelineEvents?: ReadonlyArray<InstitutionalMemoryLensTimelineEventRow>;
   /** T-G.1.η — optional projector-backed document (vault note) reads. */
   readonly documents?: ReadonlyArray<InstitutionalMemoryLensDocumentRow>;
+  /** 2026-05-20 — projector-backed team (workspace) reads. */
+  readonly teams?: ReadonlyArray<InstitutionalMemoryLensTeamRow>;
+  /** 2026-05-20 — projector-backed policy reads. */
+  readonly policies?: ReadonlyArray<InstitutionalMemoryLensPolicyRow>;
+  /** 2026-05-20 — projector-backed governance-record reads. */
+  readonly governanceRecords?: ReadonlyArray<InstitutionalMemoryLensGovernanceRecordRow>;
   readonly truncated: boolean;
 }
 
@@ -296,6 +358,9 @@ const DECISION_NODE_PREFIX = "decision:";
 const OUTCOME_NODE_PREFIX = "outcome:";
 const TIMELINE_EVENT_NODE_PREFIX = "timeline_event:";
 const DOCUMENT_NODE_PREFIX = "document:";
+const TEAM_NODE_PREFIX = "team:";
+const POLICY_NODE_PREFIX = "policy:";
+const GOVERNANCE_RECORD_NODE_PREFIX = "governance_record:";
 
 export function buildInstitutionalMemoryLensSnapshot(
   input: BuildInstitutionalMemoryLensSnapshotInput,
@@ -562,6 +627,208 @@ export function buildInstitutionalMemoryLensSnapshot(
     } else {
       nodes.push({ typeKey: "inst_document", id, visible: false });
       hiddenNodeCount += 1;
+    }
+  }
+
+  for (const team of read.teams ?? []) {
+    const id = `${TEAM_NODE_PREFIX}${team.workspaceId}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_team",
+        id,
+        visible: true,
+        label: `${team.workspaceName} team`,
+        meta: {
+          workspaceId: team.workspaceId,
+          workspaceName: team.workspaceName,
+          memberCount: team.memberUserIds.length,
+          memberUserIds: [...team.memberUserIds],
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_team", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const pol of read.policies ?? []) {
+    const id = `${POLICY_NODE_PREFIX}${pol.policyKey}`;
+    if (visible) {
+      nodes.push({
+        typeKey: "inst_policy",
+        id,
+        visible: true,
+        label: pol.policyKey,
+        meta: {
+          policyKey: pol.policyKey,
+          enforcementCount: pol.enforcementCount,
+        },
+      });
+    } else {
+      nodes.push({ typeKey: "inst_policy", id, visible: false });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  for (const gr of read.governanceRecords ?? []) {
+    const id = `${GOVERNANCE_RECORD_NODE_PREFIX}${gr.id}`;
+    if (visible) {
+      const label = `${gr.state}: ${gr.approverRole}${gr.decidedAt ? ` @ ${gr.decidedAt.toISOString()}` : ""}`;
+      nodes.push({
+        typeKey: "inst_governance_record",
+        id,
+        visible: true,
+        label,
+        meta: {
+          recordId: gr.id,
+          approverRole: gr.approverRole,
+          state: gr.state,
+          decidedBy: gr.decidedBy,
+          decisionNote: gr.decisionNote,
+          decidedAt: gr.decidedAt ? gr.decidedAt.toISOString() : null,
+          createdAt: gr.createdAt.toISOString(),
+        },
+      });
+    } else {
+      nodes.push({
+        typeKey: "inst_governance_record",
+        id,
+        visible: false,
+      });
+      hiddenNodeCount += 1;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // Cross-node edges (item 19 closure — separate edge taxonomy slice)
+  //
+  // The first slice (#1404) only emitted owned_by + belongs_to_domain.
+  // This expansion adds the remaining institutional-memory edges,
+  // computed from foreign-key references already present on the read
+  // rows. Each edge is emitted exactly once, only when both endpoints
+  // exist in the snapshot — preserving the "no dangling edges"
+  // invariant the lens runner contract assumes.
+  // ────────────────────────────────────────────────────────────────
+
+  const personIds = new Set<number>((read.persons ?? []).map((p) => p.id));
+  const workflowIds = new Set<number>((read.workflows ?? []).map((w) => w.id));
+  const projectIds = new Set<number>((read.projects ?? []).map((p) => p.id));
+  const agentIds = new Set<number>(read.agents.map((a) => a.id));
+  const policyKeys = new Set<string>((read.policies ?? []).map((p) => p.policyKey));
+  const governanceRecordIds = new Set<number>(
+    (read.governanceRecords ?? []).map((g) => g.id),
+  );
+
+  // person → agent (owns_agent): when agent.ownerId points at a known person.
+  for (const a of read.agents) {
+    if (a.ownerId != null && personIds.has(a.ownerId)) {
+      edges.push({
+        typeKey: "owns_agent",
+        sourceNodeId: `${PERSON_NODE_PREFIX}${a.ownerId}`,
+        targetNodeId: `${AGENT_NODE_PREFIX}${a.id}`,
+        visible: true,
+      });
+    }
+  }
+
+  // person → workflow (owns_workflow): workflow.userId → person.
+  for (const wf of read.workflows ?? []) {
+    if (wf.userId != null && personIds.has(wf.userId)) {
+      edges.push({
+        typeKey: "owns_workflow",
+        sourceNodeId: `${PERSON_NODE_PREFIX}${wf.userId}`,
+        targetNodeId: `${WORKFLOW_NODE_PREFIX}${wf.id}`,
+        visible: true,
+      });
+    }
+  }
+
+  // project → workflow (contains_workflow): workflow.workspaceId → project.
+  for (const wf of read.workflows ?? []) {
+    if (wf.workspaceId != null && projectIds.has(wf.workspaceId)) {
+      edges.push({
+        typeKey: "contains_workflow",
+        sourceNodeId: `${PROJECT_NODE_PREFIX}${wf.workspaceId}`,
+        targetNodeId: `${WORKFLOW_NODE_PREFIX}${wf.id}`,
+        visible: true,
+      });
+    }
+  }
+
+  // project → document (contains_document): document → vault → workspace.
+  for (const doc of read.documents ?? []) {
+    if (doc.projectId != null && projectIds.has(doc.projectId)) {
+      edges.push({
+        typeKey: "contains_document",
+        sourceNodeId: `${PROJECT_NODE_PREFIX}${doc.projectId}`,
+        targetNodeId: `${DOCUMENT_NODE_PREFIX}${doc.id}`,
+        visible: true,
+      });
+    }
+  }
+
+  // agent → outcome (produced_outcome): outcome.agentId → agent.
+  for (const o of read.outcomes ?? []) {
+    if (agentIds.has(o.agentId)) {
+      edges.push({
+        typeKey: "produced_outcome",
+        sourceNodeId: `${AGENT_NODE_PREFIX}${o.agentId}`,
+        targetNodeId: `${OUTCOME_NODE_PREFIX}${o.id}`,
+        visible: true,
+      });
+    }
+  }
+
+  // person → team (member_of): every workspace member becomes an edge.
+  for (const team of read.teams ?? []) {
+    for (const memberId of team.memberUserIds) {
+      if (personIds.has(memberId)) {
+        edges.push({
+          typeKey: "member_of",
+          sourceNodeId: `${PERSON_NODE_PREFIX}${memberId}`,
+          targetNodeId: `${TEAM_NODE_PREFIX}${team.workspaceId}`,
+          visible: true,
+        });
+      }
+    }
+  }
+
+  // team → project (works_on): team workspace == project workspace.
+  for (const team of read.teams ?? []) {
+    if (projectIds.has(team.workspaceId)) {
+      edges.push({
+        typeKey: "works_on",
+        sourceNodeId: `${TEAM_NODE_PREFIX}${team.workspaceId}`,
+        targetNodeId: `${PROJECT_NODE_PREFIX}${team.workspaceId}`,
+        visible: true,
+      });
+    }
+  }
+
+  // governance_record → policy (enforces): when the governance record's
+  // approverRole matches a known policy key.
+  for (const gr of read.governanceRecords ?? []) {
+    if (policyKeys.has(gr.approverRole)) {
+      edges.push({
+        typeKey: "enforces",
+        sourceNodeId: `${GOVERNANCE_RECORD_NODE_PREFIX}${gr.id}`,
+        targetNodeId: `${POLICY_NODE_PREFIX}${gr.approverRole}`,
+        visible: true,
+      });
+    }
+  }
+
+  // decision → governance_record (audits): same source row, distinct
+  // typeKeys — emit the audit edge so operators tracing a decision
+  // can hop to its formal audit shape.
+  for (const d of read.decisions ?? []) {
+    if (governanceRecordIds.has(d.id)) {
+      edges.push({
+        typeKey: "audits",
+        sourceNodeId: `${DECISION_NODE_PREFIX}${d.id}`,
+        targetNodeId: `${GOVERNANCE_RECORD_NODE_PREFIX}${d.id}`,
+        visible: true,
+      });
     }
   }
 
