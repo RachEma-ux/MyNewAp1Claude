@@ -28,19 +28,24 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../../../_core/trpc.js";
 import {
   AGS_BASE_COLUMN_DATA_TYPES,
+  archiveBase,
   BaseColumnDataTypeError,
+  BaseColumnNotFoundError,
   BaseNotFoundError,
   BaseRowNotFoundError,
   BaseRowUnknownColumnsError,
   createBase,
   createBaseColumn,
   createBaseRow,
+  deleteBaseColumn,
   deleteBaseRow,
   getBaseSnapshot,
   listBaseColumns,
   listBaseRows,
   listBases,
+  unarchiveBase,
   updateBase,
+  updateBaseColumn,
   updateBaseRow,
 } from "./public-api.js";
 
@@ -237,6 +242,71 @@ export const basesRouter = router({
         return { rowId: input.rowId, deleted: true as const };
       } catch (e) {
         if (e instanceof BaseRowNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
+      }
+    }),
+
+  // ----- column lifecycle (2026-05-21 maturity slice) --------------------
+
+  updateColumn: protectedProcedure
+    .input(
+      z.object({
+        columnId: z.number().int().positive(),
+        name: z.string().min(1).max(255).optional(),
+        config: z.record(z.string(), z.unknown()).nullable().optional(),
+        sortKey: z.number().int().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { columnId, ...patch } = input;
+      try {
+        return await updateBaseColumn(columnId, patch);
+      } catch (e) {
+        if (e instanceof BaseColumnNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
+      }
+    }),
+
+  deleteColumn: protectedProcedure
+    .input(z.object({ columnId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        await deleteBaseColumn(input.columnId);
+        return { columnId: input.columnId, deleted: true as const };
+      } catch (e) {
+        if (e instanceof BaseColumnNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
+      }
+    }),
+
+  // ----- base lifecycle archive/unarchive --------------------------------
+
+  archiveBase: protectedProcedure
+    .input(z.object({ baseId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await archiveBase(input.baseId);
+      } catch (e) {
+        if (e instanceof BaseNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+        }
+        throw e;
+      }
+    }),
+
+  unarchiveBase: protectedProcedure
+    .input(z.object({ baseId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await unarchiveBase(input.baseId);
+      } catch (e) {
+        if (e instanceof BaseNotFoundError) {
           throw new TRPCError({ code: "NOT_FOUND", message: e.message });
         }
         throw e;

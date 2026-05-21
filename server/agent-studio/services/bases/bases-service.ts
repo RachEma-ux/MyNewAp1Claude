@@ -32,6 +32,7 @@ import {
 import {
   AsdbUnavailableError,
   BaseColumnDataTypeError,
+  BaseColumnNotFoundError,
   BaseNotFoundError,
   BaseRowNotFoundError,
   isAgsBaseColumnDataType,
@@ -332,6 +333,165 @@ export async function listBaseColumns(
     .from(agsBaseColumns)
     .where(eq(agsBaseColumns.baseId, baseId))
     .orderBy(asc(agsBaseColumns.sortKey), asc(agsBaseColumns.id));
+}
+
+/**
+ * Phase 24 maturity slice (2026-05-21): mutate an existing column's
+ * metadata (name / config / sortKey). `dataType` + `key` are NOT
+ * mutable — changing them would corrupt every existing row's `cells`
+ * payload. Operators delete + recreate when the type or key needs to
+ * change. `BaseColumnDataTypeError` thrown for an unknown dataType
+ * passed in by mistake (defensive; the optional override is rejected
+ * before it can land).
+ */
+export interface UpdateBaseColumnInput {
+  readonly name?: string;
+  readonly config?: Record<string, unknown> | null;
+  readonly sortKey?: number | null;
+}
+
+export async function updateBaseColumn(
+  columnId: number,
+  patch: UpdateBaseColumnInput,
+): Promise<AgsBaseColumn> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  // Workspace routing: the column row only carries baseId; resolve
+  // the workspace via the parent base in one extra round-trip.
+  const colLookup = await lookupDb
+    .select({ baseId: agsBaseColumns.baseId })
+    .from(agsBaseColumns)
+    .where(eq(agsBaseColumns.id, columnId))
+    .limit(1);
+  if (colLookup.length === 0) {
+    throw new BaseColumnNotFoundError(columnId);
+  }
+  const workspaceId = await resolveWorkspaceIdForBase(
+    lookupDb,
+    colLookup[0].baseId,
+  );
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
+
+  const updates: Record<string, unknown> = {};
+  if (patch.name !== undefined) updates.name = patch.name;
+  if (patch.config !== undefined) updates.config = patch.config;
+  if (patch.sortKey !== undefined) updates.sortKey = patch.sortKey;
+  if (Object.keys(updates).length === 0) {
+    // No-op patch: return current row rather than firing an UPDATE.
+    const current = await db
+      .select()
+      .from(agsBaseColumns)
+      .where(eq(agsBaseColumns.id, columnId))
+      .limit(1);
+    if (current.length === 0) throw new BaseColumnNotFoundError(columnId);
+    return current[0];
+  }
+  const rows = await db
+    .update(agsBaseColumns)
+    .set(updates)
+    .where(eq(agsBaseColumns.id, columnId))
+    .returning();
+  const updated = rows[0];
+  if (!updated) throw new BaseColumnNotFoundError(columnId);
+  return updated;
+}
+
+/**
+ * Phase 24 maturity slice (2026-05-21): hard-delete a column row.
+ * Row cells keyed by the dropped column become orphaned (still
+ * valid JSON in `agsBaseRows.cells`, just no longer described by
+ * any schema row). Operators with strict schemas can subsequently
+ * scrub via updateRow; the service does not pre-scrub because the
+ * cells payload is operator-owned data.
+ */
+export async function deleteBaseColumn(columnId: number): Promise<void> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const colLookup = await lookupDb
+    .select({ baseId: agsBaseColumns.baseId })
+    .from(agsBaseColumns)
+    .where(eq(agsBaseColumns.id, columnId))
+    .limit(1);
+  if (colLookup.length === 0) {
+    throw new BaseColumnNotFoundError(columnId);
+  }
+  const workspaceId = await resolveWorkspaceIdForBase(
+    lookupDb,
+    colLookup[0].baseId,
+  );
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
+  await db.delete(agsBaseColumns).where(eq(agsBaseColumns.id, columnId));
+}
+
+/**
+ * Phase 24 maturity slice (2026-05-21): explicit archive verb.
+ * Wraps `updateBase({ archivedAt: now })` so the operator surface
+ * carries verb-level intent (audits + permissions can pin on
+ * `archiveBase` rather than the generic `update`). Idempotent —
+ * already-archived rows return their current state without
+ * bumping `archivedAt`.
+ */
+export async function archiveBase(baseId: number): Promise<AgsBase> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
+  const existing = await db
+    .select()
+    .from(agsBases)
+    .where(eq(agsBases.id, baseId))
+    .limit(1);
+  if (existing.length === 0) throw new BaseNotFoundError(baseId);
+  if (existing[0].archivedAt != null) return existing[0]; // idempotent
+  const rows = await db
+    .update(agsBases)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(eq(agsBases.id, baseId))
+    .returning();
+  const updated = rows[0];
+  if (!updated) throw new BaseNotFoundError(baseId);
+  fireBaseProjection(updated, "base.updated");
+  return updated;
+}
+
+/**
+ * Phase 24 maturity slice (2026-05-21): explicit unarchive verb.
+ * Inverse of archiveBase; clears `archivedAt`. Idempotent on
+ * already-unarchived bases.
+ */
+export async function unarchiveBase(baseId: number): Promise<AgsBase> {
+  const lookupDb = getAsDb();
+  if (!lookupDb) throw new AsdbUnavailableError();
+  const workspaceId = await resolveWorkspaceIdForBase(lookupDb, baseId);
+  const db =
+    workspaceId != null
+      ? (getAsDbForWorkspace(workspaceId) ?? lookupDb)
+      : lookupDb;
+  const existing = await db
+    .select()
+    .from(agsBases)
+    .where(eq(agsBases.id, baseId))
+    .limit(1);
+  if (existing.length === 0) throw new BaseNotFoundError(baseId);
+  if (existing[0].archivedAt == null) return existing[0]; // idempotent
+  const rows = await db
+    .update(agsBases)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(eq(agsBases.id, baseId))
+    .returning();
+  const updated = rows[0];
+  if (!updated) throw new BaseNotFoundError(baseId);
+  fireBaseProjection(updated, "base.updated");
+  return updated;
 }
 
 // ----- Rows -----------------------------------------------------------

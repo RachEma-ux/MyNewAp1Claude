@@ -7,15 +7,22 @@ export {
   listBases,
   getBaseSnapshot,
   updateBase,
+  archiveBase,
+  unarchiveBase,
   createBaseColumn,
   listBaseColumns,
+  updateBaseColumn,
+  deleteBaseColumn,
   createBaseRow,
   updateBaseRow,
   deleteBaseRow,
   listBaseRows,
   BaseRowUnknownColumnsError,
 } from "./bases-service.js";
-export type { ListBasesFilter } from "./bases-service.js";
+export type {
+  ListBasesFilter,
+  UpdateBaseColumnInput,
+} from "./bases-service.js";
 
 export {
   enqueueBaseProjection,
