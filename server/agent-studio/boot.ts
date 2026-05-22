@@ -919,11 +919,18 @@ export async function bootAgentStudio(): Promise<void> {
   // runners (Step 3.36 wires those when their `_RUNNER_INSTALL` flag
   // is on). Pick exactly one strategy per kind — Step 3.36's
   // explanation on the dual-flag collision applies.
+  // F2 (2026-05-22) — capture the lens-stack install state so the
+  // misconfig warning at the end of Step 3.36 can compare it with
+  // the real-runner install count.
+  let lensStackDefaultsInstalled = false;
+  let lensStackStubRunnersInstalled = false;
   try {
     const { maybeInstallDefaultLensStack } = await import(
       "./services/graph-lens/public-api"
     );
     const result = maybeInstallDefaultLensStack();
+    lensStackDefaultsInstalled = result.lenses.installed;
+    lensStackStubRunnersInstalled = result.runners.installed;
     if (result.fullyInstalled) {
       console.log(
         `[ags-graph-lens] default lens-stack installed — lenses=${result.lenses.installedIds.length} runners=${result.runners.installedKinds.length}`,
@@ -954,11 +961,13 @@ export async function bootAgentStudio(): Promise<void> {
   // try-catch swallows the error AND logs the per-kind perKind result
   // — boot continues with whichever runners did register. Pick ONE
   // strategy per kind: real OR stub, never both.
+  let realRunnersInstalledCount = 0;
   try {
     const { maybeInstallAllLensRunnersWithAsdb } = await import(
       "./services/graph-lens/public-api"
     );
     const result = maybeInstallAllLensRunnersWithAsdb();
+    realRunnersInstalledCount = result.installedCount;
     if (result.installedCount > 0) {
       const installedKinds = Object.entries(result.perKind)
         .filter(([, installed]) => installed)
@@ -971,6 +980,27 @@ export async function bootAgentStudio(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-graph-lens] real runners install skipped — ${message}`);
+  }
+
+  // F2 (2026-05-22) — operator-discovery warning if the combined
+  // Step 3.35 + Step 3.36 state would yield a silent empty surface
+  // (e.g. real runner installed but no lens defs → graphLens.list
+  // is empty → operator thinks the feature is broken).
+  try {
+    const { computeLensStackMisconfigWarnings } = await import(
+      "./services/graph-lens/public-api"
+    );
+    const warnings = computeLensStackMisconfigWarnings({
+      defaultsInstalled: lensStackDefaultsInstalled,
+      stubRunnersInstalled: lensStackStubRunnersInstalled,
+      realRunnersInstalledCount,
+    });
+    for (const line of warnings) {
+      console.warn(line);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-graph-lens] misconfig warning skipped — ${message}`);
   }
 
   // Step 3.25 — V1+ Phase J-1-β (2026-05-13): graph health-alert cron.

@@ -118,6 +118,8 @@ export {
   maybeInstallDefaultLensStack,
   type MaybeInstallDefaultLensStackOptions,
   type MaybeInstallDefaultLensStackResult,
+  computeLensStackMisconfigWarnings,
+  type LensStackMisconfigInput,
 } from "./install-default-lens-stack.js";
 
 export {
