@@ -30,9 +30,12 @@
  *   - Source-scan tested.
  */
 
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { adminProcedure, router } from "../../../_core/trpc.js";
+import { getDb } from "../../../db/connection.js";
+import { workspaces } from "../../../../drizzle/tables/users.js";
 import {
   GRAPH_LENS_KINDS,
   GRAPH_LENS_KIND_METADATA,
@@ -82,10 +85,30 @@ export interface LensRenderEnvelopeNotFound {
   readonly lensId: string;
 }
 
+/**
+ * Returned when `render` was called with a `workspaceId` that does
+ * not match any row in the operator `workspaces` table.
+ *
+ * Why explicit (rather than letting the runner return an empty
+ * snapshot): F4 verification finding (2026-05-22) — without this
+ * check, `render({workspaceId:9999})` returned 86 nodes / 23 edges
+ * for the institutional_memory lens because the ASDB reader's
+ * agents/decisions/governance_records queries are not all
+ * workspace-scoped at the table level (some are ASDB-global). A
+ * fast existence check at the router boundary prevents cross-
+ * workspace surface leakage; per-table workspace scoping in the
+ * reader is tracked as a follow-up slice.
+ */
+export interface LensRenderEnvelopeWorkspaceNotFound {
+  readonly status: "workspace_not_found";
+  readonly workspaceId: number;
+}
+
 export type LensRenderEnvelope =
   | LensRenderEnvelopeWithRunner
   | LensRenderEnvelopeMissingRunner
-  | LensRenderEnvelopeNotFound;
+  | LensRenderEnvelopeNotFound
+  | LensRenderEnvelopeWorkspaceNotFound;
 
 // ============================================================================
 // Router
@@ -142,6 +165,25 @@ export const graphLensRouter = router({
       const runner = getLensRunner(def.kind);
       if (!runner) {
         return { status: "no_runner_for_kind", kind: def.kind };
+      }
+      // F4 — workspace existence check (2026-05-22). See
+      // `LensRenderEnvelopeWorkspaceNotFound` for the rationale.
+      // When `getDb()` is unavailable (no DATABASE_URL), we fall
+      // through to the runner with a warning rather than failing
+      // open — preserves the existing contract for CI / no-DB envs.
+      const db = getDb();
+      if (db) {
+        const wsRows = await db
+          .select({ id: workspaces.id })
+          .from(workspaces)
+          .where(eq(workspaces.id, input.workspaceId))
+          .limit(1);
+        if (wsRows.length === 0) {
+          return {
+            status: "workspace_not_found",
+            workspaceId: input.workspaceId,
+          };
+        }
       }
       const ctxAny = ctx as unknown as { user?: { id?: number } };
       const userId = ctxAny.user?.id ?? null;
