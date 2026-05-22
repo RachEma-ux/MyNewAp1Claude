@@ -141,8 +141,62 @@ function buildCreateTableSql(table: PgTable): string {
 }
 
 /**
+ * Render a drizzle SQL `.where(sql\`...\`)` chunk array into a raw
+ * SQL fragment suitable for a partial-index `WHERE` clause.
+ *
+ * F6 (2026-05-22) — before this helper landed, `buildIndexSql`
+ * silently dropped the `.where(...)` clause from drizzle's partial
+ * unique indexes (e.g. `idx_ags_graph_edges_type_edge_key` defined
+ * as `.uniqueIndex(...).where(sql\`edge_key IS NOT NULL\`)`).
+ * The seed then attempted a NON-partial unique, which collided with
+ * legitimately-duplicate rows whose `edge_key` was NULL or with
+ * legacy duplicates from before the constraint existed → repeating
+ * `[ASDB] index error on ags_graph_edges: could not create unique index`
+ * at every boot, with the unique constraint never actually landing.
+ *
+ * Supported chunk shapes (matches what `sql\`<col> IS NOT NULL\``
+ * etc. produces):
+ *   - String tags: a drizzle `SQL` chunk whose `.value[0]` is a
+ *     literal SQL fragment, e.g. `' IS NOT NULL'`.
+ *   - Column references: a `PgColumn`-like object exposing `.name`.
+ *
+ * Unrecognized chunk shapes throw so we don't silently emit a
+ * partial-clause that doesn't match drizzle's intent.
+ */
+function renderIndexWhereChunks(chunks: ReadonlyArray<unknown>): string {
+  const parts: string[] = [];
+  for (const chunk of chunks) {
+    if (typeof chunk === "string") {
+      parts.push(chunk);
+      continue;
+    }
+    const obj = chunk as Record<string, unknown>;
+    if (obj && Array.isArray((obj as any).value)) {
+      // Drizzle string-tag wrapping: { value: ['<literal>'] }
+      for (const v of (obj as any).value as unknown[]) {
+        if (typeof v === "string") parts.push(v);
+      }
+      continue;
+    }
+    if (obj && typeof (obj as any).name === "string") {
+      // Drizzle column reference.
+      parts.push(`"${(obj as any).name}"`);
+      continue;
+    }
+    throw new Error(
+      `[seed] unsupported partial-index WHERE chunk shape: ${JSON.stringify(
+        obj,
+      )}`,
+    );
+  }
+  return parts.join("").trim();
+}
+
+/**
  * Build CREATE INDEX IF NOT EXISTS statements for the table's indexes.
  * Both regular and unique indexes are derived from the same config.
+ * F6 (2026-05-22): partial-index `WHERE` clauses are now rendered
+ * (previously they were silently stripped).
  */
 function buildIndexSql(table: PgTable): string[] {
   const config = getTableConfig(table);
@@ -156,12 +210,22 @@ function buildIndexSql(table: PgTable): string[] {
     const tableName = config.name;
     if (!idxName || !colNames) continue;
     const unique = cfg.unique ? "UNIQUE " : "";
+    let whereClause = "";
+    if (cfg.where && Array.isArray(cfg.where.queryChunks)) {
+      const rendered = renderIndexWhereChunks(cfg.where.queryChunks);
+      if (rendered.length > 0) {
+        whereClause = ` WHERE ${rendered}`;
+      }
+    }
     stmts.push(
-      `CREATE ${unique}INDEX IF NOT EXISTS "${idxName}" ON "${tableName}" (${colNames});`
+      `CREATE ${unique}INDEX IF NOT EXISTS "${idxName}" ON "${tableName}" (${colNames})${whereClause};`
     );
   }
   return stmts;
 }
+
+// F6 — exported for unit-testing the WHERE-clause renderer in isolation.
+export const __testing__ = { renderIndexWhereChunks, buildIndexSql };
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
