@@ -40,6 +40,28 @@ import * as agsGraphQualitySchema from "../../../drizzle/tables/agent-studio-gra
 import * as agsCanvasSchema from "../../../drizzle/tables/agent-studio-canvas";
 // Phase 24 — Bases MVP (T-F.1).
 import * as agsBasesSchema from "../../../drizzle/tables/agent-studio-bases";
+// F5 (2026-05-22) — eight `agent-studio-*` table files that were defined +
+// re-exported via `drizzle/schema.ts` but never wired into this seed's
+// `combinedSchema`. Result before this fix: the corresponding `ags_*` tables
+// did not exist on a freshly-seeded ASDB.
+//
+// Originally surfaced as: `ags_regions` + `ags_workspace_region_pins` +
+// `ags_runtime_alerts` missing → region-cache-rewarm + graph-health-alert
+// crons failed every tick with `Failed query: ...`. The completeness
+// source-scan test caught five more drifted files in the same sweep.
+//
+// Source-scan regression guard:
+//   `tests/agent-studio/seed-combined-schema-completeness.test.ts`
+// — fails if a new `drizzle/tables/agent-studio-*.ts` lands without being
+// either imported here or added to KNOWN_NON_ASDB_TABLES.
+import * as agsRegionsSchema from "../../../drizzle/tables/agent-studio-regions";
+import * as agsWorkspaceRegionPinsSchema from "../../../drizzle/tables/agent-studio-workspace-region-pins";
+import * as agsRuntimeAlertsSchema from "../../../drizzle/tables/agent-studio-runtime-alerts";
+import * as agsCodeGraphSchema from "../../../drizzle/tables/agent-studio-code-graph";
+import * as agsExtensionsSchema from "../../../drizzle/tables/agent-studio-extensions";
+import * as agsPublishTargetsSchema from "../../../drizzle/tables/agent-studio-publish-targets";
+import * as agsSecurityGraphSchema from "../../../drizzle/tables/agent-studio-security-graph";
+import * as agsVaultTemplateInstantiationsSchema from "../../../drizzle/tables/agent-studio-vault-template-instantiations";
 
 interface SeedResult {
   created: number;
@@ -205,6 +227,14 @@ export async function seedAsDb(): Promise<SeedResult> {
     ...agsGraphQualitySchema,
     ...agsCanvasSchema,
     ...agsBasesSchema,
+    ...agsRegionsSchema,
+    ...agsWorkspaceRegionPinsSchema,
+    ...agsRuntimeAlertsSchema,
+    ...agsCodeGraphSchema,
+    ...agsExtensionsSchema,
+    ...agsPublishTargetsSchema,
+    ...agsSecurityGraphSchema,
+    ...agsVaultTemplateInstantiationsSchema,
   };
 
   try {
