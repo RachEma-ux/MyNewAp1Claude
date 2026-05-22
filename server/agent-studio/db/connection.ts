@@ -22,6 +22,7 @@
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as agsSchema from "../../../drizzle/tables/agent-studio";
+import { buildPoolWithErrorLogger } from "../../db/build-pool";
 
 let _asDb: ReturnType<typeof drizzle<typeof agsSchema>> | null = null;
 
@@ -40,7 +41,8 @@ export function getAsDb() {
     try {
       const masked = url.replace(/:([^:@]+)@/, ":****@");
       console.log("[ASDB] Connecting to:", masked);
-      _asDb = drizzle(url, { schema: agsSchema });
+      const pool = buildPoolWithErrorLogger(url, "ASDB");
+      _asDb = drizzle(pool, { schema: agsSchema });
       console.log("[ASDB] Drizzle instance created");
     } catch (error) {
       console.error("[ASDB] Connection failed:", error);

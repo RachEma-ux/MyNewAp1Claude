@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../../drizzle/schema";
+import { buildPoolWithErrorLogger } from "./build-pool";
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
@@ -9,7 +10,8 @@ export function getDb() {
       const dbUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
       console.log("[Database] Initializing Drizzle with URL:", dbUrl);
 
-      _db = drizzle(process.env.DATABASE_URL, { schema });
+      const pool = buildPoolWithErrorLogger(process.env.DATABASE_URL, "Database");
+      _db = drizzle(pool, { schema });
       console.log("[Database] Drizzle instance created successfully");
     } catch (error) {
       console.error("[Database] Failed to create Drizzle instance:", error);
