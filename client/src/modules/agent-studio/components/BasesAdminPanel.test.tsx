@@ -44,6 +44,8 @@ const mocks = vi.hoisted(() => ({
   createBase: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
   updateBase: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
   createCol: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
+  updateCol: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
+  deleteCol: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
   createRow: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
   updateRow: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
   deleteRow: { isPending: false, mutate: vi.fn(), lastOpts: null as any },
@@ -86,6 +88,18 @@ vi.mock("@/lib/trpc", () => ({
             return mocks.createCol;
           },
         },
+        updateColumn: {
+          useMutation: (opts: any) => {
+            mocks.updateCol.lastOpts = opts;
+            return mocks.updateCol;
+          },
+        },
+        deleteColumn: {
+          useMutation: (opts: any) => {
+            mocks.deleteCol.lastOpts = opts;
+            return mocks.deleteCol;
+          },
+        },
         createRow: {
           useMutation: (opts: any) => {
             mocks.createRow.lastOpts = opts;
@@ -114,6 +128,8 @@ beforeEach(() => {
     mocks.createBase,
     mocks.updateBase,
     mocks.createCol,
+    mocks.updateCol,
+    mocks.deleteCol,
     mocks.createRow,
     mocks.updateRow,
     mocks.deleteRow,
@@ -383,5 +399,98 @@ describe("BasesAdminPanel", () => {
     mocks.listQuery.error = { message: "boom" };
     render(<BasesAdminPanel />);
     expect(screen.getByTestId("ba-list-error").textContent).toContain("boom");
+  });
+
+  it("rename column opens an editor and saving calls updateColumn", () => {
+    mocks.listQuery.data = [
+      { id: 5, name: "Research", slug: "research" },
+    ];
+    mocks.snapshotQuery.data = {
+      base: { id: 5, name: "Research", slug: "research" },
+      columns: [{ id: 11, key: "status", name: "Status", dataType: "text" }],
+      rows: [],
+    };
+    render(<BasesAdminPanel />);
+    fireEvent.click(screen.getByTestId("ba-list-row-select"));
+    fireEvent.click(screen.getByTestId("ba-col-edit"));
+    const input = screen.getByTestId("ba-col-edit-name") as HTMLInputElement;
+    expect(input.value).toBe("Status");
+    fireEvent.change(input, { target: { value: "Workflow status" } });
+    fireEvent.click(screen.getByTestId("ba-col-edit-save"));
+    expect(mocks.updateCol.mutate).toHaveBeenCalledWith({
+      columnId: 11,
+      name: "Workflow status",
+    });
+  });
+
+  it("rename column save is disabled when name is blank or whitespace-only", () => {
+    mocks.listQuery.data = [
+      { id: 5, name: "Research", slug: "research" },
+    ];
+    mocks.snapshotQuery.data = {
+      base: { id: 5, name: "Research", slug: "research" },
+      columns: [{ id: 11, key: "status", name: "Status", dataType: "text" }],
+      rows: [],
+    };
+    render(<BasesAdminPanel />);
+    fireEvent.click(screen.getByTestId("ba-list-row-select"));
+    fireEvent.click(screen.getByTestId("ba-col-edit"));
+    fireEvent.change(screen.getByTestId("ba-col-edit-name"), {
+      target: { value: "   " },
+    });
+    expect(screen.getByTestId("ba-col-edit-save")).toBeDisabled();
+    expect(mocks.updateCol.mutate).not.toHaveBeenCalled();
+  });
+
+  it("delete column confirms and calls deleteColumn", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mocks.listQuery.data = [
+      { id: 5, name: "Research", slug: "research" },
+    ];
+    mocks.snapshotQuery.data = {
+      base: { id: 5, name: "Research", slug: "research" },
+      columns: [{ id: 11, key: "status", name: "Status", dataType: "text" }],
+      rows: [],
+    };
+    render(<BasesAdminPanel />);
+    fireEvent.click(screen.getByTestId("ba-list-row-select"));
+    fireEvent.click(screen.getByTestId("ba-col-delete"));
+    expect(mocks.deleteCol.mutate).toHaveBeenCalledWith({ columnId: 11 });
+    confirmSpy.mockRestore();
+  });
+
+  it("delete column cancellation skips the mutation", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    mocks.listQuery.data = [
+      { id: 5, name: "Research", slug: "research" },
+    ];
+    mocks.snapshotQuery.data = {
+      base: { id: 5, name: "Research", slug: "research" },
+      columns: [{ id: 11, key: "status", name: "Status", dataType: "text" }],
+      rows: [],
+    };
+    render(<BasesAdminPanel />);
+    fireEvent.click(screen.getByTestId("ba-list-row-select"));
+    fireEvent.click(screen.getByTestId("ba-col-delete"));
+    expect(mocks.deleteCol.mutate).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("rename column cancel button exits edit mode without mutating", () => {
+    mocks.listQuery.data = [
+      { id: 5, name: "Research", slug: "research" },
+    ];
+    mocks.snapshotQuery.data = {
+      base: { id: 5, name: "Research", slug: "research" },
+      columns: [{ id: 11, key: "status", name: "Status", dataType: "text" }],
+      rows: [],
+    };
+    render(<BasesAdminPanel />);
+    fireEvent.click(screen.getByTestId("ba-list-row-select"));
+    fireEvent.click(screen.getByTestId("ba-col-edit"));
+    expect(screen.getByTestId("ba-col-edit-name")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ba-col-edit-cancel"));
+    expect(screen.queryByTestId("ba-col-edit-name")).toBeNull();
+    expect(mocks.updateCol.mutate).not.toHaveBeenCalled();
   });
 });
