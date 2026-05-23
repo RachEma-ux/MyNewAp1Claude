@@ -98,4 +98,15 @@ describe("CodeGraphPanel — triggerIngest operator-trigger UI", () => {
     expect(src).toMatch(/disabled=\{triggerMutation\.isPending\}/);
     expect(src).toMatch(/Ingesting…/);
   });
+
+  it("auto-selects the newly-triggered ingestion and resets drill-in filters", () => {
+    // Closing the operator-visible loop: after a fresh ingest the
+    // operator wants to see the stats/nodes/edges populate without
+    // having to scroll + click. The mutation already returns the
+    // ingestionId, so we forward it to the panel selector and clear
+    // the type-key filters so the first-look drill-in is unfiltered.
+    expect(src).toMatch(/setSelectedIngestionId\(data\.ingestionId\)/);
+    expect(src).toMatch(/setNodeTypeFilter\(""\)/);
+    expect(src).toMatch(/setEdgeTypeFilter\(""\)/);
+  });
 });

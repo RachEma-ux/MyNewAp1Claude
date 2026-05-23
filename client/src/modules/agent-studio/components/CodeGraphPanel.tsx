@@ -81,6 +81,14 @@ export function CodeGraphPanel() {
           durationMs: data.durationMs,
         });
         setTriggerError(null);
+        // Auto-select the newly-triggered ingestion so the
+        // stats/nodes/edges drill-in sections populate without the
+        // operator having to scroll down + click. Resetting the
+        // type-key filters keeps the drill-in unfiltered for the
+        // first look at the fresh data.
+        setSelectedIngestionId(data.ingestionId);
+        setNodeTypeFilter("");
+        setEdgeTypeFilter("");
         void utils.agentStudio.codeGraph.listIngestions.invalidate();
         void utils.agentStudio.codeGraph.listRepositories.invalidate();
         void utils.agentStudio.codeGraph.listRecentParserErrors.invalidate();
