@@ -499,108 +499,103 @@ export function AgentStudioChatWindow() {
           refetch because agentId drives them. */}
       {agentList.length > 0 && (
         <div className="border-b px-3 py-2 shrink-0">
-          <div className="flex items-center justify-between mb-1.5">
+          {/* Labels row: Agent (left) + Session (right) on the same line */}
+          <div className="flex items-center justify-between gap-2 mb-1.5">
             <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
-              Agent
+              Agent · {agentList.length}
             </span>
-            <span className="text-[9px] text-muted-foreground">
-              {agentList.length} available
-            </span>
-          </div>
-          <Select
-            value={selectedAgentId !== null ? String(selectedAgentId) : ""}
-            onValueChange={(v) => {
-              const id = Number(v);
-              if (Number.isFinite(id)) setSelectedAgentId(id);
-            }}
-          >
-            <SelectTrigger
-              className="h-8 text-xs"
-              data-testid="agent-studio-chat-agent-select"
-            >
-              <SelectValue placeholder="Pick an agent…" />
-            </SelectTrigger>
-            <SelectContent>
-              {agentList.map((a) => {
-                const compatible = isChatCompatible(a);
-                const provider =
-                  (a?.providerConfig?.provider as string | undefined) ??
-                  "(none)";
-                return (
-                  <SelectItem
-                    key={a.id}
-                    value={String(a.id)}
-                    // Workspace-default chat binding lets non-openai
-                    // agents chat now (PR #1705-#1707). Keep all agents
-                    // selectable; surface the per-agent provider hint
-                    // for incompatible legacy bindings as a subtle
-                    // suffix instead of disabling the option.
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0",
-                          avatarColor(a.name),
-                        )}
-                      >
-                        {initials(a.name)}
-                      </span>
-                      <span className="truncate">{a.name}</span>
-                      {!compatible && (
-                        <span className="text-[9px] text-muted-foreground ml-1">
-                          ({provider} → wsDefault)
-                        </span>
-                      )}
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Session bar — shows the current session title + a collapsible
-          list of all sessions for the active agent, plus a "+ New"
-          button that clears the current session so the next send
-          creates a fresh one. Task #2. */}
-      {agentId !== null && (
-        <div className="border-b px-3 py-1.5 shrink-0">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={() => setSessionsExpanded((v) => !v)}
-              disabled={sessionList.length === 0 && !pendingNewSession}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-1 min-w-0 text-left"
-              title="Toggle session list"
-            >
-              {sessionsExpanded ? (
-                <ChevronUp className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              )}
-              <span className="font-semibold uppercase tracking-wider shrink-0">
+            {agentId !== null && (
+              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
                 Session
               </span>
-              <span className="truncate opacity-80">
-                {pendingNewSession
-                  ? "New…"
-                  : sessionId != null
-                  ? sessionList.find((s) => s.id === sessionId)?.title ??
-                    `#${sessionId}`
-                  : "none"}
-              </span>
-            </button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 px-1.5 text-[10px]"
-              onClick={handleNewSession}
-              title="Start a new session"
-              disabled={pendingNewSession}
+            )}
+          </div>
+          {/* Controls row: Agent dropdown (flex-1) + Session toggle + New */}
+          <div className="flex items-center gap-2">
+            <Select
+              value={selectedAgentId !== null ? String(selectedAgentId) : ""}
+              onValueChange={(v) => {
+                const id = Number(v);
+                if (Number.isFinite(id)) setSelectedAgentId(id);
+              }}
             >
-              <Plus className="h-3 w-3 mr-0.5" />
-              New
-            </Button>
+              <SelectTrigger
+                className="h-8 text-xs flex-1 min-w-0"
+                data-testid="agent-studio-chat-agent-select"
+              >
+                <SelectValue placeholder="Pick an agent…" />
+              </SelectTrigger>
+              <SelectContent>
+                {agentList.map((a) => {
+                  const compatible = isChatCompatible(a);
+                  const provider =
+                    (a?.providerConfig?.provider as string | undefined) ??
+                    "(none)";
+                  return (
+                    <SelectItem
+                      key={a.id}
+                      value={String(a.id)}
+                      // Workspace-default chat binding lets non-openai
+                      // agents chat now (PR #1705-#1707). Keep all agents
+                      // selectable; surface the per-agent provider hint
+                      // for incompatible legacy bindings as a subtle
+                      // suffix instead of disabling the option.
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0",
+                            avatarColor(a.name),
+                          )}
+                        >
+                          {initials(a.name)}
+                        </span>
+                        <span className="truncate">{a.name}</span>
+                        {!compatible && (
+                          <span className="text-[9px] text-muted-foreground ml-1">
+                            ({provider} → wsDefault)
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {agentId !== null && (
+              <>
+                <button
+                  onClick={() => setSessionsExpanded((v) => !v)}
+                  disabled={sessionList.length === 0 && !pendingNewSession}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors min-w-0 max-w-[110px] h-8 px-2 rounded border bg-background"
+                  title="Toggle session list"
+                >
+                  {sessionsExpanded ? (
+                    <ChevronUp className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className="truncate opacity-80">
+                    {pendingNewSession
+                      ? "New…"
+                      : sessionId != null
+                        ? sessionList.find((s) => s.id === sessionId)?.title ??
+                          `#${sessionId}`
+                        : "none"}
+                  </span>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-1.5 text-[10px] shrink-0"
+                  onClick={handleNewSession}
+                  title="Start a new session"
+                  disabled={pendingNewSession}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </>
+            )}
           </div>
           {sessionsExpanded && sessionList.length > 0 && (
             <div className="mt-1.5 max-h-32 overflow-y-auto flex flex-col gap-0.5">
