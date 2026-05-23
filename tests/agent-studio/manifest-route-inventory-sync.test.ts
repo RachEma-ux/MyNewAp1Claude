@@ -23,6 +23,7 @@ const ADMIN_PATHS = [
   "/agent-studio/region-admin",
   "/agent-studio/extensions-admin",
   "/agent-studio/mcp-manager",
+  "/agent-studio/bases-admin",
 ] as const;
 
 describe("PR-V1-178 — manifest + routes route inventory sync", () => {

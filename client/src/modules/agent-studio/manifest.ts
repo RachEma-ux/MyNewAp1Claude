@@ -70,6 +70,7 @@ export const agentStudioClientManifest: ClientModuleManifest = {
     "/agent-studio/approval-bus-admin",
     "/agent-studio/publish-targets-admin",
     "/agent-studio/graph-health-admin",
+    "/agent-studio/bases-admin",
     "/agent-studio/:agentId",
     "/agent-studio/:agentId/:section",
     "/agent-studio/:agentId/runs/:runId",

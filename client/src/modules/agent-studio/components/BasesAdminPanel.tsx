@@ -472,6 +472,8 @@ function ColumnsSubsection({
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [dataType, setDataType] = useState<ColumnDataType>("text");
+  const [editingColumnId, setEditingColumnId] = useState<number | null>(null);
+  const [editColumnName, setEditColumnName] = useState("");
 
   const createColMut = trpc.agentStudio.bases.createColumn.useMutation({
     onSuccess: () => {
@@ -483,6 +485,28 @@ function ColumnsSubsection({
     },
     onError: (err) => {
       toast.error(`Create column failed: ${err.message ?? "unknown"}`);
+    },
+  });
+
+  const updateColMut = trpc.agentStudio.bases.updateColumn.useMutation({
+    onSuccess: () => {
+      toast.success("Column renamed");
+      setEditingColumnId(null);
+      setEditColumnName("");
+      onMutate();
+    },
+    onError: (err) => {
+      toast.error(`Rename column failed: ${err.message ?? "unknown"}`);
+    },
+  });
+
+  const deleteColMut = trpc.agentStudio.bases.deleteColumn.useMutation({
+    onSuccess: () => {
+      toast.success("Column deleted");
+      onMutate();
+    },
+    onError: (err) => {
+      toast.error(`Delete column failed: ${err.message ?? "unknown"}`);
     },
   });
 
@@ -499,6 +523,31 @@ function ColumnsSubsection({
       dataType,
     });
   }
+
+  function handleEditColumn(columnId: number, currentName: string) {
+    setEditingColumnId(columnId);
+    setEditColumnName(currentName);
+  }
+
+  function handleSaveEditColumn() {
+    if (editingColumnId === null) return;
+    const trimmed = editColumnName.trim();
+    if (trimmed.length === 0) return;
+    updateColMut.mutate({ columnId: editingColumnId, name: trimmed });
+  }
+
+  function handleDeleteColumn(columnId: number, columnName: string) {
+    if (
+      !window.confirm(
+        `Delete column "${columnName}" (#${columnId})? Cells under this column will be removed from every row.`,
+      )
+    ) {
+      return;
+    }
+    deleteColMut.mutate({ columnId });
+  }
+
+  const editColumnValid = editColumnName.trim().length > 0;
 
   return (
     <Card>
@@ -574,22 +623,80 @@ function ColumnsSubsection({
           </p>
         ) : (
           <ul className="space-y-1" data-testid="ba-col-list">
-            {columns.map((c) => (
-              <li
-                key={c.id}
-                data-testid="ba-col-row"
-                className="flex items-center gap-2 rounded border bg-background p-2 text-sm"
-              >
-                <span className="font-mono text-xs text-muted-foreground">
-                  #{c.id}
-                </span>
-                <span className="font-mono">{c.key}</span>
-                <span className="flex-1">{c.name}</span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
-                  {c.dataType}
-                </span>
-              </li>
-            ))}
+            {columns.map((c) => {
+              const isEditing = editingColumnId === c.id;
+              return (
+                <li
+                  key={c.id}
+                  data-testid="ba-col-row"
+                  className="space-y-2 rounded border bg-background p-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      #{c.id}
+                    </span>
+                    <span className="font-mono">{c.key}</span>
+                    <span className="flex-1">{c.name}</span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+                      {c.dataType}
+                    </span>
+                    {isEditing ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingColumnId(null);
+                          setEditColumnName("");
+                        }}
+                        data-testid="ba-col-edit-cancel"
+                      >
+                        Cancel
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditColumn(c.id, c.name)}
+                        data-testid="ba-col-edit"
+                      >
+                        Rename
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={deleteColMut.isPending}
+                      onClick={() => handleDeleteColumn(c.id, c.name)}
+                      data-testid="ba-col-delete"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        data-testid="ba-col-edit-name"
+                        value={editColumnName}
+                        onChange={(e) => setEditColumnName(e.target.value)}
+                        maxLength={255}
+                        placeholder="New column name"
+                      />
+                      <Button
+                        type="button"
+                        disabled={!editColumnValid || updateColMut.isPending}
+                        onClick={handleSaveEditColumn}
+                        data-testid="ba-col-edit-save"
+                      >
+                        {updateColMut.isPending ? "Saving…" : "Save"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
