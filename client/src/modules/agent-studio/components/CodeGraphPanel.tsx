@@ -26,6 +26,7 @@ const INGESTIONS_LIMIT = 50;
 const DRILL_IN_LIMIT = 100;
 
 export function CodeGraphPanel() {
+  const utils = trpc.useUtils();
   const ingestionsQuery =
     trpc.agentStudio.codeGraph.listIngestions.useQuery(
       { limit: INGESTIONS_LIMIT },
@@ -43,6 +44,66 @@ export function CodeGraphPanel() {
     trpc.agentStudio.codeGraph.listKnownTypes.useQuery(undefined, {
       refetchOnWindowFocus: false,
     });
+
+  // ── triggerIngest mutation (T-G.2.3 operator-trigger UI) ─────────
+  // Closes the operator-visible boundary on the orchestrator slice:
+  // the mutation lazy-loads the orchestrator + tree-sitter binding
+  // server-side. On success, invalidates the three read queries that
+  // change shape after a new ingestion (ingestions / repositories /
+  // parserErrors). Errors surface inline; the form stays open so the
+  // operator can correct the inputs.
+  const [showTriggerForm, setShowTriggerForm] = useState(false);
+  const [triggerRepoPath, setTriggerRepoPath] = useState("");
+  const [triggerRepositoryId, setTriggerRepositoryId] = useState("");
+  const [triggerSubPath, setTriggerSubPath] = useState("");
+  const [triggerError, setTriggerError] = useState<string | null>(null);
+  const [lastTriggerResult, setLastTriggerResult] = useState<{
+    ingestionId: string;
+    filesScanned: number;
+    filesParsed: number;
+    nodesUpserted: number;
+    edgesUpserted: number;
+    edgesRejected: number;
+    parserErrorCount: number;
+    durationMs: number;
+  } | null>(null);
+  const triggerMutation =
+    trpc.agentStudio.codeGraph.triggerIngest.useMutation({
+      onSuccess: (data) => {
+        setLastTriggerResult({
+          ingestionId: data.ingestionId,
+          filesScanned: data.filesScanned,
+          filesParsed: data.filesParsed,
+          nodesUpserted: data.nodesUpserted,
+          edgesUpserted: data.edgesUpserted,
+          edgesRejected: data.edgesRejected,
+          parserErrorCount: data.parserErrorCount,
+          durationMs: data.durationMs,
+        });
+        setTriggerError(null);
+        void utils.agentStudio.codeGraph.listIngestions.invalidate();
+        void utils.agentStudio.codeGraph.listRepositories.invalidate();
+        void utils.agentStudio.codeGraph.listRecentParserErrors.invalidate();
+      },
+      onError: (err) => {
+        setTriggerError(err.message);
+      },
+    });
+  const handleTriggerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const repoPath = triggerRepoPath.trim();
+    const repositoryId = triggerRepositoryId.trim();
+    if (!repoPath || !repositoryId) {
+      setTriggerError("repoPath and repositoryId are both required.");
+      return;
+    }
+    const subPath = triggerSubPath.trim();
+    triggerMutation.mutate({
+      repoPath,
+      repositoryId,
+      ...(subPath !== "" ? { relativeSubPath: subPath } : {}),
+    });
+  };
 
   const [selectedIngestionId, setSelectedIngestionId] = useState<
     string | null
@@ -103,7 +164,126 @@ export function CodeGraphPanel() {
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <SectionLabel>Code graph ingestions</SectionLabel>
+        <div className="flex items-center justify-between">
+          <SectionLabel>Code graph ingestions</SectionLabel>
+          <button
+            type="button"
+            data-testid="cg-trigger-ingest-toggle"
+            className="text-xs text-blue-600 hover:underline"
+            onClick={() => {
+              setShowTriggerForm((v) => !v);
+              setTriggerError(null);
+            }}
+          >
+            {showTriggerForm ? "Cancel" : "+ Trigger ingest"}
+          </button>
+        </div>
+
+        {/* ── Operator-trigger form (T-G.2.3) ──────────────── */}
+        {showTriggerForm && (
+          <form
+            onSubmit={handleTriggerSubmit}
+            data-testid="cg-trigger-ingest-form"
+            className="space-y-2 rounded border bg-muted/30 p-3"
+          >
+            <div className="space-y-1">
+              <label
+                className="block text-[10px] uppercase tracking-wide text-muted-foreground"
+                htmlFor="cg-trigger-repo-path"
+              >
+                Repo path (absolute)
+              </label>
+              <input
+                id="cg-trigger-repo-path"
+                data-testid="cg-trigger-ingest-repo-path"
+                type="text"
+                className="w-full rounded border bg-background px-2 py-1 text-xs font-mono"
+                placeholder="/abs/path/to/repo"
+                value={triggerRepoPath}
+                onChange={(e) => setTriggerRepoPath(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                className="block text-[10px] uppercase tracking-wide text-muted-foreground"
+                htmlFor="cg-trigger-repository-id"
+              >
+                Repository id
+              </label>
+              <input
+                id="cg-trigger-repository-id"
+                data-testid="cg-trigger-ingest-repository-id"
+                type="text"
+                className="w-full rounded border bg-background px-2 py-1 text-xs font-mono"
+                placeholder="my-repo / code_studio_repos.id"
+                value={triggerRepositoryId}
+                onChange={(e) => setTriggerRepositoryId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                className="block text-[10px] uppercase tracking-wide text-muted-foreground"
+                htmlFor="cg-trigger-sub-path"
+              >
+                Relative sub-path (optional)
+              </label>
+              <input
+                id="cg-trigger-sub-path"
+                data-testid="cg-trigger-ingest-sub-path"
+                type="text"
+                className="w-full rounded border bg-background px-2 py-1 text-xs font-mono"
+                placeholder="server/agent-studio/services/extensions/"
+                value={triggerSubPath}
+                onChange={(e) => setTriggerSubPath(e.target.value)}
+              />
+            </div>
+            {triggerError ? (
+              <p
+                data-testid="cg-trigger-ingest-error"
+                className="text-xs text-destructive"
+              >
+                {triggerError}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              data-testid="cg-trigger-ingest-submit"
+              disabled={triggerMutation.isPending}
+              className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {triggerMutation.isPending ? "Ingesting…" : "Run ingest"}
+            </button>
+          </form>
+        )}
+
+        {lastTriggerResult ? (
+          <div
+            data-testid="cg-trigger-ingest-result"
+            className="rounded border border-emerald-300 bg-emerald-50 p-2 text-xs dark:border-emerald-900 dark:bg-emerald-900/20"
+          >
+            <p className="font-medium">Last ingest run</p>
+            <p className="mt-1 font-mono text-[10px]">
+              {lastTriggerResult.ingestionId}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-2 text-muted-foreground">
+              <span>scanned: {lastTriggerResult.filesScanned}</span>
+              <span>parsed: {lastTriggerResult.filesParsed}</span>
+              <span>nodes: {lastTriggerResult.nodesUpserted}</span>
+              <span>edges: {lastTriggerResult.edgesUpserted}</span>
+              {lastTriggerResult.edgesRejected > 0 ? (
+                <span className="text-destructive">
+                  rejected: {lastTriggerResult.edgesRejected}
+                </span>
+              ) : null}
+              {lastTriggerResult.parserErrorCount > 0 ? (
+                <span className="text-amber-700 dark:text-amber-300">
+                  errors: {lastTriggerResult.parserErrorCount}
+                </span>
+              ) : null}
+              <span>{lastTriggerResult.durationMs}ms</span>
+            </div>
+          </div>
+        ) : null}
 
         {/* ── Per-repository freshness (top section) ───────── */}
         <div data-testid="cg-repositories-section">
