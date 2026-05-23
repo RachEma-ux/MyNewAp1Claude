@@ -133,4 +133,44 @@ export function bootAiTypesModule() {
   setProviderDbPort(providerDbPort);
 
   console.log("[AI Types] Module ports wired successfully");
+
+  // 2026-05-23 — backfill domain tables on every boot.
+  //
+  // `backfillDomainTables()` scans `catalog_entries` for rows that
+  // lack a `sourceType`/`sourceId` link and creates the matching
+  // `ai_type_models` / `ai_type_llms` / provider-link rows. Its
+  // doc-comment names "server startup" as one of the intended call
+  // sites; before this wiring it was exported but never invoked, so
+  // the binding picker (`agentStudio.providerBindings.pickerAvailableModels`)
+  // returned `[]` on any fresh deployment even though the catalog
+  // already had `provider`/`model` rows. The fn is idempotent — it
+  // skips already-linked entries — so safe to run on every boot.
+  //
+  // Fire-and-forget: the boot path must not block on a DB write.
+  // Errors surface as a single log line; the picker degrades to an
+  // empty list (existing behavior) if the backfill itself fails.
+  void (async () => {
+    try {
+      const { backfillDomainTables } = await import("./migration");
+      const result = await backfillDomainTables();
+      if (
+        result.modelsCreated > 0 ||
+        result.llmsCreated > 0 ||
+        result.providersLinked > 0 ||
+        result.agentsLinked > 0
+      ) {
+        console.log(
+          `[AI Types] Domain backfill — scanned=${result.scanned} models=${result.modelsCreated} llms=${result.llmsCreated} providers_linked=${result.providersLinked} agents_linked=${result.agentsLinked} skipped=${result.skipped} errors=${result.errors.length}`,
+        );
+      } else if (result.scanned > 0) {
+        console.log(
+          `[AI Types] Domain backfill — ${result.scanned} unlinked catalog_entries scanned, nothing to create (likely a partial-shape issue; see ai-types/migration.ts)`,
+        );
+      }
+      // scanned=0 means everything is already linked — no log needed.
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[AI Types] Domain backfill skipped — ${msg}`);
+    }
+  })();
 }

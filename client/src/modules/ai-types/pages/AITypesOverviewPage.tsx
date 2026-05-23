@@ -19,9 +19,12 @@ import {
   ShieldCheck,
   ArrowRight,
   Loader2,
+  Wand2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const typeCards = [
   { key: "provider", label: "Providers", icon: Cloud, color: "text-blue-400", route: "/ai-types/providers" },
@@ -39,7 +42,29 @@ const quickLinks = [
 
 export default function AITypesOverviewPage() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const { data, isLoading } = trpc.aiTypes.orchestration.overview.useQuery();
+
+  const backfillMut = trpc.aiTypes.migration.backfillDomainTables.useMutation({
+    onSuccess: (result) => {
+      const created =
+        result.modelsCreated +
+        result.llmsCreated +
+        result.providersLinked +
+        result.agentsLinked;
+      toast.success(
+        created > 0
+          ? `Backfill complete — ${result.modelsCreated} models, ${result.llmsCreated} llms, ${result.providersLinked} providers linked`
+          : result.scanned > 0
+            ? `Backfill scanned ${result.scanned} unlinked entries but created none (partial-shape rows)`
+            : "Backfill ran — everything was already linked",
+      );
+      void utils.aiTypes.orchestration.overview.invalidate();
+    },
+    onError: (err) => {
+      toast.error(`Backfill failed: ${err.message}`);
+    },
+  });
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -146,6 +171,113 @@ export default function AITypesOverviewPage() {
           </Card>
         ))}
       </div>
+
+      {/* Admin actions — domain-table backfill. The fn is idempotent
+          per its server-side doc-comment, so this button is safe to
+          press repeatedly. Boot also invokes the same migration on
+          dev-server start; this surface is for after-the-fact
+          operator-triggered re-runs (e.g. when new catalog_entries
+          rows have been inserted since boot). */}
+      <Card
+        className="bg-zinc-900/50 border-zinc-800 mt-6"
+        data-testid="ai-types-overview-admin-actions"
+      >
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-amber-400" />
+            Admin actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => backfillMut.mutate()}
+              disabled={backfillMut.isPending}
+              data-testid="ai-types-backfill-button"
+            >
+              {backfillMut.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Backfilling…
+                </>
+              ) : (
+                "Backfill domain tables"
+              )}
+            </Button>
+            <p className="text-xs text-zinc-500 flex-1">
+              Re-runs the catalog → domain backfill. Creates{" "}
+              <code>ai_type_models</code> / <code>ai_type_llms</code>{" "}
+              rows from <code>catalog_entries</code> that lack a
+              source link. Idempotent — already-linked entries are
+              skipped.
+            </p>
+          </div>
+
+          {backfillMut.data && (
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"
+              data-testid="ai-types-backfill-result"
+            >
+              <Badge
+                variant="outline"
+                className="bg-zinc-800/50 text-zinc-300 border-zinc-700 justify-between"
+              >
+                <span>scanned</span>
+                <span className="font-mono">{backfillMut.data.scanned}</span>
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30 justify-between"
+              >
+                <span>models created</span>
+                <span className="font-mono">{backfillMut.data.modelsCreated}</span>
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30 justify-between"
+              >
+                <span>llms created</span>
+                <span className="font-mono">{backfillMut.data.llmsCreated}</span>
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-blue-500/10 text-blue-300 border-blue-500/30 justify-between"
+              >
+                <span>providers linked</span>
+                <span className="font-mono">{backfillMut.data.providersLinked}</span>
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-blue-500/10 text-blue-300 border-blue-500/30 justify-between"
+              >
+                <span>agents linked</span>
+                <span className="font-mono">{backfillMut.data.agentsLinked}</span>
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-zinc-800/50 text-zinc-400 border-zinc-700 justify-between"
+              >
+                <span>skipped</span>
+                <span className="font-mono">{backfillMut.data.skipped}</span>
+              </Badge>
+              {backfillMut.data.errors.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="bg-red-500/10 text-red-300 border-red-500/30 justify-between col-span-full"
+                >
+                  <span>errors</span>
+                  <span className="font-mono">
+                    {backfillMut.data.errors.length}
+                  </span>
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
