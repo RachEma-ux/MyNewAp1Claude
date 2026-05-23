@@ -355,43 +355,139 @@ const creationRouter = router({
 
 // ── Shell / Overview ────────────────────────────────────────────────────────
 
+/**
+ * Subcomponent identifiers surfaced through `shell.getShellSummary` /
+ * `shell.getOverview` warnings. Kept as a string-literal union so the
+ * frontend can branch on a known set when rendering the diagnostic
+ * banner. Add new entries here when a new fan-out call is wrapped.
+ *
+ * Resurrected from PR #382 (2026-05-23) — see commit message for the
+ * "Agent not found / Failed to fetch" misleading-banner motivation.
+ */
+export type ShellSubcomponent =
+  | "draft"
+  | "readiness"
+  | "governance"
+  | "latestSimulation"
+  | "latestTest"
+  | "recentRuns";
+
+export interface ShellWarning {
+  subcomponent: ShellSubcomponent;
+  message: string;
+}
+
+/**
+ * Run a single shell subcomponent call. On failure we DO NOT collapse the
+ * whole shell summary to "Agent not found" — the agent row already exists
+ * (the caller checks that first). We return the fallback value plus a
+ * structured warning so the UI can render partial data + a specific
+ * diagnostic banner.
+ */
+async function runSubcomponent<T>(
+  subcomponent: ShellSubcomponent,
+  fn: () => Promise<T>,
+  fallback: T,
+  warnings: ShellWarning[],
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    warnings.push({
+      subcomponent,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return fallback;
+  }
+}
+
+/**
+ * Internal — exposed for unit tests so the resolver body can be exercised
+ * without going through tRPC reflection. Both `getShellSummary` and
+ * `getOverview` delegate here; the only difference is whether
+ * `recentRuns` is included.
+ */
+export async function _buildShellSummary(
+  agentId: number,
+  options: { includeRecentRuns: boolean },
+) {
+  // The agent row is the only true NOT_FOUND signal. If this read itself
+  // throws (e.g., ASDB connection blip), surface it as INTERNAL_SERVER_ERROR
+  // rather than NOT_FOUND so the UI can show the precise failure instead
+  // of a misleading "Agent not found" banner.
+  let agent;
+  try {
+    agent = await repo.getAgentById(agentId);
+  } catch (e) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Failed to load agent: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
+  if (!agent) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+  }
+
+  const warnings: ShellWarning[] = [];
+  const draft = await runSubcomponent(
+    "draft",
+    () => repo.getCurrentDraft(agentId),
+    null,
+    warnings,
+  );
+  const readiness = await runSubcomponent(
+    "readiness",
+    () => readinessSvc.computeReadiness(agentId),
+    null,
+    warnings,
+  );
+  const governance = await runSubcomponent(
+    "governance",
+    () => govSvc.evaluateGovernance(agentId),
+    null,
+    warnings,
+  );
+  const latestSimulation = await runSubcomponent(
+    "latestSimulation",
+    () => repo.getLatestSimulationRun(agentId),
+    null,
+    warnings,
+  );
+  const latestTest = await runSubcomponent(
+    "latestTest",
+    () => repo.getLatestTestRun(agentId),
+    null,
+    warnings,
+  );
+
+  const base = {
+    agent,
+    draft,
+    readiness,
+    governance,
+    latestSimulation,
+    latestTest,
+    warnings,
+  };
+
+  if (!options.includeRecentRuns) return base;
+
+  const recentRuns = await runSubcomponent(
+    "recentRuns",
+    () => repo.listRuntimeRuns(agentId, 5),
+    [],
+    warnings,
+  );
+  return { ...base, recentRuns };
+}
+
 const shellRouter = router({
-  getShellSummary: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
-    const agent = await repo.getAgentById(input.agentId);
-    if (!agent) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
-    const draft = await repo.getCurrentDraft(input.agentId);
-    const readiness = await readinessSvc.computeReadiness(input.agentId);
-    const governance = await govSvc.evaluateGovernance(input.agentId);
-    const latestSim = await repo.getLatestSimulationRun(input.agentId);
-    const latestTest = await repo.getLatestTestRun(input.agentId);
-    return {
-      agent,
-      draft,
-      readiness,
-      governance,
-      latestSimulation: latestSim,
-      latestTest,
-    };
-  }),
-  getOverview: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
-    const agent = await repo.getAgentById(input.agentId);
-    if (!agent) throwTrpcAndCapture(new TRPCError({ code: "NOT_FOUND", message: "Agent not found" }));
-    const draft = await repo.getCurrentDraft(input.agentId);
-    const readiness = await readinessSvc.computeReadiness(input.agentId);
-    const governance = await govSvc.evaluateGovernance(input.agentId);
-    const latestSim = await repo.getLatestSimulationRun(input.agentId);
-    const latestTest = await repo.getLatestTestRun(input.agentId);
-    const recentRuns = await repo.listRuntimeRuns(input.agentId, 5);
-    return {
-      agent,
-      draft,
-      readiness,
-      governance,
-      latestSimulation: latestSim,
-      latestTest,
-      recentRuns,
-    };
-  }),
+  getShellSummary: protectedProcedure.input(agentIdSchema).query(({ input }) =>
+    _buildShellSummary(input.agentId, { includeRecentRuns: false }),
+  ),
+  getOverview: protectedProcedure.input(agentIdSchema).query(({ input }) =>
+    _buildShellSummary(input.agentId, { includeRecentRuns: true }),
+  ),
 });
 
 // ── Identity ────────────────────────────────────────────────────────────────
