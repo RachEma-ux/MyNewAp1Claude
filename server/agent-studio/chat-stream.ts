@@ -1098,32 +1098,30 @@ async function runPureStream(args: {
   let promptTokens = 0;
   let completionTokens = 0;
 
-  // Use Model Access stream via the gateway. Tool-less path; D2 boundary
-  // resolves the credential inside OpenRouter; no apiKey ever crosses
-  // back into Agent Studio.
-  const chunks: AsyncIterable<ModelAccessStreamChunk> = await gatewayCall<
-    ModelAccessExecuteInput,
-    AsyncIterable<ModelAccessStreamChunk>
-  >({
-    ctx: {
-      sourceModule: "agentStudio",
-      targetModule: "openRouter",
-      actionKey: "openRouter.modelAccess.stream",
-      actorId,
-      workspaceId,
-      governanceReceiptId: `chat-stream-pure-${sessionId}-${Date.now()}`,
-    },
-    input: {
-      providerConnectionId,
-      modelRef,
-      messages: messagesForModelAccess,
-      stream: true,
-      tokenBudget: maxTokens,
-      temperature,
-      intent: "chat",
-      workspaceId,
-      actorId,
-    },
+  // Use Model Access stream directly. The `openRouter.modelAccess.stream`
+  // gateway action collects the full stream and returns a single
+  // `ModelAccessResult` object — NOT the per-chunk async iterable this
+  // tool-less SSE path needs. Per the gateway handler's own doc-comment
+  // (`server/openrouter/manifest.ts:175-180`): "Direct streaming
+  // consumers should import `stream` from `server/openrouter/model-access`
+  // instead." The D2 credential boundary is preserved — `stream()`
+  // resolves the credential internally; no apiKey crosses back into
+  // Agent Studio. PR 4 hotfix (2026-05-23): the prior `gatewayCall`
+  // path threw "chunks is not async iterable" for every tool-less
+  // chat.
+  const { stream: modelAccessStream } = await import(
+    "../openrouter/model-access"
+  );
+  const chunks: AsyncIterable<ModelAccessStreamChunk> = modelAccessStream({
+    providerConnectionId,
+    modelRef,
+    messages: messagesForModelAccess,
+    stream: true,
+    tokenBudget: maxTokens,
+    temperature,
+    intent: "chat",
+    workspaceId,
+    actorId,
   });
 
   let aborted = false;
@@ -1425,13 +1423,18 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
       }
       // Streaming endpoint has user via the SSE auth context
       // (Express middleware sets req.user). Use that, plus
-      // session.userId as a secondary candidate.
+      // session.userId as a secondary candidate. In dev mode the
+      // dev user is `id=1` (see `_core/index.ts:160-167`); fall
+      // back to that so dev-box chats don't need a per-request
+      // workspace override.
       const candidates: number[] = [];
       const reqUser = (req as any).user;
       if (typeof reqUser?.id === "number") candidates.push(reqUser.id);
       if (typeof (session as any).userId === "number") {
         candidates.push((session as any).userId);
       }
+      const { ENV } = await import("../_core/env");
+      if (ENV.isDevMode && !candidates.includes(1)) candidates.push(1);
       for (const userId of candidates) {
         try {
           const { getDb } = await import("../db");

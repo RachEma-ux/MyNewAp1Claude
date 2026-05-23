@@ -1106,6 +1106,16 @@ export async function sendChatMessage(
     if (typeof (session as any).userId === "number") {
       candidates.push((session as any).userId);
     }
+    // Dev-mode fallback: the dev user is id=1
+    // (see `_core/index.ts:160-167`). When no caller passes an
+    // actorId AND the session was created pre-userId-capture,
+    // assume the dev user so the workspace_members lookup hits.
+    try {
+      const { ENV } = await import("../../_core/env");
+      if (ENV.isDevMode && !candidates.includes(1)) candidates.push(1);
+    } catch {
+      /* env import failure — proceed without dev fallback */
+    }
     for (const userId of candidates) {
       try {
         const { getDb } = await import("../../db");
