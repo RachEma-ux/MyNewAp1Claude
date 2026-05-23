@@ -242,13 +242,21 @@ export async function listAvailableProviderModels(
 
   // 3. Catalog entries for both the models and the providers.
   const modelIds = filteredModels.map((m) => m.id);
+  // Canonical convention: catalog_entries.sourceType uses the
+  // singular AIEntryType enum value ("model"), NOT the physical
+  // table name ("ai_type_models"). Every writer (`linkCatalogToDomain`,
+  // `routers/models.ts`, `legacy-import.ts`) and every other reader
+  // (`service.ts`, `db.ts`) follows the enum convention; this reader
+  // was the outlier and silently returned [] in production while its
+  // own tests (which built fixtures with the wrong convention)
+  // passed. Aligned 2026-05-23 — see types.ts AIEntryType.
   const modelEntries: CatalogEntry[] = await db
     .select()
     .from(catalogEntries)
     .where(
       and(
         eq(catalogEntries.entryType, "model"),
-        eq(catalogEntries.sourceType, "ai_type_models"),
+        eq(catalogEntries.sourceType, "model"),
         inArray(catalogEntries.sourceId, modelIds),
       ),
     );

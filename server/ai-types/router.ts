@@ -24,6 +24,7 @@ import { taxonomyRouter } from "./taxonomy/router";
 import { relationshipsRouter } from "./relationships/router";
 import { validationRouter } from "./validation/router";
 import { orchestrationRouter } from "./orchestration/router";
+import { migrationRouter } from "./migration-router";
 
 export const aiTypesRouter = router({
   // Existing functionality under new namespace
@@ -40,4 +41,8 @@ export const aiTypesRouter = router({
 
   // Orchestration — read-only aggregated views for standalone pages
   orchestration: orchestrationRouter,
+
+  // Operator-callable migrations (admin-only). Boot-time invocation
+  // also lives in `./boot.ts`.
+  migration: migrationRouter,
 });
