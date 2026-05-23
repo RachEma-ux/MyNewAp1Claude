@@ -35,6 +35,13 @@ import {
   type AgentProviderBindingStatus,
 } from "../bindings";
 import { resolveWorkspaceDefaultBinding } from "../workspace-default-bindings";
+// `findModelCatalogEntryIdByModelRef` is the boundary-clean way to
+// resolve the model's `catalog_entries.id` from a modelRef. Agent
+// Studio cannot import `catalog_entries` directly per the boundary
+// test `tests/pmb/boundary.test.ts` Phase 42 invariant 2 — the
+// helper lives in `server/ai-types/db.ts` (the canonical owner of
+// the catalog tables).
+import { findModelCatalogEntryIdByModelRef } from "../../ai-types/db";
 
 export type ChatBindingSource = "per-agent" | "workspace-default";
 
@@ -88,6 +95,20 @@ export async function resolveEffectiveChatBinding(
     wsDefault.ok &&
     wsDefault.providerConnectionId !== null
   ) {
+    // Resolve the model's `catalog_entries.id` from its modelRef so
+    // the synthesized binding satisfies Gate 4 of
+    // `provider-use-governance.ts:172-185`
+    // (`model_unknown_in_catalog` fires when modelCatalogEntryId is
+    // null). The lookup lives in `server/ai-types/db.ts` because
+    // Agent Studio cannot import `catalog_entries` directly per the
+    // boundary test. Null-tolerant: an unresolved model catalog
+    // entry doesn't block synthesis — the chat path will hit Gate 4
+    // with a clear error, matching pre-PR-4 behavior for legacy
+    // per-agent bindings with a missing modelCatalogEntryId.
+    const modelCatalogEntryId = await findModelCatalogEntryIdByModelRef(
+      wsDefault.modelRef,
+    );
+
     const now = new Date();
     const synthesized: AgentProviderBindingPublic = {
       id: 0, // synthesized — no row in ags_agent_provider_bindings
@@ -96,7 +117,7 @@ export async function resolveEffectiveChatBinding(
       draftId: input.draftId,
       role: "primary",
       providerCatalogEntryId: wsDefault.providerCatalogEntryId,
-      modelCatalogEntryId: null,
+      modelCatalogEntryId,
       providerConnectionId: wsDefault.providerConnectionId,
       modelRef: wsDefault.modelRef,
       status: "binding_v1" as AgentProviderBindingStatus,

@@ -1412,14 +1412,48 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     // PR 4 (Option-B 2026-05-23) — D-PR-4 / D-WDB-3 two-step lookup:
     // per-agent binding first, then workspace-default ("chat" role)
     // before refusing. See `services/chat-binding-resolver.ts` for
-    // the canonical resolver contract. The workspaceId derivation
-    // below was previously near `gatewayCall` further down the
-    // function — pulled forward so the resolver has it; reused at
-    // the gatewayCall site.
-    const workspaceId =
-      typeof (draft as any).workspaceId === "number"
-        ? (draft as any).workspaceId
-        : 1;
+    // the canonical resolver contract.
+    //
+    // workspaceId resolution: Agent Studio agents are workspace-less
+    // by design (`visibility="org"`), so the draft has no workspaceId.
+    // Resolve via the chat session's `userId` → `workspace_members`
+    // (the user's first workspace). The literal `1` fallback only
+    // fires when both layers miss — primarily the demo path.
+    const workspaceId = await (async (): Promise<number> => {
+      if (typeof (draft as any).workspaceId === "number") {
+        return (draft as any).workspaceId;
+      }
+      // Streaming endpoint has user via the SSE auth context
+      // (Express middleware sets req.user). Use that, plus
+      // session.userId as a secondary candidate.
+      const candidates: number[] = [];
+      const reqUser = (req as any).user;
+      if (typeof reqUser?.id === "number") candidates.push(reqUser.id);
+      if (typeof (session as any).userId === "number") {
+        candidates.push((session as any).userId);
+      }
+      for (const userId of candidates) {
+        try {
+          const { getDb } = await import("../db");
+          const { workspaceMembers } = await import(
+            "../../drizzle/tables/users"
+          );
+          const { eq } = await import("drizzle-orm");
+          const db = getDb();
+          if (db) {
+            const rows = await db
+              .select({ workspaceId: workspaceMembers.workspaceId })
+              .from(workspaceMembers)
+              .where(eq(workspaceMembers.userId, userId))
+              .limit(1);
+            if (rows[0]?.workspaceId) return rows[0].workspaceId;
+          }
+        } catch {
+          // try next candidate
+        }
+      }
+      return 1;
+    })();
     const effective = await resolveEffectiveChatBinding({
       draftId: draft.id,
       workspaceId,
