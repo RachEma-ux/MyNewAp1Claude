@@ -258,6 +258,13 @@ export async function ingestRepository(
     nodes: aggregatedNodes,
     edges: aggregatedEdges,
     errors: aggregatedErrors,
+    // Re-ingest hints persisted into metadata.lastRun so the freshness
+    // panel can re-fire the same ingest without re-prompting the
+    // operator for the path.
+    repoPath: input.repoPath,
+    ...(input.relativeSubPath !== undefined
+      ? { relativeSubPath: input.relativeSubPath }
+      : {}),
   });
 
   return {

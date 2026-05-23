@@ -62,6 +62,15 @@ export interface CodeGraphIngestionInput {
   readonly nodes: ReadonlyArray<ParsedCodeNode>;
   readonly edges: ReadonlyArray<ParsedCodeEdge>;
   readonly errors: ReadonlyArray<ParseError>;
+  /**
+   * Optional re-ingest hints — persisted into `metadata.lastRun` so
+   * the operator dashboard can fire a per-row re-ingest from the
+   * freshness panel without forcing the operator to retype the path.
+   * Not part of the closed-taxonomy contract; the store treats these
+   * as opaque metadata.
+   */
+  readonly repoPath?: string;
+  readonly relativeSubPath?: string;
 }
 
 export interface CodeGraphIngestionResult {
@@ -135,6 +144,15 @@ export interface CodeGraphRepositorySummaryRow {
   readonly latestCompletedAt: Date | null;
   /** Total ingestion-row count for this repository, across all runs. */
   readonly totalIngestionCount: number;
+  /**
+   * Re-ingest hints extracted from the most-recent run's
+   * `metadata.lastRun`. `null` when the source row was persisted
+   * before the orchestrator started forwarding these (historical
+   * rows). The dashboard renders a "Re-ingest" affordance when
+   * `latestRunRepoPath !== null`.
+   */
+  readonly latestRunRepoPath: string | null;
+  readonly latestRunRelativeSubPath: string | null;
 }
 
 /**
@@ -280,6 +298,20 @@ export function createCodeGraphStore(): CodeGraphStore {
 
       const startedAt = new Date();
 
+      // Re-ingest hints, persisted into metadata so the freshness
+      // panel can fire a per-row Re-ingest without re-prompting the
+      // operator for the path. Only included when the orchestrator
+      // forwarded them (older callers may not).
+      const lastRun: { repoPath: string; relativeSubPath?: string } | undefined =
+        input.repoPath !== undefined
+          ? {
+              repoPath: input.repoPath,
+              ...(input.relativeSubPath !== undefined
+                ? { relativeSubPath: input.relativeSubPath }
+                : {}),
+            }
+          : undefined;
+
       // Upsert ingestion row (composite-unique on ingestion_id).
       await conn
         .insert(agsCodeGraphIngestions)
@@ -296,6 +328,7 @@ export function createCodeGraphStore(): CodeGraphStore {
             unknownNodeTypeCount,
             rejectionsByReason: validation.rejectionsByReason,
             parserErrors: input.errors.slice(0, 50),
+            ...(lastRun !== undefined ? { lastRun } : {}),
           },
         })
         .onConflictDoUpdate({
@@ -309,6 +342,7 @@ export function createCodeGraphStore(): CodeGraphStore {
               unknownNodeTypeCount,
               rejectionsByReason: validation.rejectionsByReason,
               parserErrors: input.errors.slice(0, 50),
+              ...(lastRun !== undefined ? { lastRun } : {}),
             },
           },
         });
@@ -524,7 +558,8 @@ export function createCodeGraphStore(): CodeGraphStore {
           edges_upserted,
           edges_rejected,
           started_at,
-          completed_at
+          completed_at,
+          metadata
         FROM ags_code_graph_ingestions
         ORDER BY repository_id, started_at DESC
       `)) as unknown as {
@@ -537,6 +572,7 @@ export function createCodeGraphStore(): CodeGraphStore {
           edges_rejected: number;
           started_at: Date;
           completed_at: Date | null;
+          metadata: Record<string, unknown> | null;
         }>;
       };
       const totalRows = (await conn.execute(sql`
@@ -551,17 +587,30 @@ export function createCodeGraphStore(): CodeGraphStore {
         totalByRepo.set(r.repository_id, Number(r.total));
       }
       const merged: CodeGraphRepositorySummaryRow[] = latestRows.rows.map(
-        (r) => ({
-          repositoryId: r.repository_id,
-          latestIngestionId: r.ingestion_id,
-          latestStatus: r.status,
-          latestNodesUpserted: r.nodes_upserted,
-          latestEdgesUpserted: r.edges_upserted,
-          latestEdgesRejected: r.edges_rejected,
-          latestStartedAt: r.started_at,
-          latestCompletedAt: r.completed_at,
-          totalIngestionCount: totalByRepo.get(r.repository_id) ?? 0,
-        }),
+        (r) => {
+          const lastRun = (r.metadata as Record<string, unknown> | null)?.[
+            "lastRun"
+          ] as { repoPath?: unknown; relativeSubPath?: unknown } | undefined;
+          const latestRunRepoPath =
+            typeof lastRun?.repoPath === "string" ? lastRun.repoPath : null;
+          const latestRunRelativeSubPath =
+            typeof lastRun?.relativeSubPath === "string"
+              ? lastRun.relativeSubPath
+              : null;
+          return {
+            repositoryId: r.repository_id,
+            latestIngestionId: r.ingestion_id,
+            latestStatus: r.status,
+            latestNodesUpserted: r.nodes_upserted,
+            latestEdgesUpserted: r.edges_upserted,
+            latestEdgesRejected: r.edges_rejected,
+            latestStartedAt: r.started_at,
+            latestCompletedAt: r.completed_at,
+            totalIngestionCount: totalByRepo.get(r.repository_id) ?? 0,
+            latestRunRepoPath,
+            latestRunRelativeSubPath,
+          };
+        },
       );
       merged.sort(
         (a, b) => b.latestStartedAt.getTime() - a.latestStartedAt.getTime(),
