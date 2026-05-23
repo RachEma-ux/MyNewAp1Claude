@@ -57,6 +57,11 @@ export const agentStudioClientManifest: ClientModuleManifest = {
     "/agent-studio/marketplace",
     "/agent-studio/mcp-manager",
     "/agent-studio/graph-workspace",
+    "/agent-studio/vault-explorer",
+    "/agent-studio/vault-notes",
+    "/agent-studio/vault-graph",
+    "/agent-studio/vault-impact",
+    "/agent-studio/vault-traces",
     // V1+ 15-δ / 16-δ / 17-γ / 18-γ / MR-1 Phase-2 / 17-closure
     // admin pages all dispatch off path-match in the Shell. The
     // manifest needs to list them so the route-ownership tooling
