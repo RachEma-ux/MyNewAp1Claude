@@ -12,12 +12,28 @@
  *  - Consistency with the 4 other per-module databases
  *
  * Connection resolution:
- *  - DATABASE_URL_ASDB env var (explicit override)
+ *  - DATABASE_URL_ASDB env var (explicit override; recommended)
  *  - Else: replace the database name in DATABASE_URL with "asdb"
- *  - Else: postgresql://localhost:5432/asdb
+ *  - Else (test mode only): postgresql://localhost:5432/asdb
  *
  * The connection is lazy — first call to getAsDb() creates the Drizzle
  * instance and caches it. Subsequent calls reuse the cache.
+ *
+ * F5-followup (2026-05-23) — close-out for the
+ * post-#1688/#1689 verification fix plan: when both
+ * `DATABASE_URL_ASDB` and `DATABASE_URL` are unset and the process
+ * is not running under `NODE_ENV=test`, `getAsDb()` refuses to
+ * lazy-init and returns `null` after logging a clear
+ * `[ASDB] DATABASE_URL_ASDB unset — refusing to init` line. The
+ * previous behavior silently connected to the hardcoded literal
+ * `postgresql://localhost:5432/asdb`, which on Termux dev boxes
+ * fails with `role "root" does not exist` 5 minutes later when the
+ * first cron sweep runs — far from the boot log. The plan called
+ * for "fail loud at boot, not at first query"; this guard
+ * implements that by emitting the diagnostic at the first
+ * `getAsDb()` call (which happens during boot via the seed/region
+ * warm-up) instead of letting the cron surface a cryptic
+ * `Failed query: ...` later.
  */
 
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -26,9 +42,19 @@ import { buildPoolWithErrorLogger } from "../../db/build-pool";
 
 let _asDb: ReturnType<typeof drizzle<typeof agsSchema>> | null = null;
 
-const DEFAULT_AS_URL = process.env.DATABASE_URL
-  ? process.env.DATABASE_URL.replace(/\/[^/]+$/, "/asdb")
-  : "postgresql://localhost:5432/asdb";
+type AsDbUrlSource = "explicit" | "derived" | "literal";
+
+function resolveAsDbUrl(): { url: string; source: AsDbUrlSource } {
+  const explicit = process.env.DATABASE_URL_ASDB;
+  if (explicit && explicit.length > 0) {
+    return { url: explicit, source: "explicit" };
+  }
+  const main = process.env.DATABASE_URL;
+  if (main && main.length > 0) {
+    return { url: main.replace(/\/[^/]+$/, "/asdb"), source: "derived" };
+  }
+  return { url: "postgresql://localhost:5432/asdb", source: "literal" };
+}
 
 /**
  * Lazy-init the ASDB Drizzle instance. Returns null on connection
@@ -37,7 +63,19 @@ const DEFAULT_AS_URL = process.env.DATABASE_URL
  */
 export function getAsDb() {
   if (!_asDb) {
-    const url = process.env.DATABASE_URL_ASDB || DEFAULT_AS_URL;
+    const { url, source } = resolveAsDbUrl();
+
+    if (source === "literal" && process.env.NODE_ENV !== "test") {
+      console.error(
+        "[ASDB] DATABASE_URL_ASDB unset — refusing to init. " +
+          "Both DATABASE_URL_ASDB and DATABASE_URL are unset; the hardcoded " +
+          "postgresql://localhost:5432/asdb fallback is only honored under " +
+          "NODE_ENV=test. Set DATABASE_URL_ASDB (recommended) or DATABASE_URL " +
+          "so the /asdb derivation works.",
+      );
+      return null;
+    }
+
     try {
       const masked = url.replace(/:([^:@]+)@/, ":****@");
       console.log("[ASDB] Connecting to:", masked);
@@ -51,6 +89,8 @@ export function getAsDb() {
   }
   return _asDb;
 }
+
+export const __testing__ = { resolveAsDbUrl };
 
 /**
  * Reset the cached connection. Used after seed/migration so the next
