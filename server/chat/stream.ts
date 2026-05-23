@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { and, eq } from 'drizzle-orm';
 import { trackProviderUsage } from '../providers/usage';
 import { sdk } from '../_core/sdk';
 import { ENV } from '../_core/env';
@@ -9,6 +10,8 @@ import { listActiveForProvider } from '../provider-connections/public-api';
 import { resolveWorkspaceDefaultBinding } from '../agent-studio/workspace-default-bindings';
 import { stream as modelAccessStream } from '../openrouter/model-access';
 import { getModelPricing, computeCost } from '../providers/pricing';
+import { getDb } from '../db';
+import { catalogEntries } from '../../drizzle/schema';
 
 // Zod schema for chat stream request body
 const chatStreamSchema = z.object({
@@ -29,8 +32,9 @@ const chatStreamSchema = z.object({
 // PMB Phase 29.6a — chat-stream binding resolver
 //
 // Two-step lookup, mirroring D-PR-4 in PROVIDER_ROUTER_MIGRATION_DECISION.md:
-//   (I)  Map `providerId` (legacy `providers` table) → `providerConnectionId`
-//        via `listActiveForProvider({workspaceId, providerId})`.
+//   (I)  Map `providerId` (legacy `providers` table) → `providerCatalogEntryId`
+//        (via catalog_entries lookup) → `providerConnectionId`
+//        via `listActiveForProvider({workspaceId, providerCatalogEntryId})`.
 //        Picks the first ACTIVE row.
 //   (II) If (I) returns no row, fall back to the workspace `chat` default
 //        via `resolveWorkspaceDefaultBinding({workspaceId, role: "chat"})`.
@@ -38,6 +42,12 @@ const chatStreamSchema = z.object({
 // Returns null when both (I) and (II) miss; the caller refuses with
 // `binding_required` (D-WDB-3 contract — no automatic system-default
 // fallback inside the primitives).
+//
+// 2026-05-23 — Step (I) gained a `catalog_entries` lookup hop because
+// `listActiveForProvider` was realigned to take a catalog entry id
+// (matching its doc-comment and the canonical contract) rather than
+// a raw `providers.id`. See `listActiveForProvider` doc-comment for
+// the PR #1701 / PR #1703 history.
 async function resolveChatBinding(args: {
   workspaceId: number;
   providerId?: number;
@@ -47,29 +57,49 @@ async function resolveChatBinding(args: {
   modelRef: string;
   source: "active-for-provider" | "workspace-default";
 } | null> {
-  // Path (I): legacy providerId → providerConnectionId
+  // Path (I): legacy providerId → catalog entry id → providerConnectionId.
+  // Resolve legacy providers.id → catalog_entries.id for the matching
+  // entryType="provider" row, then ask listActiveForProvider for active
+  // connections under that catalog entry. If no catalog entry exists for
+  // this provider yet (pre-catalog-projection state), Path (I) misses and
+  // we fall through to Path (II).
   if (args.providerId) {
-    const active = await listActiveForProvider({
-      workspaceId: args.workspaceId,
-      providerId: args.providerId,
-    });
-    if (active.length > 0) {
-      // Prefer an explicit `model` override on the request; otherwise use
-      // the workspace's `chat` default modelRef, falling back to a
-      // sensible default so the upstream call has a model.
-      let modelRef = args.modelOverride;
-      if (!modelRef) {
-        const wsDefault = await resolveWorkspaceDefaultBinding({
-          workspaceId: args.workspaceId,
-          role: "chat",
-        });
-        modelRef = wsDefault?.modelRef ?? "gpt-4o-mini";
+    const db = getDb();
+    const [entry] = db
+      ? await db
+          .select({ id: catalogEntries.id })
+          .from(catalogEntries)
+          .where(
+            and(
+              eq(catalogEntries.entryType, 'provider'),
+              eq(catalogEntries.providerId, args.providerId),
+            ),
+          )
+          .limit(1)
+      : [undefined];
+    if (entry) {
+      const active = await listActiveForProvider({
+        workspaceId: args.workspaceId,
+        providerCatalogEntryId: entry.id,
+      });
+      if (active.length > 0) {
+        // Prefer an explicit `model` override on the request; otherwise use
+        // the workspace's `chat` default modelRef, falling back to a
+        // sensible default so the upstream call has a model.
+        let modelRef = args.modelOverride;
+        if (!modelRef) {
+          const wsDefault = await resolveWorkspaceDefaultBinding({
+            workspaceId: args.workspaceId,
+            role: "chat",
+          });
+          modelRef = wsDefault?.modelRef ?? "gpt-4o-mini";
+        }
+        return {
+          providerConnectionId: active[0].providerConnectionId,
+          modelRef,
+          source: "active-for-provider",
+        };
       }
-      return {
-        providerConnectionId: active[0].providerConnectionId,
-        modelRef,
-        source: "active-for-provider",
-      };
     }
   }
 

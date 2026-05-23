@@ -135,13 +135,15 @@ export const providerConnectionsManifest: ModuleManifest = {
       module: "providerConnections",
       action: "providerConnections.listActiveForProvider",
       handler: async (input) => {
-        // `providerId` is the `providers.id` FK target the resolver
-        // filters on. The field was historically named
-        // `providerCatalogEntryId` — see `listActiveForProvider`
-        // doc-comment for the 2026-05-23 rename rationale.
+        // `providerCatalogEntryId` is `catalog_entries.id` for an
+        // `entryType="provider"` row. The resolver joins to
+        // `providers.id` via `catalog_entries.providerId` and then
+        // filters `provider_connections.providerId`. See
+        // `listActiveForProvider` doc-comment for the canonical
+        // contract.
         const payload = input as {
           workspaceId: number;
-          providerId: number;
+          providerCatalogEntryId: number;
         };
         return listActiveForProvider(payload);
       },
