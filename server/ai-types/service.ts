@@ -62,6 +62,9 @@ export async function createModel(data: DomainModelData): Promise<ProjectionResu
   const catalogEntry = await projectToCatalog({
     domainId: model.id,
     entryType: "model",
+    // Canonical sourceType per CATALOG_SOURCE_MAPPING.md 2026-05-23
+    // extension: ai_type_models rows project as sourceType="ai_type_model".
+    sourceType: "ai_type_model",
     name: data.name,
     displayName: data.displayName,
     description: data.description,
@@ -120,12 +123,14 @@ export async function updateModel(
 
   if (!model) throw new Error(`Model ${id} not found`);
 
-  // 2. Refresh catalog projection
-  const catalogLink = await findCatalogEntryBySource("model", id);
+  // 2. Refresh catalog projection. Canonical sourceType per the
+  // 2026-05-23 extension to CATALOG_SOURCE_MAPPING.md.
+  const catalogLink = await findCatalogEntryBySource("ai_type_model", id);
   if (catalogLink) {
     await refreshCatalogProjection(catalogLink.id, {
       domainId: id,
       entryType: "model",
+      sourceType: "ai_type_model",
       name: model.name,
       displayName: model.displayName,
       description: model.description,
@@ -182,6 +187,9 @@ export async function createLlm(data: DomainLlmData): Promise<ProjectionResult> 
   const catalogEntry = await projectToCatalog({
     domainId: llm.id,
     entryType: "llm",
+    // Canonical sourceType per CATALOG_SOURCE_MAPPING.md 2026-05-23
+    // extension: ai_type_llms rows project as sourceType="ai_type_llm".
+    sourceType: "ai_type_llm",
     name: data.name,
     displayName: data.displayName,
     description: data.description,
@@ -226,11 +234,14 @@ export async function updateLlm(
 
   if (!llm) throw new Error(`LLM ${id} not found`);
 
-  const catalogLink = await findCatalogEntryBySource("llm", id);
+  // Canonical sourceType per the 2026-05-23 extension to
+  // CATALOG_SOURCE_MAPPING.md.
+  const catalogLink = await findCatalogEntryBySource("ai_type_llm", id);
   if (catalogLink) {
     await refreshCatalogProjection(catalogLink.id, {
       domainId: id,
       entryType: "llm",
+      sourceType: "ai_type_llm",
       name: llm.name,
       displayName: llm.displayName,
       description: llm.description,
@@ -288,6 +299,10 @@ export async function createProviderWithProjection(
   const catalogEntry = await projectToCatalog({
     domainId: provider.id,
     entryType: "provider",
+    // sourceType matches entryType for `providers` rows per
+    // CATALOG_SOURCE_MAPPING.md §17-28 (the providers table is
+    // the canonical source-of-truth for `entryType="provider"`).
+    sourceType: "provider",
     name: data.name,
     displayName: data.name,
     description: `Provider: ${data.type}`,

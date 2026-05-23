@@ -166,7 +166,7 @@ describe("listAvailableProviderModels — behaviour", () => {
         {
           id: 1000,
           entryType: "model",
-          sourceType: "model",
+          sourceType: "ai_type_model",
           sourceId: 100,
           status: "active",
           reviewState: "approved",
@@ -177,7 +177,7 @@ describe("listAvailableProviderModels — behaviour", () => {
         {
           id: 1001,
           entryType: "model",
-          sourceType: "model",
+          sourceType: "ai_type_model",
           sourceId: 101,
           status: "active",
           reviewState: "approved",
@@ -188,7 +188,7 @@ describe("listAvailableProviderModels — behaviour", () => {
         {
           id: 1002,
           entryType: "model",
-          sourceType: "model",
+          sourceType: "ai_type_model",
           sourceId: 102,
           status: "active",
           reviewState: "needs_review",
@@ -272,7 +272,7 @@ describe("listAvailableProviderModels — behaviour", () => {
         {
           id: 3000,
           entryType: "model",
-          sourceType: "model",
+          sourceType: "ai_type_model",
           sourceId: 200,
           status: "active",
           reviewState: "approved",
@@ -328,7 +328,7 @@ describe("listAvailableProviderModels — behaviour", () => {
         {
           id: 4000,
           entryType: "model",
-          sourceType: "model",
+          sourceType: "ai_type_model",
           sourceId: 300,
           status: "active",
           reviewState: "approved",

@@ -242,21 +242,24 @@ export async function listAvailableProviderModels(
 
   // 3. Catalog entries for both the models and the providers.
   const modelIds = filteredModels.map((m) => m.id);
-  // Canonical convention: catalog_entries.sourceType uses the
-  // singular AIEntryType enum value ("model"), NOT the physical
-  // table name ("ai_type_models"). Every writer (`linkCatalogToDomain`,
-  // `routers/models.ts`, `legacy-import.ts`) and every other reader
-  // (`service.ts`, `db.ts`) follows the enum convention; this reader
-  // was the outlier and silently returned [] in production while its
-  // own tests (which built fixtures with the wrong convention)
-  // passed. Aligned 2026-05-23 — see types.ts AIEntryType.
+  // Canonical: catalog_entries.sourceType="ai_type_model" for rows
+  // pointing at `ai_type_models.id`. Per the 2026-05-23 extension to
+  // `docs/architecture/provider-model-binding/CATALOG_SOURCE_MAPPING.md`
+  // (locked rule #2 — domain-row readers MUST query the new value).
+  // The earlier PR #1700 alignment to `"model"` made the reader
+  // consistent with the drifted writer but contradicted the spec;
+  // PR #1702 extended the canonical mapping with `ai_type_model`,
+  // and this PR migrates both writer + reader to the new value.
+  // The migration step in `migration.ts` reconciles pre-extension
+  // rows from `"model"` → `"ai_type_model"` so the inArray filter
+  // here remains correct after a one-shot rename.
   const modelEntries: CatalogEntry[] = await db
     .select()
     .from(catalogEntries)
     .where(
       and(
         eq(catalogEntries.entryType, "model"),
-        eq(catalogEntries.sourceType, "model"),
+        eq(catalogEntries.sourceType, "ai_type_model"),
         inArray(catalogEntries.sourceId, modelIds),
       ),
     );

@@ -7,7 +7,44 @@
 
 // ── Entry Types ─────────────────────────────────────────────────────────
 
+/**
+ * `catalog_entries.entryType` taxonomy — what KIND of asset the row
+ * is. Distinct from `AISourceType` (which source-of-truth table the
+ * row points at). Per the 2026-05-23 extension to
+ * `docs/architecture/provider-model-binding/CATALOG_SOURCE_MAPPING.md`
+ * locked rule #4: "Conflating the two is the root cause of the drift
+ * this extension corrects."
+ */
 export type AIEntryType = "provider" | "llm" | "model" | "agent" | "bot";
+
+// ── Source Types ────────────────────────────────────────────────────────
+
+/**
+ * `catalog_entries.sourceType` canonical vocabulary per
+ * `docs/architecture/provider-model-binding/CATALOG_SOURCE_MAPPING.md`
+ * §17-28 + the 2026-05-23 AI Types domain-table extension at the
+ * bottom of that doc.
+ *
+ * Each value names the source-of-truth table that `sourceId` points
+ * at. Legacy values (`model`, `llm`) are RESERVED for the original
+ * mapping (`models.id`, `llm_authority.id`); the new AI Types domain
+ * tables get their own canonical sourceType (`ai_type_model`,
+ * `ai_type_llm`).
+ *
+ * NOTE: `agent` and `bot` are kept here for back-compat with existing
+ * `linkCatalogToDomain` callers; the canonical spec lists `ags_agent`
+ * for Agent Studio-published agents (a separate ADR alignment).
+ */
+export type AISourceType =
+  | "provider"
+  | "model"          // legacy `models` table
+  | "ai_type_model"  // canonical for `ai_type_models` (added 2026-05-23)
+  | "llm"            // legacy `llm_authority` table
+  | "ai_type_llm"    // canonical for `ai_type_llms` (added 2026-05-23)
+  | "agent"
+  | "bot"
+  | "ags_agent"
+  | "ai_type";
 
 // ── Domain Table Map ────────────────────────────────────────────────────
 
@@ -78,6 +115,15 @@ export interface ProjectionResult {
 export interface CatalogProjectionInput {
   domainId: number;
   entryType: AIEntryType;
+  /**
+   * Canonical `catalog_entries.sourceType` value per
+   * `CATALOG_SOURCE_MAPPING.md`. Distinct from `entryType` —
+   * `entryType` is the asset kind, `sourceType` is the
+   * source-of-truth table pointer. Per the 2026-05-23 extension's
+   * locked rule #4, callers MUST pass this explicitly rather than
+   * letting the projection layer derive it from `entryType`.
+   */
+  sourceType: AISourceType;
   name: string;
   displayName?: string | null;
   description?: string | null;
