@@ -129,20 +129,24 @@ export default function AgentBindingPage({
     if (matchingModel) setSelectedSlug(matchingModel.providerSlug);
   }, [existingBinding.data, availableModels.data]);
 
-  const matchingProviderCatalogEntryId = useMemo(() => {
+  // Picker passes the underlying `providers.id` (NOT the catalog
+  // entry id) — `provider_connections.providerId` is the FK target
+  // the resolver filters on. See `listActiveForProvider` doc-comment
+  // for the 2026-05-23 contract rename rationale.
+  const matchingProviderId = useMemo(() => {
     const m = (availableModels.data as AvailableProviderModel[] | undefined)?.find(
       (x) => x.providerSlug === selectedSlug && x.modelRef === selectedModelRef,
     );
-    return m?.providerCatalogEntryId ?? null;
+    return m?.providerId ?? null;
   }, [availableModels.data, selectedSlug, selectedModelRef]);
 
   const activeConnections =
     trpc.agentStudio.providerBindings.pickerActiveConnections.useQuery(
       {
         workspaceId,
-        providerCatalogEntryId: matchingProviderCatalogEntryId ?? -1,
+        providerId: matchingProviderId ?? -1,
       },
-      { enabled: matchingProviderCatalogEntryId !== null },
+      { enabled: matchingProviderId !== null },
     );
 
   const upsertMut = trpc.agentStudio.providerBindings.upsert.useMutation({
@@ -330,7 +334,7 @@ export default function AgentBindingPage({
 
           <div className="space-y-1">
             <SectionLabel>Provider Connection</SectionLabel>
-            {matchingProviderCatalogEntryId === null ? (
+            {matchingProviderId === null ? (
               <div className="text-xs text-muted-foreground">
                 Pick a model above to see active connections.
               </div>

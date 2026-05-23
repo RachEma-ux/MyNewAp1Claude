@@ -30,7 +30,7 @@ const chatStreamSchema = z.object({
 //
 // Two-step lookup, mirroring D-PR-4 in PROVIDER_ROUTER_MIGRATION_DECISION.md:
 //   (I)  Map `providerId` (legacy `providers` table) → `providerConnectionId`
-//        via `listActiveForProvider({workspaceId, providerCatalogEntryId: providerId})`.
+//        via `listActiveForProvider({workspaceId, providerId})`.
 //        Picks the first ACTIVE row.
 //   (II) If (I) returns no row, fall back to the workspace `chat` default
 //        via `resolveWorkspaceDefaultBinding({workspaceId, role: "chat"})`.
@@ -51,7 +51,7 @@ async function resolveChatBinding(args: {
   if (args.providerId) {
     const active = await listActiveForProvider({
       workspaceId: args.workspaceId,
-      providerCatalogEntryId: args.providerId,
+      providerId: args.providerId,
     });
     if (active.length > 0) {
       // Prefer an explicit `model` override on the request; otherwise use
