@@ -176,6 +176,47 @@ export async function deleteCatalogEntry(id: number): Promise<void> {
   await db.delete(catalogEntries).where(eq(catalogEntries.id, id));
 }
 
+/**
+ * Look up the `catalog_entries.id` for the model row whose
+ * `ai_type_models.apiModelId` (or fallback `name`) matches the given
+ * `modelRef`. Used by the Agent Studio chat-binding resolver to
+ * populate `modelCatalogEntryId` on synthesized workspace-default
+ * bindings so `provider-use-governance` Gate 4
+ * (`model_unknown_in_catalog`) passes.
+ *
+ * Filters to the canonical `sourceType="ai_type_model"` per the
+ * 2026-05-23 extension to `CATALOG_SOURCE_MAPPING.md`. Lives in
+ * `ai-types/db.ts` rather than the caller because Agent Studio
+ * cannot directly import `catalog_entries` per the boundary test
+ * `tests/pmb/boundary.test.ts` Phase 42 invariant 2.
+ *
+ * Returns null when no row matches.
+ */
+export async function findModelCatalogEntryIdByModelRef(
+  modelRef: string,
+): Promise<number | null> {
+  const db = getDb();
+  if (!db) return null;
+  const { aiTypeModels } = await import("../../drizzle/tables/ai-types");
+  const { or } = await import("drizzle-orm");
+  const rows = await db
+    .select({ id: catalogEntries.id })
+    .from(catalogEntries)
+    .innerJoin(aiTypeModels, eq(aiTypeModels.id, catalogEntries.sourceId))
+    .where(
+      and(
+        eq(catalogEntries.entryType, "model"),
+        eq(catalogEntries.sourceType, "ai_type_model"),
+        or(
+          eq(aiTypeModels.apiModelId, modelRef),
+          eq(aiTypeModels.name, modelRef),
+        ),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
 export async function getCatalogEntryVersions(catalogEntryId: number): Promise<CatalogEntryVersion[]> {
   const db = getDb();
   if (!db) throw new Error("Database not available");

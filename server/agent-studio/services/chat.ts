@@ -1089,6 +1089,48 @@ export async function sendChatMessage(
   if (!session) {
     return { ok: false, error: `Chat session ${input.sessionId} not found` };
   }
+  // PR 4 hotfix (2026-05-23) — when the caller didn't pass an
+  // explicit workspaceId, resolve via session.userId →
+  // workspace_members rather than falling back to the historical
+  // hardcoded `1` (which doesn't exist on most installs). Matches
+  // the workspaceId resolution pattern in chat-stream.ts.
+  const resolvedWorkspaceId = await (async (): Promise<number> => {
+    if (typeof options.workspaceId === "number") return options.workspaceId;
+    // Prefer the actor (from ctx.user.id) over session.userId.
+    // `ags_chat_sessions.user_id` is currently nullable and
+    // `startChatSession` doesn't capture it, so the actor is the
+    // reliable source on the tRPC path. The session.userId fallback
+    // remains for streaming-endpoint callers that may pass it.
+    const candidates: number[] = [];
+    if (typeof options.actorId === "number") candidates.push(options.actorId);
+    if (typeof (session as any).userId === "number") {
+      candidates.push((session as any).userId);
+    }
+    for (const userId of candidates) {
+      try {
+        const { getDb } = await import("../../db");
+        const { workspaceMembers } = await import(
+          "../../../drizzle/tables/users"
+        );
+        const { eq } = await import("drizzle-orm");
+        const db = getDb();
+        if (db) {
+          const rows = await db
+            .select({ workspaceId: workspaceMembers.workspaceId })
+            .from(workspaceMembers)
+            .where(eq(workspaceMembers.userId, userId))
+            .limit(1);
+          if (rows[0]?.workspaceId) return rows[0].workspaceId;
+        }
+      } catch {
+        /* try next candidate */
+      }
+    }
+    return 1;
+  })();
+  options = { ...options, workspaceId: resolvedWorkspaceId };
+  // (rest of function untouched — the `options.workspaceId ?? 1`
+  // calls below now always hit the resolved value.)
   const draft = await repo.getCurrentDraft(session.agentId);
   if (!draft) {
     return {

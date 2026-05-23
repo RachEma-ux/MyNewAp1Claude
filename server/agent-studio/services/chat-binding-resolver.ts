@@ -29,16 +29,19 @@
  * available for callers that DO want to log or audit the path.
  */
 
-import { and, eq, or } from "drizzle-orm";
 import {
   getAgentProviderBinding,
   type AgentProviderBindingPublic,
   type AgentProviderBindingStatus,
 } from "../bindings";
 import { resolveWorkspaceDefaultBinding } from "../workspace-default-bindings";
-import { getDb } from "../../db";
-import { catalogEntries } from "../../../drizzle/schema";
-import { aiTypeModels } from "../../../drizzle/tables/ai-types";
+// `findModelCatalogEntryIdByModelRef` is the boundary-clean way to
+// resolve the model's `catalog_entries.id` from a modelRef. Agent
+// Studio cannot import `catalog_entries` directly per the boundary
+// test `tests/pmb/boundary.test.ts` Phase 42 invariant 2 — the
+// helper lives in `server/ai-types/db.ts` (the canonical owner of
+// the catalog tables).
+import { findModelCatalogEntryIdByModelRef } from "../../ai-types/db";
 
 export type ChatBindingSource = "per-agent" | "workspace-default";
 
@@ -96,37 +99,15 @@ export async function resolveEffectiveChatBinding(
     // the synthesized binding satisfies Gate 4 of
     // `provider-use-governance.ts:172-185`
     // (`model_unknown_in_catalog` fires when modelCatalogEntryId is
-    // null). Match `ai_type_models.apiModelId` (the canonical model
-    // identifier) OR `name` as a fallback. Filtered to the canonical
-    // `sourceType="ai_type_model"` per the 2026-05-23 extension to
-    // `CATALOG_SOURCE_MAPPING.md`. Null-tolerant: an unresolved
-    // model catalog entry doesn't block synthesis — it just means
-    // the chat path will hit Gate 4 with a clear error, matching
-    // the pre-PR-4 behavior for any legacy per-agent binding with
-    // a missing modelCatalogEntryId.
-    const db = getDb();
-    let modelCatalogEntryId: number | null = null;
-    if (db) {
-      const rows = await db
-        .select({ id: catalogEntries.id })
-        .from(catalogEntries)
-        .innerJoin(
-          aiTypeModels,
-          eq(aiTypeModels.id, catalogEntries.sourceId),
-        )
-        .where(
-          and(
-            eq(catalogEntries.entryType, "model"),
-            eq(catalogEntries.sourceType, "ai_type_model"),
-            or(
-              eq(aiTypeModels.apiModelId, wsDefault.modelRef),
-              eq(aiTypeModels.name, wsDefault.modelRef),
-            ),
-          ),
-        )
-        .limit(1);
-      modelCatalogEntryId = rows[0]?.id ?? null;
-    }
+    // null). The lookup lives in `server/ai-types/db.ts` because
+    // Agent Studio cannot import `catalog_entries` directly per the
+    // boundary test. Null-tolerant: an unresolved model catalog
+    // entry doesn't block synthesis — the chat path will hit Gate 4
+    // with a clear error, matching pre-PR-4 behavior for legacy
+    // per-agent bindings with a missing modelCatalogEntryId.
+    const modelCatalogEntryId = await findModelCatalogEntryIdByModelRef(
+      wsDefault.modelRef,
+    );
 
     const now = new Date();
     const synthesized: AgentProviderBindingPublic = {
