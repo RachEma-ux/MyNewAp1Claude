@@ -78,7 +78,16 @@ export interface ConnectionStatusSummary {
 
 export interface ListActiveForProviderInput {
   workspaceId: number;
-  providerCatalogEntryId: number;
+  /**
+   * `providers.id` — the FK target `provider_connections.providerId`
+   * actually references. Was previously named `providerCatalogEntryId`,
+   * a contract drift that silently broke the Agent Studio binding
+   * picker (which had been passing real `catalog_entries.id` values).
+   * Renamed 2026-05-23 to match the schema. `AvailableProviderModel.providerId`
+   * carries the right value for picker callers; legacy `chat/stream.ts`
+   * already passed `providers.id`, so the rename is a no-op for that path.
+   */
+  providerId: number;
 }
 
 export interface GetConnectionStatusInput {
@@ -111,10 +120,14 @@ export interface ValidateConnectionResult {
 const VISIBLE_LIFECYCLE_STATUSES = ["active", "validated"] as const;
 
 /**
- * List provider connections that are usable references for the given
- * provider catalog entry. Active and validated rows are returned;
+ * List provider connections that reference a given provider
+ * (`providers.id`). Active and validated rows are returned;
  * disabled/failed rows are filtered out at the API boundary so they
  * cannot accidentally surface in pickers.
+ *
+ * See `ListActiveForProviderInput.providerId` for the 2026-05-23
+ * rename rationale — the prior input field name was misleading and
+ * silently broke the Agent Studio binding picker.
  */
 export async function listActiveForProvider(
   input: ListActiveForProviderInput,
@@ -128,7 +141,7 @@ export async function listActiveForProvider(
     .where(
       and(
         eq(providerConnections.workspaceId, input.workspaceId),
-        eq(providerConnections.providerId, input.providerCatalogEntryId),
+        eq(providerConnections.providerId, input.providerId),
         inArray(providerConnections.lifecycleStatus, [
           ...VISIBLE_LIFECYCLE_STATUSES,
         ]),

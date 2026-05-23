@@ -135,9 +135,13 @@ export const providerConnectionsManifest: ModuleManifest = {
       module: "providerConnections",
       action: "providerConnections.listActiveForProvider",
       handler: async (input) => {
+        // `providerId` is the `providers.id` FK target the resolver
+        // filters on. The field was historically named
+        // `providerCatalogEntryId` — see `listActiveForProvider`
+        // doc-comment for the 2026-05-23 rename rationale.
         const payload = input as {
           workspaceId: number;
-          providerCatalogEntryId: number;
+          providerId: number;
         };
         return listActiveForProvider(payload);
       },

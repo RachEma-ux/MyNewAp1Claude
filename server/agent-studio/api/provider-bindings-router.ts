@@ -286,12 +286,18 @@ export const providerBindingsRouter = router({
   /**
    * Active Provider Connections for the chosen provider — cross-module
    * call to `providerConnections.listActiveForProvider` (Phase 2/8).
+   *
+   * Input field renamed 2026-05-23 from `providerCatalogEntryId` to
+   * `providerId` to match the underlying schema: the resolver filters
+   * on `provider_connections.providerId` (FK to `providers.id`),
+   * NOT on `catalog_entries.id`. The picker UI reads `providerId`
+   * directly off `AvailableProviderModel.providerId`.
    */
   pickerActiveConnections: protectedProcedure
     .input(
       z.object({
         workspaceId: z.number().int().positive(),
-        providerCatalogEntryId: z.number().int().positive(),
+        providerId: z.number().int().positive(),
       }),
     )
     .query(async ({ ctx, input }) => {
