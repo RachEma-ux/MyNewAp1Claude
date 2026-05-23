@@ -23,7 +23,7 @@
 
 import { eq, and, inArray } from "drizzle-orm";
 import { getDb } from "../db";
-import { providerConnections } from "../../drizzle/schema";
+import { providerConnections, catalogEntries } from "../../drizzle/schema";
 
 export { providerConnectionsManifest } from "./manifest";
 
@@ -79,15 +79,21 @@ export interface ConnectionStatusSummary {
 export interface ListActiveForProviderInput {
   workspaceId: number;
   /**
-   * `providers.id` — the FK target `provider_connections.providerId`
-   * actually references. Was previously named `providerCatalogEntryId`,
-   * a contract drift that silently broke the Agent Studio binding
-   * picker (which had been passing real `catalog_entries.id` values).
-   * Renamed 2026-05-23 to match the schema. `AvailableProviderModel.providerId`
-   * carries the right value for picker callers; legacy `chat/stream.ts`
-   * already passed `providers.id`, so the rename is a no-op for that path.
+   * `catalog_entries.id` for the `entryType="provider"` row that
+   * represents the provider being filtered on. The resolver joins
+   * through `catalog_entries.providerId` to the underlying
+   * `providers.id` and then filters `provider_connections.providerId`.
+   *
+   * PR #1701 (2026-05-23) briefly renamed this field to `providerId`
+   * to match the drifted implementation that was filtering on
+   * `provider_connections.providerId` directly. PR #1700's spec
+   * extension to `CATALOG_SOURCE_MAPPING.md` then re-established
+   * that the canonical contract is "given a provider catalog entry"
+   * — what the original doc-comment promised. This PR (Option-B #3)
+   * reverts the rename and adds the join, so the param name and the
+   * function semantics match the spec.
    */
-  providerId: number;
+  providerCatalogEntryId: number;
 }
 
 export interface GetConnectionStatusInput {
@@ -120,14 +126,23 @@ export interface ValidateConnectionResult {
 const VISIBLE_LIFECYCLE_STATUSES = ["active", "validated"] as const;
 
 /**
- * List provider connections that reference a given provider
- * (`providers.id`). Active and validated rows are returned;
- * disabled/failed rows are filtered out at the API boundary so they
- * cannot accidentally surface in pickers.
+ * List provider connections that reference a given provider catalog
+ * entry. The input is `catalog_entries.id` for an
+ * `entryType="provider"` row; the resolver looks up that entry's
+ * `providerId` field (the FK to `providers.id`) and then filters
+ * `provider_connections.providerId`. Active and validated rows are
+ * returned; disabled/failed rows are filtered out at the API
+ * boundary so they cannot accidentally surface in pickers.
  *
- * See `ListActiveForProviderInput.providerId` for the 2026-05-23
- * rename rationale — the prior input field name was misleading and
- * silently broke the Agent Studio binding picker.
+ * Returns `[]` when:
+ *   - the database is not initialized
+ *   - no catalog entry matches `providerCatalogEntryId`
+ *   - the matched catalog entry has no `providerId` set
+ *
+ * This contract restores what the original doc-comment promised
+ * before PR #1701's drift correction overshot. See
+ * `ListActiveForProviderInput.providerCatalogEntryId` for the
+ * rename history.
  */
 export async function listActiveForProvider(
   input: ListActiveForProviderInput,
@@ -135,13 +150,22 @@ export async function listActiveForProvider(
   const db = getDb();
   if (!db) return [];
 
+  // 1. Resolve the catalog entry to its underlying `providers.id`.
+  const [catalogEntry] = await db
+    .select({ providerId: catalogEntries.providerId })
+    .from(catalogEntries)
+    .where(eq(catalogEntries.id, input.providerCatalogEntryId))
+    .limit(1);
+  if (!catalogEntry || catalogEntry.providerId == null) return [];
+
+  // 2. Filter provider_connections by the resolved providers.id.
   const rows = await db
     .select()
     .from(providerConnections)
     .where(
       and(
         eq(providerConnections.workspaceId, input.workspaceId),
-        eq(providerConnections.providerId, input.providerId),
+        eq(providerConnections.providerId, catalogEntry.providerId),
         inArray(providerConnections.lifecycleStatus, [
           ...VISIBLE_LIFECYCLE_STATUSES,
         ]),
