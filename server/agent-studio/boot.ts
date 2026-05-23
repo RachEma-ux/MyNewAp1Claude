@@ -939,6 +939,18 @@ export async function bootAgentStudio(): Promise<void> {
       console.log(
         `[ags-graph-lens] partial install — lenses=${result.lenses.installed} runners=${result.runners.installed}`,
       );
+    } else {
+      // F2-followup (2026-05-23) — neither flag set. The F2 plan
+      // assumed the partial-install branch above would still fire
+      // for `lenses=false runners=false`, but it gates on
+      // `lenses.installed || runners.installed`, so the all-zero
+      // case logged absolutely nothing — fresh deployments had no
+      // discovery trail. This explicit line restores the plan's
+      // intent.
+      console.log(
+        `[ags-graph-lens] not installed — both AGS_GRAPH_LENS_DEFAULTS_INSTALL and AGS_GRAPH_LENS_STUB_RUNNERS_INSTALL are unset. ` +
+          `graphLens.list will be empty until at least one is set to 'on'.`,
+      );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
