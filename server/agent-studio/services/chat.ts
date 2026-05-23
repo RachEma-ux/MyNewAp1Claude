@@ -921,9 +921,20 @@ async function sendChatMessageViaBinding(
     actorId: number;
     systemPrompt: string;
     sessionTitle: string | null;
+    /**
+     * PR 4 (Option-B 2026-05-23) — optional pre-resolved binding from
+     * `resolveEffectiveChatBinding` so the per-agent → workspace-default
+     * fallback chain in the outer `sendChatMessage` doesn't get
+     * thrown away when control falls through to this path (which
+     * happens for agents whose tool list is empty). When provided,
+     * this function uses it directly; when absent, it falls back to
+     * the per-agent-only lookup the function used pre-PR-4.
+     */
+    preResolvedBinding?: import("../bindings").AgentProviderBindingPublic | null;
   },
 ): Promise<SendChatMessageResult> {
-  const binding = await getAgentProviderBinding(ctx.draftId, "primary");
+  const binding =
+    ctx.preResolvedBinding ?? (await getAgentProviderBinding(ctx.draftId, "primary"));
   if (!binding) {
     return {
       ok: false,
@@ -1361,6 +1372,9 @@ export async function sendChatMessage(
         actorId: options.actorId ?? 1,
         systemPrompt: systemPromptForBinding,
         sessionTitle: session.title ?? null,
+        // Pass the resolved binding so the per-agent → workspace-default
+        // fallback chain doesn't have to be re-run inside this function.
+        preResolvedBinding: candidateBinding,
       });
     }
   } catch {
