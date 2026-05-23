@@ -16,3 +16,4 @@ export * from "./contracts/public-api.js";
 export * from "./parser/public-api.js";
 export * from "./persistence/public-api.js";
 export * from "./projection/public-api.js";
+export * from "./orchestrator/public-api.js";

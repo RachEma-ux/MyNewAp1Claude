@@ -382,6 +382,50 @@ export const codeGraphRouter = router({
         }
       },
     ),
+
+  /**
+   * T-G.2.3 orchestrator trigger (2026-05-23). Walks the repo on
+   * disk, runs the tree-sitter parser per `.ts`/`.tsx` file, and
+   * persists nodes/edges/errors into the `ags_code_graph_*` tables.
+   *
+   * Designed to be called once per Code Studio repo registration
+   * (the user-visible Code Review Co-pilot use case) plus on
+   * operator-demand re-ingest. `ingestionId` is optional — when
+   * omitted, a fresh UUID is minted; when supplied, the persistence
+   * layer's composite-unique indexes (`(ingestion_id, node_id)` /
+   * `(ingestion_id, edge_id)`) overwrite in place.
+   *
+   * Slow on large repos — the orchestrator caps at `maxFiles`
+   * (default 200) to keep first-run interactive. Operators wanting
+   * a full sweep pass `maxFiles: 100000` explicitly.
+   */
+  triggerIngest: adminProcedure
+    .input(
+      z.object({
+        repoPath: z.string().min(1),
+        repositoryId: z.string().min(1),
+        relativeSubPath: z.string().optional(),
+        maxFiles: z.number().int().positive().optional(),
+        maxFileBytes: z.number().int().positive().optional(),
+        ingestionId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const { ingestRepository } = await import(
+          "./orchestrator/public-api.js"
+        );
+        return await ingestRepository(input);
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error
+              ? err.message
+              : "code-graph orchestrator failed",
+        });
+      }
+    }),
 });
 
 export type CodeGraphRouter = typeof codeGraphRouter;
