@@ -131,6 +131,7 @@ Execution plan index: `docs/implementation/agent-studio-native-graph-workspace-r
 - **Work with file tools** (Read, Edit, Write) and **push to GitHub**.
 - **Never modify files on device outside of git workflow** — edit, commit, push.
 - Once built on GitHub (CI), pull to device.
+- **Neo4j is not installed on this Termux dev box.** No `neo4j` binary on PATH, no `neo4j*` directory under `/data/data/com.termux`, no runit service, no `NEO4J_*` env vars. Any UI surface that depends on the graph projection (Graph Workspace, Graph Health Admin, Graph Lens Browser, KGIA pages, Vault Explorer's graph view) will render the `neo4j_unavailable` workspace-state banner (`WorkspaceStateLayer.tsx:79-85`: "Graph backend unavailable — showing cached data where possible"). This is the **designed graceful-degradation** path, not a regression. Postgres-canonical surfaces (Bases Admin, Agent CRUD, runtime runs, approvals, retention crons, etc.) work normally. If verification needs Neo4j-side behavior, the operator must install Neo4j CE + OpenJDK separately — non-trivial on Termux.
 
 ## MANDATORY: Local App Launch Procedure
 
