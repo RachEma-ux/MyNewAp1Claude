@@ -322,9 +322,39 @@ export function CodeGraphPanel() {
                     <span className="font-mono font-medium">
                       {r.repositoryId}
                     </span>
-                    <span className="text-muted-foreground">
-                      {formatRelative(r.latestStartedAt)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">
+                        {formatRelative(r.latestStartedAt)}
+                      </span>
+                      {r.latestRunRepoPath !== null ? (
+                        <button
+                          type="button"
+                          data-testid="cg-repository-reingest-btn"
+                          disabled={triggerMutation.isPending}
+                          className="rounded border border-blue-600 px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:hover:bg-blue-900/20"
+                          onClick={() => {
+                            const repoPath = r.latestRunRepoPath;
+                            if (repoPath === null) return;
+                            triggerMutation.mutate({
+                              repoPath,
+                              repositoryId: r.repositoryId,
+                              ...(r.latestRunRelativeSubPath !== null
+                                ? {
+                                    relativeSubPath: r.latestRunRelativeSubPath,
+                                  }
+                                : {}),
+                            });
+                          }}
+                          title={`Re-ingest ${r.latestRunRepoPath}${
+                            r.latestRunRelativeSubPath !== null
+                              ? ` / ${r.latestRunRelativeSubPath}`
+                              : ""
+                          }`}
+                        >
+                          Re-ingest
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-2 text-muted-foreground">
                     <span>{r.totalIngestionCount} run(s)</span>
