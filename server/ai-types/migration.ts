@@ -8,7 +8,7 @@
  * Call from server startup or as a tRPC admin endpoint.
  */
 
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, sql } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { catalogEntries, aiTypeModels, aiTypeLlms, providers } from "../../drizzle/schema";
 import { linkCatalogToDomain, findCatalogEntryBySource } from "./projection";
@@ -22,6 +22,15 @@ export interface MigrationResult {
   agentsLinked: number;
   skipped: number;
   errors: Array<{ entryId: number; name: string; error: string }>;
+  /**
+   * 2026-05-23 — count of catalog_entries rows whose `sourceType`
+   * was reconciled from the pre-extension drifted value to the
+   * canonical one (`"model"` → `"ai_type_model"` when pointing at
+   * `ai_type_models.id`; same for `"llm"` → `"ai_type_llm"`). Per
+   * `CATALOG_SOURCE_MAPPING.md` 2026-05-23 extension. Idempotent —
+   * already-canonical rows are not counted.
+   */
+  sourceTypeReconciled: number;
 }
 
 /**
@@ -45,6 +54,7 @@ export async function backfillDomainTables(): Promise<MigrationResult> {
     agentsLinked: 0,
     skipped: 0,
     errors: [],
+    sourceTypeReconciled: 0,
   };
 
   // Find all catalog entries without sourceId
@@ -89,8 +99,11 @@ export async function backfillDomainTables(): Promise<MigrationResult> {
             createdBy: entry.createdBy,
           }).returning();
 
-          // Link catalog → domain
-          await linkCatalogToDomain(entry.id, "model", model.id);
+          // Link catalog → domain. Canonical sourceType per
+          // CATALOG_SOURCE_MAPPING.md 2026-05-23 extension:
+          // ai_type_models rows project as sourceType="ai_type_model"
+          // (NOT the legacy "model" value, which references models.id).
+          await linkCatalogToDomain(entry.id, "ai_type_model", model.id);
 
           // Also set providerId on catalog entry if we resolved one
           if (providerId && !entry.providerId) {
@@ -122,7 +135,10 @@ export async function backfillDomainTables(): Promise<MigrationResult> {
             createdBy: entry.createdBy,
           }).returning();
 
-          await linkCatalogToDomain(entry.id, "llm", llm.id);
+          // Canonical sourceType per CATALOG_SOURCE_MAPPING.md
+          // 2026-05-23 extension: ai_type_llms rows project as
+          // sourceType="ai_type_llm".
+          await linkCatalogToDomain(entry.id, "ai_type_llm", llm.id);
           result.llmsCreated++;
           break;
         }
@@ -193,11 +209,66 @@ export async function backfillDomainTables(): Promise<MigrationResult> {
     }
   }
 
+  // 2026-05-23 — sourceType reconciliation step. Renames rows
+  // pre-existing this extension that wrote `sourceType="model"` /
+  // `"llm"` while pointing at `ai_type_models.id` / `ai_type_llms.id`
+  // — the conflation the spec extension at the end of
+  // `docs/architecture/provider-model-binding/CATALOG_SOURCE_MAPPING.md`
+  // corrects. Idempotent: after the rename, the legacy values won't
+  // match the WHERE clause on the next run. Safe vs the legitimate
+  // `sourceType="model"`/`"llm"` mapping to legacy `models.id` /
+  // `llm_authority.id` — the inner-join filter ensures we only
+  // rename rows whose sourceId actually resolves to the AI Types
+  // domain table.
+  // Column names match the live schema's quoted-camelCase columns
+  // ("sourceType", "entryType", "sourceId"). Drizzle's `sql\`...\``
+  // does NOT auto-translate camelCase → snake_case here — that's
+  // only the table-definition mapping. Raw SQL must use the
+  // physical column names as quoted identifiers.
+  try {
+    const modelRename = await db.execute(
+      sql`UPDATE catalog_entries
+          SET "sourceType" = 'ai_type_model'
+          WHERE "sourceType" = 'model'
+            AND "entryType" = 'model'
+            AND "sourceId" IS NOT NULL
+            AND "sourceId" IN (SELECT id FROM ai_type_models)`,
+    );
+    result.sourceTypeReconciled +=
+      (modelRename as unknown as { rowCount?: number }).rowCount ?? 0;
+  } catch (e: any) {
+    result.errors.push({
+      entryId: -1,
+      name: "sourceType reconciliation: model → ai_type_model",
+      error: e.message,
+    });
+  }
+
+  try {
+    const llmRename = await db.execute(
+      sql`UPDATE catalog_entries
+          SET "sourceType" = 'ai_type_llm'
+          WHERE "sourceType" = 'llm'
+            AND "entryType" = 'llm'
+            AND "sourceId" IS NOT NULL
+            AND "sourceId" IN (SELECT id FROM ai_type_llms)`,
+    );
+    result.sourceTypeReconciled +=
+      (llmRename as unknown as { rowCount?: number }).rowCount ?? 0;
+  } catch (e: any) {
+    result.errors.push({
+      entryId: -1,
+      name: "sourceType reconciliation: llm → ai_type_llm",
+      error: e.message,
+    });
+  }
+
   console.log(
     `[AITypes Migration] Scanned ${result.scanned}: ` +
     `${result.modelsCreated} models, ${result.llmsCreated} LLMs, ` +
     `${result.providersLinked} providers, ${result.agentsLinked} agents linked, ` +
-    `${result.skipped} skipped, ${result.errors.length} errors`
+    `${result.skipped} skipped, ${result.errors.length} errors, ` +
+    `${result.sourceTypeReconciled} sourceType reconciled`
   );
 
   return result;

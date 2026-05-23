@@ -8,7 +8,7 @@
  * BOUNDARY: Internal to AI Types domain.
  */
 
-import type { AIEntryType, CatalogProjectionInput } from "./types";
+import type { AISourceType, CatalogProjectionInput } from "./types";
 import {
   createCatalogEntry,
   getCatalogEntryById,
@@ -30,7 +30,13 @@ export function buildCatalogFields(input: CatalogProjectionInput): Record<string
     displayName: input.displayName ?? input.name,
     description: input.description ?? null,
     entryType: input.entryType,
-    sourceType: input.entryType,
+    // Canonical: sourceType is now passed explicitly per the
+    // 2026-05-23 extension to CATALOG_SOURCE_MAPPING.md. Previously
+    // this field defaulted to `input.entryType`, conflating the two
+    // vocabularies and silently producing drifted rows (e.g.
+    // `sourceType="model"` for `ai_type_models.id` instead of
+    // `sourceType="ai_type_model"`).
+    sourceType: input.sourceType,
     sourceId: input.domainId,
     scope: input.scope ?? "app",
     status: input.status ?? "draft",
@@ -82,7 +88,7 @@ export async function refreshCatalogProjection(
       providerId: input.providerId ?? existing.providerId,
       config: input.config ?? existing.config,
       capabilities: input.capabilities ?? existing.capabilities,
-      sourceType: input.entryType,
+      sourceType: input.sourceType,
       sourceId: input.domainId,
     } as any,
     input.createdBy ?? 1
@@ -95,7 +101,7 @@ export async function refreshCatalogProjection(
  * Find a catalog entry linked to a specific domain entity.
  */
 export async function findCatalogEntryBySource(
-  sourceType: AIEntryType,
+  sourceType: AISourceType,
   sourceId: number
 ): Promise<{ id: number } | null> {
   const db = getDb();
@@ -123,7 +129,7 @@ export async function findCatalogEntryBySource(
  */
 export async function linkCatalogToDomain(
   catalogEntryId: number,
-  sourceType: AIEntryType,
+  sourceType: AISourceType,
   sourceId: number
 ): Promise<void> {
   const db = getDb();
