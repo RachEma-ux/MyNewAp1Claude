@@ -65,6 +65,19 @@ const AgentMarketplacePage = lazy(() => import("../pages/AgentMarketplacePage"))
 // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
 const AgentMcpManagerPage = lazy(() => import("../pages/AgentMcpManagerPage"));
 const GraphWorkspacePage = lazy(() => import("../pages/GraphWorkspacePage"));
+const VaultExplorerDashboardPage = lazy(
+  () => import("../pages/VaultExplorerDashboardPage"),
+);
+const VaultNotesPage = lazy(() => import("../pages/VaultNotesPage"));
+const VaultGraphExplorationPage = lazy(
+  () => import("../pages/VaultGraphExplorationPage"),
+);
+const VaultImpactAnalysisPage = lazy(
+  () => import("../pages/VaultImpactAnalysisPage"),
+);
+const VaultRuntimeTracesPage = lazy(
+  () => import("../pages/VaultRuntimeTracesPage"),
+);
 // V1+ 15-δ slice (PR-V1-83): Vault Attachments admin page.
 const VaultAttachmentsPage = lazy(() => import("../pages/VaultAttachmentsPage"));
 // V1+ 16-δ slice (PR-V1-85): Vault Saved Views admin page.
@@ -328,6 +341,24 @@ function parseRoute(path: string): ParsedRoute {
     return { ...empty, view: "mcp-manager" as any, homeMode: null };
   }
   // ── Phase 13 §7: Native Graph Workspace observability (no agent context) ──
+  // 2026-05-23 — split into the Vault Explorer group's 5 child paths.
+  // Order: most-specific first so longer paths match before shorter
+  // prefixes (e.g. `/vault-notes` must check before `/vault-`).
+  if (path.startsWith("/agent-studio/vault-notes")) {
+    return { ...empty, view: "vault-notes" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/vault-graph")) {
+    return { ...empty, view: "vault-graph" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/vault-impact")) {
+    return { ...empty, view: "vault-impact" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/vault-traces")) {
+    return { ...empty, view: "vault-traces" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/vault-explorer")) {
+    return { ...empty, view: "vault-explorer" as any, homeMode: null };
+  }
   if (path.startsWith("/agent-studio/graph-workspace")) {
     return { ...empty, view: "graph-workspace" as any, homeMode: null };
   }
@@ -651,6 +682,28 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/graph-workspace");
       return;
     }
+    // 2026-05-23 — Vault Explorer group split into 4 focused pages
+    // + dashboard. Each navigates to its own URL.
+    if ((key as string) === "vault-explorer") {
+      navigate("/agent-studio/vault-explorer");
+      return;
+    }
+    if ((key as string) === "vault-notes") {
+      navigate("/agent-studio/vault-notes");
+      return;
+    }
+    if ((key as string) === "vault-graph") {
+      navigate("/agent-studio/vault-graph");
+      return;
+    }
+    if ((key as string) === "vault-impact") {
+      navigate("/agent-studio/vault-impact");
+      return;
+    }
+    if ((key as string) === "vault-traces") {
+      navigate("/agent-studio/vault-traces");
+      return;
+    }
     // V1+ 15-δ slice (PR-V1-84): vault-attachments is a global view.
     if ((key as string) === "vault-attachments") {
       navigate("/agent-studio/vault-attachments");
@@ -888,6 +941,17 @@ export default function AgentStudioShell() {
         // ── Phase 13 §7: Native Graph Workspace observability ──
         case "graph-workspace" as any:
           return <GraphWorkspacePage />;
+        // ── 2026-05-23 Vault Explorer group: 5 child pages ──
+        case "vault-explorer" as any:
+          return <VaultExplorerDashboardPage />;
+        case "vault-notes" as any:
+          return <VaultNotesPage />;
+        case "vault-graph" as any:
+          return <VaultGraphExplorationPage />;
+        case "vault-impact" as any:
+          return <VaultImpactAnalysisPage />;
+        case "vault-traces" as any:
+          return <VaultRuntimeTracesPage />;
         // ── V1+ 15-δ slice (PR-V1-83): Vault Attachments admin ──
         case "vault-attachments" as any:
           return <VaultAttachmentsPage />;

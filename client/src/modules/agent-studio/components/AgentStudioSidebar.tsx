@@ -48,6 +48,7 @@ import {
   Table2,
   Inbox,
   Gavel,
+  TrendingUp,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -231,7 +232,16 @@ export type AgentStudioView =
   // runtime/decision trace). Previously only reachable via direct
   // URL; this entry surfaces it under the Vaults sidebar group so
   // operators can find "+ New vault / + New note" affordances.
-  | "graph-workspace";
+  | "graph-workspace"
+  // ── 2026-05-23 Vault Explorer group split: 4 focused child pages
+  // + dashboard landing. Each wraps one panel from the legacy
+  // GraphWorkspacePage monolith. Backed by the Native Graph
+  // Workspace runtime.
+  | "vault-explorer"
+  | "vault-notes"
+  | "vault-graph"
+  | "vault-impact"
+  | "vault-traces";
 
 /**
  * Sidebar items can be internal views (default: `key` dispatches to
@@ -288,20 +298,33 @@ const HOME_GROUPS: SectionGroup[] = [
   // admin entries. Reach /agent-studio/vault-attachments and
   // /agent-studio/vault-saved-views; PRs #834 + #836 wire the URL
   // parser + render cases in the Shell.
+  // 2026-05-23 — Vault Explorer is now a group with 4 focused
+  // children + a dashboard landing. Each child wraps one panel from
+  // the legacy GraphWorkspacePage monolith; the dashboard surfaces
+  // them as nav cards. All four are backed by the Native Graph
+  // Workspace runtime (`agentStudio.vault.*` for notes,
+  // `agentStudio.graphWorkspace.*` for graph/impact/trace).
   {
-    label: "Vaults",
+    label: "Vault Explorer",
     items: [
-      // 2026-05-18: surface the Graph Workspace explorer (vault tree +
-      // markdown editor + local/global graph + impact/decision trace)
-      // as the first Vaults entry — operators land here to find the
-      // "+ New vault" / "+ New note" affordances.
-      { key: "graph-workspace", label: "Vault Explorer", icon: BookOpen },
+      { key: "vault-explorer", label: "Dashboard", icon: BookOpen },
+      { key: "vault-notes", label: "Vault Notes", icon: FileText },
+      { key: "vault-graph", label: "Graph Exploration", icon: GitBranch },
+      { key: "vault-impact", label: "Impact Analysis", icon: TrendingUp },
+      { key: "vault-traces", label: "Runtime Traces", icon: Activity },
+    ],
+  },
+  // Vault admin surfaces (the previous Vaults group items, kept as a
+  // sibling so the Vault Explorer group stays clean per the
+  // 2026-05-23 restructure spec).
+  {
+    label: "Vault Admin",
+    items: [
+      // Legacy single-page Vault Explorer kept for back-compat;
+      // operators can switch to the focused pages above.
+      { key: "graph-workspace", label: "Legacy explorer", icon: BookOpen },
       { key: "vault-attachments", label: "Attachments", icon: Folder },
       { key: "vault-saved-views", label: "Saved Views", icon: GitBranch },
-      // No-deferral continuation-10 slice 63 (follow-on to slice 53):
-      // wire the Templates standalone page into the Vaults sidebar
-      // group. The page + route + view shipped in slice 53; the
-      // sidebar entry + AgentStudioView union variant were missed.
       { key: "vault-templates", label: "Templates", icon: FileText },
     ],
   },

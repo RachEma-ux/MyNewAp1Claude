@@ -33,7 +33,12 @@ export const agentStudioRoutes: AgentStudioRouteEntry[] = [
   { path: "/agent-studio/catalog", component: AgentStudioShell, label: "Catalog" },
   { path: "/agent-studio/marketplace", component: AgentStudioShell, label: "Marketplace" },
   { path: "/agent-studio/mcp-manager", component: AgentStudioShell, label: "MCP Manager" },
-  { path: "/agent-studio/graph-workspace", component: AgentStudioShell, label: "Vault Explorer" },
+  { path: "/agent-studio/graph-workspace", component: AgentStudioShell, label: "Vault Explorer (legacy)" },
+  { path: "/agent-studio/vault-explorer", component: AgentStudioShell, label: "Vault Explorer" },
+  { path: "/agent-studio/vault-notes", component: AgentStudioShell, label: "Vault Notes" },
+  { path: "/agent-studio/vault-graph", component: AgentStudioShell, label: "Graph Exploration" },
+  { path: "/agent-studio/vault-impact", component: AgentStudioShell, label: "Impact Analysis" },
+  { path: "/agent-studio/vault-traces", component: AgentStudioShell, label: "Runtime Traces" },
   // V1+ admin pages — manifest.routeInventory carries the matching declaration.
   { path: "/agent-studio/vault-attachments", component: AgentStudioShell, label: "Vault Attachments" },
   { path: "/agent-studio/vault-saved-views", component: AgentStudioShell, label: "Vault Saved Views" },
