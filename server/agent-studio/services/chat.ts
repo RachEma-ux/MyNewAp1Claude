@@ -81,6 +81,7 @@ function approvalResumeTimeoutMs(): number {
 }
 import { getSnapshot } from "./mcp/registry";
 import { getAgentProviderBinding } from "../bindings";
+import { resolveEffectiveChatBinding } from "./chat-binding-resolver";
 import { gatewayCall } from "../../platform/modules/module-gateway";
 import type {
   ModelAccessExecuteInput,
@@ -1256,7 +1257,20 @@ export async function sendChatMessage(
   //   - the binding is local-provider (providerConnectionId=null —
   //     Model Access has no local adapter yet).
   try {
-    const candidateBinding = await getAgentProviderBinding(draft.id, "primary");
+    // PR 4 (Option-B 2026-05-23) — resolve effective binding via the
+    // per-agent → workspace-default fallback chain (D-PR-4 / D-WDB-3).
+    // The legacy `getAgentProviderBinding` is still the source of truth
+    // for the per-agent layer; the resolver adds the workspace-default
+    // fallback so a single "chat" row in `ags_workspace_default_provider_bindings`
+    // unblocks chat for every agent in the workspace without per-agent
+    // picker work. The synthesized workspace-default binding mimics
+    // `AgentProviderBindingPublic` so downstream tool-loop + Model-Access
+    // calls don't need to branch on source.
+    const effective = await resolveEffectiveChatBinding({
+      draftId: draft.id,
+      workspaceId: options.workspaceId ?? 1,
+    });
+    const candidateBinding = effective?.binding ?? null;
     const canUseBindingPath =
       candidateBinding !== null &&
       candidateBinding.status === "binding_v1" &&

@@ -43,6 +43,7 @@
 import type { Request, Response } from "express";
 import * as repo from "./repository";
 import { getAgentProviderBinding } from "./bindings";
+import { resolveEffectiveChatBinding } from "./services/chat-binding-resolver";
 import { gatewayCall } from "../platform/modules/module-gateway";
 import type {
   ModelAccessExecuteInput,
@@ -1407,7 +1408,23 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     // resolves provider keys directly. Every runtime path goes through
     // OpenRouter Model Access (D2), which means an active Provider
     // Connection bound to this draft is now mandatory.
-    const binding = await getAgentProviderBinding(draft.id, "primary");
+    //
+    // PR 4 (Option-B 2026-05-23) — D-PR-4 / D-WDB-3 two-step lookup:
+    // per-agent binding first, then workspace-default ("chat" role)
+    // before refusing. See `services/chat-binding-resolver.ts` for
+    // the canonical resolver contract. The workspaceId derivation
+    // below was previously near `gatewayCall` further down the
+    // function — pulled forward so the resolver has it; reused at
+    // the gatewayCall site.
+    const workspaceId =
+      typeof (draft as any).workspaceId === "number"
+        ? (draft as any).workspaceId
+        : 1;
+    const effective = await resolveEffectiveChatBinding({
+      draftId: draft.id,
+      workspaceId,
+    });
+    const binding = effective?.binding ?? null;
     if (
       !binding ||
       binding.status !== "binding_v1" ||
@@ -1418,7 +1435,8 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
         error:
           "No active provider binding configured for this agent. " +
           "Open the Provider Binding page in Agent Studio and bind a provider/model " +
-          "from the AI Types catalog before starting an Expert chat.",
+          "from the AI Types catalog, or set a workspace-default chat binding " +
+          "in /workspace/default-bindings, before starting an Expert chat.",
         code: "binding_required",
       });
       res.end();
@@ -1440,8 +1458,7 @@ export async function handleAgentStudioChatStream(req: Request, res: Response) {
     // Plan v3 Phase 15 staleness check is enforced inside Model Access's
     // resolve path; we don't need to duplicate it here. Workspace and
     // actor are required for the gatewayCall sealed context.
-    const workspaceId =
-      typeof (draft as any).workspaceId === "number" ? (draft as any).workspaceId : 1;
+    // (workspaceId already derived above for the binding resolver.)
     const actorId =
       typeof (session as any).createdBy === "number"
         ? (session as any).createdBy
