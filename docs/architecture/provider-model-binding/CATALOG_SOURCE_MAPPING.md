@@ -21,12 +21,14 @@ The existing `sourceType` column is the de facto "source module" pointer. After 
 | `ags_agent` | Agent Studio-published agent | `ags_agents.id` | `ags_agent_releases.id` (the published release) |
 | `ai_type` | AI Types catalog row (loop — same table referenced for entry-of-entry mapping in legacy imports) | `catalog_entries.id` | n/a (use `ai_types_versions` once that table lands) |
 | `provider` | Legacy `providers` table row | `providers.id` | `provider_versions.id` *(if/when versioning added)* |
-| `model` | Legacy `models` table row | `models.id` | `model_versions.id` |
+| `model` | **Legacy** `models` table row (local-download / GGUF management — see `ARCHITECTURE.md` Database Schema) | `models.id` | `model_versions.id` |
+| `ai_type_model` *(added 2026-05-23 — see §"AI Types domain-table extension")* | AI Types domain model row (the canonical model registry referenced by the binding picker + Model Access) | `ai_type_models.id` | n/a (versioning lives at the catalog-entry layer) |
 | `bot` | Legacy `bots` table row | `bots.id` | n/a |
-| `llm` | Legacy LLM authority row | `llm_authority.id` | n/a |
+| `llm` | **Legacy** LLM authority row | `llm_authority.id` | n/a |
+| `ai_type_llm` *(added 2026-05-23 — see §"AI Types domain-table extension")* | AI Types domain LLM row (the canonical LLM registry) | `ai_type_llms.id` | n/a |
 | **null** | **Admin-created entry with no source linkage** | — | — |
 
-Phase 23 does NOT change any existing values. It only adds the two new columns + documents the conventions.
+Phase 23 does NOT change any existing values. It only adds the two new columns + documents the conventions. The 2026-05-23 extension at the end of this document adds two values to the table for the AI Types domain tables that were silently writing `sourceType="model"` / `"llm"` in disagreement with this table.
 
 ## Mapping from legacy `sourceType` / `sourceId`
 
@@ -66,3 +68,33 @@ The classifier and the duplicate-prevention guard live in `server/ai-types/legac
 - Does NOT write `legacy_import_state` for any existing row (Phase 24 owns the backfill).
 - Does NOT change behavior of any catalog read path — every read still returns the same shape; the new columns are present-but-unset on existing rows (`null`).
 - Does NOT touch the `catalog_entry_versions` table — that's a separate versioning concept (snapshots of the entry's `config` blob), orthogonal to "which source-module version is this entry tracking".
+
+---
+
+## AI Types domain-table extension (2026-05-23)
+
+This section extends the canonical `sourceType` table above with two new values — `ai_type_model` and `ai_type_llm` — for the AI Types domain tables that landed after Phase 23 was first written.
+
+### Motivation
+
+Phase 23 (above) named the `model` / `llm` sourceTypes as pointers to the **legacy** `models` / `llm_authority` tables. The AI Types domain build-out (`docs/architecture/ai-types-domain.md`) added two new domain-truth tables — `ai_type_models` and `ai_type_llms` — but the projection code (`server/ai-types/projection.ts:124` `linkCatalogToDomain` + its callers in `server/ai-types/migration.ts:93,125` and `server/ai-types/service.ts`) silently overloaded the existing `"model"` and `"llm"` values to point at the new tables, contradicting the canonical mapping. A 2026-05-23 audit of the Agent Studio binding picker exposed the drift: the picker reader queried one convention, the writer wrote another, and neither matched this doc.
+
+The extension resolves the conflict by **adding** two canonical values rather than re-using the legacy ones. The legacy `model` / `llm` values keep their original Phase 23 semantics; the new `ai_type_model` / `ai_type_llm` values are the canonical sourceType for AI Types domain rows from this date forward.
+
+### Locked rules
+
+1. **Domain-row writers MUST use the new values.** `server/ai-types/projection.ts` `linkCatalogToDomain` and every caller (`migration.ts`, `service.ts`) write `sourceType="ai_type_model"` for `ai_type_models.id` and `sourceType="ai_type_llm"` for `ai_type_llms.id`.
+2. **Domain-row readers MUST query the new values.** `server/ai-types/provider-models-availability.ts:251` and any equivalent reader of `catalog_entries` for AI Types domain rows.
+3. **The legacy `model` / `llm` values remain reserved** for any pre-existing rows still pointing at `models.id` / `llm_authority.id` (per the Phase 23 mapping). Phase 24's backfill report (`docs/evidence/provider-model-binding/CATALOG_LEGACY_IMPORT_BACKFILL_REPORT.md`) is the authority on which existing rows fall under the legacy mapping vs. the new mapping.
+4. **`AIEntryType` is `entryType`, not `sourceType`.** The enum at `server/ai-types/types.ts:10` defines the `catalog_entries.entryType` taxonomy (`"provider" | "llm" | "model" | "agent" | "bot"` — what kind of asset). The `sourceType` column is a separate vocabulary tied to source-of-truth tables. Conflating the two is the root cause of the drift this extension corrects.
+
+### Migration shape
+
+Code changes that adopt this extension are tracked separately (PR #1700's `provider-models-availability.ts` change is being revised to align with this extension). Schema is unchanged — these are new permissible values for the existing `varchar(50)` `sourceType` column, not a new column.
+
+### What this extension explicitly does NOT do
+
+- Does NOT change the meaning of the existing `model` / `llm` sourceType values. Legacy rows that already use those values continue to point at `models.id` / `llm_authority.id`.
+- Does NOT add new columns to `catalog_entries`. Only new permissible values for the existing `sourceType` text column.
+- Does NOT prescribe a backfill of existing rows. Any rows currently written with `sourceType="model"` pointing at `ai_type_models.id` are pre-extension drift; their reconciliation strategy (rename to `ai_type_model` vs. leave + adapt readers) is the implementation PR's call, not this doc's.
+- Does NOT change `entryType` semantics. The `entryType` column still uses the `AIEntryType` enum.
